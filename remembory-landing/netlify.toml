@@ -1,0 +1,20 @@
+[build]
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Rewrite /s/* to the fetch function so share links look like:
+# https://remembory.netlify.app/s/abc123
+[[redirects]]
+  from = "/s/:code"
+  to = "/.netlify/functions/fetch/:code"
+  status = 200
+
+# Allow the Chronicle app to call functions from any origin (it's a local file)
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"

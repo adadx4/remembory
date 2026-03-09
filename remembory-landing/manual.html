@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chronicle User Manual — Remembory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --parchment: #f5f0e8;
+    --parchment-deep: #ede5d4;
+    --parchment-dark: #d4c4a8;
+    --ink: #1a1208;
+    --ink-mid: #2c2416;
+    --ink-light: #6a5c48;
+    --ink-faint: #8a7460;
+    --gold: #c8a87a;
+    --gold-dark: #a8885a;
+    --sage: #7a9e8a;
+    --sage-dark: #4a7a5a;
+    --sidebar-w: 280px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--parchment);
+    font-family: 'Crimson Text', Georgia, serif;
+    color: var(--ink-mid);
+    font-size: 1.05rem;
+    line-height: 1.75;
+  }
+
+  /* ── TOP NAV ── */
+  .topnav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 200;
+    background: rgba(245,240,232,0.96);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--parchment-dark);
+    padding: 13px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .topnav-brand {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--ink);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .topnav-brand span { color: var(--gold-dark); }
+
+  .topnav-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 0.88rem;
+    color: var(--ink-faint);
+  }
+
+  .topnav-right a {
+    color: var(--ink-faint);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .topnav-right a:hover { color: var(--ink); }
+
+  .topnav-dl {
+    background: var(--ink-mid);
+    color: var(--parchment) !important;
+    padding: 6px 16px;
+    border-radius: 2px;
+    font-family: 'Crimson Text', serif;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+  }
+
+  .topnav-dl:hover { background: var(--ink) !important; }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: flex;
+    padding-top: 52px;
+    min-height: 100vh;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    position: fixed;
+    top: 52px;
+    left: 0;
+    bottom: 0;
+    overflow-y: auto;
+    background: var(--parchment-deep);
+    border-right: 1px solid var(--parchment-dark);
+    padding: 28px 0 40px;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--parchment-dark); border-radius: 2px; }
+
+  .sidebar-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold-dark);
+    padding: 0 24px 12px;
+    border-bottom: 1px solid var(--parchment-dark);
+    margin-bottom: 12px;
+  }
+
+  .sidebar nav a {
+    display: block;
+    padding: 5px 24px;
+    font-size: 0.9rem;
+    color: var(--ink-faint);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+    line-height: 1.4;
+  }
+
+  .sidebar nav a:hover {
+    color: var(--ink);
+    background: rgba(200,168,122,0.08);
+  }
+
+  .sidebar nav a.active {
+    color: var(--ink);
+    border-left-color: var(--gold-dark);
+    background: rgba(200,168,122,0.1);
+    font-weight: 600;
+  }
+
+  .sidebar nav a.section-link {
+    font-size: 0.82rem;
+    padding-left: 38px;
+    color: var(--ink-faint);
+    opacity: 0.8;
+  }
+
+  .sidebar nav a.section-link:hover { opacity: 1; }
+
+  .sidebar-chapter {
+    margin-top: 16px;
+    padding: 6px 24px 4px;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--parchment-dark);
+  }
+
+  /* ── MAIN CONTENT ── */
+  .content {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    min-width: 0;
+    padding: 56px 64px 80px;
+    max-width: 860px;
+  }
+
+  /* ── SECTION ANCHORS ── */
+  .section {
+    padding-top: 24px;
+    margin-bottom: 0;
+  }
+
+  /* ── TYPOGRAPHY ── */
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.15;
+    margin-bottom: 10px;
+    margin-top: 56px;
+    padding-top: 56px;
+    border-top: 2px solid var(--parchment-dark);
+  }
+
+  h1:first-child, .first-h1 {
+    border-top: none;
+    margin-top: 0;
+    padding-top: 0;
+  }
+
+  h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--ink-mid);
+    margin-top: 40px;
+    margin-bottom: 10px;
+  }
+
+  h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    font-style: italic;
+    color: var(--ink-light);
+    margin-top: 28px;
+    margin-bottom: 8px;
+  }
+
+  p {
+    margin-bottom: 14px;
+    color: var(--ink-light);
+  }
+
+  p strong {
+    color: var(--ink-mid);
+    font-weight: 600;
+  }
+
+  /* ── CHAPTER INTRO ── */
+  .chapter-intro {
+    font-size: 1.12rem;
+    color: var(--ink-light);
+    font-style: italic;
+    border-left: 3px solid var(--gold);
+    padding-left: 18px;
+    margin-bottom: 28px;
+    line-height: 1.8;
+  }
+
+  /* ── CALLOUTS ── */
+  .tip, .note, .warning {
+    border-radius: 3px;
+    padding: 12px 16px;
+    margin: 18px 0;
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
+
+  .tip {
+    background: rgba(200,168,122,0.1);
+    border-left: 3px solid var(--gold-dark);
+    color: var(--ink-light);
+  }
+
+  .note {
+    background: rgba(122,158,138,0.1);
+    border-left: 3px solid var(--sage);
+    color: var(--sage-dark);
+  }
+
+  .warning {
+    background: rgba(196,133,138,0.1);
+    border-left: 3px solid #c4858a;
+    color: #7a3838;
+  }
+
+  .tip::before { content: "💡 "; }
+  .note::before { content: "ℹ "; }
+  .warning::before { content: "⚠ "; }
+
+  /* ── LISTS ── */
+  ul, ol {
+    padding-left: 24px;
+    margin-bottom: 14px;
+    color: var(--ink-light);
+  }
+
+  li { margin-bottom: 6px; line-height: 1.7; }
+  li strong { color: var(--ink-mid); }
+
+  /* ── FEATURE TABLE ── */
+  .ftable {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0 24px;
+    font-size: 0.95rem;
+  }
+
+  .ftable th {
+    background: var(--parchment-deep);
+    border: 1px solid var(--parchment-dark);
+    padding: 9px 14px;
+    text-align: left;
+    font-family: 'Crimson Text', serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--gold-dark);
+    font-weight: 600;
+  }
+
+  .ftable td {
+    border: 1px solid var(--parchment-dark);
+    padding: 9px 14px;
+    vertical-align: top;
+    color: var(--ink-light);
+    line-height: 1.6;
+  }
+
+  .ftable tr:nth-child(even) td { background: rgba(237,229,212,0.4); }
+  .ftable td:first-child { font-weight: 600; color: var(--ink-mid); white-space: nowrap; }
+
+  /* ── STEPS ── */
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    padding: 0;
+    margin: 18px 0;
+  }
+
+  .steps li {
+    counter-increment: step;
+    display: flex;
+    gap: 14px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+
+  .steps li::before {
+    content: counter(step);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--gold-dark);
+    color: var(--parchment);
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-family: 'Crimson Text', serif;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  /* ── DIVIDER ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(to right, var(--parchment-dark), transparent);
+    margin: 36px 0;
+  }
+
+  /* ── COVER ── */
+  .cover {
+    text-align: center;
+    padding: 60px 0 48px;
+    border-bottom: 2px solid var(--parchment-dark);
+    margin-bottom: 56px;
+  }
+
+  .cover h1 {
+    border-top: none;
+    margin-top: 0;
+    padding-top: 0;
+    font-size: 3.5rem;
+    margin-bottom: 6px;
+  }
+
+  .cover .subtitle {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-style: italic;
+    color: var(--gold-dark);
+    margin-bottom: 10px;
+  }
+
+  .cover .byline {
+    font-size: 0.9rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.06em;
+  }
+
+  .cover .tagline {
+    margin-top: 20px;
+    font-style: italic;
+    color: var(--ink-light);
+    font-size: 1.05rem;
+  }
+
+  /* ── KEYBOARD SHORTCUT BADGE ── */
+  kbd {
+    display: inline-block;
+    background: var(--parchment-deep);
+    border: 1px solid var(--parchment-dark);
+    border-radius: 3px;
+    padding: 1px 7px;
+    font-family: monospace;
+    font-size: 0.85em;
+    color: var(--ink-mid);
+  }
+
+  /* ── MOBILE TOGGLE ── */
+  .menu-toggle {
+    display: none;
+    background: transparent;
+    border: 1px solid var(--parchment-dark);
+    border-radius: 2px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-family: 'Crimson Text', serif;
+    font-size: 0.9rem;
+    color: var(--ink-faint);
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .sidebar {
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+      z-index: 150;
+    }
+
+    .sidebar.open { transform: translateX(0); }
+
+    .content {
+      margin-left: 0;
+      padding: 32px 24px 60px;
+    }
+
+    .menu-toggle { display: block; }
+
+    .topnav-right a:not(.topnav-dl) { display: none; }
+
+    h1 { font-size: 1.8rem; }
+  }
+
+  /* ── SCROLL ACTIVE HIGHLIGHT ── */
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Top nav -->
+<div class="topnav">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Menu">☰ Contents</button>
+    <a href="index.html" class="topnav-brand">Remem<span>bory</span></a>
+    <span style="color:var(--parchment-dark);font-size:0.9rem">›</span>
+    <span style="font-size:0.9rem;color:var(--ink-faint);">Chronicle Manual</span>
+  </div>
+  <div class="topnav-right">
+    <a href="index.html">Home</a>
+    <a href="chronicle.html" download class="topnav-dl">⬇ Download Chronicle</a>
+  </div>
+</div>
+
+<!-- Layout -->
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-title">Chronicle Manual</div>
+    <nav id="sidebar-nav">
+      <a href="#intro" class="active">Introduction</a>
+      <a href="#getting-started" class="section-link">Getting started</a>
+      <a href="#settings" class="section-link">Your name & email</a>
+
+      <div class="sidebar-chapter">Views</div>
+      <a href="#navigating">Navigating Chronicle</a>
+      <a href="#life-view">The Life View</a>
+      <a href="#list-view">The List View</a>
+
+      <div class="sidebar-chapter">Memories</div>
+      <a href="#adding">Adding a Memory</a>
+      <a href="#date-fields" class="section-link">Fuzzy dates</a>
+      <a href="#tags" class="section-link">Tags</a>
+      <a href="#people" class="section-link">People & orgs</a>
+      <a href="#photos-field" class="section-link">Photos</a>
+      <a href="#detail-view">Memory Detail View</a>
+      <a href="#editing">Editing & Deleting</a>
+
+      <div class="sidebar-chapter">Browsing</div>
+      <a href="#index-view">The Index View</a>
+      <a href="#people-manager">People & Orgs Manager</a>
+      <a href="#map-view">The Map View</a>
+
+      <div class="sidebar-chapter">Import</div>
+      <a href="#import">Importing Memories</a>
+      <a href="#photo-import" class="section-link">From photos</a>
+      <a href="#email-import" class="section-link">From email</a>
+
+      <div class="sidebar-chapter">Sharing</div>
+      <a href="#sharing">Sharing Memories</a>
+      <a href="#share-email" class="section-link">Sharing by email</a>
+      <a href="#share-link" class="section-link">Sharing by link</a>
+      <a href="#receiving" class="section-link">Receiving a shared memory</a>
+      <a href="#perspectives">Perspectives</a>
+      <a href="#dominant" class="section-link">Dominant perspective</a>
+
+      <div class="sidebar-chapter">Output</div>
+      <a href="#print">Print & Export</a>
+
+      <div class="sidebar-chapter">Your Data</div>
+      <a href="#backup">Backup & Restore</a>
+      <a href="#privacy">Privacy</a>
+    </nav>
+  </aside>
+
+  <!-- Main content -->
+  <main class="content">
+
+    <!-- Cover -->
+    <div class="cover" id="intro">
+      <h1 class="first-h1">Chronicle</h1>
+      <div class="subtitle">User Manual</div>
+      <div class="byline">by Remembory</div>
+      <p class="tagline">A personal life journal for your whole story.</p>
+    </div>
+
+    <!-- Introduction -->
+    <section class="section">
+      <p class="chapter-intro">Chronicle is a personal life journal that lives entirely on your computer as a single HTML file. Open it in any web browser and your memories are stored locally — nothing leaves your device unless you choose to share.</p>
+
+      <p>This manual covers every feature in Chronicle. Whether you are just getting started or looking to make the most of a specific capability, you will find step-by-step instructions throughout.</p>
+
+      <h2 id="getting-started">Getting Started</h2>
+      <ol class="steps">
+        <li>Download <strong>chronicle.html</strong> from <a href="index.html#download" style="color:var(--gold-dark)">remembory.net</a></li>
+        <li>Save it somewhere easy to find — your Documents folder is ideal</li>
+        <li>Open it by double-clicking the file, or dragging it into a browser window</li>
+        <li>Chronicle opens and you are ready to record your first memory</li>
+      </ol>
+
+      <div class="tip">Bookmark Chronicle in your browser for quick access, or pin the tab. Your data is stored in the browser's local storage, so always open the same file in the same browser to see your memories.</div>
+      <div class="note">If you use multiple browsers (e.g. Chrome and Safari), your memories will be separate in each. Pick one browser and stick to it, or use the backup feature to keep them in sync.</div>
+
+      <h2 id="settings">Your Name & Email</h2>
+      <p>Before sharing memories with others, set your name and email address so recipients know who sent them.</p>
+      <ol class="steps">
+        <li>Click the <strong>⚙</strong> Settings button in the top right corner</li>
+        <li>Enter your name in the <em>Your name & email</em> field</li>
+        <li>Enter your email address below your name</li>
+        <li>Settings are saved automatically as you type</li>
+      </ol>
+      <div class="tip">Your email is only used when you share memories. It is stored locally and never sent anywhere automatically.</div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Navigating -->
+    <section class="section">
+      <h1 id="navigating">Navigating Chronicle</h1>
+      <p class="chapter-intro">Chronicle has several views, each offering a different way to see and interact with your memories.</p>
+
+      <p>On <strong>desktop</strong>, navigation buttons appear in the top right of the header. On <strong>mobile</strong>, a tab bar appears at the bottom of the screen with icon buttons for each view.</p>
+
+      <table class="ftable">
+        <thead><tr><th>View</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>◉ Life</td><td>Your home view — memories as a grid of decade cards showing activity across your whole life</td></tr>
+          <tr><td>≡ List</td><td>A scrollable chronological list of all memories with search and tag filtering</td></tr>
+          <tr><td>☰ Index</td><td>Browse memories by tag, person, organisation, or location</td></tr>
+          <tr><td>🗺 Map</td><td>A world map showing where memories took place, with clickable pins</td></tr>
+          <tr><td>🖨 Print</td><td>Generate a formatted document of your life story to print or save as PDF</td></tr>
+          <tr><td>↑ Import</td><td>Bring in new memories from photos or email files</td></tr>
+        </tbody>
+      </table>
+
+      <h2>The Header</h2>
+      <p>The header stays fixed at the top as you scroll. It contains:</p>
+      <ul>
+        <li><strong>Chronicle title</strong> — click it to return to the Life view from anywhere</li>
+        <li><strong>Breadcrumb trail</strong> — shows where you are, e.g. <em>1980s › 1987 › The summer holiday</em></li>
+        <li><strong>← Back button</strong> — appears when navigating inside a decade or memory</li>
+        <li><strong>+ Add button</strong> — opens the form to record a new memory</li>
+        <li><strong>⚙ Settings button</strong> — opens the settings drawer</li>
+      </ul>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Life View -->
+    <section class="section">
+      <h1 id="life-view">The Life View</h1>
+      <p class="chapter-intro">The Life view is your starting point — your whole life at a glance, organised by decade.</p>
+
+      <h2>Decade Cards</h2>
+      <p>Each decade card shows:</p>
+      <ul>
+        <li>The decade label (e.g. <em>1980s</em>)</li>
+        <li>A mini bar chart showing memory count for each year in that decade</li>
+        <li>Coloured dots representing the most common tags in that decade</li>
+        <li>The specific years that contain memories</li>
+      </ul>
+      <p>Click any decade card to open the <strong>Decade View</strong>.</p>
+
+      <h2>Decade View</h2>
+      <p>Shows all ten years within a decade as a vertical timeline. Years with memories show a preview title and count. Empty years appear dimmed. Click a year to open the <strong>Year View</strong>, or click a coloured memory dot to go directly to that memory.</p>
+
+      <h2>Year View</h2>
+      <p>Shows all memories within a year, grouped by month or season along a vertical timeline. Memories are grouped as follows:</p>
+      <ul>
+        <li>Day-precise or month-precise memories are placed in their correct month</li>
+        <li>Season memories are placed at the start (Early), middle (Mid), or end (Late) of the year</li>
+        <li>Year-only memories are grouped together at the top</li>
+      </ul>
+      <div class="tip">Adding even a few memories to each year creates a rich, satisfying picture of that time when you look back at the Year View.</div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- List View -->
+    <section class="section">
+      <h1 id="list-view">The List View</h1>
+      <p>The List view shows all memories in a single scrollable chronological timeline, grouped into decades. This is the best view for searching across your whole archive.</p>
+
+      <h2>Searching</h2>
+      <p>A search box appears at the top. Type any word or phrase to filter memories in real time — Chronicle searches across both titles and content.</p>
+
+      <h2>Filtering by Tag</h2>
+      <p>A tag dropdown sits next to the search box. Select any tag to show only memories with that tag. You can combine tag filtering with a text search simultaneously.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Adding -->
+    <section class="section">
+      <h1 id="adding">Adding a Memory</h1>
+      <p class="chapter-intro">Click the <strong>+ Add</strong> button in the header to open the memory form. Only the title is required — fill in everything else at whatever level of detail feels right.</p>
+
+      <h2>Title</h2>
+      <p>Give the memory a name that will mean something to you later. The title appears in all views and is the primary way you will find the memory again.</p>
+
+      <h2 id="date-fields">Date — Fuzzy Dating</h2>
+      <p>Chronicle understands that not every memory has a precise date. You can record dates at four levels of precision:</p>
+
+      <table class="ftable">
+        <thead><tr><th>Precision</th><th>When to use it</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td>Year only</td><td>You remember the year but not much else</td><td>1985</td></tr>
+          <tr><td>Season</td><td>You remember roughly when in the year — Early, Mid, or Late</td><td>Early 1985</td></tr>
+          <tr><td>Month</td><td>You remember the year and month</td><td>March 1985</td></tr>
+          <tr><td>Day</td><td>You know the exact date</td><td>14 March 1985</td></tr>
+        </tbody>
+      </table>
+
+      <p>Use the date type selector to choose your precision level, then fill in the fields that appear.</p>
+      <div class="tip">Don't let uncertainty stop you from recording a memory. A memory with just a year is infinitely better than no memory at all.</div>
+
+      <h2>Location</h2>
+      <p>Enter the primary location where the memory took place. As you type, Chronicle suggests locations you have used before. This location appears in the memory card subtitle and on the Map view.</p>
+
+      <h2>Additional Locations</h2>
+      <p>For memories that span multiple places — a road trip, a multi-city holiday, a house move — add extra locations using the Additional Locations field. Type a location and press <kbd>Enter</kbd> or click <strong>+ Add</strong>. Each location will appear on the Map view.</p>
+
+      <h2 id="tags">Tags</h2>
+      <p>Tags help you categorise and find memories later. Chronicle includes 12 preset tags:</p>
+
+      <table class="ftable">
+        <thead><tr><th>Tag</th><th>Suggested use</th></tr></thead>
+        <tbody>
+          <tr><td>Childhood</td><td>Early life memories</td></tr>
+          <tr><td>Family</td><td>Memories involving family</td></tr>
+          <tr><td>Travel</td><td>Trips, journeys, and adventures away from home</td></tr>
+          <tr><td>Education</td><td>School, university, courses, and learning</td></tr>
+          <tr><td>Work</td><td>Career, jobs, and professional life</td></tr>
+          <tr><td>Love</td><td>Relationships and romance</td></tr>
+          <tr><td>Health</td><td>Medical events, illness, recovery, fitness milestones</td></tr>
+          <tr><td>Milestone</td><td>Significant life events and achievements</td></tr>
+          <tr><td>Home</td><td>Houses, moves, and domestic life</td></tr>
+          <tr><td>Friendship</td><td>Friends and social connections</td></tr>
+          <tr><td>Adventure</td><td>Challenges, risks, and new experiences</td></tr>
+          <tr><td>Loss</td><td>Bereavement, endings, and grief</td></tr>
+        </tbody>
+      </table>
+
+      <p>You can also create <strong>custom tags</strong>. Type a tag name in the custom field and press Add. Remove custom tags from the picker when no longer needed.</p>
+
+      <h2 id="people">People & Organisations</h2>
+      <p><strong>People</strong> — add the names of people who were part of this memory. As you type, Chronicle suggests names from your existing records. Each person tagged will appear in the People index.</p>
+      <p>To add: type a name and press <kbd>Enter</kbd> or click <strong>+ Add</strong>. To remove: click the × next to their name.</p>
+
+      <p><strong>Organisations</strong> — add any organisations relevant to the memory: schools, companies, clubs, hospitals. These are indexed separately from people.</p>
+
+      <h2 id="photos-field">Photos & Media</h2>
+      <p>Click the <strong>+</strong> button in the media area to attach photos to a memory. Multiple photos can be attached. They appear in the detail view, and a thumbnail shows on the memory card in timeline views.</p>
+      <div class="tip">When importing photos via the Import feature, EXIF date data is read automatically, placing photos on your timeline without any manual date entry.</div>
+
+      <h2>Saving</h2>
+      <p>Click <strong>Save to Chronicle</strong> to save the memory. It immediately appears in all relevant views. A small ✓ confirmation tick appears briefly in the header.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Detail View -->
+    <section class="section">
+      <h1 id="detail-view">The Memory Detail View</h1>
+      <p>Click any memory card to open its full detail view. This shows:</p>
+      <ul>
+        <li>The date, location, and dominant author (if applicable) in the subtitle</li>
+        <li>The memory title as a large heading</li>
+        <li>Tag chips, people badges, and organisation badges</li>
+        <li>Any attached photos</li>
+        <li>The full memory text</li>
+        <li>Perspectives from other people (if any have been added or shared)</li>
+        <li>Edit, Delete, and Share buttons</li>
+        <li>The Historical Context section at the bottom</li>
+      </ul>
+
+      <h2 id="editing">Editing a Memory</h2>
+      <p>In the detail view, click <strong>Edit</strong> to reopen the memory form with all fields populated. Make your changes and click <strong>Save Changes</strong>.</p>
+
+      <h2>Deleting a Memory</h2>
+      <p>In the detail view, click <strong>Delete</strong>. You will be asked to confirm before the memory is permanently removed.</p>
+      <div class="warning">Deletion is permanent. If you are unsure, consider exporting a backup first before deleting.</div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Index View -->
+    <section class="section">
+      <h1 id="index-view">The Index View</h1>
+      <p class="chapter-intro">The Index view lets you browse memories by category rather than by time. Access it from the navigation — it has four tabs.</p>
+
+      <h2>Tags Tab</h2>
+      <p>Shows all tags used across your memories, with a count of how many memories carry each tag. Click any tag to see all matching memories displayed as cards.</p>
+
+      <h2>People Tab</h2>
+      <p>Shows everyone tagged across your memories, with a count of appearances. Click any person to see all their memories. A <strong>Manage</strong> button in the top right opens the People & Organisations manager.</p>
+
+      <h2>Organisations Tab</h2>
+      <p>The same as the People tab, but for organisations.</p>
+
+      <h2>Locations Tab</h2>
+      <p>Shows all locations used across your memories. Click any location to see all memories that mention it — whether as a primary or additional location.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- People Manager -->
+    <section class="section">
+      <h1 id="people-manager">People & Organisations Manager</h1>
+      <p>Access from <strong>Index → People tab → Manage</strong>, or via the ⚙ Settings drawer.</p>
+
+      <h2>Renaming</h2>
+      <p>If you have used two spellings of the same name, rename one to consolidate them. Click the pencil icon next to a name, type the corrected name, and press <kbd>Enter</kbd>. All memories update automatically.</p>
+
+      <h2>Adding Email Addresses</h2>
+      <p>Email addresses are used when sharing memories. Click the envelope icon next to a person's name to add or update their email. This address is used when you share memories with them, and is also how Chronicle verifies that an incoming shared memory is from someone you know.</p>
+
+      <h2>Deleting</h2>
+      <p>Click the trash icon to remove a person or organisation from the registry. This does not delete the memories they appear in — it only removes them from the index of known contacts.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Map View -->
+    <section class="section">
+      <h1 id="map-view">The Map View</h1>
+      <p class="chapter-intro">The Map view plots all your memories on an interactive world map, powered by OpenStreetMap. Every location in your memories — primary and additional — gets a coloured pin.</p>
+
+      <h2>Using the Map</h2>
+      <ul>
+        <li>Zoom in and out using the <strong>+ / −</strong> buttons or your scroll wheel</li>
+        <li>Click and drag to pan</li>
+        <li>Click any pin to see a popup with the memory title, date, and a button to open the full memory</li>
+      </ul>
+
+      <p>Locations are geocoded (converted to map coordinates) the first time they appear. Chronicle caches these results locally so the map loads quickly on subsequent visits.</p>
+
+      <div class="tip">Use consistent, specific location names — "Melbourne, Australia" rather than just "Melbourne" helps the geocoder find the right place, especially for common city names.</div>
+      <div class="note">Geocoding requires an internet connection the first time a new location is resolved. Once cached, the map works fully offline.</div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Import -->
+    <section class="section">
+      <h1 id="import">Importing Memories</h1>
+      <p class="chapter-intro">The Import view lets you bring in memories from photos or emails, saving you from entering all the details by hand.</p>
+
+      <h2 id="photo-import">Importing from Photos</h2>
+      <p>Chronicle reads EXIF date data embedded in JPEG photos, automatically placing them on your timeline.</p>
+      <ol class="steps">
+        <li>Click <strong>Import</strong> in the navigation</li>
+        <li>Select the <strong>Photos</strong> tab</li>
+        <li>Drag photos onto the drop zone, or click it to browse your files</li>
+        <li>Chronicle displays each photo with its extracted date and fields for title, location, and tags</li>
+        <li>Review and edit the details for each photo</li>
+        <li>Use the <strong>Include / Skip</strong> button to deselect any photos you don't want</li>
+        <li>Click <strong>Save</strong> to create the memories</li>
+      </ol>
+      <div class="tip">You can import many photos at once. Chronicle processes them all and lets you review each before saving.</div>
+      <div class="note">If a photo has no EXIF date (common with scanned prints or screenshots), a warning will show and you can enter the date manually.</div>
+
+      <h2 id="email-import">Importing from Email</h2>
+      <p>Chronicle can parse raw email files (.eml format) or pasted email text and convert them into memories — useful for preserving old correspondence as part of your life story.</p>
+      <ol class="steps">
+        <li>Click <strong>Import</strong> in the navigation</li>
+        <li>Select the <strong>Email</strong> tab</li>
+        <li>Either drag an .eml file onto the drop zone, click to browse for it, or paste raw email text into the text area</li>
+        <li>Chronicle will parse the email and populate the memory fields with the subject, date, sender, and body text</li>
+        <li>Review and edit the extracted details</li>
+        <li>Click <strong>Save to Chronicle</strong></li>
+      </ol>
+      <div class="tip">Most email clients can export messages as .eml files. In Apple Mail, select a message and use File → Save As. In Gmail, open the message, click the three-dot menu, and choose Download message.</div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Sharing -->
+    <section class="section">
+      <h1 id="sharing">Sharing Memories</h1>
+      <p class="chapter-intro">Chronicle lets you share memories with the people who were part of them. Shared memories open automatically in the recipient's Chronicle — no app needed, no import steps.</p>
+
+      <p>To access sharing, open any memory and click the <strong>✉ Share</strong> button. This button only appears when the memory includes at least one person who has a saved email address.</p>
+
+      <h2>Anti-Spam Protections</h2>
+      <p>Chronicle has two protections built into the sharing flow to keep sharing thoughtful and consensual:</p>
+      <ul>
+        <li><strong>24-hour cooldown</strong> — once you share with someone, you cannot send another share to the same person for 24 hours. A timer shows how long remains.</li>
+        <li><strong>Required personal note</strong> — you must write at least a sentence explaining why you are sharing. This cannot be skipped. It ensures recipients receive something personal, not just data.</li>
+      </ul>
+
+      <h2 id="share-email">Sharing by Email</h2>
+      <ol class="steps">
+        <li>Open a memory and click <strong>✉ Share</strong></li>
+        <li>Select the recipient from the list of people with saved email addresses</li>
+        <li>Choose which memories to include — the current memory is pre-selected, but you can add others from the scrollable checklist</li>
+        <li>Write a personal note (at least one sentence is required)</li>
+        <li>Click <strong>Send</strong> — a Chronicle HTML file downloads to your computer and your email client opens with a pre-written message</li>
+        <li>Attach the downloaded file to the email and send</li>
+      </ol>
+      <div class="note">The file that downloads is a complete copy of Chronicle with the shared memories pre-loaded. The recipient just opens the file — no import steps needed.</div>
+
+      <h2 id="share-link">Sharing by Link</h2>
+      <p>Chronicle also supports sharing via a web link, using the optional Cloudflare Worker backend. If your Chronicle is connected to a Worker, a <strong>Share via link</strong> option appears at the bottom of the share panel.</p>
+      <ol class="steps">
+        <li>Click <strong>Generate link</strong> in the Share via link section</li>
+        <li>A short link is created (e.g. <em>chronicle-share.workers.dev/ABC123</em>) — click to copy it</li>
+        <li>Send the link by any means — text message, email, messaging app</li>
+        <li>The recipient clicks the link, sees a preview page, and can download a pre-loaded Chronicle file with one click</li>
+      </ol>
+      <div class="note">Link sharing requires a Cloudflare Worker to be deployed. This is an optional advanced setup — see the technical documentation for details.</div>
+
+      <h2 id="receiving">Receiving a Shared Memory</h2>
+      <p>When someone sends you a Chronicle file:</p>
+      <ol class="steps">
+        <li>Save the attached .html file to your computer</li>
+        <li>Open it in your browser — Chronicle loads automatically</li>
+        <li>A dialog appears: <em>"[Name] shared a memory with you"</em>, showing the memory titles and their personal note</li>
+        <li>Click <strong>Save to my Chronicle</strong> to add the memories</li>
+      </ol>
+
+      <h3>Known vs unknown senders</h3>
+      <p>Chronicle checks whether the sender's email address matches someone already in your People registry:</p>
+      <ul>
+        <li><strong>Known sender</strong> — the dialog appears normally with a warm "Save to my Chronicle" button</li>
+        <li><strong>Unknown sender</strong> — an amber warning appears noting the sender is not in your contacts. The accept button is more subdued and labelled "Accept anyway". This gives you pause to consider whether you know who sent the file before accepting.</li>
+      </ul>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Perspectives -->
+    <section class="section">
+      <h1 id="perspectives">Perspectives</h1>
+      <p class="chapter-intro">When a memory is shared with you, the sender's original version becomes a <em>perspective</em> — their account of the event, preserved alongside yours.</p>
+
+      <p>Perspectives appear in the memory detail view beneath the main content, in a dedicated Perspectives panel. Each perspective shows the author's name, their text, and when it was added.</p>
+
+      <h2>Adding Your Own Perspective</h2>
+      <p>Once a memory has been shared with you, you can add your own version of events:</p>
+      <ol class="steps">
+        <li>Open the shared memory</li>
+        <li>Scroll to the <strong>Perspectives</strong> panel</li>
+        <li>Click <strong>Add my perspective</strong></li>
+        <li>Write your version of the memory</li>
+        <li>Choose whether your version should be the main timeline entry (see Dominant Perspective below)</li>
+        <li>Click <strong>Save perspective</strong></li>
+      </ol>
+
+      <h2>Sharing Back</h2>
+      <p>Once you have added your perspective, a <strong>Share back</strong> option appears at the bottom of the Perspectives panel. This lets you send your version back to the original sender, so they can read your account and add it to their own Chronicle.</p>
+
+      <h2 id="dominant">Dominant Perspective</h2>
+      <p>By default, when a memory is shared with you, the main timeline entry shows no content (since it is the sender's memory, not yours). You can choose which version appears in timeline views using the dominant perspective feature.</p>
+
+      <p>When adding your perspective, you will see two radio options:</p>
+      <ul>
+        <li><strong>My version</strong> — use your account as the main entry shown in timelines</li>
+        <li><strong>Their version</strong> — keep the sender's original as the main timeline entry</li>
+      </ul>
+
+      <p>You can also change this later from within the Perspectives panel:</p>
+      <ul>
+        <li>Click <strong>make dominant</strong> on a perspective to promote it to the main timeline entry</li>
+        <li>Click <strong>remove from timeline</strong> to revert the current dominant back to the panel</li>
+      </ul>
+
+      <div class="note">When a perspective is set as dominant, the author's name appears in the memory card subtitle in timeline views — e.g. <em>1987 · Melbourne · John's memory</em> — so you always know whose account you are reading.</div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Print -->
+    <section class="section">
+      <h1 id="print">Print & Export</h1>
+      <p class="chapter-intro">Chronicle can generate a formatted document of your life story — suitable for printing, saving as PDF, or sharing with family as a document.</p>
+
+      <p>Click <strong>🖨 Print</strong> in the navigation to open the Print view.</p>
+
+      <h2>Scope</h2>
+      <p>Choose how much of your Chronicle to include:</p>
+      <table class="ftable">
+        <thead><tr><th>Option</th><th>What it includes</th></tr></thead>
+        <tbody>
+          <tr><td>All memories</td><td>Your entire Chronicle from the earliest memory to the most recent</td></tr>
+          <tr><td>One decade</td><td>A single decade — select from the dropdown</td></tr>
+          <tr><td>One year</td><td>A single year — select the decade first, then the year</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Content Level</h2>
+      <table class="ftable">
+        <thead><tr><th>Option</th><th>What it shows</th></tr></thead>
+        <tbody>
+          <tr><td>Full memories</td><td>Complete text, photos, people, and perspectives for every memory</td></tr>
+          <tr><td>Headings only</td><td>Date and title for each memory — a scannable timeline without content</td></tr>
+          <tr><td>Table of contents</td><td>A compact tabular list with people listed per entry, organised by decade</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Additional Options</h2>
+      <ul>
+        <li><strong>Photos</strong> — include or exclude attached photos (Full memories mode only)</li>
+        <li><strong>People & orgs</strong> — show people and organisation badges, and include a People index at the end</li>
+        <li><strong>Tags</strong> — show tag labels on each memory</li>
+      </ul>
+
+      <h2>Printing</h2>
+      <p>Click <strong>🖨 Print / Save as PDF</strong> to open your browser's print dialog. To save as a PDF instead of printing, select <strong>Save as PDF</strong> (or <strong>Microsoft Print to PDF</strong> on Windows) as the destination.</p>
+      <div class="tip">The print options panel automatically hides when you print — only the formatted story goes to the printer or PDF.</div>
+
+      <h2>People Index</h2>
+      <p>When People & orgs is enabled and you are printing Full memories or Headings, a <strong>People Index</strong> is automatically generated at the end of the document. It lists every person alphabetically, with the title and year of each memory they appear in — like a book index.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Backup -->
+    <section class="section">
+      <h1 id="backup">Backup & Restore</h1>
+      <p class="chapter-intro">Chronicle stores your data in your browser's local storage. It is good practice to export a backup regularly in case you change browsers, clear your browser data, or switch devices.</p>
+
+      <h2>Exporting a Backup</h2>
+      <ol class="steps">
+        <li>Click <strong>⚙ Settings</strong></li>
+        <li>Click <strong>Export backup</strong></li>
+        <li>A JSON file downloads containing all your memories, settings, and data</li>
+        <li>Save this file somewhere safe — an external drive, cloud storage, or email it to yourself</li>
+      </ol>
+
+      <h2>Restoring from a Backup</h2>
+      <ol class="steps">
+        <li>Click <strong>⚙ Settings</strong></li>
+        <li>Click <strong>Import backup</strong></li>
+        <li>Select your previously exported JSON file</li>
+        <li>Your memories will be restored — any existing memories will be merged with the backup</li>
+      </ol>
+
+      <div class="tip">Export a backup before making major changes, switching browsers, or clearing your browser's storage. A regular monthly backup is a good habit.</div>
+      <div class="warning">Importing a backup merges memories — it does not overwrite. If you want a clean restore, use <strong>Clear all memories</strong> in Settings first, then import your backup.</div>
+
+      <h2>Importing a Share Code</h2>
+      <p>If someone shared a memory with you via a link and gave you the 6-character share code directly, you can enter it manually:</p>
+      <ol class="steps">
+        <li>Click <strong>⚙ Settings</strong></li>
+        <li>Enter the share code in the <em>Import from share code</em> field</li>
+        <li>Click <strong>Import</strong></li>
+      </ol>
+
+      <h2>Clearing All Memories</h2>
+      <p>To erase everything and start fresh, click <strong>🗑 Clear all memories</strong> in Settings. You will be asked to confirm. <strong>Export a backup first</strong> if you want to keep your data.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Privacy -->
+    <section class="section">
+      <h1 id="privacy">Privacy</h1>
+      <p class="chapter-intro">Chronicle is built on a single principle: your memories belong to you.</p>
+
+      <ul>
+        <li><strong>No account required</strong> — Chronicle needs no login or registration</li>
+        <li><strong>No cloud storage</strong> — all data is stored in your browser's local storage on your own device</li>
+        <li><strong>No tracking or analytics</strong> — Chronicle does not send any data anywhere by default</li>
+        <li><strong>No subscription</strong> — Chronicle is free forever</li>
+        <li><strong>Sharing is always opt-in</strong> — nothing is shared unless you explicitly initiate it</li>
+      </ul>
+
+      <p>The only time data leaves your device is when you:</p>
+      <ul>
+        <li>Share a memory by email (you control what is attached and sent)</li>
+        <li>Generate a share link (the memory is uploaded to your own Cloudflare Worker)</li>
+        <li>Use Historical Context (the memory date and location are sent to the Anthropic API using your own key)</li>
+        <li>View the Map (location names are sent to a geocoding service to resolve coordinates)</li>
+      </ul>
+
+      <div class="note">Map geocoding results are cached locally after the first lookup — so each location is only ever sent to the geocoding service once.</div>
+    </section>
+
+    <!-- Footer -->
+    <div class="divider"></div>
+    <footer style="text-align:center;padding:40px 0 20px;color:var(--ink-faint);font-size:0.88rem;font-style:italic;">
+      <p>Chronicle by <a href="index.html" style="color:var(--gold-dark);text-decoration:none;">Remembory</a> · Free personal life journal</p>
+      <p style="margin-top:6px;font-size:0.8rem;">Built with care. Yours to keep.</p>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  // Sidebar toggle for mobile
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+  }
+
+  // Close sidebar when a link is clicked on mobile
+  document.querySelectorAll('#sidebar-nav a').forEach(a => {
+    a.addEventListener('click', () => {
+      if (window.innerWidth < 900) {
+        document.getElementById('sidebar').classList.remove('open');
+      }
+    });
+  });
+
+  // Active sidebar link on scroll
+  const sections = [];
+  document.querySelectorAll('h1[id], h2[id]').forEach(el => {
+    sections.push({ id: el.id, top: el.offsetTop });
+  });
+
+  const navLinks = document.querySelectorAll('#sidebar-nav a');
+
+  function updateActive() {
+    const scrollY = window.scrollY + 80;
+    let current = sections[0]?.id;
+    for (const s of sections) {
+      if (scrollY >= s.top) current = s.id;
+    }
+    navLinks.forEach(a => {
+      const href = a.getAttribute('href').replace('#', '');
+      a.classList.toggle('active', href === current);
+    });
+  }
+
+  window.addEventListener('scroll', updateActive, { passive: true });
+  updateActive();
+
+  // Close sidebar if clicking outside on mobile
+  document.addEventListener('click', (e) => {
+    const sidebar = document.getElementById('sidebar');
+    if (window.innerWidth < 900 && sidebar.classList.contains('open')) {
+      if (!sidebar.contains(e.target) && !e.target.closest('.menu-toggle')) {
+        sidebar.classList.remove('open');
+      }
+    }
+  });
+</script>
+</body>
+</html>
