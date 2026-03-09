@@ -2582,7 +2582,15 @@ function App() {
     });
   }
 
+  const isLocalFile = window.location.protocol === "file:";
+
   return React.createElement("div",{style:{minHeight:"100vh",background:"#f5f0e8",backgroundImage:"radial-gradient(ellipse at 20% 50%, rgba(200,180,140,0.15) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(160,140,100,0.1) 0%, transparent 50%)"}},
+
+    // ── LOCAL FILE NOTICE ──
+    isLocalFile && React.createElement("div",{style:{background:"#4a5a7a",color:"#e8edf5",padding:"10px 20px",fontSize:"0.84rem",display:"flex",alignItems:"center",justifyContent:"center",gap:"12px",flexWrap:"wrap",textAlign:"center"}},
+      React.createElement("span",null,"⚠️ You’re running Chronicle from a local file. For the best experience — offline support, automatic updates, and easy sharing — use the web version instead."),
+      React.createElement("a",{href:"https://adadx4.github.io/remembory/chronicle.html",target:"_blank",style:{color:"#c8d8f0",fontWeight:600,whiteSpace:"nowrap",textDecoration:"underline"}},"Open web version →")
+    ),
 
     // ── SUBJECT MANAGER ──
     showSubjectMgr&&React.createElement(SubjectManager,{
