@@ -818,42 +818,30 @@
 
       <p>To access sharing, open any memory and click the <strong>✉ Share</strong> button. This button only appears when the memory includes at least one person who has a saved email address.</p>
 
-      <h2>Anti-Spam Protections</h2>
-      <p>Chronicle has two protections built into the sharing flow to keep sharing thoughtful and consensual:</p>
-      <ul>
-        <li><strong>24-hour cooldown</strong> — once you share with someone, you cannot send another share to the same person for 24 hours. A timer shows how long remains.</li>
-        <li><strong>Required personal note</strong> — you must write at least a sentence explaining why you are sharing. This cannot be skipped. It ensures recipients receive something personal, not just data.</li>
-      </ul>
+      <h2>How Sharing Works</h2>
+      <p>Sharing in Chronicle is link-based. When you share a memory, a private short link is created. The recipient clicks the link, sees a preview, and downloads a file that imports automatically into their Chronicle. The link is single-use — it stops working once collected.</p>
+      <p>A personal note is required to share — at least one sentence explaining why you are sharing. This keeps sharing thoughtful rather than mechanical.</p>
 
-      <h2 id="share-email">Sharing by Email</h2>
+      <h2 id="share-link">Sharing a Memory</h2>
       <ol class="steps">
-        <li>Open a memory and click <strong>✉ Share</strong></li>
-        <li>Select the recipient from the list of people with saved email addresses</li>
-        <li>Choose which memories to include — the current memory is pre-selected, but you can add others from the scrollable checklist</li>
+        <li>Open a memory and click <strong>Share</strong></li>
+        <li>Select who you are sharing with — only people tagged in the current memory are shown</li>
+        <li>Choose which memories to include — the current memory is pre-selected, but you can add others from the checklist</li>
+        <li>Enter your name (pre-filled from Settings, editable) — this will be tagged in the memory on the recipient's side</li>
         <li>Write a personal note (at least one sentence is required)</li>
-        <li>Click <strong>Send</strong> — a Chronicle HTML file downloads to your computer and your email client opens with a pre-written message</li>
-        <li>Attach the downloaded file to the email and send</li>
+        <li>Click <strong>Get shareable link</strong> — a short private link is generated</li>
+        <li>Copy the link and send it by any means — text message, email, messaging app</li>
       </ol>
-      <div class="note">The file that downloads is a complete copy of Chronicle with the shared memories pre-loaded. The recipient just opens the file — no import steps needed.</div>
-
-      <h2 id="share-link">Sharing by Link</h2>
-      <p>Chronicle also supports sharing via a web link, using the optional Cloudflare Worker backend. If your Chronicle is connected to a Worker, a <strong>Share via link</strong> option appears at the bottom of the share panel.</p>
-      <ol class="steps">
-        <li>Click <strong>Generate link</strong> in the Share via link section</li>
-        <li>A short link is created (e.g. <em>chronicle-share.workers.dev/ABC123</em>) — click to copy it</li>
-        <li>Send the link by any means — text message, email, messaging app</li>
-        <li>The recipient clicks the link, sees a preview page, and can download a pre-loaded Chronicle file with one click</li>
-      </ol>
-      <div class="note">Link sharing requires a Cloudflare Worker to be deployed. This is an optional advanced setup — see the technical documentation for details.</div>
+      <div class="note">The link expires after 30 days and is deleted once the recipient collects it. Your memories never leave your device permanently — the shared payload is a temporary copy.</div>
 
       <h2 id="receiving">Receiving a Shared Memory</h2>
-      <p>When someone sends you a Chronicle file:</p>
       <ol class="steps">
-        <li>Save the attached .html file to your computer</li>
-        <li>Open it in your browser — Chronicle loads automatically</li>
-        <li>A dialog appears: <em>"[Name] shared a memory with you"</em>, showing the memory titles and their personal note</li>
-        <li>Click <strong>Save to my Chronicle</strong> to add the memories</li>
+        <li>Click the share link — a preview page shows the memory titles and the sender's personal note</li>
+        <li>Click <strong>Save to my Chronicle</strong> — a file downloads automatically</li>
+        <li>Open the downloaded file in your browser — Chronicle loads and shows an import prompt</li>
+        <li>Click <strong>Save to my Chronicle</strong> to add the memories to your Chronicle</li>
       </ol>
+      <div class="note">After this, the downloaded file can be discarded. Your memories are saved in your local Chronicle as normal — everything works offline from here.</div>
 
       <h3>Known vs unknown senders</h3>
       <p>Chronicle checks whether the sender's email address matches someone already in your People registry:</p>
