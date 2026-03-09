@@ -53,7 +53,7 @@ function useWindowSize() {
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const TAGS = ["childhood","family","travel","education","work","love","health","milestone","home","friendship","adventure","loss"];
 // ← Replace this with your Worker URL after deploying to Cloudflare
-const WORKER_URL = "https://remembory-share.adadx4.workers.dev"; // ← update this after deploying
+const WORKER_URL = "https://remembory-share.adadx4.workers.dev";
 const TAG_COLORS = {
   childhood:"#e8a87c", family:"#c9b89a", travel:"#7a9e9f", education:"#8b9dc3",
   work:"#b5936b", love:"#c4858a", health:"#89b08a", milestone:"#c4a962",
@@ -1500,15 +1500,18 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail}) {
 
     step==="compose" && React.createElement("div",null,
 
-      // Sender name
-      React.createElement("div",{style:{marginBottom:"14px",padding:"8px 12px",background:"rgba(245,240,232,0.8)",borderRadius:"3px",border:"1px solid #e0d4be"}},
-        senderName
-          ? React.createElement("span",{style:{fontSize:"0.82rem",color:"#6a5c48"}},
-              "Sharing as ", React.createElement("strong",null,senderName))
-          : React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
-              React.createElement("span",{style:{fontSize:"0.82rem",color:"#8a7460",whiteSpace:"nowrap"}},"Your name:"),
-              React.createElement("input",{value:senderName,onChange:e=>setSenderName(e.target.value),placeholder:"Your name",style:{...S.input,flex:1,padding:"4px 8px",fontSize:"0.9rem"}})
-            )
+      // Sender name — always editable, pre-filled from settings
+      React.createElement("div",{style:{marginBottom:"14px"}},
+        React.createElement("label",{style:{...S.label,marginBottom:"4px",display:"block"}},"Your name"),
+        React.createElement("input",{
+          value:senderName,
+          onChange:e=>setSenderName(e.target.value),
+          placeholder:"Your name (will be added to the memory)",
+          style:{...S.input,fontSize:"0.9rem"}
+        }),
+        React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",marginTop:"4px",fontStyle:"italic"}},
+          "This name will be tagged in the memory on the recipient’s side."
+        )
       ),
 
       // Recipient picker
