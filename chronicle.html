@@ -299,7 +299,7 @@ function seedData(data) { return data; }
 const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], ownerName:"", ownerEmail:"" };
 
 function emptySubject(id, name, isSelf=false) {
-  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, lastBackup:null, backupPassword:"" };
+  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, lastBackup:null, backupPassword:"" };
 }
 
 // Migrate flat data → subjects structure
@@ -315,6 +315,8 @@ function migrateData(raw) {
     knownLocations: raw.knownLocations || [],
     peopleEmails: raw.peopleEmails || {},
     peopleRelationships: raw.peopleRelationships || {},
+    peopleNotes: raw.peopleNotes || {},
+    orgNotes: raw.orgNotes || {},
     lastBackup: raw.lastBackup || null,
     backupPassword: raw.backupPassword || "",
   };
@@ -1094,7 +1096,7 @@ function MemoryCard({m, onClick}) {
 
 // ── Main App ───────────────────────────────────────────────────
 
-function PersonRow({name, count, email, relationship, onRename, onDelete, onSetEmail, onSetRelationship, onViewMemories}) {
+function PersonRow({name, count, email, relationship, notes, onRename, onDelete, onSetEmail, onSetRelationship, onSetNotes, onViewMemories}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(name);
   const [editingEmail, setEditingEmail] = React.useState(false);
@@ -1102,11 +1104,14 @@ function PersonRow({name, count, email, relationship, onRename, onDelete, onSetE
   const [editingRel, setEditingRel] = React.useState(false);
   const [relDraft, setRelDraft] = React.useState(relationship||"");
   const [showRelSugs, setShowRelSugs] = React.useState(false);
+  const [showNotes, setShowNotes] = React.useState(false);
+  const [notesDraft, setNotesDraft] = React.useState(notes||"");
   const relSugs = RELATIONSHIP_SUGGESTIONS.filter(r=>r.toLowerCase().includes(relDraft.toLowerCase())&&relDraft.length>0);
 
   function commitRename() { if(draft.trim()&&draft.trim()!==name) onRename(name,draft.trim()); setRenaming(false); }
   function commitEmail() { onSetEmail(name, emailDraft.trim()); setEditingEmail(false); }
   function commitRel() { onSetRelationship(name, relDraft.trim()); setEditingRel(false); setShowRelSugs(false); }
+  function commitNotes() { onSetNotes(name, notesDraft); }
 
   return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"14px 0"}},
     // Name row
@@ -1127,10 +1132,25 @@ function PersonRow({name, count, email, relationship, onRename, onDelete, onSetE
       React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px"}},
         !renaming&&React.createElement("button",{onClick:()=>{setDraft(name);setRenaming(true);},
           style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem"}},"Rename"),
+        React.createElement("button",{onClick:()=>setShowNotes(s=>!s),
+          style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:notes?"#4a7a5a":"#8a7460",borderColor:notes?"#7a9e8a":"#c8b89a"}},
+          showNotes ? "Hide notes" : (notes ? "\u2713 Notes" : "+ Notes")),
         React.createElement("button",{onClick:()=>{if(window.confirm(`Remove "${name}" from all memories?`))onDelete(name);},
           style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove")
       )
     ),
+    showNotes && React.createElement("div",{style:{marginTop:"8px",paddingLeft:"2px"}},
+      React.createElement("textarea",{
+        value:notesDraft,
+        onChange:e=>setNotesDraft(e.target.value),
+        onBlur:commitNotes,
+        placeholder:"Notes about this person \u2014 details, context, anything that doesn\u2019t belong in a memory\u2026",
+        rows:3,
+        style:{...S.input,width:"100%",resize:"vertical",fontSize:"0.88rem",fontFamily:"'Crimson Text',Georgia,serif",lineHeight:1.6}
+      }),
+      React.createElement("p",{style:{fontSize:"0.75rem",color:"#b0a08a",fontStyle:"italic",marginTop:"3px"}},"Saved automatically when you click away")
+    ),
+
     // Email row
     React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginTop:"7px",paddingLeft:"2px",flexWrap:"wrap"}},
       editingEmail
@@ -1176,49 +1196,90 @@ function PersonRow({name, count, email, relationship, onRename, onDelete, onSetE
   );
 }
 
-function OrgRow({name, count, onRename, onDelete}) {
+function OrgRow({name, count, notes, onRename, onDelete, onSetNotes}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(name);
+  const [showNotes, setShowNotes] = React.useState(false);
+  const [notesDraft, setNotesDraft] = React.useState(notes||"");
   function commitRename() { if(draft.trim()&&draft.trim()!==name) onRename(name,draft.trim()); setRenaming(false); }
-  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"12px 0",display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
-    renaming
-      ? React.createElement("input",{autoFocus:true,value:draft,onChange:e=>setDraft(e.target.value),
-          onKeyDown:e=>{if(e.key==="Enter")commitRename();if(e.key==="Escape"){setDraft(name);setRenaming(false);}},
-          onBlur:commitRename,style:{...S.input,padding:"5px 9px",fontSize:"1rem",flex:1,minWidth:"140px"}})
-      : React.createElement("span",{style:{flex:1,fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208"}},name),
-    React.createElement("span",{style:{fontSize:"0.78rem",color:"#b0a08a",fontStyle:"italic"}},
-      count," ",count===1?"memory":"memories"),
-    React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px"}},
-      !renaming&&React.createElement("button",{onClick:()=>{setDraft(name);setRenaming(true);},
-        style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem"}},"Rename"),
-      React.createElement("button",{onClick:()=>{if(window.confirm(`Remove "${name}" from all memories?`))onDelete(name);},
-        style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove")
+  function commitNotes() { onSetNotes(name, notesDraft); }
+  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"12px 0"}},
+    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
+      renaming
+        ? React.createElement("input",{autoFocus:true,value:draft,onChange:e=>setDraft(e.target.value),
+            onKeyDown:e=>{if(e.key==="Enter")commitRename();if(e.key==="Escape"){setDraft(name);setRenaming(false);}},
+            onBlur:commitRename,style:{...S.input,padding:"5px 9px",fontSize:"1rem",flex:1,minWidth:"140px"}})
+        : React.createElement("span",{style:{flex:1,fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208"}},name),
+      React.createElement("span",{style:{fontSize:"0.78rem",color:"#b0a08a",fontStyle:"italic"}},
+        count," ",count===1?"memory":"memories"),
+      React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px"}},
+        !renaming&&React.createElement("button",{onClick:()=>{setDraft(name);setRenaming(true);},
+          style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem"}},"Rename"),
+        React.createElement("button",{onClick:()=>setShowNotes(s=>!s),
+          style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:notes?"#4a7a5a":"#8a7460",borderColor:notes?"#7a9e8a":"#c8b89a"}},
+          showNotes ? "Hide notes" : (notes ? "✓ Notes" : "+ Notes")),
+        React.createElement("button",{onClick:()=>{if(window.confirm(`Remove "${name}" from all memories?`))onDelete(name);},
+          style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove")
+      )
+    ),
+    showNotes && React.createElement("div",{style:{marginTop:"8px"}},
+      React.createElement("textarea",{
+        value:notesDraft,
+        onChange:e=>setNotesDraft(e.target.value),
+        onBlur:commitNotes,
+        placeholder:"Notes about this organisation…",
+        rows:3,
+        style:{...S.input,width:"100%",resize:"vertical",fontSize:"0.88rem",fontFamily:"'Crimson Text',Georgia,serif",lineHeight:1.6}
+      }),
+      React.createElement("p",{style:{fontSize:"0.75rem",color:"#b0a08a",fontStyle:"italic",marginTop:"3px"}},"Saved automatically when you click away")
     )
   );
 }
 
-function PeopleOrgsManager({knownPeople,knownOrgs,memories,peopleEmails,peopleRelationships,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetEmail,onSetRelationship,onViewPerson}) {
+function PeopleOrgsManager({knownPeople,knownOrgs,memories,peopleEmails,peopleRelationships,peopleNotes,orgNotes,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetEmail,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onViewPerson}) {
+  const [search, setSearch] = React.useState("");
   const personCount=name=>memories.filter(m=>m.people?.includes(name)).length;
   const orgCount=name=>memories.filter(m=>m.orgs?.includes(name)).length;
+  const q = search.trim().toLowerCase();
+  const filteredPeople = q ? knownPeople.filter(n=>n.toLowerCase().includes(q)) : knownPeople;
+  const filteredOrgs   = q ? knownOrgs.filter(n=>n.toLowerCase().includes(q))   : knownOrgs;
+  const totalResults = filteredPeople.length + filteredOrgs.length;
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
-    knownPeople.length>0&&React.createElement("div",{style:{marginBottom:"36px"}},
+    (knownPeople.length + knownOrgs.length) > 5 && React.createElement("div",{style:{marginBottom:"20px",position:"relative"}},
+      React.createElement("input",{
+        value:search,
+        onChange:e=>setSearch(e.target.value),
+        placeholder:"Search people & organisations\u2026",
+        style:{...S.input,paddingLeft:"32px",fontSize:"0.92rem"}
+      }),
+      React.createElement("span",{style:{position:"absolute",left:"10px",top:"50%",transform:"translateY(-50%)",color:"#b0a08a",fontSize:"0.9rem",pointerEvents:"none"}},"\uD83D\uDD0D"),
+      search && React.createElement("button",{
+        onClick:()=>setSearch(""),
+        style:{position:"absolute",right:"8px",top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",color:"#b0a08a",cursor:"pointer",fontSize:"1rem",lineHeight:1}
+      },"\u00d7"),
+      q && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",marginTop:"5px"}},
+        totalResults===0 ? "No matches" : totalResults+" result"+(totalResults===1?"":"s"))
+    ),
+    filteredPeople.length>0&&React.createElement("div",{style:{marginBottom:"36px"}},
       React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:"0 0 4px"}},"People"),
       React.createElement("p",{style:{fontSize:"0.8rem",color:"#b0a08a",fontStyle:"italic",margin:"0 0 2px"}},
-        knownPeople.length," ",knownPeople.length===1?"person":"people"," · click a name to see their memories"),
-      knownPeople.map(name=>React.createElement(PersonRow,{key:name,name,count:personCount(name),
-        email:peopleEmails?.[name],relationship:peopleRelationships?.[name],
-        onSetEmail,onSetRelationship,onRename:onRenamePerson,onDelete:onDeletePerson,
+        filteredPeople.length," ",filteredPeople.length===1?"person":"people"," \xb7 click a name to see their memories"),
+      filteredPeople.map(name=>React.createElement(PersonRow,{key:name,name,count:personCount(name),
+        email:peopleEmails?.[name],relationship:peopleRelationships?.[name],notes:peopleNotes?.[name],
+        onSetEmail,onSetRelationship,onSetNotes:onSetPersonNotes,onRename:onRenamePerson,onDelete:onDeletePerson,
         onViewMemories:()=>onViewPerson(name)}))
     ),
-    knownOrgs.length>0&&React.createElement("div",null,
+    filteredOrgs.length>0&&React.createElement("div",null,
       React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:"0 0 4px"}},"Organisations"),
       React.createElement("p",{style:{fontSize:"0.8rem",color:"#b0a08a",fontStyle:"italic",margin:"0 0 2px"}},
-        knownOrgs.length," ",knownOrgs.length===1?"organisation":"organisations"),
-      knownOrgs.map(name=>React.createElement(OrgRow,{key:name,name,count:orgCount(name),onRename:onRenameOrg,onDelete:onDeleteOrg}))
+        filteredOrgs.length," ",filteredOrgs.length===1?"organisation":"organisations"),
+      filteredOrgs.map(name=>React.createElement(OrgRow,{key:name,name,count:orgCount(name),notes:orgNotes?.[name],onRename:onRenameOrg,onDelete:onDeleteOrg,onSetNotes:onSetOrgNotes}))
     ),
     knownPeople.length===0&&knownOrgs.length===0&&React.createElement("div",null,
       React.createElement("p",{style:{color:"#b0a08a",fontStyle:"italic",marginBottom:"16px"}},"No people or organisations tagged yet.")
-    )
+    ),
+    q && totalResults===0 && React.createElement("p",{style:{color:"#b0a08a",fontStyle:"italic"}},
+      "No results for \u201c"+search+"\u201d")
   );
 }
 
@@ -2003,6 +2064,8 @@ function App() {
   const knownLocations      = subject.knownLocations || [];
   const peopleEmails        = subject.peopleEmails || {};
   const peopleRelationships = subject.peopleRelationships || {};
+  const peopleNotes         = subject.peopleNotes || {};
+  const orgNotes            = subject.orgNotes || {};
   const ownerName           = subject.name || "";
   const ownerEmail          = data.carerEmail || "";
   const carerName           = data.carerName || "";
@@ -2017,6 +2080,7 @@ function App() {
   const [form, setForm] = useState(newForm());
   const [filter, setFilter] = useState({tag:null,search:""});
   const [showSettings, setShowSettings] = useState(false);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [indexTab, setIndexTab] = useState("people");
   const [indexFilter, setIndexFilter] = useState(null); // {type, value}
   const [saveStatus, setSaveStatus] = useState(""); // "", "saved", "error"
@@ -2116,6 +2180,8 @@ function App() {
   function registerPeople(names) { const merged=[...new Set([...knownPeople,...names])].sort(); persistSubject({knownPeople:merged}); }
   function setPersonEmail(name, email) { persistSubject({peopleEmails:{...peopleEmails, [name]: email}}); }
   function setPersonRelationship(name, rel) { persistSubject({peopleRelationships:{...peopleRelationships, [name]: rel}}); }
+  function setPersonNotes(name, notes) { persistSubject({peopleNotes:{...peopleNotes, [name]: notes}}); }
+  function setOrgNotes(name, notes) { persistSubject({orgNotes:{...orgNotes, [name]: notes}}); }
   function registerOrgs(names) { const merged=[...new Set([...knownOrgs,...names])].sort(); persistSubject({knownOrgs:merged}); }
   function registerLocations(names) { const merged=[...new Set([...knownLocations,...names])].sort(); persistSubject({knownLocations:merged}); }
 
@@ -2323,7 +2389,7 @@ function App() {
       }));
       return {...m, mediaUrls: urls};
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships}, null, 2);
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes}, null, 2);
   }
 
   async function buildBackupBlob(backupPassword) {
@@ -2422,7 +2488,8 @@ function App() {
       const updatedPeopleEmails = {...(peopleEmails||{})};
       if (senderName && senderEmail) updatedPeopleEmails[senderName] = senderEmail;
       const mergedRelationships = {...(d.peopleRelationships||{}), ...(data.peopleRelationships||{})};
-      persistSubject({memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships});
+      const mergedPeopleNotes={...(d.peopleNotes||{}),...peopleNotes}; const mergedOrgNotes={...(d.orgNotes||{}),...orgNotes};
+      persistSubject({memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes});
       const msg = isShared
         ? `Imported ${d.memories.length} ${d.memories.length===1?"memory":"memories"} shared by ${senderName}. Open ${d.memories.length===1?"it":"them"} to add your own perspective.`
         : `Imported ${d.memories.length} ${d.memories.length===1?"memory":"memories"}.`;
@@ -2590,6 +2657,22 @@ function App() {
     isLocalFile && React.createElement("div",{style:{background:"#4a5a7a",color:"#e8edf5",padding:"10px 20px",fontSize:"0.84rem",display:"flex",alignItems:"center",justifyContent:"center",gap:"12px",flexWrap:"wrap",textAlign:"center"}},
       React.createElement("span",null,"⚠️ You’re running Chronicle from a local file. For the best experience — offline support, automatic updates, and easy sharing — use the web version instead."),
       React.createElement("a",{href:"https://adadx4.github.io/remembory/chronicle.html",target:"_blank",style:{color:"#c8d8f0",fontWeight:600,whiteSpace:"nowrap",textDecoration:"underline"}},"Open web version →")
+    ),
+
+    // ── ONBOARDING PROMPT ──
+    !onboardingDismissed && !ownerName && React.createElement("div",{style:{background:"rgba(200,168,122,0.12)",borderBottom:"1px solid rgba(200,168,122,0.4)",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
+      React.createElement("div",null,
+        React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#4a3820",fontWeight:600}},"👋 Welcome to Chronicle"),
+        React.createElement("span",{style:{fontSize:"0.88rem",color:"#6a5c48",marginLeft:"10px"}},"Add your name in Settings so people know who\u2019s sharing memories with them.")
+      ),
+      React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0}},
+        React.createElement("button",{
+          onClick:()=>{setShowSettings(true);setOnboardingDismissed(true);},
+          style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem"}},"Open Settings"),
+        React.createElement("button",{
+          onClick:()=>setOnboardingDismissed(true),
+          style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1rem",padding:"4px 8px"}},"\u00d7")
+      )
     ),
 
     // ── SUBJECT MANAGER ──
@@ -2951,12 +3034,12 @@ function App() {
           indexTab==="people"
             ? React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs:[],memories,peopleEmails,peopleRelationships,
                 onRenamePerson:renamePerson,onDeletePerson:deletePerson,
-                onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetEmail:setPersonEmail,onSetRelationship:setPersonRelationship,
+                onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetEmail:setPersonEmail,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
                 onViewPerson:name=>setIndexFilter({type:"people",value:name})})
             : indexTab==="orgs"
             ? React.createElement(PeopleOrgsManager,{knownPeople:[],knownOrgs,memories,peopleEmails,peopleRelationships,
                 onRenamePerson:renamePerson,onDeletePerson:deletePerson,
-                onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetEmail:setPersonEmail,onSetRelationship:setPersonRelationship,
+                onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetEmail:setPersonEmail,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
                 onViewPerson:name=>setIndexFilter({type:"people",value:name})})
             // Locations and Tags: pill grid
             : activeTab.items.length===0
@@ -2986,7 +3069,7 @@ function App() {
       })(),
 
       // ── PEOPLE & ORGS ──
-      view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,memories,peopleEmails,peopleRelationships,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetEmail:setPersonEmail,onSetRelationship:setPersonRelationship,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");}}),
+      view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,memories,peopleEmails,peopleRelationships,peopleNotes,orgNotes,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetEmail:setPersonEmail,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");}}),
 
       // ── PRINT VIEW ──
       view==="print"&&React.createElement(PrintView,{memories,ownerName,allDecades}),
