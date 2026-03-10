@@ -2074,6 +2074,19 @@ function PasswordCard({activePassword, data, setActivePassword, setLocked, setDa
   );
 }
 
+function isInAppBrowser() {
+  const ua = navigator.userAgent || "";
+  if (/FBAN|FBAV|FB_IAB/i.test(ua)) return "facebook";
+  if (/Instagram/i.test(ua)) return "instagram";
+  if (/WhatsApp/i.test(ua)) return "whatsapp";
+  if (/LinkedInApp/i.test(ua)) return "linkedin";
+  if (/Snapchat/i.test(ua)) return "snapchat";
+  if (/TikTok|musical_ly|Bytedance/i.test(ua)) return "tiktok";
+  if (/MicroMessenger/i.test(ua)) return "wechat";
+  if (/Twitter/i.test(ua)) return "twitter";
+  return null;
+}
+
 function App() {
   const winW = useWindowSize();
   const isMobile = winW < 768;
@@ -2082,19 +2095,27 @@ function App() {
   const [activePassword, setActivePassword] = useState(null);    // current session password
   const [data, setData]               = useState(()=> isEncrypted() ? migrateData({}) : loadData());
   const [pendingShare, setPendingShare] = useState(null);
+  const [inAppShareCode, setInAppShareCode] = useState(null);
+  const [inAppBrowser, setInAppBrowser] = useState(null);
   const [pendingEndMemory, setPendingEndMemory] = useState(null);
   const [showSubjectMgr, setShowSubjectMgr] = useState(false);
 
-  // Detect ?share=code from landing page
+  // Detect ?share=code — block in-app browsers to avoid consuming the link
   useEffect(()=>{
     const params = new URLSearchParams(window.location.search);
     const code = params.get("share");
     if (code) {
-      fetch(WORKER_URL + "/s/" + code, {headers:{"X-Chronicle-Client":"1"}})
-        .then(r=>r.ok?r.json():Promise.reject(r.status))
-        .then(d=>{ if(d.memories) setPendingShare(d); })
-        .catch(err=>console.warn("Could not load share:", err));
-      window.history.replaceState({}, "", window.location.pathname);
+      const iab = isInAppBrowser();
+      if (iab) {
+        setInAppShareCode(code);
+        setInAppBrowser(iab);
+      } else {
+        fetch(WORKER_URL + "/s/" + code, {headers:{"X-Chronicle-Client":"1"}})
+          .then(r=>r.ok?r.json():Promise.reject(r.status))
+          .then(d=>{ if(d.memories) setPendingShare(d); })
+          .catch(err=>console.warn("Could not load share:", err));
+        window.history.replaceState({}, "", window.location.pathname);
+      }
     }
   }, []);
 
@@ -2754,7 +2775,53 @@ function App() {
     }),
 
 
-        pendingShare && (()=>{
+        inAppShareCode ? (()=>{
+      const shareLink = window.location.origin + "/chronicle.html?share=" + inAppShareCode;
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const isAndroid = /Android/i.test(navigator.userAgent);
+      const instructions = {
+        facebook:  isIOS ? "Tap ··· at the bottom right, then \"Open in Safari\"" : "Tap ··· at the top right, then \"Open in browser\"",
+        instagram: isIOS ? "Tap ··· at the top right, then \"Open in external browser\"" : "Tap ··· at the top right, then \"Open in Chrome\"",
+        whatsapp:  isIOS ? "Tap the link, then tap \"Open in Safari\" at the bottom" : "Tap ··· then \"Open in Chrome\"",
+        linkedin:  "Tap ··· at the top right, then \"Open in browser\"",
+        snapchat:  "Tap the share icon, then \"Open in browser\"",
+        tiktok:    isIOS ? "Tap ··· then \"Open in Safari\"" : "Tap ··· then \"Open in system browser\"",
+        wechat:    "Tap ··· at the top right, then \"Open in browser\"",
+        twitter:   isIOS ? "Tap the share icon, then \"Open in Safari\"" : "Tap ··· then \"Open in Chrome\"",
+      };
+      const instruction = instructions[inAppBrowser] || "Tap the menu or share icon, then \"Open in browser\"";
+      return React.createElement("div",{style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(44,36,22,0.85)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}},
+        React.createElement("div",{style:{background:"#fffcf5",border:"1px solid #d4c4a8",borderRadius:"6px",padding:"28px 24px",maxWidth:"400px",width:"100%",textAlign:"center",boxShadow:"0 8px 40px rgba(44,36,22,0.3)"}},
+          React.createElement("p",{style:{fontSize:"2rem",marginBottom:"12px"}},"\ud83c\udf10"),
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.15rem",color:"#1a1208",marginBottom:"12px"}},"Open in your browser to save this memory"),
+          React.createElement("div",{style:{background:"#f0e8d8",borderRadius:"4px",padding:"12px 16px",marginBottom:"16px",textAlign:"left"}},
+            React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5c48",margin:"0 0 6px",fontWeight:600,letterSpacing:"0.04em",textTransform:"uppercase"}},"How to open:"),
+            React.createElement("p",{style:{fontSize:"0.95rem",color:"#2c2416",lineHeight:1.6,margin:0}},instruction)
+          ),
+          React.createElement("p",{style:{fontSize:"0.8rem",color:"#8a7460",marginBottom:"14px",lineHeight:1.5}},
+            "Or copy this link and paste it into Safari or Chrome:"
+          ),
+          React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"18px"}},
+            React.createElement("input",{readOnly:true,value:shareLink,onClick:e=>e.target.select(),style:{...S.input,fontSize:"0.75rem",flex:1,color:"#4a5a7a",padding:"8px 10px"}}),
+            React.createElement("button",{
+              onClick:()=>navigator.clipboard?.writeText(shareLink).catch(()=>{}),
+              style:{...S.btnOutline,padding:"8px 12px",fontSize:"0.82rem",whiteSpace:"nowrap"}
+            },"Copy")
+          ),
+          React.createElement("button",{
+            onClick:()=>{
+              fetch(WORKER_URL+"/s/"+inAppShareCode,{headers:{"X-Chronicle-Client":"1"}})
+                .then(r=>r.ok?r.json():Promise.reject(r.status))
+                .then(d=>{ if(d.memories){ setPendingShare(d); setInAppShareCode(null); }})
+                .catch(()=>setInAppShareCode(null));
+            },
+            style:{...S.btnOutline,width:"100%",fontSize:"0.82rem",color:"#b0a08a",borderColor:"#d4c4a8"}
+          },"Continue anyway (memories may not save properly)")
+        )
+      );
+    })() : null,
+
+    pendingShare && (()=>{
       const senderEmail = pendingShare.sharedByEmail || "";
       const isKnown = senderEmail && Object.values(peopleEmails||{}).includes(senderEmail);
       const darkBg = isKnown ? "#2c2416" : "#3a2c1a";
