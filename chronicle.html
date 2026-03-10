@@ -239,9 +239,12 @@ function isEncrypted() {
 async function saveEncrypted(password, data) {
   const clean = {
     ...data,
-    memories: data.memories.map(m => ({
-      ...m,
-      mediaUrls: (m.mediaUrls||[]).map(med => med.url?.startsWith("data:") ? {mediaId:med.mediaId, name:med.name} : med)
+    subjects: (data.subjects||[]).map(s => ({
+      ...s,
+      memories: (s.memories||[]).map(m => ({
+        ...m,
+        mediaUrls: (m.mediaUrls||[]).map(med => med.url?.startsWith("data:") ? {mediaId:med.mediaId, name:med.name} : med)
+      }))
     }))
   };
   const stored = await encryptData(password, JSON.stringify(clean));
