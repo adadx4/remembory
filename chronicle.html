@@ -2087,6 +2087,7 @@ function App() {
   const [activePassword, setActivePassword] = useState(null);    // current session password
   const [data, setData]               = useState(()=> isEncrypted() ? migrateData({}) : loadData());
   const [pendingShare, setPendingShare] = useState(null);
+  const [inAppShareCode, setInAppShareCode] = useState(null);
   const [pendingEndMemory, setPendingEndMemory] = useState(null);
   const [showSubjectMgr, setShowSubjectMgr] = useState(false);
 
