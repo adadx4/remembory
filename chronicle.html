@@ -1659,39 +1659,6 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail}) {
 }
 
 // ── Shared Chronicle generator ─────────────────────────────────
-async function buildAndDownloadShare(payload, filename) {
-  // Fetch the original source file rather than using outerHTML (which mangles the live DOM)
-  let source;
-  try {
-    const res = await fetch(window.location.href);
-    source = await res.text();
-  } catch(e) {
-    // Fallback for file:// protocol or fetch failure — use outerHTML (may be imperfect)
-    source = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
-  }
-  const injection = `<script>window.__CHRONICLE_SHARE__ = ${JSON.stringify(payload)};<\/script>`;
-  const injected = source.replace('</head>', injection + '</head>');
-  const blob = new Blob([injected], {type:"text/html"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href=url; a.download=filename;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-}
-
-async function downloadAndEmail(recipientName, recipientEmail, memories, senderName, isReply=false, senderEmail='', personalMsg='') {
-  const filename = `chronicle-from-${(senderName||"friend").replace(/\s+/g,"-").toLowerCase()}.html`;
-  const payload = { version:1, sharedBy:senderName||"a friend", sharedByEmail:senderEmail||'', sharedAt:new Date().toISOString(), memories, message:personalMsg||'' };
-  await buildAndDownloadShare(payload, filename);
-
-  const memTitles = memories.map(m=>`  * ${m.title} (${m.year})`).join("\n");
-  const subject = encodeURIComponent(isReply ? `Re: A memory shared with you` : `A memory shared with you`);
-  const msgLine = personalMsg ? `\n${personalMsg}\n` : "";
-  const bodyText = isReply
-    ? `Hi ${recipientName},\n\nI've added my own perspective to the ${memories.length===1?"memory":"memories"} you shared with me.${msgLine}\n${memTitles}\n\nTo view: just open the attached file (${filename}) in any web browser — no app needed.`
-    : `Hi ${recipientName},${msgLine}\n\nI wanted to share ${memories.length===1?"a memory":"some memories"} with you.\n\n${memTitles}\n\nTo view: just open the attached file (${filename}) in any web browser. Chronicle opens automatically and will ask if you'd like to save ${memories.length===1?"it":"them"} — no setup needed.`;
-  window.open(`mailto:${recipientEmail}?subject=${subject}&body=${encodeURIComponent(bodyText)}`);
-}
 
 // ── PerspectivesPanel ──────────────────────────────────────────
 function PerspectivesPanel({memory, onSave, peopleEmails, senderName}) {
@@ -2104,6 +2071,11 @@ function PasswordCard({activePassword, data, setActivePassword, setLocked, setDa
   );
 }
 
+function isInAppBrowser() {
+  const ua = navigator.userAgent || "";
+  return /FBAN|FBAV|FB_IAB|Instagram|LinkedInApp|WhatsApp|Snapchat|TikTok|Twitter|musical_ly|MicroMessenger|Line\/|Pinterest|Bytedance/i.test(ua);
+}
+
 function App() {
   const winW = useWindowSize();
   const isMobile = winW < 768;
@@ -2115,21 +2087,20 @@ function App() {
   const [pendingEndMemory, setPendingEndMemory] = useState(null);
   const [showSubjectMgr, setShowSubjectMgr] = useState(false);
 
-  // Detect pre-loaded share payload on startup, or ?share=code from landing page
+  // Detect ?share=code — block if in-app browser to avoid consuming the link
   useEffect(()=>{
-    if (window.__CHRONICLE_SHARE__) {
-      setPendingShare(window.__CHRONICLE_SHARE__);
-      delete window.__CHRONICLE_SHARE__;
-      return;
-    }
     const params = new URLSearchParams(window.location.search);
     const code = params.get("share");
     if (code) {
-      fetch(WORKER_URL + "/s/" + code, {headers:{"X-Chronicle-Client":"1"}})
-        .then(r=>r.ok?r.json():Promise.reject(r.status))
-        .then(d=>{ if(d.memories) setPendingShare(d); })
-        .catch(err=>console.warn("Could not load share:", err));
-      window.history.replaceState({}, "", window.location.pathname);
+      if (isInAppBrowser()) {
+        setInAppShareCode(code);
+      } else {
+        fetch(WORKER_URL + "/s/" + code, {headers:{"X-Chronicle-Client":"1"}})
+          .then(r=>r.ok?r.json():Promise.reject(r.status))
+          .then(d=>{ if(d.memories) setPendingShare(d); })
+          .catch(err=>console.warn("Could not load share:", err));
+        window.history.replaceState({}, "", window.location.pathname);
+      }
     }
   }, []);
 
@@ -2789,6 +2760,36 @@ function App() {
     }),
 
     // ── INCOMING SHARE DIALOG ──
+    inAppShareCode && React.createElement("div",{style:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(44,36,22,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}},
+      React.createElement("div",{style:{background:"#fffcf5",border:"1px solid #d4c4a8",borderRadius:"6px",padding:"28px 24px",maxWidth:"420px",width:"100%",textAlign:"center",boxShadow:"0 8px 40px rgba(44,36,22,0.22)"}},
+        React.createElement("div",{style:{fontSize:"2.2rem",marginBottom:"12px"}},String.fromCodePoint(0x1F4F1)),
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",marginBottom:"10px"}},"Open in your browser first"),
+        React.createElement("p",{style:{fontSize:"0.92rem",color:"#6a5c48",lineHeight:1.65,marginBottom:"20px"}},
+          "You\u2019re viewing this inside an app\u2019s built-in browser. If you import here, your memories may not be saved in the right place.",
+          React.createElement("br"),React.createElement("br"),
+          "Open this link in Safari or Chrome first, then your memories will save properly."
+        ),
+        React.createElement("button",{
+          onClick:()=>{
+            const url = window.location.origin + window.location.pathname + "?share=" + inAppShareCode;
+            const a = document.createElement("a"); a.href=url; a.target="_blank"; a.rel="noopener";
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          },
+          style:{...S.btn,width:"100%",marginBottom:"10px"}
+        },"Open in browser \u2192"),
+        React.createElement("button",{
+          onClick:()=>{
+            fetch(WORKER_URL + "/s/" + inAppShareCode, {headers:{"X-Chronicle-Client":"1"}})
+              .then(r=>r.ok?r.json():Promise.reject(r.status))
+              .then(d=>{ if(d.memories){ setPendingShare(d); setInAppShareCode(null); }})
+              .catch(err=>console.warn("Share load failed:", err));
+            setInAppShareCode(null);
+          },
+          style:{...S.btnOutline,width:"100%",fontSize:"0.82rem",color:"#8a7460"}
+        },"Continue anyway")
+      )
+    ),
+
     pendingShare && (()=>{
       const senderEmail = pendingShare.sharedByEmail || "";
       const isKnown = senderEmail && Object.values(peopleEmails||{}).includes(senderEmail);
