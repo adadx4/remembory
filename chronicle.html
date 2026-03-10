@@ -307,7 +307,7 @@ function migrateData(raw) {
   if (raw.subjects) return raw; // already migrated
   const id = "subj_" + Date.now();
   const subject = {
-    ...emptySubject(id, raw.ownerName || "My Chronicle", true),
+    ...emptySubject(id, raw.ownerName || "", true),
     memories: raw.memories || [],
     customTags: raw.customTags || [],
     knownPeople: raw.knownPeople || [],
@@ -1944,7 +1944,7 @@ function PrintView({memories, ownerName, allDecades}) {
       // Cover
       React.createElement("div",{style:{textAlign:"center",paddingBottom:"32px",marginBottom:"32px",borderBottom:"2px solid #c8b89a"}},
         React.createElement("h1",{style:{fontFamily:"'Playfair Display',serif",fontSize:"2.4rem",fontWeight:700,margin:"0 0 8px",color:"#1a1208"}},
-          ownerName ? `${ownerName}'s Chronicle` : "My Chronicle"
+          ownerName ? `${ownerName}'s Chronicle` : "Chronicle"
         ),
         React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",fontSize:"1rem",margin:0}},
           scope==="decade"&&scopeDecade ? `The ${scopeDecade}s` :
@@ -2055,7 +2055,7 @@ function App() {
   // ── Active subject ────────────────────────────────────────────
   const subjects = data.subjects || [];
   const activeSubjectId = data.activeSubjectId || subjects[0]?.id;
-  const subject = subjects.find(s=>s.id===activeSubjectId) || subjects[0] || emptySubject("default","My Chronicle",true);
+  const subject = subjects.find(s=>s.id===activeSubjectId) || subjects[0] || emptySubject("default","",true);
 
   const memories            = subject.memories || [];
   const customTags          = subject.customTags || [];
@@ -2617,6 +2617,7 @@ function App() {
     if (view==="prompt") return "Prompter";
     if (view==="people") return "People & Organisations";
     if (view==="map") return "Map";
+    if (view==="settings") return "Settings";
     if (view==="print") return "Print / Export";
     if (view==="index") return indexFilter ? `${indexFilter.value}` : "Index";
     return null;
@@ -2819,7 +2820,7 @@ function App() {
           [["life","◉ Life"],["timeline","≡ List"]].map(([v,label])=>React.createElement("button",{key:v,onClick:()=>setView(v),style:{padding:"7px 12px",border:"none",borderRight:v==="life"?"1px solid #c8b89a":"none",background:view===v?"#2c2416":"transparent",color:view===v?"#f5f0e8":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem"}},label))
         ),
         !isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>{setIndexFilter(null);setView("index");},style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"☰ Index"),
-        !isMobile&&view!=="import"&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("import"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"↑ Import"),
+        !isMobile&&view!=="import"&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("import"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"↑ Import Media"),
         !isMobile&&view!=="prompt"&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("prompt"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"✦ Prompt"),
         !isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("map"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"🗺 Map"),
         !isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("print"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"🖨 Print"),
@@ -2832,7 +2833,7 @@ function App() {
           title:"Save backup file",
           style:{...S.btn,padding:"7px 13px",fontSize:"0.84rem",background:"#4a7a5a",opacity:saveBackupBusy?0.6:1}
         }, saveBackupBusy ? "Saving…" : "💾 Save"),
-        React.createElement("button",{onClick:()=>setShowSettings(s=>!s),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"⚙"),
+        React.createElement("button",{onClick:()=>setView("settings"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"⚙ Settings"),
         showBack&&React.createElement("button",{onClick:goBack,style:{...S.btnOutline,padding:isMobile?"8px 14px":"7px 13px",fontSize:"0.9rem"}},"← Back"),
         showAdd&&React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView("add"); },style:{...S.btn,padding:isMobile?"8px 16px":"7px 15px",fontSize:"0.9rem"}},"+ Add")
       )
@@ -2853,112 +2854,6 @@ function App() {
       ))
     ),
 
-    // ── SETTINGS DRAWER ──
-    showSettings&&React.createElement("div",{style:{background:"#f0ebe0",borderBottom:"1px solid #c8b89a",padding:isMobile?"14px 16px":"16px 28px",display:"flex",flexWrap:"wrap",gap:"20px",alignItems:"flex-end"}},
-      React.createElement("div",{style:{flex:1,minWidth:"200px"}},
-        React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"2px"}},
-          React.createElement("label",{style:S.label},subject.isSelf?"Your name & email":"Subject name"),
-          React.createElement("button",{onClick:()=>{setShowSettings(false);setShowSubjectMgr(true);},style:{background:"transparent",border:"none",fontSize:"0.76rem",color:"#a8885a",cursor:"pointer",padding:0,fontFamily:"'Crimson Text',serif"}},
-            subjects.length>1 ? `Switch (${subjects.length} people) →` : "Manage people →")
-        ),
-        React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 6px"}},
-          subject.isSelf ? "Used when sharing memories" : "The person whose memories this is"),
-        React.createElement("input",{value:ownerName,onChange:e=>persistSubject({name:e.target.value}),placeholder:"Name",style:{...S.input,marginBottom:"6px"}}),
-        React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:S.input})
-      ),
-      React.createElement("div",{style:{flex:1,minWidth:"220px"}},
-        React.createElement("label",{style:S.label},"Import from share code"),
-        React.createElement("div",{style:{display:"flex",gap:"8px"}},
-          React.createElement("input",{
-            value:shareCodeInput, onChange:e=>setShareCodeInput(e.target.value.toLowerCase().trim()),
-            placeholder:"e.g. abc123", maxLength:6,
-            style:{...S.input,flex:1,letterSpacing:"0.12em",fontFamily:"monospace"},
-            onKeyDown:e=>{ if(e.key==="Enter") importFromCode(); }
-          }),
-          React.createElement("button",{onClick:importFromCode,disabled:shareCodeInput.length<4,style:{...S.btn,padding:"9px 14px",fontSize:"0.86rem",opacity:shareCodeInput.length<4?0.5:1}},"Import")
-        ),
-        shareCodeStatus&&React.createElement("p",{style:{fontSize:"0.78rem",marginTop:"5px",color:shareCodeStatus.startsWith("✓")?"#89b08a":"#c4858a",fontStyle:"italic"}},shareCodeStatus)
-      ),
-      // ── Backup panel ──
-      React.createElement("div",{style:{flex:"1 1 280px",minWidth:"240px",background:"rgba(255,252,245,0.6)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"14px 16px"}},
-        React.createElement("label",{style:{...S.label,marginBottom:"4px",display:"block"}},"Backup"),
-        (()=>{
-          const photoCount = memories.reduce((n,m)=>n+(m.mediaUrls||[]).length,0);
-          const photoNote = photoCount > 0 ? ` · ${photoCount} photo${photoCount===1?"":"s"} included` : "";
-          let statusMsg, statusColor;
-          if (!subject.lastBackup) {
-            statusMsg = "Not yet backed up — your backup includes all memories and photos";
-            statusColor = "#b0804a";
-          } else {
-            const days = Math.floor((Date.now() - new Date(subject.lastBackup)) / 86400000);
-            if (days === 0) { statusMsg = `✓ Backed up today${photoNote}`; statusColor = "#4a7a5a"; }
-            else if (days === 1) { statusMsg = `✓ Backed up yesterday${photoNote}`; statusColor = "#6a5c48"; }
-            else if (days < 7)  { statusMsg = `Backed up ${days} days ago${photoNote}`; statusColor = "#6a5c48"; }
-            else if (days < 30) { statusMsg = `⚠ Last backup ${days} days ago — save a fresh copy`; statusColor = "#b0804a"; }
-            else { statusMsg = `⚠ Last backup was ${days} days ago — please back up soon`; statusColor = "#c4858a"; }
-          }
-          return React.createElement("p",{style:{fontSize:"0.76rem",color:statusColor,fontStyle:"italic",margin:"0 0 10px"}}, statusMsg);
-        })(),
-        React.createElement("p",{style:{fontSize:"0.74rem",color:"#8a7460",margin:"0 0 10px",lineHeight:1.5}},
-          "Your backup file is self-contained — memories, photos, and all. Open it on any device to restore everything."
-        ),
-        React.createElement("input",{
-          type:"password",
-          value:subject.backupPassword||"",
-          onChange:e=>persistSubject({backupPassword:e.target.value}),
-          placeholder:"Backup password (optional — encrypts the file)",
-          style:{...S.input,marginBottom:"10px",fontSize:"0.88rem"}
-        }),
-        React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
-          React.createElement("button",{
-            onClick:async()=>{ setSaveBackupBusy(true); await exportBackup(); setSaveBackupBusy(false); },
-            style:{...S.btn,padding:"7px 14px",fontSize:"0.84rem",background:"#4a7a5a",flex:1}
-          }, saveBackupBusy ? "Saving…" : "💾 Download backup"),
-          React.createElement("label",{style:{...S.btnOutline,padding:"7px 14px",fontSize:"0.84rem",cursor:"pointer",flex:1,textAlign:"center"}},
-            "⬆ Restore from file",
-            React.createElement("input",{type:"file",accept:".json",style:{display:"none"},onChange:importBackup})
-          )
-        )
-      ),
-      // Danger + other actions
-      React.createElement("div",{style:{alignSelf:"flex-end",display:"flex",flexDirection:"column",gap:"8px"}},
-        isMobile&&React.createElement("button",{onClick:()=>{ setView("print"); setShowSettings(false); },style:{...S.btnOutline,padding:"8px 14px",fontSize:"0.84rem"}},"🖨 Print / Export"),
-        React.createElement("button",{onClick:()=>{ if(window.confirm(`Delete all ${memories.length} memories? This cannot be undone.\n\nDownload a backup first.`)) { persistSubject({memories:[],knownPeople:[],knownOrgs:[]}); setView("life"); }},style:{...S.btnOutline,padding:"8px 14px",fontSize:"0.84rem",color:"#c4858a",borderColor:"#e0c8c8"}},"🗑 Clear all")
-      ),
-      React.createElement("p",{style:{width:"100%",fontSize:"0.78rem",color:"#8a7460",margin:0,fontStyle:"italic"}},`${memories.length} memories · stored locally · never leaves your device`),
-      // ── Password controls ──
-      React.createElement("div",{style:{width:"100%",borderTop:"1px solid #d4c4a8",marginTop:"14px",paddingTop:"14px",display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"center"}},
-        React.createElement("span",{style:{fontSize:"0.78rem",color:activePassword?"#89b08a":"#b0a08a",fontStyle:"italic"}},
-          activePassword ? "🔒 Password protected" : "🔓 No password set"
-        ),
-        React.createElement("button",{
-          onClick:async ()=>{
-            const pw1 = window.prompt(activePassword?"Enter new password (leave blank to cancel):":"Set a password for Chronicle:");
-            if (!pw1) return;
-            if (pw1.length < 6) { alert("Password must be at least 6 characters."); return; }
-            const pw2 = window.prompt("Confirm password:");
-            if (pw1 !== pw2) { alert("Passwords don't match."); return; }
-            await saveEncrypted(pw1, data);
-            setActivePassword(pw1);
-            alert("Password set. Chronicle is now encrypted.");
-          },
-          style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.82rem"}
-        }, activePassword ? "Change password" : "Set password"),
-        activePassword&&React.createElement("button",{
-          onClick:async ()=>{
-            if (!window.confirm("Remove password protection? Your data will be stored unencrypted.")) return;
-            saveData(data);
-            localStorage.removeItem(CRYPTO_KEY);
-            setActivePassword(null);
-          },
-          style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.82rem",color:"#c4858a",borderColor:"#e0c8c8"}
-        },"Remove password"),
-        activePassword&&React.createElement("button",{
-          onClick:()=>{ setLocked(true); setActivePassword(null); setData(EMPTY_DATA); setShowSettings(false); },
-          style:{...S.btn,padding:"5px 14px",fontSize:"0.82rem"}
-        },"🔒 Lock now")
-      )
-    ),
 
     // ── MAIN CONTENT ──
     React.createElement("div",{style:{maxWidth:"900px",margin:"0 auto",padding:isMobile?"20px 16px 90px":"28px 20px"}},
@@ -3072,6 +2967,111 @@ function App() {
       view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,memories,peopleEmails,peopleRelationships,peopleNotes,orgNotes,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetEmail:setPersonEmail,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");}}),
 
       // ── PRINT VIEW ──
+      view==="settings"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"640px"}},
+        React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 24px",color:"#1a1208"}},"Settings"),
+
+        // ── Identity ──
+        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+          React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
+            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},subject.isSelf?"Your name & email":"Subject name"),
+            React.createElement("button",{onClick:()=>setShowSubjectMgr(true),style:{background:"transparent",border:"none",fontSize:"0.76rem",color:"#a8885a",cursor:"pointer",padding:0,fontFamily:"'Crimson Text',serif"}},
+              subjects.length>1 ? `Switch (${subjects.length} people) →` : "Manage people →")
+          ),
+          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 12px"}},
+            subject.isSelf ? "Your name and email are used when sharing memories with others." : "The person whose memories this is."),
+          React.createElement("input",{value:ownerName,onChange:e=>persistSubject({name:e.target.value}),placeholder:"Your name",style:{...S.input,marginBottom:"10px"}}),
+          React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:S.input})
+        ),
+
+        // ── Backup ──
+        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Backup"),
+          (()=>{
+            const photoCount = memories.reduce((n,m)=>n+(m.mediaUrls||[]).length,0);
+            const photoNote = photoCount > 0 ? ` · ${photoCount} photo${photoCount===1?"":"s"} included` : "";
+            let statusMsg, statusColor;
+            if (!subject.lastBackup) {
+              statusMsg = "Not yet backed up — your backup includes all memories and photos";
+              statusColor = "#b0804a";
+            } else {
+              const days = Math.floor((Date.now() - new Date(subject.lastBackup)) / 86400000);
+              if (days === 0) { statusMsg = `✓ Backed up today${photoNote}`; statusColor = "#4a7a5a"; }
+              else if (days === 1) { statusMsg = `✓ Backed up yesterday${photoNote}`; statusColor = "#6a5c48"; }
+              else if (days < 7)  { statusMsg = `Backed up ${days} days ago${photoNote}`; statusColor = "#6a5c48"; }
+              else if (days < 30) { statusMsg = `⚠ Last backup ${days} days ago — save a fresh copy`; statusColor = "#b0804a"; }
+              else { statusMsg = `⚠ Last backup was ${days} days ago — please back up soon`; statusColor = "#c4858a"; }
+            }
+            return React.createElement("p",{style:{fontSize:"0.82rem",color:statusColor,fontStyle:"italic",margin:"0 0 8px"}}, statusMsg);
+          })(),
+          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.5}},
+            "Your backup file is self-contained — memories, photos, and all. Open it on any device to restore everything."
+          ),
+          React.createElement("input",{
+            type:"password",
+            value:subject.backupPassword||"",
+            onChange:e=>persistSubject({backupPassword:e.target.value}),
+            placeholder:"Backup password (optional — encrypts the file)",
+            style:{...S.input,marginBottom:"12px",fontSize:"0.88rem"}
+          }),
+          React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap"}},
+            React.createElement("button",{
+              onClick:async()=>{ setSaveBackupBusy(true); await exportBackup(); setSaveBackupBusy(false); },
+              style:{...S.btn,padding:"9px 16px",fontSize:"0.88rem",background:"#4a7a5a",flex:1}
+            }, saveBackupBusy ? "Saving…" : "💾 Download backup"),
+            React.createElement("label",{style:{...S.btnOutline,padding:"9px 16px",fontSize:"0.88rem",cursor:"pointer",flex:1,textAlign:"center"}},
+              "⬆ Restore from file",
+              React.createElement("input",{type:"file",accept:".json",style:{display:"none"},onChange:importBackup})
+            )
+          )
+        ),
+
+        // ── Password / lock ──
+        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Password"),
+          React.createElement("p",{style:{fontSize:"0.82rem",color:activePassword?"#89b08a":"#b0a08a",fontStyle:"italic",margin:"0 0 14px"}},
+            activePassword ? "🔒 Password protected" : "🔓 No password set"
+          ),
+          React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap"}},
+            React.createElement("button",{
+              onClick:async ()=>{
+                const pw1 = window.prompt(activePassword?"Enter new password (leave blank to cancel):":"Set a password for Chronicle:");
+                if (!pw1) return;
+                if (pw1.length < 6) { alert("Password must be at least 6 characters."); return; }
+                const pw2 = window.prompt("Confirm password:");
+                if (pw1 !== pw2) { alert("Passwords don't match."); return; }
+                await saveEncrypted(pw1, data);
+                setActivePassword(pw1);
+                alert("Password set. Chronicle is now encrypted.");
+              },
+              style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem"}
+            }, activePassword ? "Change password" : "Set password"),
+            activePassword&&React.createElement("button",{
+              onClick:async ()=>{
+                if (!window.confirm("Remove password protection? Your data will be stored unencrypted.")) return;
+                saveData(data);
+                localStorage.removeItem(CRYPTO_KEY);
+                setActivePassword(null);
+              },
+              style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}
+            },"Remove password"),
+            activePassword&&React.createElement("button",{
+              onClick:()=>{ setLocked(true); setActivePassword(null); setData(EMPTY_DATA); },
+              style:{...S.btn,padding:"8px 16px",fontSize:"0.86rem"}
+            },"🔒 Lock now")
+          )
+        ),
+
+        // ── Danger zone ──
+        React.createElement("div",{style:{background:"rgba(255,245,245,0.7)",border:"1px solid #e0c8c8",borderRadius:"3px",padding:"20px"}},
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#8a3030",margin:"0 0 8px"}},"Danger zone"),
+          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px"}},`${memories.length} memories · stored locally · never leaves your device`),
+          React.createElement("button",{
+            onClick:()=>{ if(window.confirm(`Delete all ${memories.length} memories? This cannot be undone.\n\nDownload a backup first.`)) { persistSubject({memories:[],knownPeople:[],knownOrgs:[]}); setView("life"); }},
+            style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}
+          },"🗑 Clear all memories")
+        )
+      ),
+
       view==="print"&&React.createElement(PrintView,{memories,ownerName,allDecades}),
 
       // ── PROMPTER ──
