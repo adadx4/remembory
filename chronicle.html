@@ -2740,7 +2740,7 @@ function App() {
     !onboardingDismissed && !ownerName && React.createElement("div",{style:{background:"rgba(200,168,122,0.12)",borderBottom:"1px solid rgba(200,168,122,0.4)",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
       React.createElement("div",null,
         React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#4a3820",fontWeight:600}},"👋 Welcome to Chronicle"),
-        React.createElement("span",{style:{fontSize:"0.88rem",color:"#6a5c48",marginLeft:"10px"}},"Add your name in Settings so people know who\u2019s sharing memories with them.")
+        React.createElement("span",{style:{fontSize:"0.88rem",color:"#6a5c48",marginLeft:"10px"}},"Add your name in Settings, and remember to back up regularly \u2014 your memories live in this browser and could be lost if you clear your browser data.")
       ),
       React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0}},
         React.createElement("button",{
@@ -3113,6 +3113,13 @@ function App() {
             onClick:()=>{ if(window.confirm(`Delete all ${memories.length} memories? This cannot be undone.\n\nDownload a backup first.`)) { persistSubject({memories:[],knownPeople:[],knownOrgs:[]}); setView("life"); }},
             style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}
           },"🗑 Clear all memories")
+        ),
+
+        // ── Ko-fi ──
+        React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#b0a08a",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
+          "Chronicle is free and always will be. If it’s been useful — ",
+          React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"☕ buy us a coffee"),
+          "."
         )
       ),
 
