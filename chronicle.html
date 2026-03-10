@@ -2870,7 +2870,7 @@ function App() {
         !isMobile&&view!=="prompt"&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("prompt"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"✦ Prompt"),
         !isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("map"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"🗺 Map"),
         !isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("print"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"🖨 Print"),
-        React.createElement("button",{
+        !isMobile&&React.createElement("button",{
           onClick: async ()=>{
             setSaveBackupBusy(true);
             await exportBackup();
@@ -2879,7 +2879,7 @@ function App() {
           title:"Save backup file",
           style:{...S.btn,padding:"7px 13px",fontSize:"0.84rem",background:"#4a7a5a",opacity:saveBackupBusy?0.6:1}
         }, saveBackupBusy ? "Saving…" : "💾 Save"),
-        React.createElement("button",{onClick:()=>setView("settings"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"⚙ Settings"),
+        !isMobile&&React.createElement("button",{onClick:()=>setView("settings"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"⚙ Settings"),
         !isMobile&&React.createElement("span",{style:{width:"1px",height:"20px",background:"#d4c4a8",margin:"0 4px",flexShrink:0}}),
         !isMobile&&React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",title:"Support Remembory on Ko-fi",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#b0906a",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#b0906a";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
         showBack&&React.createElement("button",{onClick:goBack,style:{...S.btnOutline,padding:isMobile?"8px 14px":"7px 13px",fontSize:"0.9rem"}},"← Back"),
