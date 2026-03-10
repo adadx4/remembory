@@ -2180,6 +2180,11 @@ function App() {
 
   // Import state
   const [importTab, setImportTab] = useState("photos");
+  const [gedPersons, setGedPersons] = useState(null);   // parsed persons array
+  const [gedPicked, setGedPicked]   = useState(null);   // selected person object
+  const [gedPreview, setGedPreview] = useState(null);   // {subject, memories} ready to import
+  const [gedBusy, setGedBusy]       = useState(false);
+
   const [photoQueue, setPhotoQueue] = useState([]);
   const [emailForm, setEmailForm] = useState({...newForm(),from:"",rawDate:""});
   const [photoDragOver, setPhotoDragOver] = useState(false);
@@ -2510,6 +2515,270 @@ function App() {
     a.click();
     // Record last backup time
     persistSubject({lastBackup: new Date().toISOString()});
+  }
+
+
+  // ────────────────────────────────────────────────────────────────
+  // GEDCOM parser
+  // ────────────────────────────────────────────────────────────────
+  function parseGedcom(text) {
+    // Normalise line endings
+    const lines = text.replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n");
+
+    // Build a tree of records
+    const records = [];
+    let cur = null;
+    let stack = [];
+
+    for (const raw of lines) {
+      const m = raw.match(/^(\d+)\s+(@[^@]+@|\w+)\s*(.*)?$/);
+      if (!m) continue;
+      const level = parseInt(m[1]);
+      const tag   = m[2];
+      const value = (m[3]||"").trim();
+
+      const node = { tag, value, children: [] };
+
+      if (level === 0) {
+        records.push(node);
+        cur = node;
+        stack = [node];
+      } else {
+        // pop back to correct parent
+        while (stack.length > level) stack.pop();
+        const parent = stack[stack.length - 1];
+        if (parent) parent.children.push(node);
+        stack[level] = node;
+      }
+    }
+
+    // Helper: get first child value by tag
+    function child(node, tag) {
+      const c = node.children.find(n=>n.tag===tag);
+      return c ? c.value : null;
+    }
+    function children(node, tag) {
+      return node.children.filter(n=>n.tag===tag);
+    }
+    // Concatenate CONT/CONC continuations
+    function fullText(node) {
+      let t = node.value || "";
+      for (const c of node.children) {
+        if (c.tag === "CONT") t += "\n" + (c.value||"");
+        if (c.tag === "CONC") t += (c.value||"");
+      }
+      return t.trim();
+    }
+
+    // Parse a DATE value into {year, month, day, fuzzy}
+    function parseDate(raw) {
+      if (!raw) return null;
+      // Strip qualifiers: ABT, EST, CAL, BEF, AFT etc.
+      const s = raw.replace(/^(ABT|EST|CAL|BEF|AFT|CIR|FROM|TO|INT)\s*/i,"").trim();
+      const months = {JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
+      // DD MON YYYY
+      let mr = s.match(/^(\d{1,2})\s+([A-Z]{3})\s+(\d{4})$/i);
+      if (mr) return {year:parseInt(mr[3]),month:months[mr[2].toUpperCase()]||1,day:parseInt(mr[1]),fuzzy:"day"};
+      // MON YYYY
+      mr = s.match(/^([A-Z]{3})\s+(\d{4})$/i);
+      if (mr) return {year:parseInt(mr[2]),month:months[mr[1].toUpperCase()]||1,day:1,fuzzy:"month"};
+      // YYYY
+      mr = s.match(/^(\d{4})$/);
+      if (mr) return {year:parseInt(mr[1]),month:1,day:1,fuzzy:"year"};
+      return null;
+    }
+
+    // Map GEDCOM event tag → human title
+    const EVENT_TITLES = {
+      BIRT:"Born", DEAT:"Died", MARR:"Married", DIV:"Divorced",
+      BURI:"Buried", BAPM:"Baptised", CONF:"Confirmed",
+      EMIG:"Emigrated", IMMI:"Immigrated", NATU:"Naturalised",
+      CENS:"Census", RESI:"Resided", OCCU:"Occupation",
+      EDUC:"Education", GRAD:"Graduated", RETI:"Retired",
+      MILI:"Military service", WILL:"Will written", PROB:"Probate",
+      CHR:"Christened", ADOP:"Adopted", EVEN:"Event",
+    };
+
+    // Index individuals and families
+    const indiMap = {};
+    const famMap  = {};
+    for (const r of records) {
+      if (r.tag.startsWith("@") && r.tag.endsWith("@")) continue;
+      if (r.value === "INDI") indiMap[r.tag] = r;
+      if (r.value === "FAM")  famMap[r.tag]  = r;
+    }
+    // Actually the record structure is:  tag=@I1@ value=INDI
+    for (const r of records) {
+      if (r.tag.match(/^@.*@$/) && r.value === "INDI") indiMap[r.tag] = r;
+      if (r.tag.match(/^@.*@$/) && r.value === "FAM")  famMap[r.tag]  = r;
+    }
+
+    // Build person list
+    const persons = [];
+    for (const [id, rec] of Object.entries(indiMap)) {
+      const nameNode = rec.children.find(n=>n.tag==="NAME");
+      let fullName = nameNode ? fullText(nameNode) : "Unknown";
+      // Clean GEDCOM name slashes: /SURNAME/
+      fullName = fullName.replace(/\//g,"").replace(/\s+/g," ").trim();
+
+      const birt = rec.children.find(n=>n.tag==="BIRT");
+      const deat = rec.children.find(n=>n.tag==="DEAT");
+      const birtDate = birt ? parseDate(child(birt,"DATE")) : null;
+      const deatDate = deat ? parseDate(child(deat,"DATE")) : null;
+      const birtPlace = birt ? child(birt,"PLAC") : null;
+      const deatPlace = deat ? child(deat,"PLAC") : null;
+
+      const sex = child(rec, "SEX") || "";
+      persons.push({
+        id, rec, fullName, sex,
+        birtYear: birtDate?.year || null,
+        deatYear: deatDate?.year || null,
+        birtPlace, deatPlace,
+      });
+    }
+    persons.sort((a,b)=>(a.fullName||"").localeCompare(b.fullName||""));
+
+    // Build memories for a chosen person
+    function buildMemories(person) {
+      const rec = person.rec;
+      const mems = [];
+      let idx = 0;
+
+      function addMem(title, dateObj, place, note, extraPeople) {
+        if (!dateObj && !place && !note && !title) return;
+        const year  = dateObj?.year  || new Date().getFullYear();
+        const month = dateObj?.month || 1;
+        const day   = dateObj?.day   || 1;
+        const fuzzy = dateObj?.fuzzy || (dateObj ? "year" : "year");
+        const loc   = place || "";
+        const content = [note, place ? "Place: "+place : ""].filter(Boolean).join("\n\n").trim();
+        mems.push({
+          id: "ged_" + Date.now() + "_" + (idx++),
+          title,
+          content,
+          year, month, day, fuzzy,
+          season: "Early",
+          location: loc,
+          locations: loc ? [loc] : [],
+          tags: ["genealogy"],
+          people: extraPeople || [],
+          orgs: [],
+          mediaUrls: [],
+          endFuzzy: null, endYear: null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false,
+          perspectives: [],
+          fromGedcom: true,
+        });
+      }
+
+      // Standard events on the individual record
+      const skipTags = new Set(["NAME","SEX","FAMS","FAMC","CHAN","NOTE","SOUR","OBJE","SUBM"]);
+      for (const node of rec.children) {
+        if (skipTags.has(node.tag)) continue;
+        const title = EVENT_TITLES[node.tag];
+        if (!title && node.tag !== "EVEN") continue;
+        const evTitle = node.tag === "EVEN"
+          ? (child(node,"TYPE") || "Event")
+          : title;
+        const dateObj = parseDate(child(node,"DATE"));
+        const place   = child(node,"PLAC");
+        // Notes on the event itself
+        const noteNodes = children(node,"NOTE");
+        const note = noteNodes.map(n=>fullText(n)).filter(Boolean).join("\n\n");
+        addMem(evTitle, dateObj, place, note, []);
+      }
+
+      // Spouse / marriage info from FAM records
+      for (const famRef of rec.children.filter(n=>n.tag==="FAMS")) {
+        const fam = famMap[famRef.value];
+        if (!fam) continue;
+        const marrNode = fam.children.find(n=>n.tag==="MARR");
+        if (marrNode) {
+          const dateObj = parseDate(child(marrNode,"DATE"));
+          const place   = child(marrNode,"PLAC");
+          // Get spouse name
+          const spouseTag = child(rec,"SEX")==="F" ? "HUSB" : "WIFE";
+          const spouseRef = child(fam, spouseTag);
+          const spouseRec = spouseRef ? indiMap[spouseRef] : null;
+          let spouseName = null;
+          if (spouseRec) {
+            const sn = spouseRec.children.find(n=>n.tag==="NAME");
+            if (sn) spouseName = fullText(sn).replace(/\//g,"").replace(/\s+/g," ").trim();
+          }
+          const evTitle = spouseName ? `Married ${spouseName}` : "Married";
+          const note = child(marrNode,"NOTE")||"";
+          addMem(evTitle, dateObj, place, note, spouseName ? [spouseName] : []);
+        }
+        // Children
+        for (const childRef of fam.children.filter(n=>n.tag==="CHIL")) {
+          const childRec = indiMap[childRef.value];
+          if (!childRec) continue;
+          const cn = childRec.children.find(n=>n.tag==="NAME");
+          if (!cn) continue;
+          const childName = fullText(cn).replace(/\//g,"").replace(/\s+/g," ").trim();
+          const birt = childRec.children.find(n=>n.tag==="BIRT");
+          const dateObj = birt ? parseDate(child(birt,"DATE")) : null;
+          const place   = birt ? child(birt,"PLAC") : null;
+          addMem(`Birth of ${childName}`, dateObj, place, "", [childName]);
+        }
+      }
+
+      // Top-level notes on the individual
+      const topNotes = rec.children.filter(n=>n.tag==="NOTE").map(n=>fullText(n)).filter(Boolean).join("\n\n");
+
+      // Sort by year
+      mems.sort((a,b)=>sortKey(a)-sortKey(b));
+
+      return { mems, topNotes };
+    }
+
+    return { persons, buildMemories };
+  }
+
+  function handleGedFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setGedBusy(true);
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const result = parseGedcom(ev.target.result);
+        setGedPersons(result);
+        setGedPicked(null);
+        setGedPreview(null);
+      } catch(err) {
+        alert("Could not parse GEDCOM file: " + err.message);
+      }
+      setGedBusy(false);
+    };
+    reader.readAsText(file, "utf-8");
+  }
+
+  function handleGedPick(person) {
+    setGedPicked(person);
+    if (!gedPersons) return;
+    const { mems, topNotes } = gedPersons.buildMemories(person);
+    const subjId = "subj_ged_" + Date.now();
+    const newSubj = {
+      ...emptySubject(subjId, person.fullName, false),
+      dob: person.birtYear ? String(person.birtYear) : "",
+      notes: topNotes || "",
+      knownPeople: [...new Set(mems.flatMap(m=>m.people))],
+      knownLocations: [...new Set(mems.map(m=>m.location).filter(Boolean))],
+    };
+    setGedPreview({ subj: newSubj, mems });
+  }
+
+  function commitGedImport() {
+    if (!gedPreview) return;
+    const { subj, mems } = gedPreview;
+    setData(prev => ({
+      ...prev,
+      subjects: [...prev.subjects, { ...subj, memories: mems }],
+      activeSubjectId: subj.id,
+    }));
+    setGedPersons(null); setGedPicked(null); setGedPreview(null);
+    setView("life");
+    alert(`Imported ${mems.length} memories for ${subj.name}. You can now add notes and photos to each event.`);
   }
 
   function importBackup(e) {
@@ -3260,7 +3529,7 @@ function App() {
         importSaved>0&&React.createElement("div",{style:{background:"#e8f4e8",border:"1px solid #89b08a",borderRadius:"3px",padding:"12px 16px",marginBottom:"18px",color:"#3a6b3a",fontSize:"0.95rem"}},`✓ ${importSaved} ${importSaved===1?"memory":"memories"} saved.`),
         // Tabs
         React.createElement("div",{style:{display:"flex",borderBottom:"1px solid #c8b89a",marginBottom:"24px"}},
-          [["photos","📷  Photos"],["email","✉️  Email"]].map(([tab,label])=>React.createElement("button",{key:tab,onClick:()=>setImportTab(tab),style:{padding:"10px 20px",border:"none",borderBottom:importTab===tab?"2px solid #2c2416":"2px solid transparent",background:"transparent",color:importTab===tab?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"1rem",marginBottom:"-1px"}},label))
+          [["photos","📷  Photos"],["email","✉️  Email"],["gedcom","🌳  Family Tree"]].map(([tab,label])=>React.createElement("button",{key:tab,onClick:()=>setImportTab(tab),style:{padding:"10px 20px",border:"none",borderBottom:importTab===tab?"2px solid #2c2416":"2px solid transparent",background:"transparent",color:importTab===tab?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"1rem",marginBottom:"-1px"}},label))
         ),
         // Photo tab
         importTab==="photos"&&React.createElement("div",null,
@@ -3298,6 +3567,79 @@ function App() {
           )
         ),
         // Email tab
+        importTab==="gedcom"&&React.createElement("div",null,
+          // No file loaded yet
+          !gedPersons&&React.createElement("div",null,
+            React.createElement("div",{
+              onClick:()=>document.getElementById("ged-file-input").click(),
+              style:{border:"2px dashed #c8b89a",borderRadius:"6px",padding:"36px 24px",textAlign:"center",cursor:"pointer",background:"rgba(255,252,245,0.5)",marginBottom:"16px"}
+            },
+              React.createElement("div",{style:{fontSize:"2rem",marginBottom:"8px",opacity:0.6}},"🌳"),
+              React.createElement("p",{style:{margin:"0 0 5px",fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208"}},"Drop a GEDCOM file here"),
+              React.createElement("p",{style:{margin:0,fontSize:"0.86rem",color:"#8a7460",fontStyle:"italic"}},"Export from Ancestry, MyHeritage, FamilySearch or any genealogy app · .ged files only"),
+              React.createElement("input",{id:"ged-file-input",type:"file",accept:".ged,.GED",style:{display:"none"},onChange:handleGedFile})
+            ),
+            gedBusy&&React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",textAlign:"center"}},"Parsing…")
+          ),
+
+          // Person picker
+          gedPersons&&!gedPicked&&React.createElement("div",null,
+            React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}},
+              React.createElement("p",{style:{margin:0,fontSize:"0.9rem",color:"#4a7a5a",fontWeight:600}},
+                `Found ${gedPersons.persons.length} people — choose one to import:`
+              ),
+              React.createElement("button",{onClick:()=>setGedPersons(null),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",textDecoration:"underline"}},"Start over")
+            ),
+            React.createElement("div",{style:{maxHeight:"380px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px"}},
+              gedPersons.persons.map((p,i)=>React.createElement("div",{
+                key:p.id,
+                onClick:()=>handleGedPick(p),
+                style:{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #ede0cc",background:i%2===0?"transparent":"rgba(200,184,154,0.08)",display:"flex",justifyContent:"space-between",alignItems:"center"}
+              },
+                React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208"}},p.fullName),
+                React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},
+                  [p.birtYear, p.deatYear].filter(Boolean).join(" – ") ||
+                  (p.birtPlace ? p.birtPlace.split(",")[0] : "")
+                )
+              ))
+            )
+          ),
+
+          // Preview before importing
+          gedPreview&&gedPicked&&React.createElement("div",null,
+            React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}},
+              React.createElement("div",null,
+                React.createElement("p",{style:{margin:"0 0 2px",fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208"}},gedPicked.fullName),
+                React.createElement("p",{style:{margin:0,fontSize:"0.82rem",color:"#8a7460"}},
+                  [gedPicked.birtYear&&`b. ${gedPicked.birtYear}`, gedPicked.deatYear&&`d. ${gedPicked.deatYear}`].filter(Boolean).join("  ·  ")
+                )
+              ),
+              React.createElement("button",{onClick:()=>{setGedPicked(null);setGedPreview(null);},style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",textDecoration:"underline"}},"← Back")
+            ),
+            React.createElement("p",{style:{fontSize:"0.88rem",color:"#4a7a5a",marginBottom:"12px"}},
+              `${gedPreview.mems.length} ${gedPreview.mems.length===1?"memory":"memories"} ready to import:`
+            ),
+            React.createElement("div",{style:{maxHeight:"300px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px",marginBottom:"16px"}},
+              gedPreview.mems.map((m,i)=>React.createElement("div",{key:m.id,style:{padding:"8px 14px",borderBottom:"1px solid #ede0cc",display:"flex",justifyContent:"space-between",gap:"12px",background:i%2===0?"transparent":"rgba(200,184,154,0.08)"}},
+                React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.88rem",color:"#1a1208"}},m.title),
+                React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",whiteSpace:"nowrap"}},
+                  m.fuzzy==="day"?`${m.day}/${m.month}/${m.year}`:m.fuzzy==="month"?`${m.month}/${m.year}`:String(m.year)
+                )
+              ))
+            ),
+            gedPreview.subj.notes&&React.createElement("div",{style:{background:"rgba(200,184,154,0.15)",borderRadius:"3px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.82rem",color:"#6a5c48",fontStyle:"italic",lineHeight:1.6}},
+              React.createElement("strong",{style:{fontStyle:"normal",display:"block",marginBottom:"4px"}},"Biographical notes:"),
+              gedPreview.subj.notes.length > 300 ? gedPreview.subj.notes.slice(0,300)+"…" : gedPreview.subj.notes
+            ),
+            React.createElement("div",{style:{background:"rgba(196,133,138,0.1)",border:"1px solid rgba(196,133,138,0.3)",borderRadius:"3px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.8rem",color:"#8a3030",lineHeight:1.5}},
+              "This will create a new subject in your Chronicle. You can add photos, notes and your own perspectives to each memory afterwards."
+            ),
+            React.createElement("button",{onClick:commitGedImport,style:{...S.btn,width:"100%",fontSize:"0.95rem",padding:"11px"}},
+              `Import ${gedPicked.fullName} →`
+            )
+          )
+        ),
+
         importTab==="email"&&React.createElement("div",null,
           React.createElement("p",{style:{fontSize:"0.92rem",color:"#8a7460",marginBottom:"14px",fontStyle:"italic"}},"Export email as .eml from your mail client, or paste raw email text below."),
           React.createElement("div",{onDragOver:e=>{e.preventDefault();setEmailDragOver(true);},onDragLeave:()=>setEmailDragOver(false),onDrop:e=>{ e.preventDefault();setEmailDragOver(false);const f=e.dataTransfer.files[0];if(f){const r=new FileReader();r.onload=ev=>handleEmailText(ev.target.result);r.readAsText(f);}},onClick:()=>emlImportRef.current?.click(),style:{border:`2px dashed ${emailDragOver?"#2c2416":"#c8b89a"}`,borderRadius:"6px",padding:"24px",textAlign:"center",cursor:"pointer",background:emailDragOver?"rgba(200,184,154,0.2)":"rgba(255,252,245,0.5)",marginBottom:"12px"}},
