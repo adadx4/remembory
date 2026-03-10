@@ -2623,7 +2623,7 @@ function App() {
     return null;
   }
 
-  const showBack=["add","edit","detail","decade","year","timeline","import","people","index","map","print"].includes(view);
+  const showBack=["add","edit","detail","decade","year","timeline","import","people","index","map","print","prompt","settings"].includes(view);
   const showAdd=!["add","edit","print"].includes(view);
   const breadcrumb=bc();
 
@@ -3006,11 +3006,12 @@ function App() {
           React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.5}},
             "Your backup file is self-contained — memories, photos, and all. Open it on any device to restore everything."
           ),
+          React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 6px"}},"Backup password (optional) — encrypts the downloaded file only. This is separate from your Chronicle lock password."),
           React.createElement("input",{
             type:"password",
             value:subject.backupPassword||"",
             onChange:e=>persistSubject({backupPassword:e.target.value}),
-            placeholder:"Backup password (optional — encrypts the file)",
+            placeholder:"Password for this backup file",
             style:{...S.input,marginBottom:"12px",fontSize:"0.88rem"}
           }),
           React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap"}},
@@ -3026,45 +3027,83 @@ function App() {
         ),
 
         // ── Password / lock ──
-        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Password"),
-          React.createElement("p",{style:{fontSize:"0.82rem",color:activePassword?"#89b08a":"#b0a08a",fontStyle:"italic",margin:"0 0 14px"}},
-            activePassword ? "🔒 Password protected" : "🔓 No password set"
-          ),
-          React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap"}},
-            React.createElement("button",{
-              onClick:async ()=>{
-                const pw1 = window.prompt(activePassword?"Enter new password (leave blank to cancel):":"Set a password for Chronicle:");
-                if (!pw1) return;
-                if (pw1.length < 6) { alert("Password must be at least 6 characters."); return; }
-                const pw2 = window.prompt("Confirm password:");
-                if (pw1 !== pw2) { alert("Passwords don't match."); return; }
-                await saveEncrypted(pw1, data);
-                setActivePassword(pw1);
-                alert("Password set. Chronicle is now encrypted.");
-              },
-              style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem"}
-            }, activePassword ? "Change password" : "Set password"),
-            activePassword&&React.createElement("button",{
-              onClick:async ()=>{
-                if (!window.confirm("Remove password protection? Your data will be stored unencrypted.")) return;
-                saveData(data);
-                localStorage.removeItem(CRYPTO_KEY);
-                setActivePassword(null);
-              },
-              style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}
-            },"Remove password"),
-            activePassword&&React.createElement("button",{
-              onClick:()=>{ setLocked(true); setActivePassword(null); setData(EMPTY_DATA); },
-              style:{...S.btn,padding:"8px 16px",fontSize:"0.86rem"}
-            },"🔒 Lock now")
-          )
-        ),
+        (()=>{
+          const [pw1, setPw1] = React.useState("");
+          const [pw2, setPw2] = React.useState("");
+          const [pwErr, setPwErr] = React.useState("");
+          const [pwOk, setPwOk] = React.useState("");
+
+          async function applyPassword() {
+            setPwErr(""); setPwOk("");
+            if (pw1.length < 6) { setPwErr("Password must be at least 6 characters."); return; }
+            if (pw1 !== pw2) { setPwErr("Passwords don’t match."); return; }
+            await saveEncrypted(pw1, data);
+            setActivePassword(pw1);
+            setPw1(""); setPw2("");
+            setPwOk("Password set. Chronicle is now encrypted.");
+          }
+
+          async function removePassword() {
+            if (!window.confirm("Remove password protection? Your data will be stored unencrypted.")) return;
+            saveData(data);
+            localStorage.removeItem(CRYPTO_KEY);
+            setActivePassword(null);
+            setPwOk("Password removed.");
+          }
+
+          return React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Lock Chronicle"),
+            React.createElement("p",{style:{fontSize:"0.82rem",color:activePassword?"#89b08a":"#b0a08a",fontStyle:"italic",margin:"0 0 12px"}},
+              activePassword ? "🔒 Password protected — Chronicle will ask for your password on each visit." : "🔓 No password set — Chronicle opens freely on this device."
+            ),
+            !activePassword && React.createElement(React.Fragment, null,
+              React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",margin:"0 0 8px"}},"Set a password to encrypt your data. You’ll need to enter it each time you open Chronicle."),
+              React.createElement("input",{
+                type:"password", value:pw1, onChange:e=>{setPw1(e.target.value);setPwErr("");setPwOk("");},
+                placeholder:"New password (min. 6 characters)",
+                style:{...S.input,marginBottom:"8px"}
+              }),
+              React.createElement("input",{
+                type:"password", value:pw2, onChange:e=>{setPw2(e.target.value);setPwErr("");setPwOk("");},
+                placeholder:"Confirm password",
+                onKeyDown:e=>{if(e.key==="Enter")applyPassword();},
+                style:{...S.input,marginBottom:"10px"}
+              }),
+              pwErr && React.createElement("p",{style:{fontSize:"0.82rem",color:"#c4858a",fontStyle:"italic",margin:"0 0 8px"}},pwErr),
+              pwOk  && React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontStyle:"italic",margin:"0 0 8px"}},pwOk),
+              React.createElement("button",{onClick:applyPassword,disabled:!pw1||!pw2,style:{...S.btn,padding:"8px 16px",fontSize:"0.86rem",opacity:(!pw1||!pw2)?0.5:1}},"Set password")
+            ),
+            activePassword && React.createElement(React.Fragment, null,
+              pwOk && React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontStyle:"italic",margin:"0 0 8px"}},pwOk),
+              React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap"}},
+                React.createElement("button",{
+                  onClick:async ()=>{
+                    setPwErr(""); setPwOk("");
+                    const np1 = window.prompt("Enter new password:");
+                    if (!np1) return;
+                    if (np1.length < 6) { setPwErr("Password must be at least 6 characters."); return; }
+                    const np2 = window.prompt("Confirm new password:");
+                    if (np1 !== np2) { setPwErr("Passwords don’t match."); return; }
+                    await saveEncrypted(np1, data);
+                    setActivePassword(np1);
+                    setPwOk("Password changed.");
+                  },
+                  style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem"}
+                },"Change password"),
+                React.createElement("button",{onClick:removePassword,style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove password"),
+                React.createElement("button",{
+                  onClick:()=>{ setLocked(true); setActivePassword(null); setData(EMPTY_DATA); },
+                  style:{...S.btn,padding:"8px 16px",fontSize:"0.86rem"}
+                },"🔒 Lock now")
+              )
+            )
+          );
+        })(),
 
         // ── Danger zone ──
         React.createElement("div",{style:{background:"rgba(255,245,245,0.7)",border:"1px solid #e0c8c8",borderRadius:"3px",padding:"20px"}},
-          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#8a3030",margin:"0 0 8px"}},"Danger zone"),
-          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px"}},`${memories.length} memories · stored locally · never leaves your device`),
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#8a3030",margin:"0 0 8px"}},"Reset"),
+          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px"}},"Permanently deletes all memories and cannot be undone. Download a backup first if you want to keep a copy."),
           React.createElement("button",{
             onClick:()=>{ if(window.confirm(`Delete all ${memories.length} memories? This cannot be undone.\n\nDownload a backup first.`)) { persistSubject({memories:[],knownPeople:[],knownOrgs:[]}); setView("life"); }},
             style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}
