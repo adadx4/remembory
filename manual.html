@@ -941,37 +941,31 @@
     <!-- Backup -->
     <section class="section">
       <h1 id="backup">Backup & Restore</h1>
-      <p class="chapter-intro">Chronicle stores your data in your browser's local storage. It is good practice to export a backup regularly in case you change browsers, clear your browser data, or switch devices.</p>
+      <p class="chapter-intro">Chronicle stores your memories in your browser on your device — they never leave it. This is great for privacy, but it means <strong>you are responsible for keeping a copy</strong>. Clearing your browser's history, cache, or site data will permanently erase your memories with no way to recover them.</p>
 
-      <h2>Exporting a Backup</h2>
+      <div class="warning"><strong>Back up regularly.</strong> Treat your Chronicle backup the way you would treat irreplaceable photos. Download a backup at least once a month and keep it somewhere safe — a cloud drive, an external disk, or email it to yourself. The file contains everything: memories, photos, and settings.</div>
+
+      <h2>Downloading a Backup</h2>
       <ol class="steps">
-        <li>Click <strong>⚙ Settings</strong></li>
-        <li>Click <strong>Export backup</strong></li>
-        <li>A JSON file downloads containing all your memories, settings, and data</li>
-        <li>Save this file somewhere safe — an external drive, cloud storage, or email it to yourself</li>
+        <li>Click <strong>⚙ Settings</strong> in the top navigation</li>
+        <li>In the <em>Backup</em> section, click <strong>💾 Download backup</strong></li>
+        <li>Save the file somewhere safe — a cloud drive, external disk, or email it to yourself as an attachment</li>
       </ol>
+
+      <div class="tip">The easiest habit: after adding a batch of memories, email the backup file to yourself. It stays in your sent mail forever as an offsite copy.</div>
 
       <h2>Restoring from a Backup</h2>
       <ol class="steps">
         <li>Click <strong>⚙ Settings</strong></li>
-        <li>Click <strong>Import backup</strong></li>
-        <li>Select your previously exported JSON file</li>
-        <li>Your memories will be restored — any existing memories will be merged with the backup</li>
+        <li>Click <strong>⬆ Restore from file</strong></li>
+        <li>Select your previously downloaded backup file</li>
+        <li>Your memories will be restored — existing memories are merged with the backup, not overwritten</li>
       </ol>
 
-      <div class="tip">Export a backup before making major changes, switching browsers, or clearing your browser's storage. A regular monthly backup is a good habit.</div>
-      <div class="warning">Importing a backup merges memories — it does not overwrite. If you want a clean restore, use <strong>Clear all memories</strong> in Settings first, then import your backup.</div>
-
-      <h2>Importing a Share Code</h2>
-      <p>If someone shared a memory with you via a link and gave you the 6-character share code directly, you can enter it manually:</p>
-      <ol class="steps">
-        <li>Click <strong>⚙ Settings</strong></li>
-        <li>Enter the share code in the <em>Import from share code</em> field</li>
-        <li>Click <strong>Import</strong></li>
-      </ol>
+      <div class="warning">For a clean restore with no merging, go to Settings → Reset → <strong>Clear all memories</strong> first, then restore from your backup file.</div>
 
       <h2>Clearing All Memories</h2>
-      <p>To erase everything and start fresh, click <strong>🗑 Clear all memories</strong> in Settings. You will be asked to confirm. <strong>Export a backup first</strong> if you want to keep your data.</p>
+      <p>To erase everything and start fresh, go to <strong>⚙ Settings → Reset</strong> and click <strong>🗑 Clear all memories</strong>. You will be asked to confirm. Download a backup first if you want to keep your data.</p>
     </section>
 
     <div class="divider"></div>
@@ -1005,6 +999,7 @@
     <footer style="text-align:center;padding:40px 0 20px;color:var(--ink-faint);font-size:0.88rem;font-style:italic;">
       <p>Chronicle by <a href="index.html" style="color:var(--gold-dark);text-decoration:none;">Remembory</a> · Free personal life journal</p>
       <p style="margin-top:6px;font-size:0.8rem;">Built with care. Yours to keep.</p>
+      <p style="margin-top:10px;"><a href="https://ko-fi.com/remembory" target="_blank" rel="noopener" style="color:var(--gold-dark); text-decoration:none; border-bottom:1px solid rgba(168,136,90,0.35);">☕ Support Remembory on Ko-fi</a></p>
     </footer>
 
   </main>
