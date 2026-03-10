@@ -1483,19 +1483,36 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
     React.createElement("button",{onClick:onDone,style:{...S.btnOutline,marginLeft:"8px",color:"#8a7460",borderColor:"#c8b89a"}},"Cancel")
   );
 
+
+  const CHRONICLE_INTRO = "Chronicle is a free, private memory keeper \u2014 no account needed. Your memories stay on your device.\n\nOpen the link below to see what I've shared with you, then save it to your own Chronicle at remembory.net:\n";
+  const [includeIntro, setIncludeIntro] = useState(true);
+  const [copiedMsg, setCopiedMsg] = useState(false);
+
+  function buildMessage() { return includeIntro ? CHRONICLE_INTRO + shareUrl : shareUrl; }
+  function copyMessage() {
+    navigator.clipboard.writeText(buildMessage()).then(()=>{ setCopiedMsg(true); setTimeout(()=>setCopiedMsg(false),2500); });
+  }
+
   if (status==="done") return React.createElement("div",null,
-    React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontWeight:600,marginBottom:"10px"}},"✓ Link ready — send it however you like:"),
-    React.createElement("div",{style:{display:"flex",gap:"8px",alignItems:"center",marginBottom:"10px"}},
-      React.createElement("input",{readOnly:true,value:shareUrl,onClick:e=>e.target.select(),style:{...S.input,fontSize:"0.85rem",flex:1,color:"#4a5a7a"}}),
-      React.createElement("button",{onClick:copy,style:{...S.btn,padding:"9px 14px",fontSize:"0.86rem",whiteSpace:"nowrap"}},copied?"✓ Copied!":"Copy")
+    React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontWeight:600,marginBottom:"12px"}},"✓ Link ready — copy and send the message below:"),
+    React.createElement("label",{style:{display:"flex",alignItems:"flex-start",gap:"8px",marginBottom:"10px",cursor:"pointer"}},
+      React.createElement("input",{type:"checkbox",checked:includeIntro,onChange:e=>setIncludeIntro(e.target.checked),style:{marginTop:"3px",flexShrink:0}}),
+      React.createElement("span",{style:{fontSize:"0.82rem",color:"#6a5c48",lineHeight:1.5}},"Include a brief explanation of Chronicle (good for first-time recipients)")
     ),
-    React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",marginBottom:"8px"}},"Paste it anywhere. Expires in 30 days and deleted once collected."),
-    React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},
-      "If they don’t have Chronicle yet, send them ",
-      React.createElement("a",{href:"https://remembory.net",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"remembory.net"),
-      " too."
+    React.createElement("textarea",{
+      readOnly:true,
+      value:buildMessage(),
+      onClick:e=>e.target.select(),
+      rows: includeIntro ? 6 : 2,
+      style:{...S.input,width:"100%",fontSize:"0.82rem",color:"#2c2416",lineHeight:1.6,resize:"none",boxSizing:"border-box",fontFamily:"inherit",whiteSpace:"pre-wrap",marginBottom:"10px"}
+    }),
+    React.createElement("button",{onClick:copyMessage,style:{...S.btn,width:"100%",marginBottom:"8px",fontSize:"0.88rem"}},
+      copiedMsg ? "✓ Copied!" : "Copy message"
     ),
-    React.createElement("button",{onClick:onDone,style:{...S.btnOutline,marginTop:"14px",color:"#8a7460",borderColor:"#c8b89a",width:"100%"}},"Done")
+    React.createElement("p",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic",margin:"0"}},
+      "Link expires in 30 days and is deleted once the recipient saves it."
+    ),
+    React.createElement("button",{onClick:onDone,style:{...S.btnOutline,marginTop:"12px",color:"#8a7460",borderColor:"#c8b89a",width:"100%"}},"Done")
   );
 
   return null;
