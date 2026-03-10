@@ -1432,6 +1432,7 @@ function MapView({ memories, onSelectLocation }) {
 function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) {
   const [status, setStatus] = useState("idle");
   const [shareUrl, setShareUrl] = useState("");
+  const [shareErr, setShareErr] = useState("");
   const [copied, setCopied] = useState(false);
 
   useEffect(()=>{ generate(); }, []);
@@ -1462,7 +1463,7 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
       setStatus("done");
     } catch(e) {
       setStatus("error");
-      setShareUrl(e.message || String(e));
+      setShareErr(e.message || String(e));
       console.error(e);
     }
   }
@@ -1475,7 +1476,7 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
 
   if (status==="error") return React.createElement("div",null,
     React.createElement("p",{style:{color:"#c4858a",fontSize:"0.9rem",marginBottom:"10px"}},"Couldn’t reach the share server. Check your connection."),
-    shareUrl && React.createElement("p",{style:{color:"#8a7460",fontSize:"0.78rem",fontStyle:"italic",marginBottom:"10px",wordBreak:"break-all"}},shareUrl),
+    shareErr ? React.createElement("p",{style:{color:"#8a7460",fontSize:"0.78rem",fontStyle:"italic",marginBottom:"10px",wordBreak:"break-all"}},shareErr) : null,
     React.createElement("button",{onClick:generate,style:{...S.btnOutline,color:"#7a9e8a",borderColor:"#7a9e8a"}},"Retry"),
     React.createElement("button",{onClick:onDone,style:{...S.btnOutline,marginLeft:"8px",color:"#8a7460",borderColor:"#c8b89a"}},"Cancel")
   );
