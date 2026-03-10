@@ -1484,7 +1484,12 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
       React.createElement("input",{readOnly:true,value:shareUrl,onClick:e=>e.target.select(),style:{...S.input,fontSize:"0.85rem",flex:1,color:"#4a5a7a"}}),
       React.createElement("button",{onClick:copy,style:{...S.btn,padding:"9px 14px",fontSize:"0.86rem",whiteSpace:"nowrap"}},copied?"✓ Copied!":"Copy")
     ),
-    React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},"Paste it anywhere. Expires in 30 days and deleted once collected."),
+    React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",marginBottom:"8px"}},"Paste it anywhere. Expires in 30 days and deleted once collected."),
+    React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},
+      "If they don’t have Chronicle yet, send them ",
+      React.createElement("a",{href:"https://remembory.net",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"remembory.net"),
+      " too."
+    ),
     React.createElement("button",{onClick:onDone,style:{...S.btnOutline,marginTop:"14px",color:"#8a7460",borderColor:"#c8b89a",width:"100%"}},"Done")
   );
 
@@ -2924,12 +2929,19 @@ function App() {
         ["timeline","≡","List"],
         ["index","☰","Index"],
         ["map","🗺","Map"],
-        ["import","↑","Import"],
         ["prompt","✦","Prompt"],
+        ["settings","⚙","Settings"],
       ].map(([v,icon,label])=>React.createElement("button",{key:v,onClick:()=>{ setIndexFilter(null); setView(v); },style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:view===v?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:view===v?"2px solid #2c2416":"2px solid transparent"}},
         React.createElement("span",{style:{fontSize:"1.1rem",lineHeight:1}},icon),
         label
-      ))
+      )),
+      React.createElement("button",{
+        onClick:async()=>{ setSaveBackupBusy(true); await exportBackup(); setSaveBackupBusy(false); },
+        style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:"#4a7a5a",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:"2px solid transparent"}
+      },
+        React.createElement("span",{style:{fontSize:"1.1rem",lineHeight:1}},saveBackupBusy?"…":"💾"),
+        saveBackupBusy?"Saving":"Save"
+      )
     ),
 
 
