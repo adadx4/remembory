@@ -1436,6 +1436,13 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
   const [shareUrl, setShareUrl] = useState("");
   const [shareErr, setShareErr] = useState("");
   const [copied, setCopied] = useState(false);
+  const [includeIntro, setIncludeIntro] = useState(true);
+  const [copiedMsg, setCopiedMsg] = useState(false);
+  const CHRONICLE_INTRO = "Chronicle is a free, private memory keeper \u2014 no account needed. Your memories stay on your device.\n\nOpen the link below to see what I've shared with you, then save it to your own Chronicle at remembory.net:\n";
+  function buildMessage() { return includeIntro ? CHRONICLE_INTRO + shareUrl : shareUrl; }
+  function copyMessage() {
+    navigator.clipboard.writeText(buildMessage()).then(()=>{ setCopiedMsg(true); setTimeout(()=>setCopiedMsg(false),2500); });
+  }
 
   useEffect(()=>{ generate(); }, []);
 
@@ -1483,15 +1490,6 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
     React.createElement("button",{onClick:onDone,style:{...S.btnOutline,marginLeft:"8px",color:"#8a7460",borderColor:"#c8b89a"}},"Cancel")
   );
 
-
-  const CHRONICLE_INTRO = "Chronicle is a free, private memory keeper \u2014 no account needed. Your memories stay on your device.\n\nOpen the link below to see what I've shared with you, then save it to your own Chronicle at remembory.net:\n";
-  const [includeIntro, setIncludeIntro] = useState(true);
-  const [copiedMsg, setCopiedMsg] = useState(false);
-
-  function buildMessage() { return includeIntro ? CHRONICLE_INTRO + shareUrl : shareUrl; }
-  function copyMessage() {
-    navigator.clipboard.writeText(buildMessage()).then(()=>{ setCopiedMsg(true); setTimeout(()=>setCopiedMsg(false),2500); });
-  }
 
   if (status==="done") return React.createElement("div",null,
     React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontWeight:600,marginBottom:"12px"}},"✓ Link ready — copy and send the message below:"),
