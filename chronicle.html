@@ -2748,7 +2748,7 @@ function App() {
       ),
       React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0}},
         React.createElement("button",{
-          onClick:()=>{setShowSettings(true);setOnboardingDismissed(true);},
+          onClick:()=>{setView("settings");setOnboardingDismissed(true);},
           style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem"}},"Open Settings"),
         React.createElement("button",{
           onClick:()=>setOnboardingDismissed(true),
