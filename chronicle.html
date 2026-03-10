@@ -302,7 +302,7 @@ function seedData(data) { return data; }
 const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], ownerName:"", ownerEmail:"" };
 
 function emptySubject(id, name, isSelf=false) {
-  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, lastBackup:null, backupPassword:"" };
+  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, shareHistory:[], lastBackup:null, backupPassword:"" };
 }
 
 // Migrate flat data → subjects structure
@@ -322,6 +322,7 @@ function migrateData(raw) {
     orgNotes: raw.orgNotes || {},
     lastBackup: raw.lastBackup || null,
     backupPassword: raw.backupPassword || "",
+    shareHistory: raw.shareHistory || [],
   };
   return {
     carerMode: false,
@@ -1500,7 +1501,7 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
 }
 
 // ── ShareButton component ──────────────────────────────────────
-function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail}) {
+function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, shareHistory, onRecordShare}) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState("compose");
   const [senderName, setSenderName] = useState(ownerName||"");
@@ -1543,6 +1544,7 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail}) {
     if (!senderName.trim()) { alert("Please enter your name first."); return; }
     if (personalMsg.trim().length < 20) { setMsgError("Please write at least a sentence so they know why you’re sharing this."); return; }
     setMsgError("");
+    if (onRecordShare && selectedPeople.length) onRecordShare(selectedPeople, selectedMemIds);
     setStep("link");
   }
 
@@ -1615,11 +1617,17 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail}) {
           ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic"}},"No memories feature all the selected people.")
           : React.createElement("div",null,
               React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"4px",maxHeight:"180px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"8px"}},
-                eligibleMems.map(m=>React.createElement("label",{key:m.id,style:{display:"flex",alignItems:"baseline",gap:"10px",padding:"5px 6px",cursor:"pointer",background:selectedMemIds.has(m.id)?"rgba(122,158,138,0.07)":"transparent",borderRadius:"2px"}},
-                  React.createElement("input",{type:"checkbox",checked:selectedMemIds.has(m.id),onChange:()=>toggleMem(m.id),style:{marginTop:"2px",flexShrink:0}}),
-                  React.createElement("span",{style:{fontSize:"0.88rem",color:"#2c2416",fontFamily:"'Playfair Display',serif"}},m.title),
-                  React.createElement("span",{style:{fontSize:"0.76rem",color:"#8a7460",marginLeft:"4px"}},m.year||"")
-                ))
+                eligibleMems.map(m=>{
+                  const alreadySent = selectedPeople.length > 0 && (shareHistory||[]).some(h=>
+                    h.memIds.includes(m.id) && selectedPeople.every(p=>h.people.includes(p))
+                  );
+                  return React.createElement("label",{key:m.id,style:{display:"flex",alignItems:"baseline",gap:"10px",padding:"5px 6px",cursor:"pointer",background:selectedMemIds.has(m.id)?"rgba(122,158,138,0.07)":"transparent",borderRadius:"2px"}},
+                    React.createElement("input",{type:"checkbox",checked:selectedMemIds.has(m.id),onChange:()=>toggleMem(m.id),style:{marginTop:"2px",flexShrink:0}}),
+                    React.createElement("span",{style:{fontSize:"0.88rem",color:"#2c2416",fontFamily:"'Playfair Display',serif"}},m.title),
+                    React.createElement("span",{style:{fontSize:"0.76rem",color:"#8a7460",marginLeft:"4px"}},m.year||""),
+                    alreadySent && React.createElement("span",{style:{fontSize:"0.72rem",color:"#7a9e8a",marginLeft:"auto",whiteSpace:"nowrap",fontStyle:"italic"}},"✓ sent")
+                  );
+                })
               ),
               eligibleMems.length > 1 && React.createElement("div",{style:{display:"flex",gap:"10px",marginTop:"5px"}},
                 React.createElement("button",{onClick:()=>setSelectedMemIds(new Set(eligibleMems.map(m=>m.id))),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem",padding:0}},"Select all"),
@@ -2132,6 +2140,7 @@ function App() {
   const peopleEmails        = subject.peopleEmails || {};
   const peopleRelationships = subject.peopleRelationships || {};
   const peopleNotes         = subject.peopleNotes || {};
+  const shareHistory          = subject.shareHistory || [];
   const orgNotes            = subject.orgNotes || {};
   const ownerName           = subject.name || "";
   const ownerEmail          = data.carerEmail || "";
@@ -2248,6 +2257,10 @@ function App() {
   function setPersonEmail(name, email) { persistSubject({peopleEmails:{...peopleEmails, [name]: email}}); }
   function setPersonRelationship(name, rel) { persistSubject({peopleRelationships:{...peopleRelationships, [name]: rel}}); }
   function setPersonNotes(name, notes) { persistSubject({peopleNotes:{...peopleNotes, [name]: notes}}); }
+  function recordShare(people, memIds) {
+    const entry = { people, memIds:[...memIds], date:new Date().toISOString() };
+    persistSubject({shareHistory:[...shareHistory, entry]});
+  }
   function setOrgNotes(name, notes) { persistSubject({orgNotes:{...orgNotes, [name]: notes}}); }
   function registerOrgs(names) { const merged=[...new Set([...knownOrgs,...names])].sort(); persistSubject({knownOrgs:merged}); }
   function registerLocations(names) { const merged=[...new Set([...knownLocations,...names])].sort(); persistSubject({knownLocations:merged}); }
@@ -2456,7 +2469,7 @@ function App() {
       }));
       return {...m, mediaUrls: urls};
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes}, null, 2);
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, shareHistory}, null, 2);
   }
 
   async function buildBackupBlob(backupPassword) {
@@ -3390,7 +3403,7 @@ function App() {
           React.createElement("div",{style:{display:"flex",gap:"10px",marginBottom:"20px",flexWrap:"wrap"}},
             React.createElement("button",{onClick:()=>handleEdit(m),style:S.btn},"Edit"),
             React.createElement("button",{onClick:()=>handleDelete(m.id),style:{...S.btnOutline,color:"#c4858a",borderColor:"#c4858a"}},"Delete"),
-            React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail})
+            React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,onRecordShare:recordShare})
           )
         );
       })(),
