@@ -774,6 +774,42 @@
 </head>
 <body>
 
+<div id="iab-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(44,36,22,0.95);padding:14px 20px;display:none;align-items:flex-start;gap:14px;box-shadow:0 2px 12px rgba(0,0,0,0.4)">
+  <div style="flex:1">
+    <p id="iab-title" style="margin:0 0 4px;font-size:0.9rem;color:#f5f0e8;font-weight:600;font-family:'Playfair Display',serif"></p>
+    <p id="iab-instruction" style="margin:0;font-size:0.8rem;color:#c8b89a;line-height:1.5;font-family:'Crimson Text',serif"></p>
+  </div>
+  <button onclick="document.getElementById('iab-banner').style.display='none'" style="background:transparent;border:1px solid rgba(200,184,154,0.4);border-radius:3px;color:#c8b89a;cursor:pointer;font-size:0.78rem;padding:5px 12px;white-space:nowrap;flex-shrink:0;font-family:'Crimson Text',serif">Continue anyway</button>
+</div>
+<script>
+(function(){
+  var ua = navigator.userAgent || "";
+  var app = null;
+  if (/FBAN|FBAV|FB_IAB/i.test(ua)) app = "facebook";
+  else if (/Instagram/i.test(ua)) app = "instagram";
+  else if (/WhatsApp/i.test(ua)) app = "whatsapp";
+  else if (/LinkedInApp/i.test(ua)) app = "linkedin";
+  else if (/Snapchat/i.test(ua)) app = "snapchat";
+  else if (/TikTok|musical_ly|Bytedance/i.test(ua)) app = "tiktok";
+  else if (/MicroMessenger/i.test(ua)) app = "wechat";
+  else if (/Twitter/i.test(ua)) app = "twitter";
+  if (!app) return;
+  var isIOS = /iPhone|iPad|iPod/i.test(ua);
+  var names = {facebook:"Messenger / Facebook",instagram:"Instagram",whatsapp:"WhatsApp",linkedin:"LinkedIn",snapchat:"Snapchat",tiktok:"TikTok",wechat:"WeChat",twitter:"Twitter"};
+  var how = {
+    facebook:  isIOS ? "Tap ··· at the bottom right → Open in Safari" : "Tap ··· at the top right → Open in browser",
+    instagram: isIOS ? "Tap ··· at the top right → Open in external browser" : "Tap ··· → Open in Chrome",
+    whatsapp:  isIOS ? "Tap the link → Open in Safari" : "Tap ··· → Open in Chrome",
+  }[app] || (isIOS ? "Tap the share icon → Open in Safari" : "Tap the menu → Open in browser");
+  document.getElementById("iab-title").textContent = "📱 You're viewing this inside " + names[app] + " — some features may not work properly.";
+  document.getElementById("iab-instruction").textContent = how;
+  var banner = document.getElementById("iab-banner");
+  banner.style.display = "flex";
+  // Push nav down so banner doesnt cover it
+  document.documentElement.style.paddingTop = banner.offsetHeight + "px";
+})();
+</script>
+
 <!-- Nav -->
 <nav>
   <a href="#" class="nav-brand">Remem<span>bory</span></a>
