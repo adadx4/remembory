@@ -2,8 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chronicle</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Chronicle — Remembory</title>
+<meta name="description" content="A private, beautiful memory keeper. Record the stories that matter.">
+<meta name="theme-color" content="#2c2416">
+
+<!-- PWA manifest -->
+<link rel="manifest" href="/manifest.json">
+
+<!-- Apple PWA -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Chronicle">
+<link rel="apple-touch-icon" href="/icon-apple.png">
+
+<!-- Favicon -->
+<link rel="icon" type="image/png" href="/favicon.ico">
 <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -3312,7 +3326,7 @@ function App() {
     ),
 
     // ── MOBILE BOTTOM NAV ──
-    isMobile&&!["add","edit"].includes(view)&&React.createElement("nav",{style:{position:"fixed",bottom:0,left:0,right:0,zIndex:200,background:"rgba(245,240,232,0.97)",borderTop:"1px solid #c8b89a",display:"flex",backdropFilter:"blur(8px)"}},
+    isMobile&&!["add","edit"].includes(view)&&React.createElement("nav",{style:{position:"fixed",bottom:0,left:0,right:0,zIndex:200,background:"rgba(245,240,232,0.97)",borderTop:"1px solid #c8b89a",display:"flex",backdropFilter:"blur(8px)",paddingBottom:"env(safe-area-inset-bottom, 0px)"}},
       [
         ["life","◉","Life"],
         ["timeline","≡","List"],
@@ -3336,7 +3350,7 @@ function App() {
 
 
     // ── MAIN CONTENT ──
-    React.createElement("div",{style:{maxWidth:"900px",margin:"0 auto",padding:isMobile?"20px 16px 90px":"28px 20px"}},
+    React.createElement("div",{style:{maxWidth:"900px",margin:"0 auto",padding:isMobile?"20px 16px calc(90px + env(safe-area-inset-bottom, 0px))":"28px 20px"}},
 
       // ── MAP VIEW ──
       view==="map"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
