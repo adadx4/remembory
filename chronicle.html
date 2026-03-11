@@ -27,7 +27,7 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #f5f0e8; font-family: 'Crimson Text', Georgia, serif; color: #2c2416; }
-  input::placeholder, textarea::placeholder { color: #b0a08a; font-style: italic; }
+  input::placeholder, textarea::placeholder { color: #7a6a58; font-style: italic; }
   input[type=number]::-webkit-inner-spin-button { opacity: 1; }
   @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
   ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #f5f0e8; } ::-webkit-scrollbar-thumb { background: #c8b89a; border-radius: 3px; }
@@ -560,7 +560,7 @@ function TagPicker({tags, onToggle, customTags=[], onAddCustom, onRemoveCustom})
         const color=TAG_COLORS[tag]||"#9a8a7a"; const isCustom=!TAGS.includes(tag);
         return React.createElement("span",{key:tag,style:{display:"inline-flex",alignItems:"center",gap:"2px"}},
           React.createElement("button",{onClick:()=>onToggle(tag),style:{padding:"3px 9px",borderRadius:"20px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.8rem",background:tags.includes(tag)?color:"transparent",color:tags.includes(tag)?"#fff":"#8a7460",border:`1px solid ${tags.includes(tag)?color:"#c8b89a"}`}},tag),
-          isCustom&&React.createElement("button",{onClick:()=>onRemoveCustom&&onRemoveCustom(tag),style:{background:"none",border:"none",color:"#b0a08a",cursor:"pointer",fontSize:"0.72rem",padding:"0 1px",lineHeight:1}},"×")
+          isCustom&&React.createElement("button",{onClick:()=>onRemoveCustom&&onRemoveCustom(tag),style:{background:"none",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.72rem",padding:"0 1px",lineHeight:1}},"×")
         );
       })
     ),
@@ -665,7 +665,7 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
       ? React.createElement("div",{style:{background:"rgba(240,235,224,0.8)",border:"1px solid #c8b89a",borderRadius:"3px",padding:"10px 12px",marginBottom:"4px"}},
           React.createElement("p",{style:{margin:"0 0 7px",fontSize:"0.84rem",color:"#2c2416"}},
             React.createElement("strong",null,pendingName)," added. Email address? ",
-            React.createElement("span",{style:{color:"#b0a08a",fontStyle:"italic"}},"(optional — used for sharing)")
+            React.createElement("span",{style:{color:"#7a6a58",fontStyle:"italic"}},"(optional — used for sharing)")
           ),
           React.createElement("div",{style:{display:"flex",gap:"6px"}},
             React.createElement("input",{autoFocus:true,type:"email",value:emailInput,
@@ -680,7 +680,7 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
       ? React.createElement("div",{style:{background:"rgba(240,235,224,0.8)",border:"1px solid #c8b89a",borderRadius:"3px",padding:"10px 12px",marginBottom:"4px",position:"relative"}},
           React.createElement("p",{style:{margin:"0 0 7px",fontSize:"0.84rem",color:"#2c2416"}},
             "Relationship to ",React.createElement("strong",null,pendingName),"? ",
-            React.createElement("span",{style:{color:"#b0a08a",fontStyle:"italic"}},"(optional)")
+            React.createElement("span",{style:{color:"#7a6a58",fontStyle:"italic"}},"(optional)")
           ),
           React.createElement("div",{style:{display:"flex",gap:"6px"}},
             React.createElement("input",{autoFocus:true,value:relInput,
@@ -867,7 +867,7 @@ function PrompterView({memories, knownPeople, knownOrgs, knownLocations, onAddWi
           React.createElement("span",{style:{fontSize:"0.76rem",letterSpacing:"0.1em",textTransform:"uppercase",
             color:"#8a7060",fontWeight:600}},
             prompt.type==="decade" ? `${prompt.entity}s` : prompt.entity),
-          prompt.count>0&&React.createElement("span",{style:{fontSize:"0.76rem",color:"#b0a08a",fontStyle:"italic"}},
+          prompt.count>0&&React.createElement("span",{style:{fontSize:"0.76rem",color:"#7a6a58",fontStyle:"italic"}},
             `· ${prompt.count} ${prompt.count===1?"memory":"memories"}`)
         ),
         React.createElement("p",{style:{
@@ -888,12 +888,12 @@ function PrompterView({memories, knownPeople, knownOrgs, knownLocations, onAddWi
       ),
 
       // Subtle stats
-      dismissed>0&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#b0a08a",fontStyle:"italic",textAlign:"right",margin:"0 0 24px"}},
+      dismissed>0&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",textAlign:"right",margin:"0 0 24px"}},
         `${dismissed} prompt${dismissed===1?"":"s"} skipped this session`),
 
       // Recent history
       history.length>0&&React.createElement("div",null,
-        React.createElement("p",{style:{fontSize:"0.78rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#b0a08a",margin:"0 0 10px",fontWeight:600}},"Earlier prompts"),
+        React.createElement("p",{style:{fontSize:"0.78rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#7a6a58",margin:"0 0 10px",fontWeight:600}},"Earlier prompts"),
         history.map((p,i)=>React.createElement("div",{key:i,style:{
           borderLeft:`2px solid ${TYPE_BORDER[p.type]}`,paddingLeft:"14px",
           marginBottom:"12px",opacity:0.6
@@ -1147,7 +1147,7 @@ function PersonRow({name, count, email, relationship, notes, onRename, onDelete,
             textAlign:"left"
           }},name),
       relationship&&!renaming&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7060",background:"rgba(200,168,122,0.12)",border:"1px solid rgba(200,168,122,0.3)",borderRadius:"20px",padding:"1px 9px",fontStyle:"italic"}},relationship),
-      React.createElement("span",{style:{fontSize:"0.78rem",color:"#b0a08a",fontStyle:"italic"}},
+      React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},
         count," ",count===1?"memory":"memories"),
       React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px"}},
         !renaming&&React.createElement("button",{onClick:()=>{setDraft(name);setRenaming(true);},
@@ -1168,7 +1168,7 @@ function PersonRow({name, count, email, relationship, notes, onRename, onDelete,
         rows:3,
         style:{...S.input,width:"100%",resize:"vertical",fontSize:"0.88rem",fontFamily:"'Crimson Text',Georgia,serif",lineHeight:1.6}
       }),
-      React.createElement("p",{style:{fontSize:"0.75rem",color:"#b0a08a",fontStyle:"italic",marginTop:"3px"}},"Saved automatically when you click away")
+      React.createElement("p",{style:{fontSize:"0.75rem",color:"#7a6a58",fontStyle:"italic",marginTop:"3px"}},"Saved automatically when you click away")
     ),
 
     // Email row
@@ -1186,7 +1186,7 @@ function PersonRow({name, count, email, relationship, notes, onRename, onDelete,
             React.createElement("span",{style:{fontSize:"0.82rem",color:email?"#5a6a8a":"#c0b0a0",fontStyle:email?"normal":"italic"}},
               email ? "✉ "+email : "no email"),
             React.createElement("button",{onClick:()=>{setEmailDraft(email||"");setEditingEmail(true);},
-              style:{background:"transparent",border:"none",color:"#b0a08a",cursor:"pointer",
+              style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",
                 fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px",textDecoration:"underline"}},
               email?"edit":"+ add email")
           ),
@@ -1208,7 +1208,7 @@ function PersonRow({name, count, email, relationship, notes, onRename, onDelete,
             )
           )
         : React.createElement("button",{onClick:()=>{setRelDraft(relationship||"");setEditingRel(true);},
-            style:{background:"transparent",border:"none",color:"#b0a08a",cursor:"pointer",
+            style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",
               fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px",textDecoration:"underline"}},
             relationship ? "edit relationship" : "+ add relationship"
           )
@@ -1230,7 +1230,7 @@ function OrgRow({name, count, notes, onRename, onDelete, onSetNotes}) {
             onKeyDown:e=>{if(e.key==="Enter")commitRename();if(e.key==="Escape"){setDraft(name);setRenaming(false);}},
             onBlur:commitRename,style:{...S.input,padding:"5px 9px",fontSize:"1rem",flex:1,minWidth:"140px"}})
         : React.createElement("span",{style:{flex:1,fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208"}},name),
-      React.createElement("span",{style:{fontSize:"0.78rem",color:"#b0a08a",fontStyle:"italic"}},
+      React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},
         count," ",count===1?"memory":"memories"),
       React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px"}},
         !renaming&&React.createElement("button",{onClick:()=>{setDraft(name);setRenaming(true);},
@@ -1251,7 +1251,7 @@ function OrgRow({name, count, notes, onRename, onDelete, onSetNotes}) {
         rows:3,
         style:{...S.input,width:"100%",resize:"vertical",fontSize:"0.88rem",fontFamily:"'Crimson Text',Georgia,serif",lineHeight:1.6}
       }),
-      React.createElement("p",{style:{fontSize:"0.75rem",color:"#b0a08a",fontStyle:"italic",marginTop:"3px"}},"Saved automatically when you click away")
+      React.createElement("p",{style:{fontSize:"0.75rem",color:"#7a6a58",fontStyle:"italic",marginTop:"3px"}},"Saved automatically when you click away")
     )
   );
 }
@@ -1272,17 +1272,17 @@ function PeopleOrgsManager({knownPeople,knownOrgs,memories,peopleEmails,peopleRe
         placeholder:"Search people & organisations\u2026",
         style:{...S.input,paddingLeft:"32px",fontSize:"0.92rem"}
       }),
-      React.createElement("span",{style:{position:"absolute",left:"10px",top:"50%",transform:"translateY(-50%)",color:"#b0a08a",fontSize:"0.9rem",pointerEvents:"none"}},"\uD83D\uDD0D"),
+      React.createElement("span",{style:{position:"absolute",left:"10px",top:"50%",transform:"translateY(-50%)",color:"#7a6a58",fontSize:"0.9rem",pointerEvents:"none"}},"\uD83D\uDD0D"),
       search && React.createElement("button",{
         onClick:()=>setSearch(""),
-        style:{position:"absolute",right:"8px",top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",color:"#b0a08a",cursor:"pointer",fontSize:"1rem",lineHeight:1}
+        style:{position:"absolute",right:"8px",top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"1rem",lineHeight:1}
       },"\u00d7"),
       q && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",marginTop:"5px"}},
         totalResults===0 ? "No matches" : totalResults+" result"+(totalResults===1?"":"s"))
     ),
     filteredPeople.length>0&&React.createElement("div",{style:{marginBottom:"36px"}},
       React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:"0 0 4px"}},"People"),
-      React.createElement("p",{style:{fontSize:"0.8rem",color:"#b0a08a",fontStyle:"italic",margin:"0 0 2px"}},
+      React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 2px"}},
         filteredPeople.length," ",filteredPeople.length===1?"person":"people"," \xb7 click a name to see their memories"),
       filteredPeople.map(name=>React.createElement(PersonRow,{key:name,name,count:personCount(name),
         email:peopleEmails?.[name],relationship:peopleRelationships?.[name],notes:peopleNotes?.[name],
@@ -1291,14 +1291,14 @@ function PeopleOrgsManager({knownPeople,knownOrgs,memories,peopleEmails,peopleRe
     ),
     filteredOrgs.length>0&&React.createElement("div",null,
       React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:"0 0 4px"}},"Organisations"),
-      React.createElement("p",{style:{fontSize:"0.8rem",color:"#b0a08a",fontStyle:"italic",margin:"0 0 2px"}},
+      React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 2px"}},
         filteredOrgs.length," ",filteredOrgs.length===1?"organisation":"organisations"),
       filteredOrgs.map(name=>React.createElement(OrgRow,{key:name,name,count:orgCount(name),notes:orgNotes?.[name],onRename:onRenameOrg,onDelete:onDeleteOrg,onSetNotes:onSetOrgNotes}))
     ),
     knownPeople.length===0&&knownOrgs.length===0&&React.createElement("div",null,
-      React.createElement("p",{style:{color:"#b0a08a",fontStyle:"italic",marginBottom:"16px"}},"No people or organisations tagged yet.")
+      React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic",marginBottom:"16px"}},"No people or organisations tagged yet.")
     ),
-    q && totalResults===0 && React.createElement("p",{style:{color:"#b0a08a",fontStyle:"italic"}},
+    q && totalResults===0 && React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},
       "No results for \u201c"+search+"\u201d")
   );
 }
@@ -1678,7 +1678,7 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
           style:{...S.input,resize:"vertical",marginTop:"4px",fontFamily:"'Crimson Text',Georgia,serif",fontSize:"0.95rem",lineHeight:1.6}
         }),
         msgError && React.createElement("p",{style:{fontSize:"0.82rem",color:"#a04848",marginTop:"4px"}},msgError),
-        personalMsg.trim().length > 0 && personalMsg.trim().length < 20 && !msgError && React.createElement("p",{style:{fontSize:"0.78rem",color:"#b0a08a",marginTop:"4px",fontStyle:"italic"}},
+        personalMsg.trim().length > 0 && personalMsg.trim().length < 20 && !msgError && React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",marginTop:"4px",fontStyle:"italic"}},
           (20 - personalMsg.trim().length) + " more characters needed"
         )
       ),
@@ -1778,9 +1778,9 @@ function PerspectivesPanel({memory, onSave, peopleEmails, senderName}) {
           }, "make dominant"),
           isDominant && React.createElement("button", {
             onClick:clearDominant,
-            style:{background:"transparent",border:"none",color:"#b0a08a",cursor:"pointer",fontSize:"0.75rem",fontFamily:"'Crimson Text',serif"}
+            style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.75rem",fontFamily:"'Crimson Text',serif"}
           }, "remove from timeline"),
-          isMine && React.createElement("button", {onClick:()=>{setMyDraft(p.content);setMyName(p.author);setMakeDominant(dominantAuthor===p.author);setAddingMine(true);},style:{background:"transparent",border:"none",color:"#b0a08a",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif"}}, "edit"),
+          isMine && React.createElement("button", {onClick:()=>{setMyDraft(p.content);setMyName(p.author);setMakeDominant(dominantAuthor===p.author);setAddingMine(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif"}}, "edit"),
           isMine && React.createElement("button", {onClick:removeMine,style:{background:"transparent",border:"none",color:"#c4858a",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif"}}, "remove")
         )
       ),
@@ -1799,7 +1799,7 @@ function PerspectivesPanel({memory, onSave, peopleEmails, senderName}) {
       )
     ),
     React.createElement("div", {style:{padding:"14px 16px",display:"flex",flexDirection:"column",gap:"16px"}},
-      !showAll && React.createElement("p", {style:{color:"#b0a08a",fontStyle:"italic",fontSize:"0.88rem",margin:0}}, "Showing your perspective only"),
+      !showAll && React.createElement("p", {style:{color:"#7a6a58",fontStyle:"italic",fontSize:"0.88rem",margin:0}}, "Showing your perspective only"),
       ...others.map((p,i)=> React.createElement(PerspectiveBlock, {key:i,p,isMine:false})),
       myPerspective && React.createElement(PerspectiveBlock, {p:myPerspective,isMine:true}),
       !myPerspective && !addingMine && React.createElement("button", {
@@ -1968,7 +1968,7 @@ function PrintView({memories, ownerName, allDecades}) {
           scope==="year"&&scopeYear ? String(scopeYear) :
           `${scopedMems[0]?.year||""} – ${scopedMems[scopedMems.length-1]?.year||""}`
         ),
-        React.createElement("p",{style:{fontSize:"0.8rem",color:"#b0a08a",marginTop:"6px"}},
+        React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",marginTop:"6px"}},
           `${scopedMems.length} ${scopedMems.length===1?"memory":"memories"}`
         )
       ),
@@ -2066,7 +2066,7 @@ function PasswordCard({activePassword, data, setActivePassword, setLocked, setDa
 
   return React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
     React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Lock Chronicle"),
-    React.createElement("p",{style:{fontSize:"0.82rem",color:activePassword?"#89b08a":"#b0a08a",fontStyle:"italic",margin:"0 0 12px"}},
+    React.createElement("p",{style:{fontSize:"0.82rem",color:activePassword?"#89b08a":"#7a6a58",fontStyle:"italic",margin:"0 0 12px"}},
       activePassword ? "🔒 Password protected — Chronicle will ask for your password on each visit." : "🔓 No password set — Chronicle opens freely on this device."
     ),
     !activePassword && React.createElement(React.Fragment, null,
@@ -3186,7 +3186,7 @@ function App() {
                 .then(d=>{ if(d.memories){ setPendingShare(d); setInAppShareCode(null); }})
                 .catch(()=>setInAppShareCode(null));
             },
-            style:{...S.btnOutline,width:"100%",fontSize:"0.82rem",color:"#b0a08a",borderColor:"#d4c4a8"}
+            style:{...S.btnOutline,width:"100%",fontSize:"0.82rem",color:"#7a6a58",borderColor:"#d4c4a8"}
           },"Continue anyway (memories may not save properly)")
         )
       );
@@ -3266,7 +3266,7 @@ function App() {
               onKeyDown:e=>{ if(e.key==="Enter") { commitMemory(primary,secondary); } },
               style:{...S.input,fontSize:"1rem"}
             }),
-            React.createElement("p",{style:{fontSize:"0.78rem",color:"#b0a08a",fontStyle:"italic",marginTop:"5px"}},
+            React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",marginTop:"5px"}},
               fuzzyDateLabel(secondary)
             )
           ),
@@ -3319,7 +3319,7 @@ function App() {
         }, saveBackupBusy ? "Saving…" : "💾 Save"),
         !isMobile&&React.createElement("button",{onClick:()=>setView("settings"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"⚙ Settings"),
         !isMobile&&React.createElement("span",{style:{width:"1px",height:"20px",background:"#d4c4a8",margin:"0 4px",flexShrink:0}}),
-        !isMobile&&React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",title:"Support Remembory on Ko-fi",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#b0906a",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#b0906a";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
+        !isMobile&&React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",title:"Support Remembory on Ko-fi",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#7a6040",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#7a6040";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
         showBack&&React.createElement("button",{onClick:goBack,style:{...S.btnOutline,padding:isMobile?"8px 14px":"7px 13px",fontSize:"0.9rem"}},"← Back"),
         showAdd&&React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView("add"); },style:{...S.btn,padding:isMobile?"8px 16px":"7px 15px",fontSize:"0.9rem"}},"+ Add")
       )
@@ -3432,7 +3432,7 @@ function App() {
                 onViewPerson:name=>setIndexFilter({type:"people",value:name})})
             // Locations and Tags: pill grid
             : activeTab.items.length===0
-            ? React.createElement("p",{style:{color:"#b0a08a",fontStyle:"italic"}},"Nothing here yet.")
+            ? React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"Nothing here yet.")
             : React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"10px"}},
                 activeTab.items.map(item=>{
                   const count=activeTab.getCount(item);
@@ -3566,7 +3566,7 @@ function App() {
         ),
 
         // ── Ko-fi ──
-        React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#b0a08a",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
+        React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
           "Chronicle is free and always will be. If it’s been useful — ",
           React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"☕ buy us a coffee"),
           "."
@@ -3577,7 +3577,7 @@ function App() {
         const legMems = memories.filter(m=>m.inLegacy).sort((a,b)=>sortKey(a)-sortKey(b));
         return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"680px"}},
           React.createElement("div",{style:{textAlign:"center",marginBottom:"32px",paddingBottom:"24px",borderBottom:"1px solid #d4c4a8"}},
-            React.createElement("p",{style:{fontSize:"0.82rem",color:"#b0906a",letterSpacing:"0.1em",textTransform:"uppercase",margin:"0 0 8px",fontFamily:"'Crimson Text',serif"}},"🌟 Legacy View"),
+            React.createElement("p",{style:{fontSize:"0.82rem",color:"#7a6040",letterSpacing:"0.1em",textTransform:"uppercase",margin:"0 0 8px",fontFamily:"'Crimson Text',serif"}},"🌟 Legacy View"),
             React.createElement("h1",{style:{fontFamily:"'Playfair Display',serif",fontSize:isMobile?"1.8rem":"2.4rem",color:"#1a1208",margin:"0 0 6px",fontStyle:"italic"}},ownerName||"A Life"),
             subject.dob&&React.createElement("p",{style:{fontSize:"0.9rem",color:"#8a7460",margin:"0 0 16px"}},subject.dob),
             legacyMessage&&React.createElement("p",{style:{fontSize:"1rem",color:"#4a3a28",lineHeight:1.8,fontStyle:"italic",maxWidth:"520px",margin:"0 auto",fontFamily:"'Crimson Text',Georgia,serif"}},'“'+legacyMessage+'”')
@@ -3587,7 +3587,7 @@ function App() {
             React.createElement("p",{style:{fontSize:"0.86rem"}},"Open any memory and tick \"Include in Legacy View\" to add it here.")
           ),
           legMems.map((m,i)=>React.createElement("div",{key:m.id,style:{marginBottom:"32px",paddingBottom:"32px",borderBottom:i<legMems.length-1?"1px solid rgba(200,184,154,0.4)":"none"}},
-            React.createElement("p",{style:{fontSize:"0.82rem",color:"#b0906a",margin:"0 0 4px",letterSpacing:"0.04em"}},fuzzyDateLabel(m)+(m.location?" · "+m.location:"")),
+            React.createElement("p",{style:{fontSize:"0.82rem",color:"#7a6040",margin:"0 0 4px",letterSpacing:"0.04em"}},fuzzyDateLabel(m)+(m.location?" · "+m.location:"")),
             React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.3rem",color:"#1a1208",margin:"0 0 10px",fontStyle:"italic"}},m.title),
             m.mediaUrls?.length>0&&React.createElement("div",{style:{marginBottom:"14px"}},
               m.mediaUrls.slice(0,1).map((med,i)=>React.createElement(MediaImg,{key:i,med,alt:"",style:{maxWidth:"100%",maxHeight:"280px",objectFit:"cover",borderRadius:"3px",border:"1px solid #d4c4a8"}}))
@@ -3600,7 +3600,7 @@ function App() {
               ))
             )
           )),
-          legMems.length>0&&React.createElement("div",{style:{textAlign:"center",paddingTop:"16px",fontSize:"0.8rem",color:"#b0a08a",fontStyle:"italic"}},
+          legMems.length>0&&React.createElement("div",{style:{textAlign:"center",paddingTop:"16px",fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic"}},
             `${legMems.length} ${legMems.length===1?"memory":"memories"} · Chronicle by Remembory`
           )
         );
@@ -3752,7 +3752,7 @@ function App() {
             React.createElement("p",{style:{margin:0,fontSize:"1rem",color:"#1a1208"}},"Drop .eml file here or click to browse")
           ),
           React.createElement("input",{ref:emlImportRef,type:"file",accept:".eml,.txt",style:{display:"none"},onChange:e=>{ const f=e.target.files[0];if(f){const r=new FileReader();r.onload=ev=>handleEmailText(ev.target.result);r.readAsText(f);}}}),
-          React.createElement("div",{style:{textAlign:"center",color:"#b0a08a",margin:"10px 0",fontSize:"0.86rem"}},"— or paste text —"),
+          React.createElement("div",{style:{textAlign:"center",color:"#7a6a58",margin:"10px 0",fontSize:"0.86rem"}},"— or paste text —"),
           React.createElement("textarea",{placeholder:"Paste raw email text here…",rows:4,onChange:e=>{ if(e.target.value.length>50) handleEmailText(e.target.value); },style:{...S.input,resize:"vertical",lineHeight:"1.5",marginBottom:"18px",fontSize:"0.86rem",fontFamily:"monospace",color:"#6a5c48"}}),
           emailForm.title&&React.createElement("div",{style:{background:"rgba(255,252,245,0.9)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"18px"}},
             React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",margin:"0 0 14px",color:"#1a1208"}},"Parsed — review & save"),
@@ -3765,7 +3765,7 @@ function App() {
               React.createElement("div",null,React.createElement("label",{style:S.label},"Tags"),React.createElement(TagPicker,{tags:emailForm.tags,onToggle:tag=>setEmailForm(f=>({...f,tags:f.tags.includes(tag)?f.tags.filter(t=>t!==tag):[...f.tags,tag]}))})),
               React.createElement("div",null,
                 React.createElement("label",{style:S.label},"People"),
-                React.createElement("p",{style:{fontSize:"0.78rem",color:"#b0a08a",fontStyle:"italic",margin:"0 0 6px"}},"Sender added automatically. Add anyone else mentioned in the email."),
+                React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 6px"}},"Sender added automatically. Add anyone else mentioned in the email."),
                 React.createElement(PeopleOrgField,{icon:"👤",values:emailForm.people||[],allValues:knownPeople,onChange:v=>setEmailForm(f=>({...f,people:v})),placeholder:"Add a person…",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); }})
               ),
               React.createElement("button",{onClick:saveEmail,style:{...S.btn,justifySelf:"start"}},"Save to Chronicle")
@@ -3816,12 +3816,12 @@ function App() {
           const empty=yMems.length===0;
           return React.createElement("div",{key:yr,style:{display:"flex",alignItems:"stretch",marginBottom:"8px",opacity:empty?0.4:1}},
             React.createElement("div",{onClick:()=>{ if(!empty){setZoomYear(yr);setView("year");} },style:{width:isMobile?"52px":"76px",flexShrink:0,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-end",paddingRight:isMobile?"10px":"14px",cursor:empty?"default":"pointer"}},
-              React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:empty?"#b0a08a":"#1a1208",fontWeight:700}},yr),
+              React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:empty?"#7a6a58":"#1a1208",fontWeight:700}},yr),
               !empty&&React.createElement("span",{style:{fontSize:"0.7rem",color:"#8a7460"}},yMems.length)
             ),
             React.createElement("div",{style:{flex:1,borderLeft:`3px solid ${empty?"#e0d4be":"#c8a87a"}`,paddingLeft:"14px"}},
               empty
-                ? React.createElement("div",{style:{height:"34px",display:"flex",alignItems:"center"}},React.createElement("span",{style:{fontSize:"0.78rem",color:"#b0a08a",fontStyle:"italic"}},"no memories recorded"))
+                ? React.createElement("div",{style:{height:"34px",display:"flex",alignItems:"center"}},React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},"no memories recorded"))
                 : React.createElement("div",{onClick:()=>{setZoomYear(yr);setView("year");},style:{cursor:"pointer",paddingTop:"6px",paddingBottom:"8px"}},
                     React.createElement("div",{style:{display:"flex",gap:"5px",marginBottom:"5px",flexWrap:"wrap"}},
                       yMems.map(m=>React.createElement("span",{key:m.id,title:m.title,onClick:e=>{e.stopPropagation();setSelected(m.id);setView("detail");},style:{width:"8px",height:"8px",borderRadius:"50%",background:m.tags[0]?TAG_COLORS[m.tags[0]]:"#c8b89a",display:"inline-block",cursor:"pointer"}}))
@@ -3904,7 +3904,7 @@ function App() {
           ),
           React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"8px",cursor:"pointer",marginBottom:"24px",userSelect:"none"}},
             React.createElement("input",{type:"checkbox",checked:!!m.inLegacy,onChange:()=>toggleLegacy(m.id),style:{accentColor:"#a8885a",cursor:"pointer",width:"15px",height:"15px"}}),
-            React.createElement("span",{style:{fontSize:"0.84rem",color:m.inLegacy?"#a8885a":"#b0a08a",fontStyle:"italic",transition:"color 0.2s"}},
+            React.createElement("span",{style:{fontSize:"0.84rem",color:m.inLegacy?"#a8885a":"#7a6a58",fontStyle:"italic",transition:"color 0.2s"}},
               m.inLegacy ? "🌟 Include in Legacy View" : "Include in Legacy View"
             )
           )
@@ -3935,7 +3935,7 @@ function App() {
                     : {endFuzzy:null, endOngoing:false}),
                   style:{accentColor:"#2c2416",cursor:"pointer"}}),
                 "Has an end date",
-                React.createElement("span",{style:{fontWeight:"normal",textTransform:"none",fontSize:"0.8rem",color:"#b0a08a",fontStyle:"italic",letterSpacing:0}},"— for jobs, addresses, relationships…")
+                React.createElement("span",{style:{fontWeight:"normal",textTransform:"none",fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",letterSpacing:0}},"— for jobs, addresses, relationships…")
               )
             ),
             (form.endFuzzy||form.endOngoing)&&React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"10px"}},
@@ -3969,7 +3969,7 @@ function App() {
           ),
           React.createElement("div",null,
             React.createElement("label",{style:S.label},"Additional Locations"),
-            React.createElement("p",{style:{fontSize:"0.78rem",color:"#b0a08a",fontStyle:"italic",margin:"0 0 6px"}},"For road trips, multi-city visits, or any memory spanning several places"),
+            React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 6px"}},"For road trips, multi-city visits, or any memory spanning several places"),
             React.createElement(PeopleOrgField,{icon:"📍",values:form.locations||[],allValues:knownLocations,onChange:v=>updateForm({locations:v}),placeholder:"Add another location…"})
           ),
           React.createElement("div",null,React.createElement("label",{style:S.label},"The Memory"),React.createElement("textarea",{value:form.content,onChange:e=>updateForm({content:e.target.value}),placeholder:"Write as much or as little as you remember…",rows:6,style:{...S.input,resize:"vertical",lineHeight:"1.7"}})),
