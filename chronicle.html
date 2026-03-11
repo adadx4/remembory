@@ -101,7 +101,7 @@ function sortKey(m) {
 }
 
 function newForm() {
-  return { title:"", content:"", year:new Date().getFullYear(), month:1, day:1, fuzzy:"day", season:"Early", location:"", locations:[], tags:[], people:[], orgs:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false };
+  return { title:"", content:"", year:new Date().getFullYear(), month:1, day:1, fuzzy:"day", season:"Early", location:"", locations:[], tags:[], people:[], orgs:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false };
 }
 
 // ── Storage ────────────────────────────────────────────────────
@@ -302,7 +302,7 @@ function seedData(data) { return data; }
 const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], ownerName:"", ownerEmail:"" };
 
 function emptySubject(id, name, isSelf=false) {
-  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"" };
+  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
 }
 
 // Migrate flat data → subjects structure
@@ -324,6 +324,7 @@ function migrateData(raw) {
     backupPassword: raw.backupPassword || "",
     shareHistory: raw.shareHistory || [],
     lastImport: raw.lastImport || null,
+    legacyMessage: raw.legacyMessage || "",
   };
   return {
     carerMode: false,
@@ -2157,6 +2158,7 @@ function App() {
   const peopleRelationships = subject.peopleRelationships || {};
   const peopleNotes         = subject.peopleNotes || {};
   const shareHistory          = subject.shareHistory || [];
+  const legacyMessage         = subject.legacyMessage || "";
   const orgNotes            = subject.orgNotes || {};
   const ownerName           = subject.name || "";
   const ownerEmail          = data.carerEmail || "";
@@ -2216,7 +2218,7 @@ function App() {
   // persist: legacy-compatible — detects if patch is subject-level or top-level
   function persist(patch) {
     // If patch contains subject-level keys, route to persistSubject
-    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword"]);
+    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage"]);
     const isSubjectPatch = Object.keys(patch).some(k => subjectKeys.has(k));
     if (isSubjectPatch) {
       // strip any top-level only keys before passing to persistSubject
@@ -2282,6 +2284,11 @@ function App() {
   function recordShare(people, memIds) {
     const entry = { people, memIds:[...memIds], date:new Date().toISOString() };
     persistSubject({shareHistory:[...shareHistory, entry]});
+  }
+  function setLegacyMessage(msg) { persistSubject({legacyMessage:msg}); }
+  function toggleLegacy(id) {
+    const updated = memories.map(m=>m.id===id?{...m,inLegacy:!m.inLegacy}:m);
+    persistSubject({memories:updated});
   }
   function setOrgNotes(name, notes) { persistSubject({orgNotes:{...orgNotes, [name]: notes}}); }
   function registerOrgs(names) { const merged=[...new Set([...knownOrgs,...names])].sort(); persistSubject({knownOrgs:merged}); }
@@ -2987,12 +2994,13 @@ function App() {
     if (view==="people") return "People & Organisations";
     if (view==="map") return "Map";
     if (view==="settings") return "Settings";
+    if (view==="legacy") return "Legacy View";
     if (view==="print") return "Print / Export";
     if (view==="index") return indexFilter ? `${indexFilter.value}` : "Index";
     return null;
   }
 
-  const showBack=["add","edit","detail","decade","year","timeline","import","people","index","map","print","prompt","settings"].includes(view);
+  const showBack=["add","edit","detail","decade","year","timeline","import","people","index","map","print","prompt","settings","legacy"].includes(view);
   const showAdd=!["add","edit","print"].includes(view);
   const breadcrumb=bc();
 
@@ -3288,6 +3296,7 @@ function App() {
         ["map","🗺","Map"],
         ["prompt","✦","Prompt"],
         ["settings","⚙","Settings"],
+            ["legacy","🌟","Legacy"],
       ].map(([v,icon,label])=>React.createElement("button",{key:v,onClick:()=>{ setIndexFilter(null); setView(v); },style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:view===v?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:view===v?"2px solid #2c2416":"2px solid transparent"}},
         React.createElement("span",{style:{fontSize:"1.1rem",lineHeight:1}},icon),
         label
@@ -3483,6 +3492,31 @@ function App() {
         // ── Password / lock ──
         React.createElement(PasswordCard,{activePassword,data,setActivePassword,setLocked,setData}),
 
+        // ── Legacy View ──
+        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"🌟 Legacy View"),
+          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.6}},
+            "Choose which memories to include in your Legacy View — a curated life story you can share or preserve as a memorial. Toggle individual memories from their detail view."
+          ),
+          React.createElement("p",{style:{fontSize:"0.82rem",color:memories.filter(m=>m.inLegacy).length>0?"#4a7a5a":"#b0804a",fontStyle:"italic",margin:"0 0 14px"}},
+            memories.filter(m=>m.inLegacy).length>0
+              ? `✓ ${memories.filter(m=>m.inLegacy).length} ${memories.filter(m=>m.inLegacy).length===1?"memory":"memories"} included`
+              : "No memories included yet — open any memory and tick \"Include in Legacy View\""
+          ),
+          React.createElement("label",{style:{...S.label,display:"block",marginBottom:"4px"}},"A message to leave with your Legacy"),
+          React.createElement("textarea",{
+            value:legacyMessage,
+            onChange:e=>setLegacyMessage(e.target.value),
+            placeholder:"Something you'd like people to know, remember, or carry forward…",
+            rows:4,
+            style:{...S.input,resize:"vertical",lineHeight:1.6,fontSize:"0.9rem",marginBottom:"12px"}
+          }),
+          React.createElement("button",{
+            onClick:()=>setView("legacy"),
+            style:{...S.btn,padding:"9px 16px",fontSize:"0.88rem"}
+          },"🌟 Preview Legacy View")
+        ),
+
         // ── Danger zone ──
         React.createElement("div",{style:{background:"rgba(255,245,245,0.7)",border:"1px solid #e0c8c8",borderRadius:"3px",padding:"20px"}},
           React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#8a3030",margin:"0 0 8px"}},"Reset"),
@@ -3500,6 +3534,39 @@ function App() {
           "."
         )
       ),
+
+      view==="legacy"&&(()=>{
+        const legMems = memories.filter(m=>m.inLegacy).sort((a,b)=>sortKey(a)-sortKey(b));
+        return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"680px"}},
+          React.createElement("div",{style:{textAlign:"center",marginBottom:"32px",paddingBottom:"24px",borderBottom:"1px solid #d4c4a8"}},
+            React.createElement("p",{style:{fontSize:"0.82rem",color:"#b0906a",letterSpacing:"0.1em",textTransform:"uppercase",margin:"0 0 8px",fontFamily:"'Crimson Text',serif"}},"🌟 Legacy View"),
+            React.createElement("h1",{style:{fontFamily:"'Playfair Display',serif",fontSize:isMobile?"1.8rem":"2.4rem",color:"#1a1208",margin:"0 0 6px",fontStyle:"italic"}},ownerName||"A Life"),
+            subject.dob&&React.createElement("p",{style:{fontSize:"0.9rem",color:"#8a7460",margin:"0 0 16px"}},subject.dob),
+            legacyMessage&&React.createElement("p",{style:{fontSize:"1rem",color:"#4a3a28",lineHeight:1.8,fontStyle:"italic",maxWidth:"520px",margin:"0 auto",fontFamily:"'Crimson Text',Georgia,serif"}},'“'+legacyMessage+'”')
+          ),
+          legMems.length===0&&React.createElement("div",{style:{textAlign:"center",padding:"40px 20px",color:"#8a7460"}},
+            React.createElement("p",{style:{fontSize:"1.1rem",fontStyle:"italic",marginBottom:"12px"}},"No memories included in Legacy View yet."),
+            React.createElement("p",{style:{fontSize:"0.86rem"}},"Open any memory and tick \"Include in Legacy View\" to add it here.")
+          ),
+          legMems.map((m,i)=>React.createElement("div",{key:m.id,style:{marginBottom:"32px",paddingBottom:"32px",borderBottom:i<legMems.length-1?"1px solid rgba(200,184,154,0.4)":"none"}},
+            React.createElement("p",{style:{fontSize:"0.82rem",color:"#b0906a",margin:"0 0 4px",letterSpacing:"0.04em"}},fuzzyDateLabel(m)+(m.location?" · "+m.location:"")),
+            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.3rem",color:"#1a1208",margin:"0 0 10px",fontStyle:"italic"}},m.title),
+            m.mediaUrls?.length>0&&React.createElement("div",{style:{marginBottom:"14px"}},
+              m.mediaUrls.slice(0,1).map((med,i)=>React.createElement(MediaImg,{key:i,med,alt:"",style:{maxWidth:"100%",maxHeight:"280px",objectFit:"cover",borderRadius:"3px",border:"1px solid #d4c4a8"}}))
+            ),
+            m.content&&React.createElement("p",{style:{fontSize:"1rem",lineHeight:1.85,color:"#2c2416",whiteSpace:"pre-wrap",fontFamily:"'Crimson Text',Georgia,serif",margin:0}},m.content),
+            m.perspectives&&m.perspectives.filter(p=>p.content).length>0&&React.createElement("div",{style:{marginTop:"12px",paddingLeft:"16px",borderLeft:"2px solid #d4c4a8"}},
+              m.perspectives.filter(p=>p.content).map((p,pi)=>React.createElement("div",{key:pi,style:{marginBottom:"8px"}},
+                React.createElement("p",{style:{fontSize:"0.8rem",color:"#8a7460",margin:"0 0 2px",fontStyle:"italic"}},p.author),
+                React.createElement("p",{style:{fontSize:"0.95rem",lineHeight:1.7,color:"#4a3a28",margin:0,fontFamily:"'Crimson Text',Georgia,serif"}},p.content)
+              ))
+            )
+          )),
+          legMems.length>0&&React.createElement("div",{style:{textAlign:"center",paddingTop:"16px",fontSize:"0.8rem",color:"#b0a08a",fontStyle:"italic"}},
+            `${legMems.length} ${legMems.length===1?"memory":"memories"} · Chronicle by Remembory`
+          )
+        );
+      })(),
 
       view==="print"&&React.createElement(PrintView,{memories,ownerName,allDecades}),
 
@@ -3792,10 +3859,16 @@ function App() {
             peopleEmails,
             senderName:m.sharedBy||null
           }),
-          React.createElement("div",{style:{display:"flex",gap:"10px",marginBottom:"20px",flexWrap:"wrap"}},
+          React.createElement("div",{style:{display:"flex",gap:"10px",marginBottom:"12px",flexWrap:"wrap"}},
             React.createElement("button",{onClick:()=>handleEdit(m),style:S.btn},"Edit"),
             React.createElement("button",{onClick:()=>handleDelete(m.id),style:{...S.btnOutline,color:"#c4858a",borderColor:"#c4858a"}},"Delete"),
             React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,onRecordShare:recordShare})
+          ),
+          React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"8px",cursor:"pointer",marginBottom:"24px",userSelect:"none"}},
+            React.createElement("input",{type:"checkbox",checked:!!m.inLegacy,onChange:()=>toggleLegacy(m.id),style:{accentColor:"#a8885a",cursor:"pointer",width:"15px",height:"15px"}}),
+            React.createElement("span",{style:{fontSize:"0.84rem",color:m.inLegacy?"#a8885a":"#b0a08a",fontStyle:"italic",transition:"color 0.2s"}},
+              m.inLegacy ? "🌟 Include in Legacy View" : "Include in Legacy View"
+            )
           )
         );
       })(),
