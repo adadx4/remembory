@@ -627,7 +627,6 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
   const [showSugs, setShowSugs] = React.useState(false);
   const [step, setStep] = React.useState(null); // null | "email" | "relationship"
   const [pendingName, setPendingName] = React.useState(null);
-  const [emailInput, setEmailInput] = React.useState("");
   const [relInput, setRelInput] = React.useState("");
   const [showRelSugs, setShowRelSugs] = React.useState(false);
   const suggestions=allValues.filter(v=>v.toLowerCase().includes(input.toLowerCase())&&!values.includes(v)&&input.length>0);
@@ -636,17 +635,17 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
   function commit(name, email, rel) {
     const v = name.trim();
     if (v && !values.includes(v)) onChange([...values, v]);
-    if (onNewPerson && email) onNewPerson(v, email.trim());
+    if (onNewPerson) onNewPerson(v, "");
     if (onNewPersonRelationship && rel.trim()) onNewPersonRelationship(v, rel.trim());
     setInput(""); setShowSugs(false); setPendingName(null);
-    setEmailInput(""); setRelInput(""); setStep(null);
+    setRelInput(""); setStep(null);
   }
 
   function add(val) {
     const v = val.trim(); if (!v) return;
     if (values.includes(v)) { setInput(""); return; }
     if (onNewPerson && !allValues.includes(v)) {
-      setPendingName(v); setInput(""); setShowSugs(false); setStep("email");
+      setPendingName(v); setInput(""); setShowSugs(false); setStep("relationship");
     } else {
       commit(v, "", "");
     }
@@ -661,22 +660,7 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
         React.createElement("button",{onClick:()=>remove(v),style:{background:"none",border:"none",cursor:"pointer",color:"#8a8aaa",fontSize:"0.75rem",padding:0,lineHeight:1}},"×")
       ))
     ),
-    step==="email"
-      ? React.createElement("div",{style:{background:"rgba(240,235,224,0.8)",border:"1px solid #c8b89a",borderRadius:"3px",padding:"10px 12px",marginBottom:"4px"}},
-          React.createElement("p",{style:{margin:"0 0 7px",fontSize:"0.84rem",color:"#2c2416"}},
-            React.createElement("strong",null,pendingName)," added. Email address? ",
-            React.createElement("span",{style:{color:"#7a6a58",fontStyle:"italic"}},"(optional — used for sharing)")
-          ),
-          React.createElement("div",{style:{display:"flex",gap:"6px"}},
-            React.createElement("input",{autoFocus:true,type:"email",value:emailInput,
-              onChange:e=>setEmailInput(e.target.value),
-              onKeyDown:e=>{if(e.key==="Enter"){e.preventDefault();setStep("relationship");}if(e.key==="Escape")commit(pendingName,"","");},
-              placeholder:"their@email.com",style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",flex:1}}),
-            React.createElement("button",{onClick:()=>setStep("relationship"),style:{...S.btn,padding:"6px 13px",fontSize:"0.84rem"}},"Next"),
-            React.createElement("button",{onClick:()=>commit(pendingName,"",""),style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"6px 11px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",color:"#8a7460"}},"Skip")
-          )
-        )
-      : step==="relationship"
+    step==="relationship"
       ? React.createElement("div",{style:{background:"rgba(240,235,224,0.8)",border:"1px solid #c8b89a",borderRadius:"3px",padding:"10px 12px",marginBottom:"4px",position:"relative"}},
           React.createElement("p",{style:{margin:"0 0 7px",fontSize:"0.84rem",color:"#2c2416"}},
             "Relationship to ",React.createElement("strong",null,pendingName),"? ",
@@ -685,11 +669,11 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
           React.createElement("div",{style:{display:"flex",gap:"6px"}},
             React.createElement("input",{autoFocus:true,value:relInput,
               onChange:e=>{setRelInput(e.target.value);setShowRelSugs(true);},
-              onKeyDown:e=>{if(e.key==="Enter"){e.preventDefault();commit(pendingName,emailInput,relInput);}if(e.key==="Escape")commit(pendingName,emailInput,"");},
+              onKeyDown:e=>{if(e.key==="Enter"){e.preventDefault();commit(pendingName,"",relInput);}if(e.key==="Escape")commit(pendingName,"","");},
               onBlur:()=>setTimeout(()=>setShowRelSugs(false),150),
               placeholder:"e.g. Friend, Sister, Colleague…",style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",flex:1}}),
-            React.createElement("button",{onClick:()=>commit(pendingName,emailInput,relInput),style:{...S.btn,padding:"6px 13px",fontSize:"0.84rem"}},"Save"),
-            React.createElement("button",{onClick:()=>commit(pendingName,emailInput,""),style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"6px 11px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",color:"#8a7460"}},"Skip")
+            React.createElement("button",{onClick:()=>commit(pendingName,"",relInput),style:{...S.btn,padding:"6px 13px",fontSize:"0.84rem"}},"Save"),
+            React.createElement("button",{onClick:()=>commit(pendingName,"",""),style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"6px 11px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",color:"#8a7460"}},"Skip")
           ),
           showRelSugs&&relSugs.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,right:"80px",background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",maxHeight:"160px",overflowY:"auto"}},
             relSugs.map(r=>React.createElement("div",{key:r,onMouseDown:()=>{setRelInput(r);setShowRelSugs(false);},
@@ -1116,11 +1100,9 @@ function MemoryCard({m, onClick}) {
 
 // ── Main App ───────────────────────────────────────────────────
 
-function PersonRow({name, count, email, relationship, notes, onRename, onDelete, onSetEmail, onSetRelationship, onSetNotes, onViewMemories}) {
+function PersonRow({name, count, relationship, notes, onRename, onDelete, onSetRelationship, onSetNotes, onViewMemories}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(name);
-  const [editingEmail, setEditingEmail] = React.useState(false);
-  const [emailDraft, setEmailDraft] = React.useState(email||"");
   const [editingRel, setEditingRel] = React.useState(false);
   const [relDraft, setRelDraft] = React.useState(relationship||"");
   const [showRelSugs, setShowRelSugs] = React.useState(false);
@@ -1129,7 +1111,6 @@ function PersonRow({name, count, email, relationship, notes, onRename, onDelete,
   const relSugs = RELATIONSHIP_SUGGESTIONS.filter(r=>r.toLowerCase().includes(relDraft.toLowerCase())&&relDraft.length>0);
 
   function commitRename() { if(draft.trim()&&draft.trim()!==name) onRename(name,draft.trim()); setRenaming(false); }
-  function commitEmail() { onSetEmail(name, emailDraft.trim()); setEditingEmail(false); }
   function commitRel() { onSetRelationship(name, relDraft.trim()); setEditingRel(false); setShowRelSugs(false); }
   function commitNotes() { onSetNotes(name, notesDraft); }
 
@@ -1171,25 +1152,8 @@ function PersonRow({name, count, email, relationship, notes, onRename, onDelete,
       React.createElement("p",{style:{fontSize:"0.75rem",color:"#7a6a58",fontStyle:"italic",marginTop:"3px"}},"Saved automatically when you click away")
     ),
 
-    // Email row
+    // Details row
     React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"8px",marginTop:"7px",paddingLeft:"2px",flexWrap:"wrap"}},
-      editingEmail
-        ? React.createElement(React.Fragment,null,
-            React.createElement("input",{autoFocus:true,value:emailDraft,onChange:e=>setEmailDraft(e.target.value),
-              onKeyDown:e=>{if(e.key==="Enter")commitEmail();if(e.key==="Escape")setEditingEmail(false);},
-              onBlur:commitEmail,placeholder:"their@email.com",type:"email",
-              style:{...S.input,padding:"4px 9px",fontSize:"0.84rem",flex:1,maxWidth:"280px"}}),
-            React.createElement("button",{onClick:commitEmail,style:{...S.btn,padding:"4px 10px",fontSize:"0.82rem"}},"Save"),
-            React.createElement("button",{onClick:()=>setEditingEmail(false),style:{...S.btnOutline,padding:"4px 10px",fontSize:"0.82rem"}},"Cancel")
-          )
-        : React.createElement(React.Fragment,null,
-            React.createElement("span",{style:{fontSize:"0.82rem",color:email?"#5a6a8a":"#c0b0a0",fontStyle:email?"normal":"italic"}},
-              email ? "✉ "+email : "no email"),
-            React.createElement("button",{onClick:()=>{setEmailDraft(email||"");setEditingEmail(true);},
-              style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",
-                fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px",textDecoration:"underline"}},
-              email?"edit":"+ add email")
-          ),
       // Relationship inline
       editingRel
         ? React.createElement("div",{style:{position:"relative",display:"flex",gap:"6px",flex:1,minWidth:"180px"}},
@@ -1256,7 +1220,7 @@ function OrgRow({name, count, notes, onRename, onDelete, onSetNotes}) {
   );
 }
 
-function PeopleOrgsManager({knownPeople,knownOrgs,memories,peopleEmails,peopleRelationships,peopleNotes,orgNotes,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetEmail,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onViewPerson}) {
+function PeopleOrgsManager({knownPeople,knownOrgs,memories,peopleRelationships,peopleNotes,orgNotes,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onViewPerson}) {
   const [search, setSearch] = React.useState("");
   const personCount=name=>memories.filter(m=>m.people?.includes(name)).length;
   const orgCount=name=>memories.filter(m=>m.orgs?.includes(name)).length;
@@ -1285,8 +1249,8 @@ function PeopleOrgsManager({knownPeople,knownOrgs,memories,peopleEmails,peopleRe
       React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 2px"}},
         filteredPeople.length," ",filteredPeople.length===1?"person":"people"," \xb7 click a name to see their memories"),
       filteredPeople.map(name=>React.createElement(PersonRow,{key:name,name,count:personCount(name),
-        email:peopleEmails?.[name],relationship:peopleRelationships?.[name],notes:peopleNotes?.[name],
-        onSetEmail,onSetRelationship,onSetNotes:onSetPersonNotes,onRename:onRenamePerson,onDelete:onDeletePerson,
+        relationship:peopleRelationships?.[name],notes:peopleNotes?.[name],
+        onSetRelationship,onSetNotes:onSetPersonNotes,onRename:onRenamePerson,onDelete:onDeletePerson,
         onViewMemories:()=>onViewPerson(name)}))
     ),
     filteredOrgs.length>0&&React.createElement("div",null,
@@ -1711,7 +1675,6 @@ function PerspectivesPanel({memory, onSave, peopleEmails, senderName}) {
   const [myName, setMyName] = useState("");
   const [makeDominant, setMakeDominant] = useState(true);
   const myPerspective = perspectives.find(p=>p.isOwn);
-  const senderEmail = senderName ? peopleEmails[senderName] : null;
 
   // Who is currently dominant? Stored as memory.dominantAuthor — null means OP (memory.content from before sharing)
   const dominantAuthor = memory.dominantAuthor || null;
@@ -1739,13 +1702,7 @@ function PerspectivesPanel({memory, onSave, peopleEmails, senderName}) {
       : {...memory, perspectives:updatedPerspectives};
     onSave(updatedMemory);
     setAddingMine(false);
-    if (senderName && senderEmail) {
-      setTimeout(()=>{
-        if (window.confirm(`Would you like to send your perspective back to ${senderName}?`)) {
-          downloadAndEmail(senderName, senderEmail, [updatedMemory], newP.author, true, '');
-        }
-      }, 300);
-    }
+
   }
 
   function removeMine() {
@@ -1758,18 +1715,58 @@ function PerspectivesPanel({memory, onSave, peopleEmails, senderName}) {
 
   const others = showAll ? otherPerspectives : [];
 
+  const [editingAuthor, setEditingAuthor] = useState(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [keepOriginal, setKeepOriginal] = useState(true);
+
+  function startEditOther(p) {
+    setEditingAuthor(p.author);
+    setEditDraft(p.content);
+    setKeepOriginal(true);
+  }
+
+  function saveEditOther() {
+    if (!editDraft.trim()) return;
+    const updated = perspectives.map(p => {
+      if (p.author !== editingAuthor) return p;
+      const base = {...p, content: editDraft.trim(), editedAt: new Date().toISOString()};
+      if (keepOriginal && p.content !== editDraft.trim()) {
+        base.originalContent = p.originalContent || p.content;
+      } else if (!keepOriginal) {
+        delete base.originalContent;
+      }
+      return base;
+    });
+    const wasDominant = dominantAuthor === editingAuthor;
+    const updatedMemory = wasDominant
+      ? {...memory, perspectives: updated, content: editDraft.trim()}
+      : {...memory, perspectives: updated};
+    onSave(updatedMemory);
+    setEditingAuthor(null);
+  }
+
+  function removeOther(author) {
+    if (!window.confirm("Remove this perspective? This cannot be undone.")) return;
+    const updated = perspectives.filter(p => p.author !== author);
+    const wasDominant = dominantAuthor === author;
+    onSave({...memory, perspectives: updated, dominantAuthor: wasDominant ? null : dominantAuthor});
+  }
+
   function PerspectiveBlock({p, isMine}) {
     const isDominant = dominantAuthor === p.author;
     const borderColor = isMine ? "#7a9e8a" : "#8b9dc3";
     const bgColor = isMine ? "rgba(122,158,138,0.07)" : "rgba(139,157,195,0.07)";
     const labelColor = isMine ? "#7a9e8a" : "#8b9dc3";
+    const isEditing = editingAuthor === p.author;
+
     return React.createElement("div", {style:{background:bgColor,borderLeft:`3px solid ${borderColor}`,borderRadius:"0 4px 4px 0",padding:"10px 14px"}},
       React.createElement("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px",flexWrap:"wrap",gap:"6px"}},
         React.createElement("div", {style:{display:"flex",alignItems:"center",gap:"8px"}},
           React.createElement("span", {style:{fontSize:"0.76rem",color:labelColor,fontWeight:600,letterSpacing:"0.05em",textTransform:"uppercase"}},
             p.author + (isMine ? "'s memory (you)" : "'s memory")
           ),
-          isDominant && React.createElement("span", {style:{fontSize:"0.7rem",background:labelColor,color:"#fff",padding:"1px 7px",borderRadius:"10px",letterSpacing:"0.04em"}}, "shown in timeline")
+          isDominant && React.createElement("span", {style:{fontSize:"0.7rem",background:labelColor,color:"#fff",padding:"1px 7px",borderRadius:"10px",letterSpacing:"0.04em"}}, "shown in timeline"),
+          p.editedAt && React.createElement("span", {style:{fontSize:"0.7rem",color:"#7a6a58",fontStyle:"italic"}}, "edited")
         ),
         React.createElement("div", {style:{display:"flex",gap:"8px",alignItems:"center"}},
           !isDominant && React.createElement("button", {
@@ -1780,11 +1777,38 @@ function PerspectivesPanel({memory, onSave, peopleEmails, senderName}) {
             onClick:clearDominant,
             style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.75rem",fontFamily:"'Crimson Text',serif"}
           }, "remove from timeline"),
-          isMine && React.createElement("button", {onClick:()=>{setMyDraft(p.content);setMyName(p.author);setMakeDominant(dominantAuthor===p.author);setAddingMine(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif"}}, "edit"),
-          isMine && React.createElement("button", {onClick:removeMine,style:{background:"transparent",border:"none",color:"#c4858a",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif"}}, "remove")
+          isMine
+            ? React.createElement("button", {onClick:()=>{setMyDraft(p.content);setMyName(p.author);setMakeDominant(dominantAuthor===p.author);setAddingMine(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif"}}, "edit")
+            : React.createElement("button", {onClick:()=>startEditOther(p),style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif"}}, "edit"),
+          isMine
+            ? React.createElement("button", {onClick:removeMine,style:{background:"transparent",border:"none",color:"#c4858a",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif"}}, "remove")
+            : React.createElement("button", {onClick:()=>removeOther(p.author),style:{background:"transparent",border:"none",color:"#c4858a",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif"}}, "remove")
         )
       ),
-      React.createElement("div", {style:{fontSize:"1rem",lineHeight:"1.8",color:"#2c2416",whiteSpace:"pre-wrap"}}, linkify(p.content))
+      isEditing
+        ? React.createElement("div", null,
+            React.createElement("textarea", {
+              value: editDraft,
+              onChange: e=>setEditDraft(e.target.value),
+              rows: 5,
+              style:{...S.input, resize:"vertical", lineHeight:"1.7", marginBottom:"10px"}
+            }),
+            React.createElement("label", {style:{display:"flex",alignItems:"center",gap:"8px",marginBottom:"12px",cursor:"pointer",fontSize:"0.84rem",color:"#6a5840"}},
+              React.createElement("input", {type:"checkbox", checked:keepOriginal, onChange:e=>setKeepOriginal(e.target.checked)}),
+              "Keep a copy of the original version"
+            ),
+            React.createElement("div", {style:{display:"flex",gap:"8px"}},
+              React.createElement("button", {onClick:saveEditOther, style:{...S.btn,fontSize:"0.86rem",padding:"7px 14px"}}, "Save"),
+              React.createElement("button", {onClick:()=>setEditingAuthor(null), style:{...S.btnOutline,fontSize:"0.86rem",padding:"7px 14px"}}, "Cancel")
+            )
+          )
+        : React.createElement("div", null,
+            React.createElement("div", {style:{fontSize:"1rem",lineHeight:"1.8",color:"#2c2416",whiteSpace:"pre-wrap"}}, linkify(p.content)),
+            p.originalContent && React.createElement("details", {style:{marginTop:"10px"}},
+              React.createElement("summary", {style:{fontSize:"0.78rem",color:"#7a6a58",cursor:"pointer",fontStyle:"italic"}}, "Original version"),
+              React.createElement("div", {style:{fontSize:"0.9rem",lineHeight:"1.75",color:"#6a5840",whiteSpace:"pre-wrap",marginTop:"6px",paddingLeft:"10px",borderLeft:"2px solid #d4c4a8",fontStyle:"italic"}}, p.originalContent)
+            )
+          )
     );
   }
 
@@ -1831,15 +1855,6 @@ function PerspectivesPanel({memory, onSave, peopleEmails, senderName}) {
           React.createElement("button", {onClick:()=>setAddingMine(false),style:S.btnOutline}, "Cancel")
         )
       )
-    ),
-    myPerspective && senderName && React.createElement("div", {style:{borderTop:"1px solid #e0d4be",padding:"12px 16px",background:"rgba(245,240,232,0.6)",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"8px"}},
-      React.createElement("span", {style:{fontSize:"0.86rem",color:"#8a7460",fontStyle:"italic"}},
-        senderEmail ? `Send your perspective back to ${senderName}` : `To reply, add ${senderName}'s email in ☰ Index → People`
-      ),
-      senderEmail && React.createElement("button", {
-        onClick:()=>downloadAndEmail(senderName,senderEmail,[memory],"Me",true),
-        style:{...S.btnOutline,color:"#7a9e8a",borderColor:"#7a9e8a",fontSize:"0.86rem"}
-      }, `✉ Send back to ${senderName}`)
     )
   );
 }
@@ -3423,12 +3438,12 @@ function App() {
           indexTab==="people"
             ? React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs:[],memories,peopleEmails,peopleRelationships,
                 onRenamePerson:renamePerson,onDeletePerson:deletePerson,
-                onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetEmail:setPersonEmail,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
+                onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
                 onViewPerson:name=>setIndexFilter({type:"people",value:name})})
             : indexTab==="orgs"
             ? React.createElement(PeopleOrgsManager,{knownPeople:[],knownOrgs,memories,peopleEmails,peopleRelationships,
                 onRenamePerson:renamePerson,onDeletePerson:deletePerson,
-                onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetEmail:setPersonEmail,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
+                onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
                 onViewPerson:name=>setIndexFilter({type:"people",value:name})})
             // Locations and Tags: pill grid
             : activeTab.items.length===0
@@ -3458,7 +3473,7 @@ function App() {
       })(),
 
       // ── PEOPLE & ORGS ──
-      view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,memories,peopleEmails,peopleRelationships,peopleNotes,orgNotes,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetEmail:setPersonEmail,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");}}),
+      view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,memories,peopleRelationships,peopleNotes,orgNotes,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");}}),
 
       // ── PRINT VIEW ──
       view==="settings"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"640px"}},
@@ -3467,12 +3482,12 @@ function App() {
         // ── Identity ──
         React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
           React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
-            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},subject.isSelf?"Your name & email":"Subject name"),
+            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},subject.isSelf?"Your name":"Subject name"),
             React.createElement("button",{onClick:()=>setShowSubjectMgr(true),style:{background:"transparent",border:"none",fontSize:"0.76rem",color:"#a8885a",cursor:"pointer",padding:0,fontFamily:"'Crimson Text',serif"}},
               subjects.length>1 ? `Switch (${subjects.length} people) →` : "Manage people →")
           ),
           React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 12px"}},
-            subject.isSelf ? "Your name and email are used when sharing memories with others." : "The person whose memories this is."),
+            subject.isSelf ? "Your name is shown when you share memories with others." : "The person whose memories this is."),
           React.createElement("input",{value:ownerName,onChange:e=>persistSubject({name:e.target.value}),placeholder:"Your name",style:{...S.input,marginBottom:"10px"}}),
           React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:S.input})
         ),
