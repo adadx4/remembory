@@ -3136,9 +3136,9 @@ function App() {
       onAdd: draft => {
         const id = "subj_" + Date.now();
         const s = {...emptySubject(id, draft.name, draft.isSelf), dob:draft.dob||"", notes:draft.notes||""};
-        const newData = {...data, subjects:[...subjects, s]};
+        const newData = {...data, subjects:[...subjects, s], activeSubjectId: id};
         setData(newData); saveData(newData);
-        switchSubject(id);
+        setView("life"); setSelected(null); setIndexFilter(null);
         setShowSubjectMgr(false);
       },
       onEdit: (id, draft) => {
