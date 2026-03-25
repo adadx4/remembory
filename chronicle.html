@@ -316,7 +316,7 @@ function seedData(data) { return data; }
 const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], ownerName:"", ownerEmail:"" };
 
 function emptySubject(id, name, isSelf=false) {
-  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, locationNotes:{}, personOrgs:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
+  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, locationNotes:{}, personOrgs:{}, personLocations:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
 }
 
 // Migrate flat data → subjects structure
@@ -336,6 +336,7 @@ function migrateData(raw) {
     peopleNotes: raw.peopleNotes || {},
     orgNotes: raw.orgNotes || {},
     personOrgs: raw.personOrgs || {},
+    personLocations: raw.personLocations || {},
     lastBackup: raw.lastBackup || null,
     backupPassword: raw.backupPassword || "",
     shareHistory: raw.shareHistory || [],
@@ -755,9 +756,15 @@ function buildPrompt(memories, knownPeople, knownOrgs, knownLocations, seen=new 
     ).length
   })).sort((a,b) => a.n - b.n);
 
-  const people = memCount(knownPeople).filter(({n})=>n<10);
-  const orgs   = memCount(knownOrgs).filter(({n})=>n<8);
-  const locs   = memCount(knownLocations).filter(({n})=>n<8);
+  const people = memCount(knownPeople).filter(({n})=>n<10).sort((a,b)=>a.n-b.n);
+  const orgs   = memCount(knownOrgs).filter(({n})=>n<8).sort((a,b)=>a.n-b.n);
+  const locs   = memCount(knownLocations).filter(({n})=>n<8).sort((a,b)=>a.n-b.n);
+  // Zero-memory entities get top slots in pool
+  const zeroPool = [
+    ...people.filter(({n})=>n===0).map(({x})=>({ type:"person",entity:x,count:0,text:`You\u2019ve recorded ${x} but haven\u2019t linked any memories yet. What\u2019s the first thing that comes to mind?`,action:`Add a memory with ${x}` })),
+    ...orgs.filter(({n})=>n===0).map(({x})=>({ type:"org",entity:x,count:0,text:`${x} is in your index but has no memories attached. What period of your life does it belong to?`,action:`Add a memory about ${x}` })),
+    ...locs.filter(({n})=>n===0).map(({x})=>({ type:"place",entity:x,count:0,text:`You\u2019ve noted ${x} but haven\u2019t added any memories there yet. What happened at ${x}?`,action:`Add a memory at ${x}` })),
+  ];
 
   // Find decade gaps
   const decades = [...new Set(memories.map(m=>Math.floor(m.year/10)*10))];
@@ -775,7 +782,9 @@ function buildPrompt(memories, knownPeople, knownOrgs, knownLocations, seen=new 
   // Build pool of possible prompts
   const pool = [];
 
-  people.slice(0,8).forEach(({x,n})=>{
+  // Zero-memory entities always go first if not seen
+  zeroPool.forEach(p=>{ if(!seen.has(p.entity+"||"+p.text)) pool.unshift(p); });
+  people.filter(({n})=>n>0).slice(0,8).forEach(({x,n})=>{
     const fns = PERSON_PROMPTS;
     const fn = fns[Math.floor(Math.random()*fns.length)];
     pool.push({ type:"person", entity:x, count:n, text:fn(x), action:`Add a memory with ${x}` });
@@ -1102,7 +1111,7 @@ function MemoryCard({m, onClick}) {
 
 // ── Main App ───────────────────────────────────────────────────
 
-function PersonRow({name, count, relationship, notes, orgs, knownOrgs, onRename, onDelete, onSetRelationship, onSetNotes, onSetOrgs, onViewMemories, allRelationships=[]}) {
+function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, knownLocations, onRename, onDelete, onSetRelationship, onSetNotes, onSetOrgs, onSetLocs, onViewMemories, allRelationships=[]}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(name);
   const [editingRel, setEditingRel] = React.useState(false);
@@ -1114,6 +1123,9 @@ function PersonRow({name, count, relationship, notes, orgs, knownOrgs, onRename,
   const [editingOrgs, setEditingOrgs] = React.useState(false);
   const [orgSearch, setOrgSearch] = React.useState("");
   const orgSugs = orgSearch.length>0 ? (knownOrgs||[]).filter(o=>o.toLowerCase().includes(orgSearch.toLowerCase())&&!(orgs||[]).includes(o)) : [];
+  const [editingLocs, setEditingLocs] = React.useState(false);
+  const [locSearch, setLocSearch] = React.useState("");
+  const locSugs = locSearch.length>0 ? (knownLocations||[]).filter(l=>l.toLowerCase().includes(locSearch.toLowerCase())&&!(locs||[]).includes(l)) : [];
 
   function commitRename() { if(draft.trim()&&draft.trim()!==name) onRename(name,draft.trim()); setRenaming(false); }
   function commitRel() { onSetRelationship(name, relDraft.trim()); setEditingRel(false); setShowRelSugs(false); }
@@ -1203,6 +1215,29 @@ function PersonRow({name, count, relationship, notes, orgs, knownOrgs, onRename,
             style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",
               fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px",textDecoration:"underline"}},
             "+ link org"
+          ),
+      (locs||[]).map(l=>React.createElement("span",{key:l,style:{display:"inline-flex",alignItems:"center",gap:"3px",fontSize:"0.78rem",color:"#3a5a4a",background:"rgba(80,140,100,0.1)",border:"1px solid rgba(80,140,100,0.25)",borderRadius:"20px",padding:"1px 8px"}},
+        "📍 ",l,
+        React.createElement("button",{onClick:()=>onSetLocs(name,(locs||[]).filter(x=>x!==l)),style:{background:"none",border:"none",cursor:"pointer",color:"#8a7460",fontSize:"0.7rem",padding:"0 0 0 2px",lineHeight:1}},"x")
+      )),
+      editingLocs
+        ? React.createElement("div",{style:{position:"relative",display:"inline-flex",gap:"6px",alignItems:"center"}},
+            React.createElement("input",{autoFocus:true,value:locSearch,onChange:e=>setLocSearch(e.target.value),
+              onKeyDown:e=>{if(e.key==="Escape"){setEditingLocs(false);setLocSearch("");}},
+              onBlur:()=>setTimeout(()=>{setEditingLocs(false);setLocSearch("");},200),
+              placeholder:"Type location…",
+              style:{...S.input,padding:"3px 8px",fontSize:"0.8rem",width:"140px"}}),
+            locSugs.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,minWidth:"160px",background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)"}},
+              locSugs.map(l=>React.createElement("div",{key:l,onMouseDown:()=>{onSetLocs(name,[...(locs||[]),l]);setLocSearch("");setEditingLocs(false);},
+                style:{padding:"6px 12px",cursor:"pointer",fontSize:"0.86rem",color:"#2c2416"},
+                onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+                onMouseLeave:e=>e.currentTarget.style.background="transparent"},l))
+            )
+          )
+        : React.createElement("button",{onClick:()=>setEditingLocs(true),
+            style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",
+              fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px",textDecoration:"underline"}},
+            "+ link location"
           )
     )
   );
@@ -1241,6 +1276,32 @@ function RelationshipIndex({memories, peopleRelationships, onView, onRenameRelat
       const people=Object.entries(peopleRelationships).filter(([,r])=>(r||"").trim()===rel).map(([n])=>n);
       const mc=memories.filter(m=>m.people?.some(p=>people.includes(p))).length;
       return React.createElement(RelationshipRow,{key:rel,rel,people,memCount:mc,onView,onRename:onRenameRelationship});
+    })
+  );
+}
+
+function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setIndexFilter,persistSubject}) {
+  const [addingLoc, setAddingLoc] = React.useState(false);
+  const [newLoc, setNewLoc] = React.useState("");
+  function commitAdd(){const v=newLoc.trim();if(!v)return;if(!knownLocations.includes(v))persistSubject({knownLocations:[...knownLocations,v].sort()});setNewLoc("");setAddingLoc(false);}
+  return React.createElement("div",null,
+    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px"}},
+      React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},knownLocations.length+" location"+(knownLocations.length===1?"":"s")+" · click a name to see its memories"),
+      !addingLoc&&React.createElement("button",{onClick:()=>{setNewLoc("");setAddingLoc(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add location")
+    ),
+    addingLoc&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"12px"}},
+      React.createElement("input",{autoFocus:true,value:newLoc,onChange:e=>setNewLoc(e.target.value),
+        onKeyDown:e=>{if(e.key==="Enter")commitAdd();if(e.key==="Escape"){setAddingLoc(false);setNewLoc("");}},
+        placeholder:"Location name…",style:{...S.input,padding:"5px 9px",fontSize:"0.92rem",flex:1}}),
+      React.createElement("button",{onClick:commitAdd,style:{...S.btn,padding:"5px 12px",fontSize:"0.86rem"}},"Add"),
+      React.createElement("button",{onClick:()=>{setAddingLoc(false);setNewLoc("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.86rem"}},"Cancel")
+    ),
+    knownLocations.length===0&&!addingLoc&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No locations recorded yet."),
+    knownLocations.map(name=>{
+      const count=memories.filter(m=>m.location===name||m.locations?.includes(name)).length;
+      return React.createElement(LocationRow,{key:name,name,count,notes:locationNotes?.[name],
+        onRename:renameLocation,onDelete:deleteLocation,onSetNotes:setLocationNotes,
+        onView:()=>setIndexFilter({type:"locations",value:name})});
     })
   );
 }
@@ -1317,52 +1378,90 @@ function OrgRow({name, count, notes, connectedPeople, onRename, onDelete, onSetN
   );
 }
 
-function PeopleOrgsManager({knownPeople,knownOrgs,memories,peopleRelationships,peopleNotes,orgNotes,personOrgs,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onSetPersonOrgs,onViewPerson}) {
+function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,peopleNotes,orgNotes,personOrgs,personLocations,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onSetPersonOrgs,onSetPersonLocations,onViewPerson,onAddPerson,onAddOrg}) {
   const [search, setSearch] = React.useState("");
+  const [filterRel, setFilterRel] = React.useState(null);
+  const [filterOrg, setFilterOrg] = React.useState(null);
+  const [filterLoc, setFilterLoc] = React.useState(null);
+  const [addingPerson, setAddingPerson] = React.useState(false);
+  const [addingOrg, setAddingOrg] = React.useState(false);
+  const [newName, setNewName] = React.useState("");
   const personCount=name=>memories.filter(m=>m.people?.includes(name)).length;
   const orgCount=name=>memories.filter(m=>m.orgs?.includes(name)).length;
   const q = search.trim().toLowerCase();
-  const filteredPeople = q ? knownPeople.filter(n=>n.toLowerCase().includes(q)) : knownPeople;
-  const filteredOrgs   = q ? knownOrgs.filter(n=>n.toLowerCase().includes(q))   : knownOrgs;
-  const totalResults = filteredPeople.length + filteredOrgs.length;
+  const allFilterRels=[...new Set(Object.values(peopleRelationships).filter(Boolean))].sort();
+  const allFilterOrgs=[...new Set(Object.values(personOrgs||{}).flat())].sort();
+  const allFilterLocs=[...new Set(Object.values(personLocations||{}).flat())].sort();
+  let filteredPeople = knownPeople.filter(n=>{
+    if(q&&!n.toLowerCase().includes(q)) return false;
+    if(filterRel&&(peopleRelationships?.[n]||"")!==filterRel) return false;
+    if(filterOrg&&!(personOrgs?.[n]||[]).includes(filterOrg)) return false;
+    if(filterLoc&&!(personLocations?.[n]||[]).includes(filterLoc)) return false;
+    return true;
+  });
+  filteredPeople=[...filteredPeople].sort((a,b)=>{const ca=personCount(a),cb=personCount(b);if(ca===0&&cb>0)return -1;if(cb===0&&ca>0)return 1;return a.localeCompare(b);});
+  const filteredOrgs = q ? knownOrgs.filter(n=>n.toLowerCase().includes(q)) : knownOrgs;
+  const activeFilters=[filterRel,filterOrg,filterLoc].filter(Boolean);
+  const chipStyle=(active)=>({display:"inline-flex",alignItems:"center",gap:"4px",padding:"3px 10px",borderRadius:"20px",fontSize:"0.78rem",cursor:"pointer",border:"1px solid",fontFamily:"'Crimson Text',serif",background:active?"#2c2416":"transparent",color:active?"#f5f0e8":"#6a5840",borderColor:active?"#2c2416":"#c8b89a"});
+  function commitAdd(type){const v=newName.trim();if(!v)return;if(type==="person"&&!knownPeople.includes(v))onAddPerson(v);if(type==="org"&&!knownOrgs.includes(v))onAddOrg(v);setNewName("");setAddingPerson(false);setAddingOrg(false);}
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
-    (knownPeople.length + knownOrgs.length) > 5 && React.createElement("div",{style:{marginBottom:"20px",position:"relative"}},
-      React.createElement("input",{
-        value:search,
-        onChange:e=>setSearch(e.target.value),
-        placeholder:"Search people & organisations\u2026",
-        style:{...S.input,paddingLeft:"32px",fontSize:"0.92rem"}
-      }),
-      React.createElement("span",{style:{position:"absolute",left:"10px",top:"50%",transform:"translateY(-50%)",color:"#7a6a58",fontSize:"0.9rem",pointerEvents:"none"}},"\uD83D\uDD0D"),
-      search && React.createElement("button",{
-        onClick:()=>setSearch(""),
-        style:{position:"absolute",right:"8px",top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"1rem",lineHeight:1}
-      },"\u00d7"),
-      q && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",marginTop:"5px"}},
-        totalResults===0 ? "No matches" : totalResults+" result"+(totalResults===1?"":"s"))
+    React.createElement("div",{style:{marginBottom:"16px"}},
+      React.createElement("div",{style:{position:"relative",marginBottom:"8px"}},
+        React.createElement("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Search people & organisations…",style:{...S.input,paddingLeft:"32px",fontSize:"0.92rem"}}),
+        React.createElement("span",{style:{position:"absolute",left:"10px",top:"50%",transform:"translateY(-50%)",color:"#7a6a58",fontSize:"0.9rem",pointerEvents:"none"}},"������"),
+        search&&React.createElement("button",{onClick:()=>setSearch(""),style:{position:"absolute",right:"8px",top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"1rem",lineHeight:1}},"×")
+      ),
+      (allFilterRels.length>0||allFilterOrgs.length>0||allFilterLocs.length>0)&&React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"5px",alignItems:"center"}},
+        React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic",marginRight:"2px"}},"Filter:"),
+        allFilterRels.map(r=>React.createElement("button",{key:r,onClick:()=>setFilterRel(filterRel===r?null:r),style:chipStyle(filterRel===r)},r)),
+        allFilterOrgs.map(o=>React.createElement("button",{key:"o"+o,onClick:()=>setFilterOrg(filterOrg===o?null:o),style:chipStyle(filterOrg===o)},"🏛 ",o)),
+        allFilterLocs.map(l=>React.createElement("button",{key:"l"+l,onClick:()=>setFilterLoc(filterLoc===l?null:l),style:chipStyle(filterLoc===l)},"📍 ",l)),
+        activeFilters.length>0&&React.createElement("button",{onClick:()=>{setFilterRel(null);setFilterOrg(null);setFilterLoc(null);},style:{...chipStyle(false),color:"#c4858a",borderColor:"#e0c8c8"}},"clear")
+      )
     ),
-    filteredPeople.length>0&&React.createElement("div",{style:{marginBottom:"36px"}},
-      React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:"0 0 4px"}},"People"),
-      React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 2px"}},
-        filteredPeople.length," ",filteredPeople.length===1?"person":"people"," \xb7 click a name to see their memories"),
+    React.createElement("div",{style:{marginBottom:"36px"}},
+      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"4px"}},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:0}},"People"),
+        !addingPerson&&React.createElement("button",{onClick:()=>{setNewName("");setAddingPerson(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add person")
+      ),
+      addingPerson&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"10px"}},
+        React.createElement("input",{autoFocus:true,value:newName,onChange:e=>setNewName(e.target.value),
+          onKeyDown:e=>{if(e.key==="Enter")commitAdd("person");if(e.key==="Escape"){setAddingPerson(false);setNewName("");}},
+          placeholder:"Person’s name…",style:{...S.input,padding:"5px 9px",fontSize:"0.92rem",flex:1}}),
+        React.createElement("button",{onClick:()=>commitAdd("person"),style:{...S.btn,padding:"5px 12px",fontSize:"0.86rem"}},"Add"),
+        React.createElement("button",{onClick:()=>{setAddingPerson(false);setNewName("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.86rem"}},"Cancel")
+      ),
+      filteredPeople.length>0&&React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 2px"}},
+        filteredPeople.length," ",filteredPeople.length===1?"person":"people",activeFilters.length>0?" (filtered)":"",
+        " · click a name to see their memories",
+        filteredPeople.some(n=>personCount(n)===0)?" · ▲ no memories yet":""
+      ),
       filteredPeople.map(name=>React.createElement(PersonRow,{key:name,name,count:personCount(name),
         relationship:peopleRelationships?.[name],notes:peopleNotes?.[name],
         orgs:personOrgs?.[name]||[],knownOrgs,onSetOrgs:onSetPersonOrgs,
+        locs:personLocations?.[name]||[],knownLocations:knownLocations||[],onSetLocs:onSetPersonLocations,
         allRelationships:Object.values(peopleRelationships).filter(Boolean),
         onSetRelationship,onSetNotes:onSetPersonNotes,onRename:onRenamePerson,onDelete:onDeletePerson,
-        onViewMemories:()=>onViewPerson(name)}))
+        onViewMemories:()=>onViewPerson(name)})),
+      knownPeople.length===0&&!addingPerson&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No people recorded yet.")
     ),
-    filteredOrgs.length>0&&React.createElement("div",null,
-      React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:"0 0 4px"}},"Organisations"),
-      React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 2px"}},
-        filteredOrgs.length," ",filteredOrgs.length===1?"organisation":"organisations"),
-      filteredOrgs.map(name=>{const cp=Object.entries(personOrgs||{}).filter(([,os])=>(os||[]).includes(name)).map(([p])=>p);return React.createElement(OrgRow,{key:name,name,count:orgCount(name),notes:orgNotes?.[name],connectedPeople:cp,onRename:onRenameOrg,onDelete:onDeleteOrg,onSetNotes:onSetOrgNotes});})
+    React.createElement("div",null,
+      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"4px"}},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:0}},"Organisations"),
+        !addingOrg&&React.createElement("button",{onClick:()=>{setNewName("");setAddingOrg(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add org")
+      ),
+      addingOrg&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"10px"}},
+        React.createElement("input",{autoFocus:true,value:newName,onChange:e=>setNewName(e.target.value),
+          onKeyDown:e=>{if(e.key==="Enter")commitAdd("org");if(e.key==="Escape"){setAddingOrg(false);setNewName("");}},
+          placeholder:"Organisation name…",style:{...S.input,padding:"5px 9px",fontSize:"0.92rem",flex:1}}),
+        React.createElement("button",{onClick:()=>commitAdd("org"),style:{...S.btn,padding:"5px 12px",fontSize:"0.86rem"}},"Add"),
+        React.createElement("button",{onClick:()=>{setAddingOrg(false);setNewName("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.86rem"}},"Cancel")
+      ),
+      filteredOrgs.length>0&&React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 2px"}},filteredOrgs.length," ",filteredOrgs.length===1?"organisation":"organisations"),
+      filteredOrgs.map(name=>{const cp=Object.entries(personOrgs||{}).filter(([,os])=>(os||[]).includes(name)).map(([p])=>p);return React.createElement(OrgRow,{key:name,name,count:orgCount(name),notes:orgNotes?.[name],connectedPeople:cp,onRename:onRenameOrg,onDelete:onDeleteOrg,onSetNotes:onSetOrgNotes});}),
+      knownOrgs.length===0&&!addingOrg&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No organisations recorded yet.")
     ),
-    knownPeople.length===0&&knownOrgs.length===0&&React.createElement("div",null,
-      React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic",marginBottom:"16px"}},"No people or organisations tagged yet.")
-    ),
-    q && totalResults===0 && React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},
-      "No results for \u201c"+search+"\u201d")
+    q&&filteredPeople.length===0&&filteredOrgs.length===0&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No results for “"+search+"”")
   );
 }
 
@@ -2290,6 +2389,7 @@ function App() {
   const legacyMessage         = subject.legacyMessage || "";
   const orgNotes            = subject.orgNotes || {};
   const personOrgs          = subject.personOrgs || {};
+  const personLocations     = subject.personLocations || {};
   const ownerName           = subject.name || "";
   const ownerEmail          = data.carerEmail || "";
   const carerName           = data.carerName || "";
@@ -2350,7 +2450,7 @@ function App() {
   // persist: legacy-compatible — detects if patch is subject-level or top-level
   function persist(patch) {
     // If patch contains subject-level keys, route to persistSubject
-    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","personOrgs"]);
+    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","personOrgs","personLocations"]);
     const isSubjectPatch = Object.keys(patch).some(k => subjectKeys.has(k));
     if (isSubjectPatch) {
       // strip any top-level only keys before passing to persistSubject
@@ -2394,7 +2494,8 @@ function App() {
     const updRels={...peopleRelationships}; if(updRels[oldName]!==undefined){updRels[n]=updRels[oldName];delete updRels[oldName];}
     const updNotes={...peopleNotes}; if(updNotes[oldName]!==undefined){updNotes[n]=updNotes[oldName];delete updNotes[oldName];}
     const updPOrgs={...personOrgs}; if(updPOrgs[oldName]!==undefined){updPOrgs[n]=updPOrgs[oldName];delete updPOrgs[oldName];}
-    persistSubject({memories:updMems,knownPeople:updKnown,peopleRelationships:updRels,peopleNotes:updNotes,personOrgs:updPOrgs});
+    const updPLocs={...personLocations}; if(updPLocs[oldName]!==undefined){updPLocs[n]=updPLocs[oldName];delete updPLocs[oldName];}
+    persistSubject({memories:updMems,knownPeople:updKnown,peopleRelationships:updRels,peopleNotes:updNotes,personOrgs:updPOrgs,personLocations:updPLocs});
   }
   function deletePerson(name) {
     const updMems=memories.map(m=>({...m,people:m.people?.filter(p=>p!==name)||[]}));
@@ -2440,6 +2541,7 @@ function App() {
   }
   function setOrgNotes(name, notes) { persistSubject({orgNotes:{...orgNotes, [name]: notes}}); }
   function setPersonOrgs(name, orgs) { persistSubject({personOrgs:{...personOrgs, [name]: orgs}}); }
+  function setPersonLocations(name, locs) { persistSubject({personLocations:{...personLocations, [name]: locs}}); }
   function renameRelationship(oldRel, newRel) {
     const n=newRel.trim(); if(!n||n===oldRel) return;
     const updated={}; Object.entries(peopleRelationships).forEach(([k,v])=>{updated[k]=(v||"").trim()===oldRel?n:v;}); persistSubject({peopleRelationships:updated});
@@ -2651,7 +2753,7 @@ function App() {
       }));
       return {...m, mediaUrls: urls};
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, locationNotes, personOrgs, shareHistory}, null, 2);
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, locationNotes, personOrgs, personLocations, shareHistory}, null, 2);
   }
 
   async function buildBackupBlob(backupPassword) {
@@ -3020,8 +3122,9 @@ function App() {
       const mergedPeopleNotes={...(d.peopleNotes||{}),...peopleNotes}; const mergedOrgNotes={...(d.orgNotes||{}),...orgNotes};
       const mergedLocationNotes={...(d.locationNotes||{}), ...(data.locationNotes||{})};
       const mergedPersonOrgs={...(d.personOrgs||{}), ...(data.personOrgs||{})};
+      const mergedPersonLocations={...(d.personLocations||{}), ...(data.personLocations||{})};
       // Use functional setData to avoid stale closure — importBackup runs inside async FileReader callback
-      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,locationNotes:mergedLocationNotes,personOrgs:mergedPersonOrgs,lastImport:new Date().toISOString()};
+      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,locationNotes:mergedLocationNotes,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,lastImport:new Date().toISOString()};
       setData(prev => {
         const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
         const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
