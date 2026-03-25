@@ -2937,14 +2937,17 @@ function App() {
       // Merge: if a memory with same id exists, merge perspectives into it; otherwise add new
       const existingIds = new Set(memories.map(m=>m.id));
       const toAdd = incomingMems.filter(m=>!existingIds.has(m.id));
+      let mergedPerspectivesCount = 0;
       const merged = memories.map(m=>{
         const incoming = incomingMems.find(im=>im.id===m.id);
         if (!incoming) return m;
         // Merge perspectives
         const existing = m.perspectives||[];
         const newP = (incoming.perspectives||[]).filter(p=>!existing.some(e=>e.author===p.author));
+        if (newP.length) mergedPerspectivesCount++;
         return {...m, perspectives:[...existing,...newP], sharedBy:incoming.sharedBy||m.sharedBy};
       });
+      const skippedCount = incomingMems.filter(m=>existingIds.has(m.id)).length - mergedPerspectivesCount;
       const finalMems = [...merged, ...toAdd].sort((a,b)=>sortKey(a)-sortKey(b));
 
       const backupPeople=d.knownPeople||[...new Set(d.memories.flatMap(m=>m.people||[]))];
@@ -2976,7 +2979,11 @@ function App() {
       if (isShared) {
         alert(`Imported ${d.memories.length} ${d.memories.length===1?"memory":"memories"} shared by ${senderName}.`);
       } else {
-        alert(`Done — ${addedCount} new ${addedCount===1?"memory":"memories"} added (${finalMems.length} total).`);
+        const parts = [];
+        if (addedCount > 0) parts.push(`${addedCount} new ${addedCount===1?"memory":"memories"} added`);
+        if (mergedPerspectivesCount > 0) parts.push(`${mergedPerspectivesCount} updated with new perspectives`);
+        if (skippedCount > 0) parts.push(`${skippedCount} already present — skipped`);
+        alert("Done" + (parts.length ? " — " + parts.join(", ") : "") + ".");
       }
     } catch(err) { alert("Import failed: " + err.message); } };
     r.readAsText(file);
