@@ -316,7 +316,7 @@ function seedData(data) { return data; }
 const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], ownerName:"", ownerEmail:"" };
 
 function emptySubject(id, name, isSelf=false) {
-  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
+  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, locationNotes:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
 }
 
 // Migrate flat data → subjects structure
@@ -332,6 +332,7 @@ function migrateData(raw) {
     knownLocations: raw.knownLocations || [],
     peopleEmails: raw.peopleEmails || {},
     peopleRelationships: raw.peopleRelationships || {},
+    locationNotes: raw.locationNotes || {},
     peopleNotes: raw.peopleNotes || {},
     orgNotes: raw.orgNotes || {},
     lastBackup: raw.lastBackup || null,
@@ -622,7 +623,7 @@ const RELATIONSHIP_SUGGESTIONS = [
   "Teacher","Tutor","Doctor","Therapist","Coach",
 ];
 
-function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPerson, onNewPersonRelationship}) {
+function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPerson, onNewPersonRelationship, allRelationships=[]}) {
   const [input, setInput] = React.useState("");
   const [showSugs, setShowSugs] = React.useState(false);
   const [step, setStep] = React.useState(null); // null | "email" | "relationship"
@@ -630,7 +631,7 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
   const [relInput, setRelInput] = React.useState("");
   const [showRelSugs, setShowRelSugs] = React.useState(false);
   const suggestions=allValues.filter(v=>v.toLowerCase().includes(input.toLowerCase())&&!values.includes(v)&&input.length>0);
-  const relSugs = RELATIONSHIP_SUGGESTIONS.filter(r=>r.toLowerCase().includes(relInput.toLowerCase())&&relInput.length>0);
+  const allRelSugs=[...new Set([...RELATIONSHIP_SUGGESTIONS,...allRelationships])]; const relSugs=allRelSugs.filter(r=>r.toLowerCase().includes(relInput.toLowerCase())&&relInput.length>0);
 
   function commit(name, email, rel) {
     const v = name.trim();
@@ -1176,6 +1177,56 @@ function PersonRow({name, count, relationship, notes, onRename, onDelete, onSetR
               fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px",textDecoration:"underline"}},
             relationship ? "edit relationship" : "+ add relationship"
           )
+    )
+  );
+}
+
+function RelationshipIndex({memories, peopleRelationships, onView}) {
+  const allRels=[...new Set(Object.values(peopleRelationships).map(r=>(r||"").trim()).filter(Boolean))].sort();
+  if(allRels.length===0) return React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No relationships tagged yet.");
+  return React.createElement("div",null,
+    React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 16px"}},allRels.length+" relationship type"+(allRels.length===1?"":"s")+" · click to see memories for all people with that relationship"),
+    allRels.map(rel=>{
+      const people=Object.entries(peopleRelationships).filter(([,r])=>(r||"").trim()===rel).map(([n])=>n);
+      const mc=memories.filter(m=>m.people?.some(p=>people.includes(p))).length;
+      return React.createElement("div",{key:rel,style:{borderBottom:"1px solid #ede4d4",padding:"10px 0"}},
+        React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
+          React.createElement("button",{onClick:()=>onView(rel,people),style:{flex:1,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",padding:0}},rel),
+          React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},people.length+" "+(people.length===1?"person":"people")+" · "+mc+" "+(mc===1?"memory":"memories")),
+          React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px",flexWrap:"wrap",alignItems:"center"}},
+            people.slice(0,4).map(p=>React.createElement("span",{key:p,style:{fontSize:"0.78rem",color:"#5a6a8a",background:"rgba(100,110,140,0.1)",border:"1px solid rgba(100,110,140,0.2)",borderRadius:"20px",padding:"2px 8px"}},p)),
+            people.length>4&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},"+"+(people.length-4)+" more")
+          )
+        )
+      );
+    })
+  );
+}
+
+function LocationRow({name, count, notes, onRename, onDelete, onSetNotes, onView}) {
+  const [renaming, setRenaming] = React.useState(false);
+  const [draft, setDraft] = React.useState(name);
+  const [showNotes, setShowNotes] = React.useState(false);
+  const [notesDraft, setNotesDraft] = React.useState(notes||"");
+  function commitRename() { if(draft.trim()&&draft.trim()!==name) onRename(name,draft.trim()); setRenaming(false); }
+  function commitNotes() { onSetNotes(name, notesDraft); }
+  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"12px 0"}},
+    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
+      renaming
+        ? React.createElement("input",{autoFocus:true,value:draft,onChange:e=>setDraft(e.target.value),
+            onKeyDown:e=>{if(e.key==="Enter")commitRename();if(e.key==="Escape"){setDraft(name);setRenaming(false);}},
+            onBlur:commitRename,style:{...S.input,padding:"5px 9px",fontSize:"1rem",flex:1,minWidth:"140px"}})
+        : React.createElement("button",{onClick:onView,style:{flex:1,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",padding:0}},name),
+      React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},count," ",count===1?"memory":"memories"),
+      React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px"}},
+        !renaming&&React.createElement("button",{onClick:()=>{setDraft(name);setRenaming(true);},style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem"}},"Rename"),
+        React.createElement("button",{onClick:()=>setShowNotes(s=>!s),style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:notes?"#4a7a5a":"#8a7460",borderColor:notes?"#7a9e8a":"#c8b89a"}},showNotes?"Hide notes":(notes?"✓ Notes":"+ Notes")),
+        React.createElement("button",{onClick:()=>{if(window.confirm("Remove “"+name+"” from all memories?"))onDelete(name);},style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove")
+      )
+    ),
+    showNotes&&React.createElement("div",{style:{marginTop:"8px"}},
+      React.createElement("textarea",{value:notesDraft,onChange:e=>setNotesDraft(e.target.value),onBlur:commitNotes,placeholder:"Notes about this location…",rows:3,style:{...S.input,width:"100%",resize:"vertical",fontSize:"0.88rem",fontFamily:"'Crimson Text',Georgia,serif",lineHeight:1.6}}),
+      React.createElement("p",{style:{fontSize:"0.75rem",color:"#7a6a58",fontStyle:"italic",marginTop:"3px"}},"Saved automatically when you click away")
     )
   );
 }
@@ -2185,6 +2236,7 @@ function App() {
   const knownLocations      = subject.knownLocations || [];
   const peopleEmails        = subject.peopleEmails || {};
   const peopleRelationships = subject.peopleRelationships || {};
+  const locationNotes = subject.locationNotes || {};
   const peopleNotes         = subject.peopleNotes || {};
   const shareHistory          = subject.shareHistory || [];
   const legacyMessage         = subject.legacyMessage || "";
@@ -2249,7 +2301,7 @@ function App() {
   // persist: legacy-compatible — detects if patch is subject-level or top-level
   function persist(patch) {
     // If patch contains subject-level keys, route to persistSubject
-    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage"]);
+    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes"]);
     const isSubjectPatch = Object.keys(patch).some(k => subjectKeys.has(k));
     if (isSubjectPatch) {
       // strip any top-level only keys before passing to persistSubject
@@ -2311,6 +2363,19 @@ function App() {
   function registerPeople(names) { const merged=[...new Set([...knownPeople,...names])].sort(); persistSubject({knownPeople:merged}); }
   function setPersonEmail(name, email) { persistSubject({peopleEmails:{...peopleEmails, [name]: email}}); }
   function setPersonRelationship(name, rel) { persistSubject({peopleRelationships:{...peopleRelationships, [name]: rel}}); }
+  function setLocationNotes(name, notes) { persistSubject({locationNotes:{...locationNotes, [name]: notes}}); }
+  function renameLocation(oldName, newName) {
+    const n=newName.trim(); if(!n||n===oldName) return;
+    const updMems=memories.map(m=>({...m,location:m.location===oldName?n:m.location,locations:(m.locations||[]).map(l=>l===oldName?n:l)}));
+    const updKnown=[...new Set([...knownLocations.filter(l=>l!==oldName),n])].sort();
+    const updNotes={...locationNotes}; if(updNotes[oldName]!==undefined){updNotes[n]=updNotes[oldName];delete updNotes[oldName];}
+    persistSubject({memories:updMems,knownLocations:updKnown,locationNotes:updNotes});
+  }
+  function deleteLocation(name) {
+    const updMems=memories.map(m=>({...m,location:m.location===name?"":m.location,locations:(m.locations||[]).filter(l=>l!==name)}));
+    const updKnown=knownLocations.filter(l=>l!==name);
+    persistSubject({memories:updMems,knownLocations:updKnown});
+  }
   function setPersonNotes(name, notes) { persistSubject({peopleNotes:{...peopleNotes, [name]: notes}}); }
   function recordShare(people, memIds) {
     const entry = { people, memIds:[...memIds], date:new Date().toISOString() };
@@ -2529,7 +2594,7 @@ function App() {
       }));
       return {...m, mediaUrls: urls};
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, shareHistory}, null, 2);
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, locationNotes, shareHistory}, null, 2);
   }
 
   async function buildBackupBlob(backupPassword) {
@@ -2893,7 +2958,8 @@ function App() {
       if (senderName && senderEmail) updatedPeopleEmails[senderName] = senderEmail;
       const mergedRelationships = {...(d.peopleRelationships||{}), ...(data.peopleRelationships||{})};
       const mergedPeopleNotes={...(d.peopleNotes||{}),...peopleNotes}; const mergedOrgNotes={...(d.orgNotes||{}),...orgNotes};
-      persistSubject({memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,lastImport:new Date().toISOString()});
+      const mergedLocationNotes={...(d.locationNotes||{}), ...(data.locationNotes||{})};
+      persistSubject({memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,locationNotes:mergedLocationNotes,lastImport:new Date().toISOString()});
       const addedCount = toAdd.length;
       if (isShared) {
         alert(`Imported ${d.memories.length} ${d.memories.length===1?"memory":"memories"} shared by ${senderName}.`);
@@ -3331,7 +3397,7 @@ function App() {
           },
           title:"Save backup file",
           style:{...S.btn,padding:"7px 13px",fontSize:"0.84rem",background:"#4a7a5a",opacity:saveBackupBusy?0.6:1}
-        }, saveBackupBusy ? "Saving…" : "💾 Save"),
+        }, saveBackupBusy ? "Saving…" : "💾 Backup"),
         !isMobile&&React.createElement("button",{onClick:()=>setView("settings"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"⚙ Settings"),
         !isMobile&&React.createElement("span",{style:{width:"1px",height:"20px",background:"#d4c4a8",margin:"0 4px",flexShrink:0}}),
         !isMobile&&React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",title:"Support Remembory on Ko-fi",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#7a6040",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#7a6040";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
@@ -3359,7 +3425,7 @@ function App() {
         style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:"#4a7a5a",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:"2px solid transparent"}
       },
         React.createElement("span",{style:{fontSize:"1.1rem",lineHeight:1}},saveBackupBusy?"…":"💾"),
-        saveBackupBusy?"Saving":"Save"
+        saveBackupBusy?"Saving…":"Backup"
       )
     ),
 
@@ -3397,6 +3463,7 @@ function App() {
           {id:"people", label:"👤 People", items:knownPeople, getCount:v=>memories.filter(m=>m.people?.includes(v)).length},
           {id:"orgs", label:"🏛 Orgs", items:knownOrgs, getCount:v=>memories.filter(m=>m.orgs?.includes(v)).length},
           {id:"locations", label:"📍 Locations", items:allLocations, getCount:v=>memories.filter(m=>m.location===v||m.locations?.includes(v)).length},
+          {id:"relationships", label:"🔗 Relationships", items:[], getCount:()=>0},
           {id:"tags", label:"🏷 Tags", items:allTags, getCount:v=>memories.filter(m=>m.tags?.includes(v)).length},
         ];
         const activeTab = tabs.find(t=>t.id===indexTab)||tabs[0];
@@ -3408,6 +3475,7 @@ function App() {
             if(indexFilter.type==="orgs") return m.orgs?.includes(indexFilter.value);
             if(indexFilter.type==="locations") return m.location===indexFilter.value||m.locations?.includes(indexFilter.value);
             if(indexFilter.type==="tags") return m.tags?.includes(indexFilter.value);
+            if(indexFilter.type==="relationships") return (indexFilter.people||[]).some(p=>m.people?.includes(p));
             return false;
           }).sort((a,b)=>sortKey(a)-sortKey(b));
           return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
@@ -3436,16 +3504,32 @@ function App() {
           ),
           // People tab renders the full manager inline
           indexTab==="people"
-            ? React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs:[],memories,peopleEmails,peopleRelationships,
+            ? React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs:[],memories,peopleRelationships,
                 onRenamePerson:renamePerson,onDeletePerson:deletePerson,
                 onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
                 onViewPerson:name=>setIndexFilter({type:"people",value:name})})
             : indexTab==="orgs"
-            ? React.createElement(PeopleOrgsManager,{knownPeople:[],knownOrgs,memories,peopleEmails,peopleRelationships,
+            ? React.createElement(PeopleOrgsManager,{knownPeople:[],knownOrgs,memories,peopleRelationships,
                 onRenamePerson:renamePerson,onDeletePerson:deletePerson,
                 onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
-                onViewPerson:name=>setIndexFilter({type:"people",value:name})})
-            // Locations and Tags: pill grid
+                onViewPerson:name=>setIndexFilter({type:"orgs",value:name})})
+            : indexTab==="locations"
+            ? (knownLocations.length===0
+                ? React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No locations recorded yet.")
+                : React.createElement("div",null,
+                    React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 4px"}},
+                      knownLocations.length+" location"+(knownLocations.length===1?"":"s")+" · click a name to see its memories"),
+                    knownLocations.map(name=>{
+                      const count=memories.filter(m=>m.location===name||m.locations?.includes(name)).length;
+                      return React.createElement(LocationRow,{key:name,name,count,notes:locationNotes?.[name],
+                        onRename:renameLocation,onDelete:deleteLocation,onSetNotes:setLocationNotes,
+                        onView:()=>setIndexFilter({type:"locations",value:name})});
+                    })
+                  ))
+            : indexTab==="relationships"
+            ? React.createElement(RelationshipIndex,{memories,peopleRelationships,
+                onView:(rel,people)=>setIndexFilter({type:"relationships",value:rel,people})})
+            // Tags: pill grid
             : activeTab.items.length===0
             ? React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"Nothing here yet.")
             : React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"10px"}},
@@ -3679,7 +3763,7 @@ function App() {
                 React.createElement("div",null,React.createElement("label",{style:S.label},"Tags"),React.createElement(TagPicker,{tags:item.tags,onToggle:tag=>updatePhoto(item.id,{tags:item.tags.includes(tag)?item.tags.filter(t=>t!==tag):[...item.tags,tag]})})),
                 React.createElement("div",null,
                   React.createElement("label",{style:S.label},"People"),
-                  React.createElement(PeopleOrgField,{icon:"👤",values:item.people||[],allValues:knownPeople,onChange:v=>updatePhoto(item.id,{people:v}),placeholder:"Add a person…",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); }})
+                  React.createElement(PeopleOrgField,{icon:"👤",values:item.people||[],allValues:knownPeople,onChange:v=>updatePhoto(item.id,{people:v}),placeholder:"Add a person…",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
                 ),
                 React.createElement("p",{style:{margin:0,fontSize:"0.76rem",color:item.exifDate?"#89b08a":"#c4858a",fontStyle:"italic"}},item.exifDate?"✓ Date from EXIF":"⚠ No EXIF date — set manually")
               )
@@ -3781,7 +3865,7 @@ function App() {
               React.createElement("div",null,
                 React.createElement("label",{style:S.label},"People"),
                 React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 6px"}},"Sender added automatically. Add anyone else mentioned in the email."),
-                React.createElement(PeopleOrgField,{icon:"👤",values:emailForm.people||[],allValues:knownPeople,onChange:v=>setEmailForm(f=>({...f,people:v})),placeholder:"Add a person…",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); }})
+                React.createElement(PeopleOrgField,{icon:"👤",values:emailForm.people||[],allValues:knownPeople,onChange:v=>setEmailForm(f=>({...f,people:v})),placeholder:"Add a person…",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
               ),
               React.createElement("button",{onClick:saveEmail,style:{...S.btn,justifySelf:"start"}},"Save to Chronicle")
             )
@@ -3946,7 +4030,7 @@ function App() {
               React.createElement("label",{style:{...S.label,margin:0,cursor:"pointer",display:"flex",alignItems:"center",gap:"8px",userSelect:"none"}},
                 React.createElement("input",{type:"checkbox",checked:!!form.endFuzzy||form.endOngoing,
                   onChange:e=>updateForm(e.target.checked
-                    ? {endFuzzy:form.fuzzy, endYear:form.year+1, endMonth:form.month, endDay:form.day, endSeason:form.season, endOngoing:false}
+                    ? {endFuzzy:form.fuzzy, endYear:form.year, endMonth:form.month, endDay:form.day, endSeason:form.season, endOngoing:false}
                     : {endFuzzy:null, endOngoing:false}),
                   style:{accentColor:"#2c2416",cursor:"pointer"}}),
                 "Has an end date",
@@ -3989,7 +4073,7 @@ function App() {
           ),
           React.createElement("div",null,React.createElement("label",{style:S.label},"The Memory"),React.createElement("textarea",{value:form.content,onChange:e=>updateForm({content:e.target.value}),placeholder:"Write as much or as little as you remember…",rows:6,style:{...S.input,resize:"vertical",lineHeight:"1.7"}})),
           React.createElement("div",null,React.createElement("label",{style:S.label},"Topic Tags"),React.createElement(TagPicker,{tags:form.tags,onToggle:tag=>updateForm({tags:form.tags.includes(tag)?form.tags.filter(t=>t!==tag):[...form.tags,tag]}),customTags,onAddCustom:addCustomTag,onRemoveCustom:removeCustomTag})),
-          React.createElement("div",null,React.createElement("label",{style:S.label},"People"),React.createElement(PeopleOrgField,{icon:"👤",values:form.people||[],allValues:knownPeople,onChange:v=>updateForm({people:v}),placeholder:"Add a person…",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); }})),
+          React.createElement("div",null,React.createElement("label",{style:S.label},"People"),React.createElement(PeopleOrgField,{icon:"👤",values:form.people||[],allValues:knownPeople,onChange:v=>updateForm({people:v}),placeholder:"Add a person…",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})),
           React.createElement("div",null,React.createElement("label",{style:S.label},"Organisations"),React.createElement(PeopleOrgField,{icon:"🏛",values:form.orgs||[],allValues:knownOrgs,onChange:v=>updateForm({orgs:v}),placeholder:"Add an organisation…"})),
           React.createElement("div",null,
             React.createElement("label",{style:S.label},"Photos & Media"),
