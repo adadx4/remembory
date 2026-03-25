@@ -316,7 +316,7 @@ function seedData(data) { return data; }
 const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], ownerName:"", ownerEmail:"" };
 
 function emptySubject(id, name, isSelf=false) {
-  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, locationNotes:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
+  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, locationNotes:{}, personOrgs:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
 }
 
 // Migrate flat data → subjects structure
@@ -335,6 +335,7 @@ function migrateData(raw) {
     locationNotes: raw.locationNotes || {},
     peopleNotes: raw.peopleNotes || {},
     orgNotes: raw.orgNotes || {},
+    personOrgs: raw.personOrgs || {},
     lastBackup: raw.lastBackup || null,
     backupPassword: raw.backupPassword || "",
     shareHistory: raw.shareHistory || [],
@@ -1101,7 +1102,7 @@ function MemoryCard({m, onClick}) {
 
 // ── Main App ───────────────────────────────────────────────────
 
-function PersonRow({name, count, relationship, notes, onRename, onDelete, onSetRelationship, onSetNotes, onViewMemories}) {
+function PersonRow({name, count, relationship, notes, orgs, knownOrgs, onRename, onDelete, onSetRelationship, onSetNotes, onSetOrgs, onViewMemories, allRelationships=[]}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(name);
   const [editingRel, setEditingRel] = React.useState(false);
@@ -1109,7 +1110,10 @@ function PersonRow({name, count, relationship, notes, onRename, onDelete, onSetR
   const [showRelSugs, setShowRelSugs] = React.useState(false);
   const [showNotes, setShowNotes] = React.useState(false);
   const [notesDraft, setNotesDraft] = React.useState(notes||"");
-  const relSugs = RELATIONSHIP_SUGGESTIONS.filter(r=>r.toLowerCase().includes(relDraft.toLowerCase())&&relDraft.length>0);
+  const allRelSugs=[...new Set([...RELATIONSHIP_SUGGESTIONS,...allRelationships])]; const relSugs=allRelSugs.filter(r=>r.toLowerCase().includes(relDraft.toLowerCase())&&relDraft.length>0);
+  const [editingOrgs, setEditingOrgs] = React.useState(false);
+  const [orgSearch, setOrgSearch] = React.useState("");
+  const orgSugs = orgSearch.length>0 ? (knownOrgs||[]).filter(o=>o.toLowerCase().includes(orgSearch.toLowerCase())&&!(orgs||[]).includes(o)) : [];
 
   function commitRename() { if(draft.trim()&&draft.trim()!==name) onRename(name,draft.trim()); setRenaming(false); }
   function commitRel() { onSetRelationship(name, relDraft.trim()); setEditingRel(false); setShowRelSugs(false); }
@@ -1176,29 +1180,67 @@ function PersonRow({name, count, relationship, notes, onRename, onDelete, onSetR
             style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",
               fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px",textDecoration:"underline"}},
             relationship ? "edit relationship" : "+ add relationship"
+          ),
+      (orgs||[]).map(o=>React.createElement("span",{key:o,style:{display:"inline-flex",alignItems:"center",gap:"3px",fontSize:"0.78rem",color:"#5a4a30",background:"rgba(120,100,80,0.1)",border:"1px solid rgba(120,100,80,0.25)",borderRadius:"20px",padding:"1px 8px"}},
+        "🏛 ",o,
+        React.createElement("button",{onClick:()=>onSetOrgs(name,(orgs||[]).filter(x=>x!==o)),style:{background:"none",border:"none",cursor:"pointer",color:"#8a7460",fontSize:"0.7rem",padding:"0 0 0 2px",lineHeight:1}},"x")
+      )),
+      editingOrgs
+        ? React.createElement("div",{style:{position:"relative",display:"inline-flex",gap:"6px",alignItems:"center"}},
+            React.createElement("input",{autoFocus:true,value:orgSearch,onChange:e=>setOrgSearch(e.target.value),
+              onKeyDown:e=>{if(e.key==="Escape"){setEditingOrgs(false);setOrgSearch("");}},
+              onBlur:()=>setTimeout(()=>{setEditingOrgs(false);setOrgSearch("");},200),
+              placeholder:"Type org name…",
+              style:{...S.input,padding:"3px 8px",fontSize:"0.8rem",width:"140px"}}),
+            orgSugs.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,minWidth:"160px",background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)"}},
+              orgSugs.map(o=>React.createElement("div",{key:o,onMouseDown:()=>{onSetOrgs(name,[...(orgs||[]),o]);setOrgSearch("");setEditingOrgs(false);},
+                style:{padding:"6px 12px",cursor:"pointer",fontSize:"0.86rem",color:"#2c2416"},
+                onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+                onMouseLeave:e=>e.currentTarget.style.background="transparent"},o))
+            )
+          )
+        : React.createElement("button",{onClick:()=>setEditingOrgs(true),
+            style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",
+              fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px",textDecoration:"underline"}},
+            "+ link org"
           )
     )
   );
 }
 
-function RelationshipIndex({memories, peopleRelationships, onView}) {
+function RelationshipRow({rel, people, memCount, onView, onRename}) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(rel);
+  function commitRename() { const v=draft.trim(); if(v&&v!==rel) onRename(rel,v); setEditing(false); }
+  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"10px 0"}},
+    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
+      editing
+        ? React.createElement("input",{autoFocus:true,value:draft,onChange:e=>setDraft(e.target.value),
+            onKeyDown:e=>{if(e.key==="Enter")commitRename();if(e.key==="Escape"){setDraft(rel);setEditing(false);}},
+            onBlur:commitRename,style:{...S.input,padding:"4px 9px",fontSize:"1rem",flex:1,minWidth:"140px",maxWidth:"240px"}})
+        : React.createElement("button",{onClick:()=>onView(rel,people),style:{flex:1,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",padding:0}},rel),
+      React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},
+        people.length+" "+(people.length===1?"person":"people")+" · "+memCount+" "+(memCount===1?"memory":"memories")),
+      React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px",flexWrap:"wrap",alignItems:"center"}},
+        people.slice(0,4).map(p=>React.createElement("span",{key:p,style:{fontSize:"0.78rem",color:"#5a6a8a",background:"rgba(100,110,140,0.1)",border:"1px solid rgba(100,110,140,0.2)",borderRadius:"20px",padding:"2px 8px"}},p)),
+        people.length>4&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},"+"+(people.length-4)+" more"),
+        !editing&&React.createElement("button",{onClick:()=>{setDraft(rel);setEditing(true);},
+          style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline",padding:"0 4px"}},
+          "rename")
+      )
+    )
+  );
+}
+
+function RelationshipIndex({memories, peopleRelationships, onView, onRenameRelationship}) {
   const allRels=[...new Set(Object.values(peopleRelationships).map(r=>(r||"").trim()).filter(Boolean))].sort();
   if(allRels.length===0) return React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No relationships tagged yet.");
   return React.createElement("div",null,
-    React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 16px"}},allRels.length+" relationship type"+(allRels.length===1?"":"s")+" · click to see memories for all people with that relationship"),
+    React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 16px"}},allRels.length+" relationship type"+(allRels.length===1?"":"s")+" · click a name to see memories · rename to merge types"),
     allRels.map(rel=>{
       const people=Object.entries(peopleRelationships).filter(([,r])=>(r||"").trim()===rel).map(([n])=>n);
       const mc=memories.filter(m=>m.people?.some(p=>people.includes(p))).length;
-      return React.createElement("div",{key:rel,style:{borderBottom:"1px solid #ede4d4",padding:"10px 0"}},
-        React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
-          React.createElement("button",{onClick:()=>onView(rel,people),style:{flex:1,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",padding:0}},rel),
-          React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},people.length+" "+(people.length===1?"person":"people")+" · "+mc+" "+(mc===1?"memory":"memories")),
-          React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px",flexWrap:"wrap",alignItems:"center"}},
-            people.slice(0,4).map(p=>React.createElement("span",{key:p,style:{fontSize:"0.78rem",color:"#5a6a8a",background:"rgba(100,110,140,0.1)",border:"1px solid rgba(100,110,140,0.2)",borderRadius:"20px",padding:"2px 8px"}},p)),
-            people.length>4&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},"+"+(people.length-4)+" more")
-          )
-        )
-      );
+      return React.createElement(RelationshipRow,{key:rel,rel,people,memCount:mc,onView,onRename:onRenameRelationship});
     })
   );
 }
@@ -1231,7 +1273,7 @@ function LocationRow({name, count, notes, onRename, onDelete, onSetNotes, onView
   );
 }
 
-function OrgRow({name, count, notes, onRename, onDelete, onSetNotes}) {
+function OrgRow({name, count, notes, connectedPeople, onRename, onDelete, onSetNotes}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(name);
   const [showNotes, setShowNotes] = React.useState(false);
@@ -1257,6 +1299,10 @@ function OrgRow({name, count, notes, onRename, onDelete, onSetNotes}) {
           style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove")
       )
     ),
+    (connectedPeople||[]).length>0&&React.createElement("div",{style:{marginTop:"6px",paddingLeft:"2px",display:"flex",flexWrap:"wrap",gap:"5px",alignItems:"center"}},
+      React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic"}},"People: "),
+      (connectedPeople||[]).map(p=>React.createElement("span",{key:p,style:{fontSize:"0.78rem",color:"#4a5a7a",background:"rgba(100,110,140,0.1)",border:"1px solid rgba(100,110,140,0.2)",borderRadius:"20px",padding:"1px 8px"}},p))
+    ),
     showNotes && React.createElement("div",{style:{marginTop:"8px"}},
       React.createElement("textarea",{
         value:notesDraft,
@@ -1271,7 +1317,7 @@ function OrgRow({name, count, notes, onRename, onDelete, onSetNotes}) {
   );
 }
 
-function PeopleOrgsManager({knownPeople,knownOrgs,memories,peopleRelationships,peopleNotes,orgNotes,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onViewPerson}) {
+function PeopleOrgsManager({knownPeople,knownOrgs,memories,peopleRelationships,peopleNotes,orgNotes,personOrgs,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onSetPersonOrgs,onViewPerson}) {
   const [search, setSearch] = React.useState("");
   const personCount=name=>memories.filter(m=>m.people?.includes(name)).length;
   const orgCount=name=>memories.filter(m=>m.orgs?.includes(name)).length;
@@ -1301,6 +1347,8 @@ function PeopleOrgsManager({knownPeople,knownOrgs,memories,peopleRelationships,p
         filteredPeople.length," ",filteredPeople.length===1?"person":"people"," \xb7 click a name to see their memories"),
       filteredPeople.map(name=>React.createElement(PersonRow,{key:name,name,count:personCount(name),
         relationship:peopleRelationships?.[name],notes:peopleNotes?.[name],
+        orgs:personOrgs?.[name]||[],knownOrgs,onSetOrgs:onSetPersonOrgs,
+        allRelationships:Object.values(peopleRelationships).filter(Boolean),
         onSetRelationship,onSetNotes:onSetPersonNotes,onRename:onRenamePerson,onDelete:onDeletePerson,
         onViewMemories:()=>onViewPerson(name)}))
     ),
@@ -1308,7 +1356,7 @@ function PeopleOrgsManager({knownPeople,knownOrgs,memories,peopleRelationships,p
       React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:"0 0 4px"}},"Organisations"),
       React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 2px"}},
         filteredOrgs.length," ",filteredOrgs.length===1?"organisation":"organisations"),
-      filteredOrgs.map(name=>React.createElement(OrgRow,{key:name,name,count:orgCount(name),notes:orgNotes?.[name],onRename:onRenameOrg,onDelete:onDeleteOrg,onSetNotes:onSetOrgNotes}))
+      filteredOrgs.map(name=>{const cp=Object.entries(personOrgs||{}).filter(([,os])=>(os||[]).includes(name)).map(([p])=>p);return React.createElement(OrgRow,{key:name,name,count:orgCount(name),notes:orgNotes?.[name],connectedPeople:cp,onRename:onRenameOrg,onDelete:onDeleteOrg,onSetNotes:onSetOrgNotes});})
     ),
     knownPeople.length===0&&knownOrgs.length===0&&React.createElement("div",null,
       React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic",marginBottom:"16px"}},"No people or organisations tagged yet.")
@@ -2241,6 +2289,7 @@ function App() {
   const shareHistory          = subject.shareHistory || [];
   const legacyMessage         = subject.legacyMessage || "";
   const orgNotes            = subject.orgNotes || {};
+  const personOrgs          = subject.personOrgs || {};
   const ownerName           = subject.name || "";
   const ownerEmail          = data.carerEmail || "";
   const carerName           = data.carerName || "";
@@ -2301,7 +2350,7 @@ function App() {
   // persist: legacy-compatible — detects if patch is subject-level or top-level
   function persist(patch) {
     // If patch contains subject-level keys, route to persistSubject
-    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes"]);
+    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","personOrgs"]);
     const isSubjectPatch = Object.keys(patch).some(k => subjectKeys.has(k));
     if (isSubjectPatch) {
       // strip any top-level only keys before passing to persistSubject
@@ -2342,7 +2391,10 @@ function App() {
     const n=newName.trim(); if(!n||n===oldName) return;
     const updMems=memories.map(m=>({...m,people:m.people?.map(p=>p===oldName?n:p)||[]}));
     const updKnown=[...new Set([...knownPeople.filter(p=>p!==oldName),n])].sort();
-    persistSubject({memories:updMems,knownPeople:updKnown});
+    const updRels={...peopleRelationships}; if(updRels[oldName]!==undefined){updRels[n]=updRels[oldName];delete updRels[oldName];}
+    const updNotes={...peopleNotes}; if(updNotes[oldName]!==undefined){updNotes[n]=updNotes[oldName];delete updNotes[oldName];}
+    const updPOrgs={...personOrgs}; if(updPOrgs[oldName]!==undefined){updPOrgs[n]=updPOrgs[oldName];delete updPOrgs[oldName];}
+    persistSubject({memories:updMems,knownPeople:updKnown,peopleRelationships:updRels,peopleNotes:updNotes,personOrgs:updPOrgs});
   }
   function deletePerson(name) {
     const updMems=memories.map(m=>({...m,people:m.people?.filter(p=>p!==name)||[]}));
@@ -2387,6 +2439,11 @@ function App() {
     persistSubject({memories:updated});
   }
   function setOrgNotes(name, notes) { persistSubject({orgNotes:{...orgNotes, [name]: notes}}); }
+  function setPersonOrgs(name, orgs) { persistSubject({personOrgs:{...personOrgs, [name]: orgs}}); }
+  function renameRelationship(oldRel, newRel) {
+    const n=newRel.trim(); if(!n||n===oldRel) return;
+    const updated={}; Object.entries(peopleRelationships).forEach(([k,v])=>{updated[k]=(v||"").trim()===oldRel?n:v;}); persistSubject({peopleRelationships:updated});
+  }
   function registerOrgs(names) { const merged=[...new Set([...knownOrgs,...names])].sort(); persistSubject({knownOrgs:merged}); }
   function registerLocations(names) { const merged=[...new Set([...knownLocations,...names])].sort(); persistSubject({knownLocations:merged}); }
 
@@ -2594,7 +2651,7 @@ function App() {
       }));
       return {...m, mediaUrls: urls};
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, locationNotes, shareHistory}, null, 2);
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, locationNotes, personOrgs, shareHistory}, null, 2);
   }
 
   async function buildBackupBlob(backupPassword) {
@@ -2962,8 +3019,9 @@ function App() {
       const mergedRelationships = {...(d.peopleRelationships||{}), ...(data.peopleRelationships||{})};
       const mergedPeopleNotes={...(d.peopleNotes||{}),...peopleNotes}; const mergedOrgNotes={...(d.orgNotes||{}),...orgNotes};
       const mergedLocationNotes={...(d.locationNotes||{}), ...(data.locationNotes||{})};
+      const mergedPersonOrgs={...(d.personOrgs||{}), ...(data.personOrgs||{})};
       // Use functional setData to avoid stale closure — importBackup runs inside async FileReader callback
-      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,locationNotes:mergedLocationNotes,lastImport:new Date().toISOString()};
+      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,locationNotes:mergedLocationNotes,personOrgs:mergedPersonOrgs,lastImport:new Date().toISOString()};
       setData(prev => {
         const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
         const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
@@ -3522,12 +3580,12 @@ function App() {
           ),
           // People tab renders the full manager inline
           indexTab==="people"
-            ? React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs:[],memories,peopleRelationships,
+            ? React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,memories,peopleRelationships,personOrgs,onSetPersonOrgs:setPersonOrgs,
                 onRenamePerson:renamePerson,onDeletePerson:deletePerson,
                 onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
                 onViewPerson:name=>setIndexFilter({type:"people",value:name})})
             : indexTab==="orgs"
-            ? React.createElement(PeopleOrgsManager,{knownPeople:[],knownOrgs,memories,peopleRelationships,
+            ? React.createElement(PeopleOrgsManager,{knownPeople:[],knownOrgs,memories,peopleRelationships,personOrgs,onSetPersonOrgs:setPersonOrgs,
                 onRenamePerson:renamePerson,onDeletePerson:deletePerson,
                 onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
                 onViewPerson:name=>setIndexFilter({type:"orgs",value:name})})
@@ -3546,7 +3604,7 @@ function App() {
                   ))
             : indexTab==="relationships"
             ? React.createElement(RelationshipIndex,{memories,peopleRelationships,
-                onView:(rel,people)=>setIndexFilter({type:"relationships",value:rel,people})})
+                onView:(rel,people)=>setIndexFilter({type:"relationships",value:rel,people}),onRenameRelationship:renameRelationship})
             // Tags: pill grid
             : activeTab.items.length===0
             ? React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"Nothing here yet.")
@@ -4003,7 +4061,13 @@ function App() {
           React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:isMobile?"1.6rem":"2rem",margin:"0 0 14px",color:"#1a1208",lineHeight:1.2}},m.title),
           React.createElement("div",{style:{display:"flex",gap:"7px",flexWrap:"wrap",marginBottom:"18px"}},
           ...(m.tags||[]).map(tag=>{const c=TAG_COLORS[tag]||"#9a8a7a";return React.createElement("span",{key:tag,style:{padding:"3px 10px",borderRadius:"20px",fontSize:"0.8rem",background:c,color:"#fff"}},tag);}),
-          ...(m.people||[]).map(p=>React.createElement("span",{key:p,style:{padding:"3px 10px",borderRadius:"20px",fontSize:"0.8rem",background:"rgba(100,120,160,0.15)",color:"#4a5a7a",border:"1px solid rgba(100,120,160,0.3)"}},"👤 ",p)),
+          ...(m.people||[]).map(p=>{
+            const pOrgs=(personOrgs[p]||[]);
+            return React.createElement("span",{key:p,style:{padding:"3px 10px",borderRadius:"20px",fontSize:"0.8rem",background:"rgba(100,120,160,0.15)",color:"#4a5a7a",border:"1px solid rgba(100,120,160,0.3)",display:"inline-flex",gap:"4px",alignItems:"center"}},
+              "👤 ",p,
+              pOrgs.length>0&&React.createElement("span",{style:{fontSize:"0.72rem",color:"#7a6a58",fontStyle:"italic"}},"· "+pOrgs.join(", "))
+            );
+          }),
           ...(m.orgs||[]).map(o=>React.createElement("span",{key:o,style:{padding:"3px 10px",borderRadius:"20px",fontSize:"0.8rem",background:"rgba(120,100,80,0.15)",color:"#5a4a30",border:"1px solid rgba(120,100,80,0.3)"}},"🏛 ",o))
         ),
           m.mediaUrls?.length>0&&React.createElement("div",{style:{display:"flex",gap:"12px",flexWrap:"wrap",marginBottom:"22px"}},m.mediaUrls.map((med,i)=>React.createElement(MediaImg,{key:i,med,alt:"",style:{maxWidth:"100%",maxHeight:"300px",objectFit:"cover",borderRadius:"2px",border:"1px solid #c8b89a"}}))),
