@@ -2959,13 +2959,24 @@ function App() {
       const mergedRelationships = {...(d.peopleRelationships||{}), ...(data.peopleRelationships||{})};
       const mergedPeopleNotes={...(d.peopleNotes||{}),...peopleNotes}; const mergedOrgNotes={...(d.orgNotes||{}),...orgNotes};
       const mergedLocationNotes={...(d.locationNotes||{}), ...(data.locationNotes||{})};
-      persistSubject({memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,locationNotes:mergedLocationNotes,lastImport:new Date().toISOString()});
+      // Use functional setData to avoid stale closure — importBackup runs inside async FileReader callback
+      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,locationNotes:mergedLocationNotes,lastImport:new Date().toISOString()};
+      setData(prev => {
+        const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
+        const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
+        const newData = {...prev, subjects: newSubjects};
+        if (activePassword) {
+          saveEncrypted(activePassword, newData);
+        } else {
+          saveData(newData);
+        }
+        return newData;
+      });
       const addedCount = toAdd.length;
       if (isShared) {
         alert(`Imported ${d.memories.length} ${d.memories.length===1?"memory":"memories"} shared by ${senderName}.`);
       } else {
-        const offer = window.confirm(`Merged ${addedCount} new ${addedCount===1?"memory":"memories"} (${finalMems.length} total).\n\nDownload a fresh merged backup now? Recommended when syncing across devices.`);
-        if (offer) { setSaveBackupBusy(true); await exportBackup(); setSaveBackupBusy(false); }
+        alert(`Done — ${addedCount} new ${addedCount===1?"memory":"memories"} added (${finalMems.length} total).`);
       }
     } catch(err) { alert("Import failed: " + err.message); } };
     r.readAsText(file);
