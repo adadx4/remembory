@@ -316,7 +316,7 @@ function seedData(data) { return data; }
 const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], ownerName:"", ownerEmail:"" };
 
 function emptySubject(id, name, isSelf=false) {
-  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, locationNotes:{}, personOrgs:{}, personLocations:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
+  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, locationNotes:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
 }
 
 // Migrate flat data → subjects structure
@@ -337,6 +337,7 @@ function migrateData(raw) {
     orgNotes: raw.orgNotes || {},
     personOrgs: raw.personOrgs || {},
     personLocations: raw.personLocations || {},
+    personGroups: raw.personGroups || {},
     lastBackup: raw.lastBackup || null,
     backupPassword: raw.backupPassword || "",
     shareHistory: raw.shareHistory || [],
@@ -1378,6 +1379,100 @@ function OrgRow({name, count, notes, connectedPeople, onRename, onDelete, onSetN
   );
 }
 
+function GroupRow({groupName, members, notes, onRename, onDelete, onSetNotes, onSetMembers, knownPeople, onView}) {
+  const [renaming, setRenaming] = React.useState(false);
+  const [draft, setDraft] = React.useState(groupName);
+  const [showNotes, setShowNotes] = React.useState(false);
+  const [notesDraft, setNotesDraft] = React.useState(notes||"");
+  const [addingMember, setAddingMember] = React.useState(false);
+  const [memberSearch, setMemberSearch] = React.useState("");
+  const memberSugs = memberSearch.length>0 ? knownPeople.filter(p=>p.toLowerCase().includes(memberSearch.toLowerCase())&&!(members||[]).includes(p)) : [];
+
+  function commitRename(){if(draft.trim()&&draft.trim()!==groupName)onRename(groupName,draft.trim());setRenaming(false);}
+  function commitNotes(){onSetNotes(groupName,notesDraft);}
+
+  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"14px 0"}},
+    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
+      renaming
+        ? React.createElement("input",{autoFocus:true,value:draft,onChange:e=>setDraft(e.target.value),
+            onKeyDown:e=>{if(e.key==="Enter")commitRename();if(e.key==="Escape"){setDraft(groupName);setRenaming(false);}},
+            onBlur:commitRename,style:{...S.input,padding:"5px 9px",fontSize:"1rem",flex:1,minWidth:"140px"}})
+        : React.createElement("button",{onClick:onView,style:{flex:1,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",padding:0,fontWeight:600}},groupName),
+      React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},(members||[]).length+" "+(members||[]).length===1?"member":"members"),
+      React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px"}},
+        !renaming&&React.createElement("button",{onClick:()=>{setDraft(groupName);setRenaming(true);},style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem"}},"Rename"),
+        React.createElement("button",{onClick:()=>setShowNotes(s=>!s),style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:notes?"#4a7a5a":"#8a7460",borderColor:notes?"#7a9e8a":"#c8b89a"}},showNotes?"Hide notes":(notes?"✓ Notes":"+ Notes")),
+        React.createElement("button",{onClick:()=>{if(window.confirm("Delete group “"+groupName+"”? Members won’t be affected."))onDelete(groupName);},style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Delete")
+      )
+    ),
+    React.createElement("div",{style:{marginTop:"8px",display:"flex",flexWrap:"wrap",gap:"5px",alignItems:"center"}},
+      (members||[]).map(m=>React.createElement("span",{key:m,style:{display:"inline-flex",alignItems:"center",gap:"3px",fontSize:"0.82rem",color:"#4a5a7a",background:"rgba(100,110,140,0.1)",border:"1px solid rgba(100,110,140,0.2)",borderRadius:"20px",padding:"2px 9px"}},
+        "👤 ",m,
+        React.createElement("button",{onClick:()=>onSetMembers(groupName,(members||[]).filter(x=>x!==m)),style:{background:"none",border:"none",cursor:"pointer",color:"#8a7460",fontSize:"0.7rem",padding:"0 0 0 2px",lineHeight:1}},"x")
+      )),
+      addingMember
+        ? React.createElement("div",{style:{position:"relative",display:"inline-flex",gap:"5px",alignItems:"center"}},
+            React.createElement("input",{autoFocus:true,value:memberSearch,onChange:e=>setMemberSearch(e.target.value),
+              onKeyDown:e=>{if(e.key==="Escape"){setAddingMember(false);setMemberSearch("");}},
+              onBlur:()=>setTimeout(()=>{setAddingMember(false);setMemberSearch("");},200),
+              placeholder:"Search people…",style:{...S.input,padding:"3px 8px",fontSize:"0.8rem",width:"130px"}}),
+            memberSugs.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,minWidth:"160px",background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)"}},
+              memberSugs.map(p=>React.createElement("div",{key:p,onMouseDown:()=>{onSetMembers(groupName,[...(members||[]),p]);setMemberSearch("");setAddingMember(false);},
+                style:{padding:"6px 12px",cursor:"pointer",fontSize:"0.86rem",color:"#2c2416"},
+                onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+                onMouseLeave:e=>e.currentTarget.style.background="transparent"},p))
+            )
+          )
+        : React.createElement("button",{onClick:()=>setAddingMember(true),style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline",padding:"0 4px"}},"+ add member")
+    ),
+    showNotes&&React.createElement("div",{style:{marginTop:"8px"}},
+      React.createElement("textarea",{value:notesDraft,onChange:e=>setNotesDraft(e.target.value),onBlur:commitNotes,placeholder:"Notes about this group…",rows:2,style:{...S.input,width:"100%",resize:"vertical",fontSize:"0.88rem",lineHeight:1.6}}),
+      React.createElement("p",{style:{fontSize:"0.75rem",color:"#7a6a58",fontStyle:"italic",marginTop:"3px"}},"Saved automatically when you click away")
+    )
+  );
+}
+
+function GroupsManager({personGroups, knownPeople, memories, onSetGroups, onViewGroup}) {
+  const [adding, setAdding] = React.useState(false);
+  const [newGroupName, setNewGroupName] = React.useState("");
+  const groups = Object.entries(personGroups||{}).sort((a,b)=>a[0].localeCompare(b[0]));
+
+  function commitAdd(){
+    const v=newGroupName.trim(); if(!v||personGroups[v]) return;
+    onSetGroups({...personGroups,[v]:{members:[],notes:""}});
+    setNewGroupName(""); setAdding(false);
+  }
+  function renameGroup(old,newName){
+    if(!newName.trim()||newName===old||personGroups[newName]) return;
+    const updated={};
+    Object.entries(personGroups).forEach(([k,v])=>{updated[k===old?newName:k]=v;});
+    onSetGroups(updated);
+  }
+  function deleteGroup(name){const updated={...personGroups};delete updated[name];onSetGroups(updated);}
+  function setGroupNotes(name,notes){onSetGroups({...personGroups,[name]:{...personGroups[name],notes}});}
+  function setGroupMembers(name,members){onSetGroups({...personGroups,[name]:{...personGroups[name],members}});}
+
+  return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
+    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"4px"}},
+      React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},
+        groups.length+" "+(groups.length===1?"group":"groups")+" · click a group name to see all member memories"),
+      !adding&&React.createElement("button",{onClick:()=>{setNewGroupName("");setAdding(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ new group")
+    ),
+    adding&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"12px"}},
+      React.createElement("input",{autoFocus:true,value:newGroupName,onChange:e=>setNewGroupName(e.target.value),
+        onKeyDown:e=>{if(e.key==="Enter")commitAdd();if(e.key==="Escape"){setAdding(false);setNewGroupName("");}},
+        placeholder:"Group name (e.g. Family, School friends…)",style:{...S.input,padding:"5px 9px",fontSize:"0.92rem",flex:1}}),
+      React.createElement("button",{onClick:commitAdd,style:{...S.btn,padding:"5px 12px",fontSize:"0.86rem"}},"Create"),
+      React.createElement("button",{onClick:()=>{setAdding(false);setNewGroupName("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.86rem"}},"Cancel")
+    ),
+    groups.length===0&&!adding&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic",margin:"8px 0"}},"No groups yet. Groups let you add several people to a memory at once."),
+    groups.map(([name,data])=>React.createElement(GroupRow,{key:name,groupName:name,
+      members:data.members||[],notes:data.notes||"",knownPeople,
+      onRename:renameGroup,onDelete:deleteGroup,onSetNotes:setGroupNotes,onSetMembers:setGroupMembers,
+      onView:()=>onViewGroup(name,data.members||[])}))
+  );
+}
+
 function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,peopleNotes,orgNotes,personOrgs,personLocations,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onSetPersonOrgs,onSetPersonLocations,onViewPerson,onAddPerson,onAddOrg}) {
   const [search, setSearch] = React.useState("");
   const [filterRel, setFilterRel] = React.useState(null);
@@ -1408,7 +1503,7 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
     React.createElement("div",{style:{marginBottom:"16px"}},
       React.createElement("div",{style:{position:"relative",marginBottom:"8px"}},
         React.createElement("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Search people & organisations…",style:{...S.input,paddingLeft:"32px",fontSize:"0.92rem"}}),
-        React.createElement("span",{style:{position:"absolute",left:"10px",top:"50%",transform:"translateY(-50%)",color:"#7a6a58",fontSize:"0.9rem",pointerEvents:"none"}},"������"),
+        React.createElement("span",{style:{position:"absolute",left:"10px",top:"50%",transform:"translateY(-50%)",color:"#7a6a58",fontSize:"0.9rem",pointerEvents:"none"}},"🔍"),
         search&&React.createElement("button",{onClick:()=>setSearch(""),style:{position:"absolute",right:"8px",top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"1rem",lineHeight:1}},"×")
       ),
       (allFilterRels.length>0||allFilterOrgs.length>0||allFilterLocs.length>0)&&React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"5px",alignItems:"center"}},
@@ -1615,7 +1710,7 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
   const [copied, setCopied] = useState(false);
   const [includeIntro, setIncludeIntro] = useState(true);
   const [copiedMsg, setCopiedMsg] = useState(false);
-  const CHRONICLE_INTRO = "Chronicle is a free, private memory keeper \u2014 no account needed. Your memories stay on your device.\n\nOpen the link below to see what I've shared with you, then save it to your own Chronicle at remembory.net:\n";
+  const CHRONICLE_INTRO = "I\u2019ve shared some memories with you using Chronicle \u2014 a free, private memory keeper at remembory.net.\n\nPlease open the link below in Safari or Chrome (not inside a messaging app) so it works correctly:\n";
   function buildMessage() { return includeIntro ? CHRONICLE_INTRO + shareUrl : shareUrl; }
   function copyMessage() {
     navigator.clipboard.writeText(buildMessage()).then(()=>{ setCopiedMsg(true); setTimeout(()=>setCopiedMsg(false),2500); });
@@ -2390,6 +2485,7 @@ function App() {
   const orgNotes            = subject.orgNotes || {};
   const personOrgs          = subject.personOrgs || {};
   const personLocations     = subject.personLocations || {};
+  const personGroups        = subject.personGroups || {};
   const ownerName           = subject.name || "";
   const ownerEmail          = data.carerEmail || "";
   const carerName           = data.carerName || "";
@@ -2450,7 +2546,7 @@ function App() {
   // persist: legacy-compatible — detects if patch is subject-level or top-level
   function persist(patch) {
     // If patch contains subject-level keys, route to persistSubject
-    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","personOrgs","personLocations"]);
+    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","personOrgs","personLocations","personGroups"]);
     const isSubjectPatch = Object.keys(patch).some(k => subjectKeys.has(k));
     if (isSubjectPatch) {
       // strip any top-level only keys before passing to persistSubject
@@ -2495,7 +2591,8 @@ function App() {
     const updNotes={...peopleNotes}; if(updNotes[oldName]!==undefined){updNotes[n]=updNotes[oldName];delete updNotes[oldName];}
     const updPOrgs={...personOrgs}; if(updPOrgs[oldName]!==undefined){updPOrgs[n]=updPOrgs[oldName];delete updPOrgs[oldName];}
     const updPLocs={...personLocations}; if(updPLocs[oldName]!==undefined){updPLocs[n]=updPLocs[oldName];delete updPLocs[oldName];}
-    persistSubject({memories:updMems,knownPeople:updKnown,peopleRelationships:updRels,peopleNotes:updNotes,personOrgs:updPOrgs,personLocations:updPLocs});
+    const updGroups=renamePersonInGroups(oldName,n);
+    persistSubject({memories:updMems,knownPeople:updKnown,peopleRelationships:updRels,peopleNotes:updNotes,personOrgs:updPOrgs,personLocations:updPLocs,personGroups:updGroups});
   }
   function deletePerson(name) {
     const updMems=memories.map(m=>({...m,people:m.people?.filter(p=>p!==name)||[]}));
@@ -2542,6 +2639,14 @@ function App() {
   function setOrgNotes(name, notes) { persistSubject({orgNotes:{...orgNotes, [name]: notes}}); }
   function setPersonOrgs(name, orgs) { persistSubject({personOrgs:{...personOrgs, [name]: orgs}}); }
   function setPersonLocations(name, locs) { persistSubject({personLocations:{...personLocations, [name]: locs}}); }
+  function setPersonGroups(groups) { persistSubject({personGroups:groups}); }
+  function renamePersonInGroups(oldName, newName) {
+    const updated={};
+    Object.entries(personGroups).forEach(([g,data])=>{
+      updated[g]={...data,members:(data.members||[]).map(m=>m===oldName?newName:m)};
+    });
+    return updated;
+  }
   function renameRelationship(oldRel, newRel) {
     const n=newRel.trim(); if(!n||n===oldRel) return;
     const updated={}; Object.entries(peopleRelationships).forEach(([k,v])=>{updated[k]=(v||"").trim()===oldRel?n:v;}); persistSubject({peopleRelationships:updated});
@@ -2753,7 +2858,7 @@ function App() {
       }));
       return {...m, mediaUrls: urls};
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, locationNotes, personOrgs, personLocations, shareHistory}, null, 2);
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, locationNotes, personOrgs, personLocations, personGroups, shareHistory}, null, 2);
   }
 
   async function buildBackupBlob(backupPassword) {
@@ -3123,8 +3228,9 @@ function App() {
       const mergedLocationNotes={...(d.locationNotes||{}), ...(data.locationNotes||{})};
       const mergedPersonOrgs={...(d.personOrgs||{}), ...(data.personOrgs||{})};
       const mergedPersonLocations={...(d.personLocations||{}), ...(data.personLocations||{})};
+      const mergedPersonGroups={...(d.personGroups||{}), ...(data.personGroups||{})};
       // Use functional setData to avoid stale closure — importBackup runs inside async FileReader callback
-      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,locationNotes:mergedLocationNotes,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,lastImport:new Date().toISOString()};
+      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,locationNotes:mergedLocationNotes,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,lastImport:new Date().toISOString()};
       setData(prev => {
         const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
         const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
@@ -3643,6 +3749,7 @@ function App() {
           {id:"orgs", label:"🏛 Orgs", items:knownOrgs, getCount:v=>memories.filter(m=>m.orgs?.includes(v)).length},
           {id:"locations", label:"📍 Locations", items:allLocations, getCount:v=>memories.filter(m=>m.location===v||m.locations?.includes(v)).length},
           {id:"relationships", label:"🔗 Relationships", items:[], getCount:()=>0},
+          {id:"groups", label:"👥 Groups", items:[], getCount:()=>0},
           {id:"tags", label:"🏷 Tags", items:allTags, getCount:v=>memories.filter(m=>m.tags?.includes(v)).length},
         ];
         const activeTab = tabs.find(t=>t.id===indexTab)||tabs[0];
@@ -3655,6 +3762,7 @@ function App() {
             if(indexFilter.type==="locations") return m.location===indexFilter.value||m.locations?.includes(indexFilter.value);
             if(indexFilter.type==="tags") return m.tags?.includes(indexFilter.value);
             if(indexFilter.type==="relationships") return (indexFilter.people||[]).some(p=>m.people?.includes(p));
+            if(indexFilter.type==="groups") return (indexFilter.people||[]).some(p=>m.people?.includes(p));
             return false;
           }).sort((a,b)=>sortKey(a)-sortKey(b));
           return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
@@ -3683,31 +3791,30 @@ function App() {
           ),
           // People tab renders the full manager inline
           indexTab==="people"
-            ? React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,memories,peopleRelationships,personOrgs,onSetPersonOrgs:setPersonOrgs,
+            ? React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,
+                onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,
                 onRenamePerson:renamePerson,onDeletePerson:deletePerson,
                 onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
-                onViewPerson:name=>setIndexFilter({type:"people",value:name})})
+                onViewPerson:name=>setIndexFilter({type:"people",value:name}),
+                onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},
+                onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});}})
             : indexTab==="orgs"
-            ? React.createElement(PeopleOrgsManager,{knownPeople:[],knownOrgs,memories,peopleRelationships,personOrgs,onSetPersonOrgs:setPersonOrgs,
+            ? React.createElement(PeopleOrgsManager,{knownPeople:[],knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,
+                onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,
                 onRenamePerson:renamePerson,onDeletePerson:deletePerson,
                 onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
-                onViewPerson:name=>setIndexFilter({type:"orgs",value:name})})
+                onViewPerson:name=>setIndexFilter({type:"orgs",value:name}),
+                onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},
+                onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});}})
             : indexTab==="locations"
-            ? (knownLocations.length===0
-                ? React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No locations recorded yet.")
-                : React.createElement("div",null,
-                    React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 4px"}},
-                      knownLocations.length+" location"+(knownLocations.length===1?"":"s")+" · click a name to see its memories"),
-                    knownLocations.map(name=>{
-                      const count=memories.filter(m=>m.location===name||m.locations?.includes(name)).length;
-                      return React.createElement(LocationRow,{key:name,name,count,notes:locationNotes?.[name],
-                        onRename:renameLocation,onDelete:deleteLocation,onSetNotes:setLocationNotes,
-                        onView:()=>setIndexFilter({type:"locations",value:name})});
-                    })
-                  ))
+            ? React.createElement(LocationsPanel,{knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setIndexFilter,persistSubject})
             : indexTab==="relationships"
             ? React.createElement(RelationshipIndex,{memories,peopleRelationships,
                 onView:(rel,people)=>setIndexFilter({type:"relationships",value:rel,people}),onRenameRelationship:renameRelationship})
+            : indexTab==="groups"
+            ? React.createElement(GroupsManager,{personGroups,knownPeople,memories,
+                onSetGroups:setPersonGroups,
+                onViewGroup:(name,people)=>setIndexFilter({type:"groups",value:name,people})})
             // Tags: pill grid
             : activeTab.items.length===0
             ? React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"Nothing here yet.")
@@ -3736,7 +3843,7 @@ function App() {
       })(),
 
       // ── PEOPLE & ORGS ──
-      view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,memories,peopleRelationships,peopleNotes,orgNotes,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");}}),
+      view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,peopleNotes,orgNotes,onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");},onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});}}),
 
       // ── PRINT VIEW ──
       view==="settings"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"640px"}},
@@ -4258,7 +4365,20 @@ function App() {
           ),
           React.createElement("div",null,React.createElement("label",{style:S.label},"The Memory"),React.createElement("textarea",{value:form.content,onChange:e=>updateForm({content:e.target.value}),placeholder:"Write as much or as little as you remember…",rows:6,style:{...S.input,resize:"vertical",lineHeight:"1.7"}})),
           React.createElement("div",null,React.createElement("label",{style:S.label},"Topic Tags"),React.createElement(TagPicker,{tags:form.tags,onToggle:tag=>updateForm({tags:form.tags.includes(tag)?form.tags.filter(t=>t!==tag):[...form.tags,tag]}),customTags,onAddCustom:addCustomTag,onRemoveCustom:removeCustomTag})),
-          React.createElement("div",null,React.createElement("label",{style:S.label},"People"),React.createElement(PeopleOrgField,{icon:"👤",values:form.people||[],allValues:knownPeople,onChange:v=>updateForm({people:v}),placeholder:"Add a person…",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})),
+          React.createElement("div",null,
+  React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"4px"}},
+    React.createElement("label",{style:{...S.label,margin:0}},"People"),
+    Object.keys(personGroups||{}).length>0&&React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap"}},
+      Object.entries(personGroups||{}).map(([gName,gData])=>
+        React.createElement("button",{key:gName,
+          onClick:()=>{const newPeople=[...new Set([...(form.people||[]),...(gData.members||[])])];updateForm({people:newPeople});},
+          style:{background:"rgba(100,110,140,0.08)",border:"1px solid rgba(100,110,140,0.25)",borderRadius:"20px",padding:"1px 10px",fontSize:"0.75rem",cursor:"pointer",color:"#4a5a7a",fontFamily:"'Crimson Text',serif",whiteSpace:"nowrap"}},
+          "+ ",gName)
+      )
+    )
+  ),
+  React.createElement(PeopleOrgField,{icon:"👤",values:form.people||[],allValues:knownPeople,onChange:v=>updateForm({people:v}),placeholder:"Add a person…",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
+),
           React.createElement("div",null,React.createElement("label",{style:S.label},"Organisations"),React.createElement(PeopleOrgField,{icon:"🏛",values:form.orgs||[],allValues:knownOrgs,onChange:v=>updateForm({orgs:v}),placeholder:"Add an organisation…"})),
           React.createElement("div",null,
             React.createElement("label",{style:S.label},"Photos & Media"),
