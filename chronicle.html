@@ -1709,13 +1709,17 @@ function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords }) {
         map.fitBounds(group.getBounds().pad(0.2));
       }
       setGeocodeCache({...cache});
-      // Persist auto-discovered coords back to subject (don\'t overwrite manual ones)
+      // Persist auto-discovered coords in one batch — individual calls would stomp each other
       if (onSaveCoords) {
+        const newCoords = {...(locationCoords||{})};
+        let changed = false;
         uniqueLocations.forEach(loc => {
-          if (cache[loc] && !(locationCoords&&locationCoords[loc])) {
-            onSaveCoords(loc, {lat:cache[loc].lat, lng:cache[loc].lng, manual:false});
+          if (cache[loc] && !newCoords[loc]) {
+            newCoords[loc] = {lat:cache[loc].lat, lng:cache[loc].lng, manual:false};
+            changed = true;
           }
         });
+        if (changed) onSaveCoords(newCoords);
       }
     }
 
@@ -3796,7 +3800,7 @@ function App() {
         React.createElement(MapView,{
           memories,
           locationCoords,
-          onSaveCoords: setLocationCoords,
+          onSaveCoords: (allCoords) => persistSubject({locationCoords:allCoords}),
           onSelectLocation: loc => {
             setIndexFilter({type:"locations",value:loc});
             setIndexTab("locations");
