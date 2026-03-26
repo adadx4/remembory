@@ -316,7 +316,7 @@ function seedData(data) { return data; }
 const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], ownerName:"", ownerEmail:"" };
 
 function emptySubject(id, name, isSelf=false) {
-  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, locationNotes:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
+  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
 }
 
 // Migrate flat data → subjects structure
@@ -333,6 +333,7 @@ function migrateData(raw) {
     peopleEmails: raw.peopleEmails || {},
     peopleRelationships: raw.peopleRelationships || {},
     locationNotes: raw.locationNotes || {},
+    locationCoords: raw.locationCoords || {},
     peopleNotes: raw.peopleNotes || {},
     orgNotes: raw.orgNotes || {},
     personOrgs: raw.personOrgs || {},
@@ -1281,7 +1282,7 @@ function RelationshipIndex({memories, peopleRelationships, onView, onRenameRelat
   );
 }
 
-function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setIndexFilter,persistSubject}) {
+function LocationsPanel({knownLocations,memories,locationNotes,locationCoords,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setIndexFilter,persistSubject}) {
   const [addingLoc, setAddingLoc] = React.useState(false);
   const [newLoc, setNewLoc] = React.useState("");
   function commitAdd(){const v=newLoc.trim();if(!v)return;if(!knownLocations.includes(v))persistSubject({knownLocations:[...knownLocations,v].sort()});setNewLoc("");setAddingLoc(false);}
@@ -1301,19 +1302,37 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
     knownLocations.map(name=>{
       const count=memories.filter(m=>m.location===name||m.locations?.includes(name)).length;
       return React.createElement(LocationRow,{key:name,name,count,notes:locationNotes?.[name],
+        coords:locationCoords?.[name]||null,
         onRename:renameLocation,onDelete:deleteLocation,onSetNotes:setLocationNotes,
+        onSetCoords:setLocationCoords,
         onView:()=>setIndexFilter({type:"locations",value:name})});
     })
   );
 }
 
-function LocationRow({name, count, notes, onRename, onDelete, onSetNotes, onView}) {
+function LocationRow({name, count, notes, coords, onRename, onDelete, onSetNotes, onSetCoords, onView}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(name);
   const [showNotes, setShowNotes] = React.useState(false);
   const [notesDraft, setNotesDraft] = React.useState(notes||"");
+  const [editingCoords, setEditingCoords] = React.useState(false);
+  const [coordDraft, setCoordDraft] = React.useState(coords ? coords.lat.toFixed(6)+","+coords.lng.toFixed(6) : "");
+  const hasCoords = coords && coords.lat != null && coords.lng != null;
+
   function commitRename() { if(draft.trim()&&draft.trim()!==name) onRename(name,draft.trim()); setRenaming(false); }
   function commitNotes() { onSetNotes(name, notesDraft); }
+  function commitCoords() {
+    const v = coordDraft.trim();
+    if (!v) { onSetCoords(name, null); setEditingCoords(false); return; }
+    const parts = v.split(/[,\s]+/).map(Number).filter(n=>!isNaN(n));
+    if (parts.length===2 && parts[0]>=-90 && parts[0]<=90 && parts[1]>=-180 && parts[1]<=180) {
+      onSetCoords(name, {lat:parts[0], lng:parts[1], manual:true});
+      setEditingCoords(false);
+    } else {
+      alert("Enter coordinates as: lat, lng \u2014 e.g. 51.5074, -0.1278");
+    }
+  }
+
   return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"12px 0"}},
     React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
       renaming
@@ -1321,12 +1340,27 @@ function LocationRow({name, count, notes, onRename, onDelete, onSetNotes, onView
             onKeyDown:e=>{if(e.key==="Enter")commitRename();if(e.key==="Escape"){setDraft(name);setRenaming(false);}},
             onBlur:commitRename,style:{...S.input,padding:"5px 9px",fontSize:"1rem",flex:1,minWidth:"140px"}})
         : React.createElement("button",{onClick:onView,style:{flex:1,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",padding:0}},name),
+      !hasCoords&&React.createElement("span",{title:"No coordinates \u2014 won\'t appear on the map until set",style:{fontSize:"0.85rem",cursor:"default"}},"⚠️"),
+      hasCoords&&React.createElement("span",{style:{fontSize:"0.72rem",color:"#7a6a58",fontStyle:"italic",fontFamily:"monospace"}},
+        coords.lat.toFixed(4)+", "+coords.lng.toFixed(4),coords.manual?" ✏":""),
       React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},count," ",count===1?"memory":"memories"),
-      React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px"}},
+      React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px",flexWrap:"wrap"}},
         !renaming&&React.createElement("button",{onClick:()=>{setDraft(name);setRenaming(true);},style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem"}},"Rename"),
+        React.createElement("button",{onClick:()=>{setCoordDraft(hasCoords?coords.lat.toFixed(6)+","+coords.lng.toFixed(6):"");setEditingCoords(s=>!s);},
+          style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:hasCoords?"#4a6a9a":"#c4858a",borderColor:hasCoords?"#8ab0d8":"#e0c8c8"}},
+          hasCoords?"Coords":"⚠ Set coords"),
         React.createElement("button",{onClick:()=>setShowNotes(s=>!s),style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:notes?"#4a7a5a":"#8a7460",borderColor:notes?"#7a9e8a":"#c8b89a"}},showNotes?"Hide notes":(notes?"✓ Notes":"+ Notes")),
         React.createElement("button",{onClick:()=>{if(window.confirm("Remove “"+name+"” from all memories?"))onDelete(name);},style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove")
       )
+    ),
+    editingCoords&&React.createElement("div",{style:{marginTop:"8px",display:"flex",gap:"6px",alignItems:"center",flexWrap:"wrap"}},
+      React.createElement("input",{autoFocus:true,value:coordDraft,onChange:e=>setCoordDraft(e.target.value),
+        onKeyDown:e=>{if(e.key==="Enter")commitCoords();if(e.key==="Escape")setEditingCoords(false);},
+        placeholder:"lat, lng — e.g. 51.5074, -0.1278",
+        style:{...S.input,padding:"5px 9px",fontSize:"0.84rem",flex:1,minWidth:"200px",fontFamily:"monospace"}}),
+      React.createElement("button",{onClick:commitCoords,style:{...S.btn,padding:"5px 12px",fontSize:"0.84rem"}},"Save"),
+      hasCoords&&React.createElement("button",{onClick:()=>{onSetCoords(name,null);setCoordDraft("");setEditingCoords(false);},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.84rem",color:"#c4858a"}},"Clear"),
+      React.createElement("button",{onClick:()=>setEditingCoords(false),style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.84rem"}},"Cancel")
     ),
     showNotes&&React.createElement("div",{style:{marginTop:"8px"}},
       React.createElement("textarea",{value:notesDraft,onChange:e=>setNotesDraft(e.target.value),onBlur:commitNotes,placeholder:"Notes about this location…",rows:3,style:{...S.input,width:"100%",resize:"vertical",fontSize:"0.88rem",fontFamily:"'Crimson Text',Georgia,serif",lineHeight:1.6}}),
@@ -1583,11 +1617,13 @@ async function geocode(name, cache) {
 }
 
 // ── MapView component ──────────────────────────────────────────
-function MapView({ memories, onSelectLocation }) {
+function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const [status, setStatus] = useState(""); // loading message
   const [geocodeCache, setGeocodeCache] = useState(loadGeocodeCache);
+  const [useEnglish, setUseEnglish] = useState(true);
+  const tileLayers = React.useRef({});
 
   // Collect all unique locations, tracking primary vs secondary
   const locationMemories = {};
@@ -1611,14 +1647,25 @@ function MapView({ memories, onSelectLocation }) {
 
     // Init map
     const map = L.map(mapRef.current, { zoomControl: true }).setView([20, 0], 2);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const osmLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 18
-    }).addTo(map);
+      maxZoom: 19
+    });
+    const engLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
+      subdomains: "abcd", maxZoom: 19
+    });
+    engLayer.addTo(map);
+    tileLayers.current = { osm: osmLayer, eng: engLayer };
     mapInstanceRef.current = map;
 
-    // Geocode and place pins
+    // Seed cache with stored coords before geocoding
     const cache = loadGeocodeCache();
+    if (locationCoords) {
+      Object.entries(locationCoords).forEach(([name, c]) => {
+        if (c && c.lat != null) cache[name] = { lat: c.lat, lng: c.lng, display: name };
+      });
+    }
     const pending = uniqueLocations.filter(l => !cache[l]);
     if (pending.length > 0) setStatus(`Locating ${pending.length} place${pending.length===1?"":"s"}…`);
 
@@ -1662,6 +1709,14 @@ function MapView({ memories, onSelectLocation }) {
         map.fitBounds(group.getBounds().pad(0.2));
       }
       setGeocodeCache({...cache});
+      // Persist auto-discovered coords back to subject (don\'t overwrite manual ones)
+      if (onSaveCoords) {
+        uniqueLocations.forEach(loc => {
+          if (cache[loc] && !(locationCoords&&locationCoords[loc])) {
+            onSaveCoords(loc, {lat:cache[loc].lat, lng:cache[loc].lng, manual:false});
+          }
+        });
+      }
     }
 
     // Expose callback for popup buttons
@@ -1696,7 +1751,17 @@ function MapView({ memories, onSelectLocation }) {
               React.createElement("span",{style:{display:"inline-block",width:"12px",height:"12px",borderRadius:"50%",background:"#8b9dc3",border:"2px solid #3a4a7a",verticalAlign:"middle",marginRight:"5px"}}),
               "Additional location"
             ),
-            React.createElement("span",{style:{fontStyle:"italic",marginLeft:"auto"}}, "Number = memories at that place")
+            React.createElement("span",{style:{fontStyle:"italic"}}, "Number = memories"),
+            React.createElement("button",{
+              onClick:()=>{
+                const map=mapInstanceRef.current;
+                if(!map||!tileLayers.current.osm) return;
+                if(useEnglish){map.removeLayer(tileLayers.current.eng);tileLayers.current.osm.addTo(map);}
+                else{map.removeLayer(tileLayers.current.osm);tileLayers.current.eng.addTo(map);}
+                setUseEnglish(v=>!v);
+              },
+              style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.78rem",marginLeft:"auto",whiteSpace:"nowrap"}
+            }, useEnglish ? "Switch to local names" : "Switch to English names")
           )
         )
   );
@@ -2479,6 +2544,7 @@ function App() {
   const peopleEmails        = subject.peopleEmails || {};
   const peopleRelationships = subject.peopleRelationships || {};
   const locationNotes = subject.locationNotes || {};
+  const locationCoords = subject.locationCoords || {};
   const peopleNotes         = subject.peopleNotes || {};
   const shareHistory          = subject.shareHistory || [];
   const legacyMessage         = subject.legacyMessage || "";
@@ -2546,7 +2612,7 @@ function App() {
   // persist: legacy-compatible — detects if patch is subject-level or top-level
   function persist(patch) {
     // If patch contains subject-level keys, route to persistSubject
-    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","personOrgs","personLocations","personGroups"]);
+    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","locationCoords","personOrgs","personLocations","personGroups"]);
     const isSubjectPatch = Object.keys(patch).some(k => subjectKeys.has(k));
     if (isSubjectPatch) {
       // strip any top-level only keys before passing to persistSubject
@@ -2614,12 +2680,14 @@ function App() {
   function setPersonEmail(name, email) { persistSubject({peopleEmails:{...peopleEmails, [name]: email}}); }
   function setPersonRelationship(name, rel) { persistSubject({peopleRelationships:{...peopleRelationships, [name]: rel}}); }
   function setLocationNotes(name, notes) { persistSubject({locationNotes:{...locationNotes, [name]: notes}}); }
+  function setLocationCoords(name, coords) { persistSubject({locationCoords:{...locationCoords, [name]: coords}}); }
   function renameLocation(oldName, newName) {
     const n=newName.trim(); if(!n||n===oldName) return;
     const updMems=memories.map(m=>({...m,location:m.location===oldName?n:m.location,locations:(m.locations||[]).map(l=>l===oldName?n:l)}));
     const updKnown=[...new Set([...knownLocations.filter(l=>l!==oldName),n])].sort();
     const updNotes={...locationNotes}; if(updNotes[oldName]!==undefined){updNotes[n]=updNotes[oldName];delete updNotes[oldName];}
-    persistSubject({memories:updMems,knownLocations:updKnown,locationNotes:updNotes});
+    const updCoords={...locationCoords}; if(updCoords[oldName]!==undefined){updCoords[n]=updCoords[oldName];delete updCoords[oldName];}
+    persistSubject({memories:updMems,knownLocations:updKnown,locationNotes:updNotes,locationCoords:updCoords});
   }
   function deleteLocation(name) {
     const updMems=memories.map(m=>({...m,location:m.location===name?"":m.location,locations:(m.locations||[]).filter(l=>l!==name)}));
@@ -2858,7 +2926,7 @@ function App() {
       }));
       return {...m, mediaUrls: urls};
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, locationNotes, personOrgs, personLocations, personGroups, shareHistory}, null, 2);
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory}, null, 2);
   }
 
   async function buildBackupBlob(backupPassword) {
@@ -3226,11 +3294,12 @@ function App() {
       const mergedRelationships = {...(d.peopleRelationships||{}), ...(data.peopleRelationships||{})};
       const mergedPeopleNotes={...(d.peopleNotes||{}),...peopleNotes}; const mergedOrgNotes={...(d.orgNotes||{}),...orgNotes};
       const mergedLocationNotes={...(d.locationNotes||{}), ...(data.locationNotes||{})};
+      const mergedLocationCoords={...(d.locationCoords||{}), ...(data.locationCoords||{})};
       const mergedPersonOrgs={...(d.personOrgs||{}), ...(data.personOrgs||{})};
       const mergedPersonLocations={...(d.personLocations||{}), ...(data.personLocations||{})};
       const mergedPersonGroups={...(d.personGroups||{}), ...(data.personGroups||{})};
       // Use functional setData to avoid stale closure — importBackup runs inside async FileReader callback
-      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,locationNotes:mergedLocationNotes,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,lastImport:new Date().toISOString()};
+      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,locationNotes:mergedLocationNotes,locationCoords:mergedLocationCoords,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,lastImport:new Date().toISOString()};
       setData(prev => {
         const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
         const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
@@ -3726,6 +3795,8 @@ function App() {
         ),
         React.createElement(MapView,{
           memories,
+          locationCoords,
+          onSaveCoords: setLocationCoords,
           onSelectLocation: loc => {
             setIndexFilter({type:"locations",value:loc});
             setIndexTab("locations");
@@ -3807,7 +3878,7 @@ function App() {
                 onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},
                 onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});}})
             : indexTab==="locations"
-            ? React.createElement(LocationsPanel,{knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setIndexFilter,persistSubject})
+            ? React.createElement(LocationsPanel,{knownLocations,memories,locationNotes,locationCoords,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setIndexFilter,persistSubject})
             : indexTab==="relationships"
             ? React.createElement(RelationshipIndex,{memories,peopleRelationships,
                 onView:(rel,people)=>setIndexFilter({type:"relationships",value:rel,people}),onRenameRelationship:renameRelationship})
