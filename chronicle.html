@@ -68,6 +68,29 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 const TAGS = ["childhood","family","travel","education","work","love","health","milestone","home","friendship","adventure","loss"];
 // ← Replace this with your Worker URL after deploying to Cloudflare
 const WORKER_URL = "https://share.remembory.net";
+
+// ── Licence key validation ────────────────────────────────────
+const LICENCE_SECRET = "remembory-chronicle-2025";
+async function validateLicenceKey(key) {
+  if (!key) return null;
+  const clean = key.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!clean.startsWith("CHRN") || clean.length !== 24) return { valid: false, reason: "invalid" };
+  const tier = clean.slice(4, 6).toLowerCase();
+  const expiryHex = clean.slice(6, 12);
+  const hmacGiven = clean.slice(12, 24).toLowerCase();
+  const expiryDays = parseInt(expiryHex, 16);
+  const todayDays = Math.floor(Date.now() / 86400000);
+  if (isNaN(expiryDays) || expiryDays < todayDays) return { valid: false, reason: "expired" };
+  if (tier !== "01") return { valid: false, reason: "invalid" };
+  try {
+    const enc = new TextEncoder();
+    const km = await crypto.subtle.importKey("raw", enc.encode(LICENCE_SECRET), {name:"HMAC",hash:"SHA-256"}, false, ["sign"]);
+    const sig = await crypto.subtle.sign("HMAC", km, enc.encode(tier + expiryHex));
+    const sigHex = Array.from(new Uint8Array(sig)).map(b=>b.toString(16).padStart(2,"0")).join("");
+    if (sigHex.slice(0, 12) !== hmacGiven) return { valid: false, reason: "invalid" };
+    return { valid: true, tier: "subscriber", expiresAt: new Date(expiryDays * 86400000).toISOString().slice(0,10) };
+  } catch(e) { return { valid: false, reason: "error" }; }
+}
 const TAG_COLORS = {
   childhood:"#e8a87c", family:"#c9b89a", travel:"#7a9e9f", education:"#8b9dc3",
   work:"#b5936b", love:"#c4858a", health:"#89b08a", milestone:"#c4a962",
@@ -2572,6 +2595,11 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [backupNagDismissed, setBackupNagDismissed] = useState(false);
+  const [licenceKey, setLicenceKey] = useState(()=>{try{return localStorage.getItem("chronicle-licence-key")||"";}catch(e){return "";}});
+  const [licenceStatus, setLicenceStatus] = useState(null);
+  const isSubscriber = licenceStatus?.valid===true;
+  React.useEffect(()=>{if(licenceKey){validateLicenceKey(licenceKey).then(setLicenceStatus);}else{setLicenceStatus(null);}},[licenceKey]);
+  function saveLicenceKey(k){const c=k.trim();try{if(c)localStorage.setItem("chronicle-licence-key",c);else localStorage.removeItem("chronicle-licence-key");}catch(e){}setLicenceKey(c);}
   const [iabBannerDismissed, setIabBannerDismissed] = useState(false);
   const iabOnLoad = React.useMemo(()=>isInAppBrowser(),[]);
   const [indexTab, setIndexTab] = useState("people");
@@ -4133,6 +4161,17 @@ function App() {
         ),
         // Email tab
         importTab==="gedcom"&&React.createElement("div",null,
+          !isSubscriber
+          ? React.createElement("div",{style:{textAlign:"center",padding:"48px 24px",border:"1px solid #d4c4a8",borderRadius:"6px",background:"rgba(255,252,245,0.5)"}},
+              React.createElement("div",{style:{fontSize:"2.5rem",marginBottom:"12px",opacity:0.5}},"🌳"),
+              React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",fontStyle:"italic",color:"#1a1208",marginBottom:"10px"}},"Genealogy Mode"),
+              React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,maxWidth:"380px",margin:"0 auto 16px"}},
+                "GEDCOM import requires a Remembory subscription. Import a family tree, flesh out your ancestors\u2019 lives, and connect genealogy research to narrative."),
+              React.createElement("a",{href:"https://remembory.net#subscribe",target:"_blank",rel:"noopener",style:{...S.btn,display:"inline-block",padding:"10px 24px",textDecoration:"none",fontSize:"0.9rem"}},
+                "Learn about subscribing \u2192")
+            )
+          : React.createElement("div",null,
+
           // No file loaded yet
           !gedPersons&&React.createElement("div",null,
             React.createElement("div",{
@@ -4203,7 +4242,7 @@ function App() {
               `Import ${gedPicked.fullName} →`
             )
           )
-        ),
+        ),)
 
         importTab==="email"&&React.createElement("div",null,
           React.createElement("p",{style:{fontSize:"0.92rem",color:"#8a7460",marginBottom:"14px",fontStyle:"italic"}},"Export email as .eml from your mail client, or paste raw email text below."),
@@ -4366,7 +4405,15 @@ function App() {
           React.createElement("div",{style:{display:"flex",gap:"10px",marginBottom:"12px",flexWrap:"wrap"}},
             React.createElement("button",{onClick:()=>handleEdit(m),style:S.btn},"Edit"),
             React.createElement("button",{onClick:()=>handleDelete(m.id),style:{...S.btnOutline,color:"#c4858a",borderColor:"#c4858a"}},"Delete"),
-            React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,onRecordShare:recordShare})
+            isSubscriber
+              ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,onRecordShare:recordShare})
+              : React.createElement("div",{style:{position:"relative",display:"inline-block"}},
+                  React.createElement("button",{disabled:true,style:{...S.btnOutline,opacity:0.4,cursor:"not-allowed",fontSize:"0.86rem",padding:"7px 14px"}},"✉ Share"),
+                  React.createElement("div",{style:{position:"absolute",bottom:"calc(100% + 6px)",left:"50%",transform:"translateX(-50%)",background:"#2c2416",color:"#f5f0e8",fontSize:"0.72rem",padding:"5px 9px",borderRadius:"3px",whiteSpace:"nowrap",zIndex:10,lineHeight:1.4,pointerEvents:"none"}},
+                    "Sharing requires a subscription",
+                    React.createElement("span",{style:{position:"absolute",top:"100%",left:"50%",transform:"translateX(-50%)",width:0,height:0,border:"5px solid transparent",borderTopColor:"#2c2416"}})
+                  )
+                )
           ),
           React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"8px",cursor:"pointer",marginBottom:"24px",userSelect:"none"}},
             React.createElement("input",{type:"checkbox",checked:!!m.inLegacy,onChange:()=>toggleLegacy(m.id),style:{accentColor:"#a8885a",cursor:"pointer",width:"15px",height:"15px"}}),
