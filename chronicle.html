@@ -69,27 +69,24 @@ const TAGS = ["childhood","family","travel","education","work","love","health","
 // ← Replace this with your Worker URL after deploying to Cloudflare
 const WORKER_URL = "https://share.remembory.net";
 
-// ── Licence key validation ────────────────────────────────────
+// ── Licence key validation ─────────────────────────────────────
 const LICENCE_SECRET = "remembory-chronicle-2025";
 async function validateLicenceKey(key) {
   if (!key) return null;
-  const clean = key.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  if (!clean.startsWith("CHRN") || clean.length !== 24) return { valid: false, reason: "invalid" };
-  const tier = clean.slice(4, 6).toLowerCase();
-  const expiryHex = clean.slice(6, 12);
-  const hmacGiven = clean.slice(12, 24).toLowerCase();
-  const expiryDays = parseInt(expiryHex, 16);
-  const todayDays = Math.floor(Date.now() / 86400000);
-  if (isNaN(expiryDays) || expiryDays < todayDays) return { valid: false, reason: "expired" };
-  if (tier !== "01") return { valid: false, reason: "invalid" };
+  const clean = key.toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if (!clean.startsWith("CHRN")||clean.length!==24) return {valid:false,reason:"invalid"};
+  const tier=clean.slice(4,6).toLowerCase(), expiryHex=clean.slice(6,12), hmacGiven=clean.slice(12,24).toLowerCase();
+  const expiryDays=parseInt(expiryHex,16), todayDays=Math.floor(Date.now()/86400000);
+  if(isNaN(expiryDays)||expiryDays<todayDays) return {valid:false,reason:"expired"};
+  if(tier!=="01") return {valid:false,reason:"invalid"};
   try {
-    const enc = new TextEncoder();
-    const km = await crypto.subtle.importKey("raw", enc.encode(LICENCE_SECRET), {name:"HMAC",hash:"SHA-256"}, false, ["sign"]);
-    const sig = await crypto.subtle.sign("HMAC", km, enc.encode(tier + expiryHex));
-    const sigHex = Array.from(new Uint8Array(sig)).map(b=>b.toString(16).padStart(2,"0")).join("");
-    if (sigHex.slice(0, 12) !== hmacGiven) return { valid: false, reason: "invalid" };
-    return { valid: true, tier: "subscriber", expiresAt: new Date(expiryDays * 86400000).toISOString().slice(0,10) };
-  } catch(e) { return { valid: false, reason: "error" }; }
+    const enc=new TextEncoder();
+    const km=await crypto.subtle.importKey("raw",enc.encode(LICENCE_SECRET),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
+    const sig=await crypto.subtle.sign("HMAC",km,enc.encode(tier+expiryHex));
+    const sigHex=Array.from(new Uint8Array(sig)).map(b=>b.toString(16).padStart(2,"0")).join("");
+    if(sigHex.slice(0,12)!==hmacGiven) return {valid:false,reason:"invalid"};
+    return {valid:true,tier:"subscriber",expiresAt:new Date(expiryDays*86400000).toISOString().slice(0,10)};
+  } catch(e){return {valid:false,reason:"error"};}
 }
 const TAG_COLORS = {
   childhood:"#e8a87c", family:"#c9b89a", travel:"#7a9e9f", education:"#8b9dc3",
@@ -3965,6 +3962,36 @@ function App() {
           React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:S.input})
         ),
 
+        // ── Subscription ──
+        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+          React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
+            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},"✨ Subscription"),
+            isSubscriber&&React.createElement("span",{style:{fontSize:"0.72rem",background:"#4a7a5a",color:"#fff",padding:"2px 9px",borderRadius:"20px",letterSpacing:"0.04em"}},"ACTIVE")
+          ),
+          isSubscriber
+            ? React.createElement("div",null,
+                React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"6px"}},"✓ Subscriber · expires "+licenceStatus.expiresAt),
+                React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"Sharing and Genealogy Mode are enabled."),
+                React.createElement("button",{onClick:()=>saveLicenceKey(""),style:{...S.btnOutline,fontSize:"0.82rem",padding:"5px 12px",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove key")
+              )
+            : React.createElement("div",null,
+                React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,marginBottom:"12px"}},
+                  "A subscription unlocks sharing memories with others, Genealogy Mode, and public timelines. The core app is always free — no account ever required."),
+                licenceStatus&&!licenceStatus.valid&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#c4858a",marginBottom:"8px",fontStyle:"italic"}},
+                  licenceStatus.reason==="expired"?"Your licence key has expired — renew at remembory.net.":
+                  licenceStatus.reason==="invalid"?"That key doesn’t look right — check for typos.":"Couldn’t validate that key."),
+                React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"10px"}},
+                  React.createElement("input",{value:licenceKey,onChange:e=>setLicenceKey(e.target.value),
+                    onBlur:e=>saveLicenceKey(e.target.value),
+                    onKeyDown:e=>{if(e.key==="Enter")saveLicenceKey(licenceKey);},
+                    placeholder:"CHRN-XXXX-XXXX-XXXX-XXXX",
+                    style:{...S.input,flex:1,fontSize:"0.88rem",fontFamily:"monospace",letterSpacing:"0.05em"}}),
+                  React.createElement("button",{onClick:()=>saveLicenceKey(licenceKey),style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem"}},"Apply")
+                ),
+                React.createElement("a",{href:"https://remembory.net#subscribe",target:"_blank",rel:"noopener",style:{fontSize:"0.82rem",color:"#a8885a",textDecoration:"underline"}},"Get a subscription →")
+              )
+        ),
+
         // ── Backup ──
         React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
           React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Backup"),
@@ -4160,18 +4187,16 @@ function App() {
           )
         ),
         // Email tab
-        importTab==="gedcom"&&React.createElement("div",null,
-          !isSubscriber
+        importTab==="gedcom"&&(!isSubscriber
           ? React.createElement("div",{style:{textAlign:"center",padding:"48px 24px",border:"1px solid #d4c4a8",borderRadius:"6px",background:"rgba(255,252,245,0.5)"}},
               React.createElement("div",{style:{fontSize:"2.5rem",marginBottom:"12px",opacity:0.5}},"🌳"),
               React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",fontStyle:"italic",color:"#1a1208",marginBottom:"10px"}},"Genealogy Mode"),
               React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,maxWidth:"380px",margin:"0 auto 16px"}},
-                "GEDCOM import requires a Remembory subscription. Import a family tree, flesh out your ancestors\u2019 lives, and connect genealogy research to narrative."),
+                "GEDCOM import requires a Remembory subscription. Import a family tree, flesh out your ancestors’ lives, and connect genealogy research to narrative."),
               React.createElement("a",{href:"https://remembory.net#subscribe",target:"_blank",rel:"noopener",style:{...S.btn,display:"inline-block",padding:"10px 24px",textDecoration:"none",fontSize:"0.9rem"}},
-                "Learn about subscribing \u2192")
+                "Learn about subscribing →")
             )
           : React.createElement("div",null,
-
           // No file loaded yet
           !gedPersons&&React.createElement("div",null,
             React.createElement("div",{
@@ -4242,7 +4267,8 @@ function App() {
               `Import ${gedPicked.fullName} →`
             )
           )
-        ),)
+        )
+        ),
 
         importTab==="email"&&React.createElement("div",null,
           React.createElement("p",{style:{fontSize:"0.92rem",color:"#8a7460",marginBottom:"14px",fontStyle:"italic"}},"Export email as .eml from your mail client, or paste raw email text below."),
