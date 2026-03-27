@@ -1956,20 +1956,22 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
   const effectiveEmail = ownerEmail || "";
   const allMems = memories || [];
 
-  // Only people tagged in the current memory
+  // Only people tagged in the current memory are offered as recipients
   const allPeople = [...new Set(memory.people||[])].sort();
 
-  // Memories that feature ALL currently selected recipients
+  // Memories shown in checklist: only those that include ALL selected recipients
+  // When nobody selected yet, show only the current memory
   const eligibleMems = selectedPeople.length === 0
-    ? allMems
+    ? allMems.filter(m => m.id === memory.id)
     : allMems.filter(m => selectedPeople.every(p=>(m.people||[]).includes(p)));
 
   function togglePerson(person) {
     setSelectedPeople(prev => {
       const next = prev.includes(person) ? prev.filter(p=>p!==person) : [...prev, person];
       // Re-seed selected memories to those eligible for the new recipient set
+      // Always keep current memory selected if it qualifies
       const eligible = next.length === 0
-        ? allMems
+        ? allMems.filter(m => m.id === memory.id)
         : allMems.filter(m => next.every(p=>(m.people||[]).includes(p)));
       const eligibleIds = new Set(eligible.map(m=>m.id));
       setSelectedMemIds(eligibleIds.has(memory.id) ? new Set([memory.id]) : new Set(eligible.map(m=>m.id)));
