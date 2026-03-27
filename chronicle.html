@@ -2597,6 +2597,7 @@ function App() {
   const [activePassword, setActivePassword] = useState(null);    // current session password
   const [data, setData]               = useState(()=> isEncrypted() ? migrateData({}) : loadData());
   const [pendingShare, setPendingShare] = useState(null);
+  const [pendingShareSelected, setPendingShareSelected] = useState(new Set());
   const [inAppShareCode, setInAppShareCode] = useState(null);
   const [inAppBrowser, setInAppBrowser] = useState(null);
   const [pendingEndMemory, setPendingEndMemory] = useState(null);
@@ -2614,7 +2615,7 @@ function App() {
       } else {
         fetch(WORKER_URL + "/s/" + code, {headers:{"X-Chronicle-Client":"1"}})
           .then(r=>r.ok?r.json():Promise.reject(r.status))
-          .then(d=>{ if(d.memories) setPendingShare(d); })
+          .then(d=>{ if(d.memories){ setPendingShare(d); setPendingShareSelected(new Set(d.memories.map(m=>m.id))); } })
           .catch(err=>console.warn("Could not load share:", err));
         window.history.replaceState({}, "", window.location.pathname);
       }
@@ -2654,7 +2655,7 @@ function App() {
   const [zoomDecade, setZoomDecade] = useState(null);
   const [zoomYear, setZoomYear] = useState(null);
   const [form, setForm] = useState(newForm());
-  const [filter, setFilter] = useState({tag:null,search:""});
+  const [filter, setFilter] = useState({tag:null,search:"",sharing:null});
   const [showSettings, setShowSettings] = useState(false);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [backupNagDismissed, setBackupNagDismissed] = useState(false);
@@ -3515,6 +3516,8 @@ function App() {
       const q=filter.search.toLowerCase();
       if(!m.title.toLowerCase().includes(q)&&!m.content?.toLowerCase().includes(q)&&!m.people?.some(p=>p.toLowerCase().includes(q))&&!m.orgs?.some(o=>o.toLowerCase().includes(q))) return false;
     }
+    if (filter.sharing==="sent" && !(shareHistory||[]).some(h=>h.memIds.includes(m.id))) return false;
+    if (filter.sharing==="received" && !m.sharedBy) return false;
     return true;
   });
   const filtByDec={};
@@ -3758,21 +3761,44 @@ function App() {
               `"${pendingShare.message}"`
             ),
 
-            // Memory list
-            React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"6px",marginBottom:"18px"}},
-              pendingShare.memories.map((m,i)=>React.createElement("div",{key:i,style:{display:"flex",alignItems:"baseline",gap:"10px"}},
-                React.createElement("span",{style:{fontSize:"0.8rem",color:"#8a7460",whiteSpace:"nowrap"}},m.year||""),
-                React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.02rem",color:"#1a1208"}},m.title)
-              ))
+            // Memory checklist — all ticked by default, recipient can untick any
+            React.createElement("div",{style:{marginBottom:"6px"}},
+              React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px"}},
+                pendingShare.memories.length===1
+                  ? "1 memory — tick or untick to choose what to save:"
+                  : `${pendingShare.memories.length} memories — untick any you don't want to save:`
+              ),
+              React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"4px",maxHeight:"200px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"8px",marginBottom:"14px"}},
+                pendingShare.memories.map((m,i)=>React.createElement("label",{key:i,style:{display:"flex",alignItems:"baseline",gap:"10px",padding:"5px 6px",cursor:"pointer",background:pendingShareSelected.has(m.id)?"rgba(122,158,138,0.07)":"transparent",borderRadius:"2px"}},
+                  React.createElement("input",{type:"checkbox",checked:pendingShareSelected.has(m.id),
+                    onChange:()=>setPendingShareSelected(prev=>{const next=new Set(prev);next.has(m.id)?next.delete(m.id):next.add(m.id);return next;}),
+                    style:{flexShrink:0,marginTop:"2px"}}),
+                  React.createElement("span",{style:{fontSize:"0.8rem",color:"#8a7460",whiteSpace:"nowrap",minWidth:"36px"}},m.year||""),
+                  React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208"}},m.title)
+                ))
+              ),
+              pendingShare.memories.length>1&&React.createElement("div",{style:{display:"flex",gap:"12px",marginBottom:"14px"}},
+                React.createElement("button",{onClick:()=>setPendingShareSelected(new Set(pendingShare.memories.map(m=>m.id))),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem",padding:0}},"Select all"),
+                React.createElement("button",{onClick:()=>setPendingShareSelected(new Set()),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem",padding:0}},"Select none")
+              )
             ),
 
             React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"18px"}},
-              "This will be added to your Chronicle. You can add your own perspective once it's saved."
+              "You can add your own perspective to any saved memory afterwards."
             ),
 
             React.createElement("div",{style:{display:"flex",gap:"10px"}},
-              React.createElement("button",{onClick:()=>acceptShare(pendingShare),style:{...S.btn,flex:1,background:isKnown?"#2c2416":"#5a3820"}},
-                isKnown ? `Save to my Chronicle` : `Accept anyway`
+              React.createElement("button",{
+                onClick:()=>{
+                  const filtered={...pendingShare,memories:pendingShare.memories.filter(m=>pendingShareSelected.has(m.id))};
+                  if(filtered.memories.length>0) acceptShare(filtered);
+                  setPendingShare(null);
+                },
+                disabled:pendingShareSelected.size===0,
+                style:{...S.btn,flex:1,background:isKnown?"#2c2416":"#5a3820",opacity:pendingShareSelected.size===0?0.4:1,cursor:pendingShareSelected.size===0?"not-allowed":"pointer"}},
+                pendingShareSelected.size===0 ? "Select at least one memory"
+                  : isKnown ? `Save ${pendingShareSelected.size} ${pendingShareSelected.size===1?"memory":"memories"} to my Chronicle`
+                  : `Accept ${pendingShareSelected.size} ${pendingShareSelected.size===1?"memory":"memories"}`
               ),
               React.createElement("button",{onClick:()=>setPendingShare(null),style:{...S.btnOutline}}, "Dismiss")
             )
@@ -4455,6 +4481,23 @@ function App() {
           React.createElement("input",{value:filter.search,onChange:e=>setFilter(f=>({...f,search:e.target.value})),placeholder:"Search memories…",style:{...S.input,margin:0,flex:"1",minWidth:"180px",padding:"9px 12px"}}),
           React.createElement("select",{value:filter.tag||"",onChange:e=>setFilter(f=>({...f,tag:e.target.value||null})),style:S.select},React.createElement("option",{value:""},"All tags"),...TAGS.map(t=>React.createElement("option",{key:t,value:t},t)))
         ),
+        (shareHistory?.length>0||memories.some(m=>m.sharedBy))&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"14px",flexWrap:"wrap",alignItems:"center"}},
+          React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic",marginRight:"2px"}},"Filter:"),
+          [["sent","\u2709 Sent","sent"],["received","\u2709 Received","received"]].map(([val,label,key])=>{
+            const active=filter.sharing===val;
+            const show=val==="sent"?shareHistory?.length>0:memories.some(m=>m.sharedBy);
+            if(!show) return null;
+            return React.createElement("button",{key,onClick:()=>setFilter(f=>({...f,sharing:active?null:val})),
+              style:{padding:"3px 12px",borderRadius:"20px",border:"1px solid",cursor:"pointer",fontSize:"0.78rem",
+                fontFamily:"'Crimson Text',serif",
+                background:active?"#2c2416":"transparent",
+                color:active?"#f5f0e8":"#6a5840",
+                borderColor:active?"#2c2416":"#c8b89a"}},label);
+          }),
+          filter.sharing&&React.createElement("button",{onClick:()=>setFilter(f=>({...f,sharing:null})),
+            style:{background:"transparent",border:"none",color:"#c4858a",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px"}},
+            "clear")
+        ),
         Object.keys(filtByDec).sort().map(dec=>React.createElement("div",{key:dec,style:{marginBottom:"36px"}},
           React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"12px",marginBottom:"14px"}},
             React.createElement("h3",{onClick:()=>{setZoomDecade(+dec);setZoomYear(null);setView("decade");},style:{margin:0,fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#8a7460",fontWeight:700,letterSpacing:"0.1em",cursor:"pointer"},onMouseEnter:e=>e.target.style.color="#1a1208",onMouseLeave:e=>e.target.style.color="#8a7460"},`${dec}s ↗`),
@@ -4481,8 +4524,14 @@ function App() {
           ...(m.tags||[]).map(tag=>{const c=TAG_COLORS[tag]||"#9a8a7a";return React.createElement("span",{key:tag,style:{padding:"3px 10px",borderRadius:"20px",fontSize:"0.8rem",background:c,color:"#fff"}},tag);}),
           ...(m.people||[]).map(p=>{
             const pOrgs=(personOrgs[p]||[]);
-            return React.createElement("span",{key:p,style:{padding:"3px 10px",borderRadius:"20px",fontSize:"0.8rem",background:"rgba(100,120,160,0.15)",color:"#4a5a7a",border:"1px solid rgba(100,120,160,0.3)",display:"inline-flex",gap:"4px",alignItems:"center"}},
+            // Highlight people this memory has been shared with
+            const wasSharedWith=(shareHistory||[]).some(h=>h.memIds.includes(m.id)&&h.people.includes(p));
+            const pillBg=wasSharedWith?"rgba(74,122,90,0.15)":"rgba(100,120,160,0.15)";
+            const pillColor=wasSharedWith?"#3a6b4a":"#4a5a7a";
+            const pillBorder=wasSharedWith?"1px solid rgba(74,122,90,0.35)":"1px solid rgba(100,120,160,0.3)";
+            return React.createElement("span",{key:p,style:{padding:"3px 10px",borderRadius:"20px",fontSize:"0.8rem",background:pillBg,color:pillColor,border:pillBorder,display:"inline-flex",gap:"4px",alignItems:"center"},title:wasSharedWith?"Shared with "+p:undefined},
               "👤 ",p,
+              wasSharedWith&&React.createElement("span",{style:{fontSize:"0.65rem",opacity:0.7}},"✉"),
               pOrgs.length>0&&React.createElement("span",{style:{fontSize:"0.72rem",color:"#7a6a58",fontStyle:"italic"}},"· "+pOrgs.join(", "))
             );
           }),
