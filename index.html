@@ -770,6 +770,138 @@
     .nav-links li:not(:last-child):not(:nth-child(2)) { display: none; }
     .nav-cta { display: none; }
   }
+
+/* ── Subscription section ── */
+.subscription {
+  padding: 100px 5vw;
+  background: var(--ink-mid);
+  color: var(--parchment);
+}
+.subscription-inner {
+  max-width: 860px;
+  margin: 0 auto;
+}
+.subscription-header {
+  text-align: center;
+  margin-bottom: 56px;
+}
+.subscription-header .section-label {
+  color: var(--gold);
+  opacity: 1;
+}
+.subscription-header h2 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  color: var(--parchment);
+  margin: 12px 0 16px;
+}
+.subscription-header p {
+  font-size: 1.1rem;
+  color: rgba(245,240,232,0.7);
+  max-width: 520px;
+  margin: 0 auto;
+}
+.subscription-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 640px) {
+  .subscription-cards { grid-template-columns: 1fr; }
+}
+.sub-card {
+  border-radius: 6px;
+  padding: 32px 28px;
+}
+.sub-card--free {
+  background: rgba(245,240,232,0.07);
+  border: 1px solid rgba(245,240,232,0.15);
+}
+.sub-card--subscriber {
+  background: var(--parchment);
+  color: var(--ink-mid);
+}
+.sub-card-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 8px;
+  font-family: 'Crimson Text', serif;
+}
+.sub-card--subscriber .sub-card-label {
+  color: var(--gold-dark);
+}
+.sub-card-price {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.4rem;
+  font-style: italic;
+  color: var(--parchment);
+  margin-bottom: 24px;
+  line-height: 1;
+}
+.sub-card-price span {
+  font-size: 1rem;
+  font-style: normal;
+  opacity: 0.6;
+}
+.sub-card--subscriber .sub-card-price {
+  color: var(--ink-mid);
+}
+.sub-features {
+  list-style: none;
+  margin: 0 0 28px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.sub-features li {
+  font-size: 0.92rem;
+  color: rgba(245,240,232,0.8);
+  line-height: 1.4;
+}
+.sub-card--subscriber .sub-features li {
+  color: var(--ink-light);
+}
+.sub-card--subscriber .sub-features li strong {
+  color: var(--ink-mid);
+}
+.coming-soon {
+  font-size: 0.72rem;
+  background: var(--gold-dark);
+  color: #fff;
+  padding: 1px 7px;
+  border-radius: 20px;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+  font-style: normal;
+  margin-left: 4px;
+}
+.btn-subscribe {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  background: var(--ink-mid);
+  color: var(--parchment);
+  text-align: center;
+  border-radius: 3px;
+  text-decoration: none;
+  font-family: 'Crimson Text', serif;
+  font-size: 1rem;
+  margin-bottom: 14px;
+  transition: opacity 0.15s;
+}
+.btn-subscribe:hover { opacity: 0.85; }
+.sub-note {
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  font-style: italic;
+  line-height: 1.5;
+  text-align: center;
+}
 </style>
 </head>
 <body>
@@ -933,7 +1065,7 @@
       <div class="feature">
         <span class="feature-icon">✉</span>
         <h3>Share with the people there</h3>
-        <p>Send a memory to someone who was part of it via a private link. They save it to their own Chronicle with one click. You both keep a private copy. Nothing is shared without your explicit consent.</p>
+        <p>Send a memory to someone who was part of it via a private link. They save it to their own Chronicle with one click. You both keep a private copy. Anyone can receive shared memories for free — sending requires a subscription.</p>
       </div>
       <div class="feature">
         <span class="feature-icon">🗺</span>
@@ -960,7 +1092,17 @@
       <div class="feature">
         <span class="feature-icon">◎</span>
         <h3>Yours, entirely</h3>
-        <p>Chronicle is a single HTML file that runs in your browser. No account, no cloud, no subscription. Your memories stay on your device, always.</p>
+        <p>Chronicle is a single HTML file that runs in your browser. No account, no cloud. Your memories stay on your device, always. Free to use forever as a personal journal.</p>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">👥</span>
+        <h3>Groups & connections</h3>
+        <p>Organise people into groups — family, school friends, work colleagues. Link people to locations and organisations. Add any person, place, or organisation to your index before you've written a single memory about them.</p>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">🌳</span>
+        <h3>Genealogy mode</h3>
+        <p>Import a GEDCOM file from Ancestry, MyHeritage, or FamilySearch. Chronicle generates a memory for each ancestor, giving you somewhere to record what you know about them and connect family research to narrative. Requires a subscription.</p>
       </div>
     </div>
   </div>
@@ -999,10 +1141,50 @@
     </div>
     <div class="pillar">
       <span class="pillar-icon">∞</span>
-      <span>Free forever</span>
+      <span>Free to use</span>
     </div>
   </div>
 </div>
+
+<!-- Subscription -->
+<section class="subscription" id="subscribe">
+  <div class="subscription-inner">
+    <div class="subscription-header reveal">
+      <span class="section-label">Support Chronicle</span>
+      <h2>A small subscription. A big difference.</h2>
+      <p>Chronicle is free to use as a personal journal — always. A subscription unlocks the features that connect you to others.</p>
+    </div>
+    <div class="subscription-cards reveal">
+      <div class="sub-card sub-card--free">
+        <div class="sub-card-label">Free</div>
+        <div class="sub-card-price">$0 <span>forever</span></div>
+        <ul class="sub-features">
+          <li>✓ Complete life timeline journal</li>
+          <li>✓ Photos, people, places &amp; tags</li>
+          <li>✓ People groups &amp; location linking</li>
+          <li>✓ Map view &amp; coordinates</li>
+          <li>✓ Print &amp; export</li>
+          <li>✓ Receive shared memories</li>
+          <li>✓ Works offline, always</li>
+          <li>✓ No account ever required</li>
+        </ul>
+      </div>
+      <div class="sub-card sub-card--subscriber">
+        <div class="sub-card-label">Subscriber</div>
+        <div class="sub-card-price">$20 <span>/ year</span></div>
+        <ul class="sub-features">
+          <li>✓ Everything in free</li>
+          <li>✓ <strong>Send</strong> shared memories</li>
+          <li>✓ <strong>Genealogy mode</strong> — GEDCOM import</li>
+          <li>✓ Public timeline <span class="coming-soon">coming soon</span></li>
+          <li>✓ Supports ongoing development</li>
+        </ul>
+        <a href="https://ko-fi.com/remembory" class="btn-subscribe" target="_blank" rel="noopener">Subscribe via Ko-fi →</a>
+        <p class="sub-note">After subscribing, send us a message on Ko-fi with the email address you used. We'll send you a licence key within 24 hours.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- Download -->
 <section class="download" id="download">
@@ -1016,11 +1198,11 @@
     </div>
     <ul class="download-features">
       <li>Complete life timeline journal</li>
-      <li>Photos, people, places & tags</li>
-      <li>Map view & print export</li>
-      <li>Share memories with others</li>
-      <li>Runs offline in any browser</li>
-      <li>Works offline after first visit</li>
+      <li>Photos, people, places &amp; tags</li>
+      <li>People groups &amp; location linking</li>
+      <li>Map view &amp; print export</li>
+      <li>Receive shared memories</li>
+      <li>Works offline in any browser</li>
       <li>Always up to date — no downloads needed</li>
     </ul>
     <a href="https://adadx4.github.io/remembory/chronicle.html" class="btn-primary" style="width:100%; justify-content:center; font-size:1.1rem; padding:15px;">

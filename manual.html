@@ -504,7 +504,8 @@
       <a href="#print">Print & Export</a>
 
       <div class="sidebar-chapter">Your Data</div>
-      <a href="#backup">Backup & Restore</a>
+      <a href="#subscription" class="nav-item">Subscription</a>
+              <a href="#backup">Backup & Restore</a>
       <a href="#privacy">Privacy</a>
     </nav>
   </aside>
@@ -728,30 +729,67 @@
       <p>Shows all tags used across your memories, with a count of how many memories carry each tag. Click any tag to see all matching memories displayed as cards.</p>
 
       <h2>People Tab</h2>
-      <p>Shows everyone tagged across your memories, with a count of appearances. Click any person to see all their memories. A <strong>Manage</strong> button in the top right opens the People & Organisations manager.</p>
+      <p>Shows everyone in your index with a count of memories. People with no memories yet are sorted to the top. Use the filter chips to narrow by relationship, linked organisation, or linked location. Click <strong>+ add person</strong> to record someone before writing any memories about them.</p>
 
       <h2>Organisations Tab</h2>
-      <p>The same as the People tab, but for organisations.</p>
+      <p>The same as the People tab, but for organisations. Use <strong>+ add org</strong> to record an organisation independently.</p>
 
       <h2>Locations Tab</h2>
-      <p>Shows all locations used across your memories. Click any location to see all memories that mention it — whether as a primary or additional location.</p>
+      <p>Shows all locations in your index. Locations without coordinates show a ⚠️ indicator — they won't appear on the map until coordinates are set. Click <strong>⚠ Set coords</strong> to enter them manually. Use <strong>+ add location</strong> to record a place before writing any memories about it.</p>
     </section>
 
     <div class="divider"></div>
 
     <!-- People Manager -->
     <section class="section">
-      <h1 id="people-manager">People & Organisations Manager</h1>
+      <h2>Relationships Tab</h2>
+      <p>Groups people by their relationship type — family, friend, colleague, and so on. Click any relationship to see all the people in it.</p>
+
+      <h2>Groups Tab</h2>
+      <p>Shows named groups of people. See <a href="#groups">Groups</a> below for full details.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="section">
+      <h1 id="people-manager">People &amp; Organisations Manager</h1>
       <p>Access from <strong>Index → People tab → Manage</strong>, or via the ⚙ Settings drawer.</p>
 
       <h2>Renaming</h2>
-      <p>If you have used two spellings of the same name, rename one to consolidate them. Click the pencil icon next to a name, type the corrected name, and press <kbd>Enter</kbd>. All memories update automatically.</p>
+      <p>Click <strong>Rename</strong> next to any name, type the corrected name, and press <kbd>Enter</kbd>. All memories, linked organisations, locations, and group memberships update automatically.</p>
+
+      <h2>Linking Organisations &amp; Locations</h2>
+      <p>Under each person's entry, click <strong>+ link org</strong> or <strong>+ link location</strong> to associate them with organisations or places. Multiple connections per person are supported. These appear as filter chips in the People index.</p>
 
       <h2>Adding Email Addresses</h2>
-      <p>Email addresses are used when sharing memories. Click the envelope icon next to a person's name to add or update their email. This address is used when you share memories with them, and is also how Chronicle verifies that an incoming shared memory is from someone you know.</p>
+      <p>Enter an email under a person's entry in the People tab. This lets Chronicle verify that incoming shared memories are from someone you know.</p>
 
       <h2>Deleting</h2>
-      <p>Click the trash icon to remove a person or organisation from the registry. This does not delete the memories they appear in — it only removes them from the index of known contacts.</p>
+      <p>Click <strong>Remove</strong> to remove a person or organisation from the index. This does not delete the memories they appear in.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Groups -->
+    <section class="section">
+      <h1 id="groups">Groups</h1>
+      <p class="chapter-intro">Groups let you organise people into named collections — Family, School friends, Work colleagues, and so on. Clicking a group in the memory form adds all its members at once.</p>
+
+      <h2>Creating a Group</h2>
+      <ol class="steps">
+        <li>Go to <strong>Index → Groups tab</strong></li>
+        <li>Click <strong>+ new group</strong></li>
+        <li>Type a name and press <kbd>Enter</kbd> or click <strong>Create</strong></li>
+      </ol>
+
+      <h2>Adding Members</h2>
+      <p>Click <strong>+ add member</strong> inside a group row and start typing. Only people already in your index appear as suggestions.</p>
+
+      <h2>Using a Group in a Memory</h2>
+      <p>When adding or editing a memory, group pill buttons appear above the People field. Clicking one adds all its members instantly — useful for recurring gatherings, family events, or group trips.</p>
+
+      <h2>Renaming &amp; Deleting</h2>
+      <p>Click <strong>Rename</strong> to rename a group. Click <strong>Delete</strong> to remove it — members are unaffected.</p>
     </section>
 
     <div class="divider"></div>
@@ -769,6 +807,19 @@
       </ul>
 
       <p>Locations are geocoded (converted to map coordinates) the first time they appear. Chronicle caches these results locally so the map loads quickly on subsequent visits.</p>
+
+      <h2>Map Language</h2>
+      <p>The map shows English place names by default. Click <strong>Switch to local names</strong> in the map legend to toggle to local-language tiles.</p>
+
+      <h2>Coordinates</h2>
+      <p>When Chronicle geocodes a location, it saves the coordinates to your Locations index so subsequent map loads are instant. To correct a misplaced location:</p>
+      <ol class="steps">
+        <li>Go to <strong>Index → Locations tab</strong></li>
+        <li>Click <strong>⚠ Set coords</strong> next to the location</li>
+        <li>Enter coordinates as <code>lat, lng</code> — e.g. <code>-33.8688, 151.2093</code></li>
+        <li>Click <strong>Save</strong></li>
+      </ol>
+      <p>Manually set coordinates show a ✏ symbol and are never overridden by automatic geocoding.</p>
 
       <div class="tip">Use consistent, specific location names — "Melbourne, Australia" rather than just "Melbourne" helps the geocoder find the right place, especially for common city names.</div>
       <div class="note">Geocoding requires an internet connection the first time a new location is resolved. Once cached, the map works fully offline.</div>
@@ -810,12 +861,35 @@
 
     <div class="divider"></div>
 
+    <!-- Genealogy -->
+    <section class="section">
+      <h1 id="genealogy">Genealogy &amp; GEDCOM</h1>
+      <p class="chapter-intro">Chronicle can import a GEDCOM file — the standard export from Ancestry, MyHeritage, FamilySearch, and most genealogy apps. Each ancestor becomes a memory in your Chronicle.</p>
+
+      <div class="note"><strong>Genealogy mode requires a subscription.</strong> See <a href="#subscription">Subscription</a> for details.</div>
+
+      <h2>Importing a GEDCOM File</h2>
+      <ol class="steps">
+        <li>Click <strong>Import</strong> in the navigation</li>
+        <li>Select the <strong>Family Tree</strong> tab</li>
+        <li>Drag your <code>.ged</code> file onto the drop zone, or click to browse</li>
+        <li>Chronicle lists everyone in the file — search by name to find a specific person</li>
+        <li>Click an ancestor to preview the memory Chronicle will create</li>
+        <li>Click <strong>Import [name] →</strong> to add them to your Chronicle</li>
+      </ol>
+      <p>Each import creates one memory per ancestor, dated to their birth year where known. Open the memory afterwards to add your own notes, photos, and perspectives.</p>
+      <div class="tip">Export the GEDCOM from your genealogy app first. Chronicle doesn't connect to any external service — the import is entirely local.</div>
+    </section>
+
+    <div class="divider"></div>
+
     <!-- Sharing -->
     <section class="section">
       <h1 id="sharing">Sharing Memories</h1>
       <p class="chapter-intro">Chronicle lets you share memories with the people who were part of them. Shared memories open automatically in the recipient's Chronicle — no app needed, no import steps.</p>
 
-      <p>To access sharing, open any memory and click the <strong>✉ Share</strong> button. This button only appears when the memory includes at least one person who has a saved email address.</p>
+      <p>Sending shared memories requires a subscription. The <strong>✉ Share</strong> button is visible on all memories but greyed out for free users — hovering shows a tooltip. <strong>Receiving</strong> shared memories is free for everyone.</p>
+      <div class="note">Enter your licence key in <strong>⚙ Settings → Subscription</strong> to unlock sharing. See <a href="#subscription">Subscription</a> for how to get one.</div>
 
       <h2>How Sharing Works</h2>
       <p>Sharing in Chronicle is link-based. When you share a memory, a private short link is created. The recipient clicks the link, sees a preview, and downloads a file that imports automatically into their Chronicle. The link is single-use — it stops working once collected.</p>
@@ -835,12 +909,12 @@
 
       <h2 id="receiving">Receiving a Shared Memory</h2>
       <ol class="steps">
-        <li>Click the share link — a preview page shows the memory titles and the sender's personal note</li>
-        <li>Click <strong>Save to my Chronicle</strong> — a file downloads automatically</li>
-        <li>Open the downloaded file in your browser — Chronicle loads and shows an import prompt</li>
-        <li>Click <strong>Save to my Chronicle</strong> to add the memories to your Chronicle</li>
+        <li>Click the share link — it opens a bridge page showing who shared and how many memories</li>
+        <li>If you opened the link inside a messaging app, the page will prompt you to open it in Safari or Chrome — tap the menu icon and choose <strong>Open in browser</strong></li>
+        <li>Once in your real browser, click <strong>Open in Chronicle</strong></li>
+        <li>Chronicle loads and shows an import prompt — click <strong>Save to my Chronicle</strong></li>
       </ol>
-      <div class="note">After this, the downloaded file can be discarded. Your memories are saved in your local Chronicle as normal — everything works offline from here.</div>
+      <div class="note">Share links expire after 30 days and are deleted once collected. No subscription is needed to receive memories.</div>
 
       <h3>Known vs unknown senders</h3>
       <p>Chronicle checks whether the sender's email address matches someone already in your People registry:</p>
@@ -938,9 +1012,47 @@
 
     <div class="divider"></div>
 
+    <!-- Subscription -->
+    <section class="section">
+      <h1 id="subscription">Subscription</h1>
+      <p class="chapter-intro">Chronicle is free to use as a personal journal. A subscription ($20/year) unlocks sending shared memories and Genealogy mode.</p>
+
+      <h2>What's Free</h2>
+      <ul>
+        <li>Complete life timeline journal, photos, places, tags</li>
+        <li>People groups, location &amp; organisation linking, filter chips</li>
+        <li>Map view with coordinates and language toggle</li>
+        <li>Print &amp; export</li>
+        <li>Receiving shared memories from others</li>
+        <li>Works entirely offline — no account ever required</li>
+      </ul>
+
+      <h2>What Requires a Subscription</h2>
+      <ul>
+        <li>Sending shared memories to others</li>
+        <li>Genealogy mode — GEDCOM import</li>
+        <li>Public timelines <em>(coming soon)</em></li>
+      </ul>
+
+      <h2>Getting a Subscription</h2>
+      <ol class="steps">
+        <li>Visit <a href="https://ko-fi.com/remembory" target="_blank" rel="noopener">ko-fi.com/remembory</a> and subscribe for $20/year</li>
+        <li>Send a Ko-fi message with the email address you used</li>
+        <li>You'll receive a licence key within 24 hours — it looks like <code>CHRN-XXXX-XXXX-XXXX-XXXX</code></li>
+        <li>In Chronicle, go to <strong>⚙ Settings → Subscription</strong></li>
+        <li>Paste your key into the field and click <strong>Apply</strong></li>
+      </ol>
+      <div class="note">Your licence key is stored in your browser. If you clear browser data or switch browsers, re-enter it. Keep a copy of your key somewhere safe.</div>
+
+      <h2>Renewing</h2>
+      <p>When your key expires, subscription features become unavailable. Subscribe again on Ko-fi and we'll send a new key. Your memories are never affected.</p>
+    </section>
+
+    <div class="divider"></div>
+
     <!-- Backup -->
     <section class="section">
-      <h1 id="backup">Backup & Restore</h1>
+      <h1 id="backup">Backup &amp; Restore</h1>
       <p class="chapter-intro">Chronicle stores your memories in your browser on your device — they never leave it. This is great for privacy, but it means <strong>you are responsible for keeping a copy</strong>. Clearing your browser's history, cache, or site data will permanently erase your memories with no way to recover them.</p>
 
       <div class="warning"><strong>Back up regularly.</strong> Treat your Chronicle backup the way you would treat irreplaceable photos. Download a backup at least once a month and keep it somewhere safe — a cloud drive, an external disk, or email it to yourself. The file contains everything: memories, photos, and settings.</div>
