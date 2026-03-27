@@ -69,24 +69,75 @@ const TAGS = ["childhood","family","travel","education","work","love","health","
 // ← Replace this with your Worker URL after deploying to Cloudflare
 const WORKER_URL = "https://share.remembory.net";
 
-// ── Licence key validation ─────────────────────────────────────
-const LICENCE_SECRET = "remembory-chronicle-2025";
+// ── Licence key validation (Lemon Squeezy) ────────────────────
+// Keys are issued by Lemon Squeezy. We validate against their API on first use,
+// then cache the result in localStorage for offline use.
+const LS_CACHE_KEY = "chronicle-licence-cache";
+
+function loadLicenceCache() {
+  try { return JSON.parse(localStorage.getItem(LS_CACHE_KEY)||"null"); } catch(e) { return null; }
+}
+function saveLicenceCache(data) {
+  try { localStorage.setItem(LS_CACHE_KEY, JSON.stringify(data)); } catch(e) {}
+}
+function clearLicenceCache() {
+  try { localStorage.removeItem(LS_CACHE_KEY); } catch(e) {}
+}
+
 async function validateLicenceKey(key) {
   if (!key) return null;
-  const clean = key.toUpperCase().replace(/[^A-Z0-9]/g,"");
-  if (!clean.startsWith("CHRN")||clean.length!==24) return {valid:false,reason:"invalid"};
-  const tier=clean.slice(4,6).toLowerCase(), expiryHex=clean.slice(6,12), hmacGiven=clean.slice(12,24).toLowerCase();
-  const expiryDays=parseInt(expiryHex,16), todayDays=Math.floor(Date.now()/86400000);
-  if(isNaN(expiryDays)||expiryDays<todayDays) return {valid:false,reason:"expired"};
-  if(tier!=="01") return {valid:false,reason:"invalid"};
+  const clean = key.trim();
+  if (!clean) return null;
+
+  // Check cache first (valid for 7 days to allow offline use)
+  const cached = loadLicenceCache();
+  if (cached && cached.key === clean) {
+    const age = Date.now() - (cached.checkedAt || 0);
+    if (age < 7 * 24 * 60 * 60 * 1000) {
+      // If cached as valid, also check the expiry date hasn't passed
+      if (cached.status && cached.status.valid) {
+        if (cached.status.expiresAt && new Date(cached.status.expiresAt) < new Date()) {
+          clearLicenceCache();
+          return {valid:false, reason:"expired"};
+        }
+        return cached.status;
+      }
+      return cached.status;
+    }
+  }
+
+  // Call Lemon Squeezy API to validate
   try {
-    const enc=new TextEncoder();
-    const km=await crypto.subtle.importKey("raw",enc.encode(LICENCE_SECRET),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
-    const sig=await crypto.subtle.sign("HMAC",km,enc.encode((tier+expiryHex).toLowerCase()));
-    const sigHex=Array.from(new Uint8Array(sig)).map(b=>b.toString(16).padStart(2,"0")).join("");
-    if(sigHex.slice(0,12)!==hmacGiven) return {valid:false,reason:"invalid"};
-    return {valid:true,tier:"subscriber",expiresAt:new Date(expiryDays*86400000).toISOString().slice(0,10)};
-  } catch(e){return {valid:false,reason:"error"};}
+    const res = await fetch("https://api.lemonsqueezy.com/v1/licenses/validate", {
+      method: "POST",
+      headers: {"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+      body: new URLSearchParams({license_key: clean})
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.valid) {
+      const reason = data.error === "This license key is expired" ? "expired"
+                   : data.error === "This license key has been disabled" ? "disabled"
+                   : "invalid";
+      const status = {valid:false, reason};
+      saveLicenceCache({key:clean, status, checkedAt:Date.now()});
+      return status;
+    }
+
+    // Valid key — extract expiry from Lemon Squeezy data
+    const instance = data.license_key;
+    const expiresAt = instance?.expires_at ? new Date(instance.expires_at).toISOString().slice(0,10) : null;
+    const status = {valid:true, tier:"subscriber", expiresAt, email: data.meta?.customer_email || null};
+    saveLicenceCache({key:clean, status, checkedAt:Date.now()});
+    return status;
+
+  } catch(e) {
+    // Network error — fall back to expired cache if available
+    if (cached && cached.key === clean && cached.status) {
+      return {...cached.status, offline:true};
+    }
+    return {valid:false, reason:"network"};
+  }
 }
 const TAG_COLORS = {
   childhood:"#e8a87c", family:"#c9b89a", travel:"#7a9e9f", education:"#8b9dc3",
@@ -2596,7 +2647,7 @@ function App() {
   const [licenceStatus, setLicenceStatus] = useState(null);
   const isSubscriber = licenceStatus?.valid===true;
   React.useEffect(()=>{if(licenceKey){validateLicenceKey(licenceKey).then(setLicenceStatus);}else{setLicenceStatus(null);}},[licenceKey]);
-  function saveLicenceKey(k){const c=k.trim();try{if(c)localStorage.setItem("chronicle-licence-key",c);else localStorage.removeItem("chronicle-licence-key");}catch(e){}setLicenceKey(c);}
+  function saveLicenceKey(k){const c=k.trim();try{if(c)localStorage.setItem("chronicle-licence-key",c);else localStorage.removeItem("chronicle-licence-key");}catch(e){}clearLicenceCache();setLicenceKey(c);}
   const [iabBannerDismissed, setIabBannerDismissed] = useState(false);
   const iabOnLoad = React.useMemo(()=>isInAppBrowser(),[]);
   const [indexTab, setIndexTab] = useState("people");
@@ -3783,7 +3834,7 @@ function App() {
         }, saveBackupBusy ? "Saving…" : "💾 Backup"),
         !isMobile&&React.createElement("button",{onClick:()=>setView("settings"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"⚙ Settings"),
         !isMobile&&React.createElement("span",{style:{width:"1px",height:"20px",background:"#d4c4a8",margin:"0 4px",flexShrink:0}}),
-        !isMobile&&React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",title:"Support Remembory on Ko-fi",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#7a6040",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#7a6040";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
+        !isMobile&&React.createElement("a",{href:"https://remembory.lemonsqueezy.com/buy/chronicle-subscription",target:"_blank",rel:"noopener",title:"Subscribe to Chronicle",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#7a6040",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#7a6040";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
         showBack&&React.createElement("button",{onClick:goBack,style:{...S.btnOutline,padding:isMobile?"8px 14px":"7px 13px",fontSize:"0.9rem"}},"← Back"),
         showAdd&&React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView("add"); },style:{...S.btn,padding:isMobile?"8px 16px":"7px 15px",fontSize:"0.9rem"}},"+ Add")
       )
@@ -3984,11 +4035,11 @@ function App() {
                   React.createElement("input",{value:licenceKey,onChange:e=>setLicenceKey(e.target.value),
                     onBlur:e=>saveLicenceKey(e.target.value),
                     onKeyDown:e=>{if(e.key==="Enter")saveLicenceKey(licenceKey);},
-                    placeholder:"CHRN-XXXX-XXXX-XXXX-XXXX",
+                    placeholder:"Paste your Lemon Squeezy licence key…",
                     style:{...S.input,flex:1,fontSize:"0.88rem",fontFamily:"monospace",letterSpacing:"0.05em"}}),
                   React.createElement("button",{onClick:()=>saveLicenceKey(licenceKey),style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem"}},"Apply")
                 ),
-                React.createElement("a",{href:"https://remembory.net#subscribe",target:"_blank",rel:"noopener",style:{fontSize:"0.82rem",color:"#a8885a",textDecoration:"underline"}},"Get a subscription →")
+                React.createElement("a",{href:"https://remembory.lemonsqueezy.com/buy/chronicle-subscription",target:"_blank",rel:"noopener",style:{fontSize:"0.82rem",color:"#a8885a",textDecoration:"underline"}},"Subscribe at Lemon Squeezy →")
               )
         ),
 
@@ -4080,10 +4131,10 @@ function App() {
           },"🗑 Clear all memories")
         ),
 
-        // ── Ko-fi ──
-        React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
-          "Chronicle is free and always will be. If it’s been useful — ",
-          React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"☕ buy us a coffee"),
+        // ── Support ──
+        !isSubscriber&&React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
+          "Unlock sharing & genealogy mode — ",
+          React.createElement("a",{href:"https://remembory.lemonsqueezy.com/buy/chronicle-subscription",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"✨ subscribe for $20/year"),
           "."
         )
       ),
@@ -4193,7 +4244,7 @@ function App() {
               React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",fontStyle:"italic",color:"#1a1208",marginBottom:"10px"}},"Genealogy Mode"),
               React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,maxWidth:"380px",margin:"0 auto 16px"}},
                 "GEDCOM import requires a Remembory subscription. Import a family tree, flesh out your ancestors’ lives, and connect genealogy research to narrative."),
-              React.createElement("a",{href:"https://remembory.net#subscribe",target:"_blank",rel:"noopener",style:{...S.btn,display:"inline-block",padding:"10px 24px",textDecoration:"none",fontSize:"0.9rem"}},
+              React.createElement("a",{href:"https://remembory.lemonsqueezy.com/buy/chronicle-subscription",target:"_blank",rel:"noopener",style:{...S.btn,display:"inline-block",padding:"10px 24px",textDecoration:"none",fontSize:"0.9rem"}},
                 "Learn about subscribing →")
             )
           : React.createElement("div",null,
