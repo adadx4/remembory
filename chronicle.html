@@ -2797,6 +2797,17 @@ function App() {
     const entry = { people, memIds:[...memIds], date:new Date().toISOString() };
     persistSubject({shareHistory:[...shareHistory, entry]});
   }
+  function removeShareRecord(memId, person) {
+    // Remove person from all shareHistory entries that include this memory.
+    // If an entry becomes empty of people after removal, drop it entirely.
+    const updated = (shareHistory||[]).reduce((acc, entry) => {
+      if (!entry.memIds.includes(memId)) { acc.push(entry); return acc; }
+      const people = entry.people.filter(p => p !== person);
+      if (people.length > 0) acc.push({...entry, people});
+      return acc;
+    }, []);
+    persistSubject({shareHistory: updated});
+  }
   function setLegacyMessage(msg) { persistSubject({legacyMessage:msg}); }
   function toggleLegacy(id) {
     const updated = memories.map(m=>m.id===id?{...m,inLegacy:!m.inLegacy}:m);
@@ -4532,6 +4543,11 @@ function App() {
             return React.createElement("span",{key:p,style:{padding:"3px 10px",borderRadius:"20px",fontSize:"0.8rem",background:pillBg,color:pillColor,border:pillBorder,display:"inline-flex",gap:"4px",alignItems:"center"},title:wasSharedWith?"Shared with "+p:undefined},
               "👤 ",p,
               wasSharedWith&&React.createElement("span",{style:{fontSize:"0.65rem",opacity:0.7}},"✉"),
+              wasSharedWith&&React.createElement("button",{
+                onClick:e=>{e.stopPropagation();if(window.confirm("Remove the shared record for "+p+" on this memory?"))removeShareRecord(m.id,p);},
+                title:"Remove shared record for "+p,
+                style:{background:"none",border:"none",cursor:"pointer",color:"#5a8a6a",fontSize:"0.7rem",padding:"0 0 0 1px",lineHeight:1,opacity:0.6}
+              },"×"),
               pOrgs.length>0&&React.createElement("span",{style:{fontSize:"0.72rem",color:"#7a6a58",fontStyle:"italic"}},"· "+pOrgs.join(", "))
             );
           }),
