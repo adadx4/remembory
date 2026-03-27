@@ -82,7 +82,7 @@ async function validateLicenceKey(key) {
   try {
     const enc=new TextEncoder();
     const km=await crypto.subtle.importKey("raw",enc.encode(LICENCE_SECRET),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
-    const sig=await crypto.subtle.sign("HMAC",km,enc.encode(tier+expiryHex));
+    const sig=await crypto.subtle.sign("HMAC",km,enc.encode((tier+expiryHex).toLowerCase()));
     const sigHex=Array.from(new Uint8Array(sig)).map(b=>b.toString(16).padStart(2,"0")).join("");
     if(sigHex.slice(0,12)!==hmacGiven) return {valid:false,reason:"invalid"};
     return {valid:true,tier:"subscriber",expiresAt:new Date(expiryDays*86400000).toISOString().slice(0,10)};
