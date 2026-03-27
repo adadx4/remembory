@@ -199,7 +199,7 @@ function sortKey(m) {
 }
 
 function newForm() {
-  return { title:"", content:"", year:new Date().getFullYear(), month:1, day:1, fuzzy:"day", season:"Early", location:"", locations:[], tags:[], people:[], orgs:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false };
+  return { title:"", content:"", year:new Date().getFullYear(), month:1, day:1, fuzzy:"day", season:"Early", location:"", locations:[], tags:[], people:[], orgs:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private" };
 }
 
 // ── Storage ────────────────────────────────────────────────────
@@ -588,7 +588,7 @@ function extractPlainText(headers, bodyLines) {
   if (/text\/html/i.test(ct)) {
     body = body
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/[<]script[^>]*>[\s\S]*?<\/script>/gi, "")
       .replace(/<br\s*\/?>/gi, "\n")
       .replace(/<\/p>/gi, "\n\n")
       .replace(/<\/div>/gi, "\n")
@@ -2666,6 +2666,52 @@ function App() {
   const isSubscriber = isDevMode || licenceStatus?.valid===true;
   React.useEffect(()=>{if(licenceKey){validateLicenceKey(licenceKey).then(setLicenceStatus);}else{setLicenceStatus(null);}},[licenceKey]);
   function saveLicenceKey(k){const c=k.trim();try{if(c)localStorage.setItem("chronicle-licence-key",c);else localStorage.removeItem("chronicle-licence-key");}catch(e){}clearLicenceCache();setLicenceKey(c);}
+
+  // ── Public profile state ───────────────────────────────────────
+  const [profileState, setProfileState] = React.useState(()=>{
+    try { return JSON.parse(localStorage.getItem("chronicle-profile")||"null"); } catch(e) { return null; }
+  });
+  function saveProfileState(s){
+    try { if(s) localStorage.setItem("chronicle-profile",JSON.stringify(s)); else localStorage.removeItem("chronicle-profile"); } catch(e) {}
+    setProfileState(s);
+  }
+  const [profilePublishing, setProfilePublishing] = React.useState(false);
+  const [profileMsg, setProfileMsg] = React.useState("");
+
+  async function publishProfile() {
+    if (!licenceKey) return;
+    const publicMems = memories.filter(m => m.visibility && m.visibility !== "private");
+    if (!publicMems.length) { setProfileMsg("No memories are set to a public visibility level yet."); return; }
+    setProfilePublishing(true); setProfileMsg("");
+    try {
+      const res = await fetch(WORKER_URL + "/profile/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-LS-Key": licenceKey },
+        body: JSON.stringify({ ownerName: ownerName||carerName, ownerEmail: ownerEmail||carerEmail, memories: publicMems, peopleEmails })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Server error");
+      saveProfileState({ identifier: data.identifier, url: data.url, lastPublished: new Date().toISOString() });
+      setProfileMsg("✓ Profile published at " + data.url);
+    } catch(e) { setProfileMsg("Could not publish: " + e.message); }
+    setProfilePublishing(false);
+  }
+
+  async function unpublishProfile() {
+    if (!licenceKey || !profileState) return;
+    setProfilePublishing(true); setProfileMsg("");
+    try {
+      const res = await fetch(WORKER_URL + "/profile/unpublish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-LS-Key": licenceKey },
+        body: JSON.stringify({ identifier: profileState.identifier })
+      });
+      if (!res.ok) throw new Error("Server error");
+      saveProfileState(null);
+      setProfileMsg("Profile taken offline.");
+    } catch(e) { setProfileMsg("Could not unpublish: " + e.message); }
+    setProfilePublishing(false);
+  }
   const [iabBannerDismissed, setIabBannerDismissed] = useState(false);
   const iabOnLoad = React.useMemo(()=>isInAppBrowser(),[]);
   const [indexTab, setIndexTab] = useState("people");
@@ -2678,6 +2724,8 @@ function App() {
   const [gedPicked, setGedPicked]   = useState(null);   // selected person object
   const [gedPreview, setGedPreview] = useState(null);   // {subject, memories} ready to import
   const [gedBusy, setGedBusy]       = useState(false);
+  const [gedContext, setGedContext]  = useState([]);    // [{id,fullName,relationship,events,expanded}]
+  const [gedContextSel, setGedContextSel] = useState(new Set()); // selected event ids
 
   const [photoQueue, setPhotoQueue] = useState([]);
   const [emailForm, setEmailForm] = useState({...newForm(),from:"",rawDate:""});
@@ -3016,6 +3064,15 @@ function App() {
       peopleEmails:updatedEmails
     });
     setPendingShare(null);
+    // Record mutual connection if both sides are identifiable
+    const myEmail = ownerEmail || carerEmail;
+    if (myEmail && senderEmail && licenceKey) {
+      fetch(WORKER_URL + "/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-LS-Key": licenceKey },
+        body: JSON.stringify({ myEmail, theirEmail: senderEmail })
+      }).catch(() => {});
+    }
     // Navigate to the first imported memory
     if (toAdd.length > 0) { setSelected(toAdd[0].id); setView("detail"); }
     else if (incomingMems.length > 0) { setSelected(incomingMems[0].id); setView("detail"); }
@@ -3275,7 +3332,115 @@ function App() {
       return { mems, topNotes };
     }
 
-    return { persons, buildMemories };
+    // ── Build context memories ────────────────────────────────
+    function buildContextMemories(subject) {
+      const subBirth = subject.birtYear;
+      const subDeath = subject.deatYear || new Date().getFullYear();
+      if (!subBirth) return [];
+
+      const contextPeople = [];
+      for (const [id, rec] of Object.entries(indiMap)) {
+        if (id === subject.id) continue;
+        const nameNode = rec.children.find(n=>n.tag==="NAME");
+        if (!nameNode) continue;
+        const fullName = fullText(nameNode).replace(/\/\//g,"").replace(/\s+/g," ").trim();
+        if (!fullName) continue;
+        const birt2 = rec.children.find(n=>n.tag==="BIRT");
+        const deat2 = rec.children.find(n=>n.tag==="DEAT");
+        const birthYear = birt2 ? parseDate(child(birt2,"DATE"))?.year : null;
+        const deathYear = deat2 ? parseDate(child(deat2,"DATE"))?.year : null;
+        const personBirth = birthYear || 0;
+        const personDeath = deathYear || new Date().getFullYear();
+        if (personDeath < subBirth || personBirth > subDeath) continue;
+
+        // Detect relationship
+        let relationship = "";
+        for (const famRef of rec.children.filter(n=>n.tag==="FAMS")) {
+          const fam = famMap[famRef.value];
+          if (!fam) continue;
+          if (child(fam,"HUSB")===subject.id||child(fam,"WIFE")===subject.id) { relationship="Spouse"; break; }
+        }
+        if (!relationship) {
+          for (const famRef of rec.children.filter(n=>n.tag==="FAMC")) {
+            const fam = famMap[famRef.value];
+            if (!fam) continue;
+            if (child(fam,"HUSB")===subject.id||child(fam,"WIFE")===subject.id) { relationship="Child"; break; }
+          }
+        }
+        if (!relationship) {
+          for (const famRef of subject.rec.children.filter(n=>n.tag==="FAMC")) {
+            const fam = famMap[famRef.value];
+            if (!fam) continue;
+            if (child(fam,"HUSB")===id||child(fam,"WIFE")===id) { relationship="Parent"; break; }
+          }
+        }
+
+        // Extract events within subject lifespan
+        const events = [];
+        let evIdx = 0;
+        function addCtxEvent(evTitle, dateObj, place, note, extraPeople) {
+          if (!evTitle) return;
+          const yr = dateObj?.year || null;
+          if (yr && (yr < subBirth || yr > subDeath)) return;
+          const titleStr = fullName + " " + evTitle.charAt(0).toLowerCase() + evTitle.slice(1);
+          const contentStr = [note, place ? "Place: "+place : ""].filter(Boolean).join("\n\n").trim();
+          events.push({
+            id: "ged_ctx_" + id + "_" + (evIdx++),
+            title: titleStr, content: contentStr,
+            year: yr || subBirth, month: dateObj?.month||1, day: dateObj?.day||1,
+            fuzzy: dateObj?.fuzzy||"year", season:"Early",
+            location: place||"", locations: place?[place]:[],
+            tags:["genealogy"], people:[fullName,...extraPeople],
+            orgs:[], mediaUrls:[], endFuzzy:null, endYear:null,
+            endMonth:1, endDay:1, endSeason:"Early", endOngoing:false,
+            perspectives:[], fromGedcom:true, visibility:"private",
+          });
+        }
+
+        const skipTags2 = new Set(["NAME","SEX","FAMS","FAMC","CHAN","NOTE","SOUR","OBJE","SUBM"]);
+        for (const node of rec.children) {
+          if (skipTags2.has(node.tag)) continue;
+          const evLabel = EVENT_TITLES[node.tag];
+          if (!evLabel && node.tag !== "EVEN") continue;
+          const evTitle = node.tag==="EVEN" ? (child(node,"TYPE")||"Event") : evLabel;
+          const dateObj = parseDate(child(node,"DATE"));
+          const place   = child(node,"PLAC");
+          const note    = children(node,"NOTE").map(n=>fullText(n)).filter(Boolean).join("\n\n");
+          addCtxEvent(evTitle, dateObj, place, note, []);
+        }
+        for (const famRef of rec.children.filter(n=>n.tag==="FAMS")) {
+          const fam = famMap[famRef.value];
+          if (!fam) continue;
+          const marrNode = fam.children.find(n=>n.tag==="MARR");
+          if (!marrNode) continue;
+          const dateObj = parseDate(child(marrNode,"DATE"));
+          const place   = child(marrNode,"PLAC");
+          const spouseTag = child(rec,"SEX")==="F" ? "HUSB" : "WIFE";
+          const spouseRef = child(fam,spouseTag);
+          const spouseRec = spouseRef ? indiMap[spouseRef] : null;
+          let spouseName = null;
+          if (spouseRec) {
+            const sn = spouseRec.children.find(n=>n.tag==="NAME");
+            if (sn) spouseName = fullText(sn).replace(/\/\//g,"").replace(/\s+/g," ").trim();
+          }
+          addCtxEvent(spouseName?"Married "+spouseName:"Married", dateObj, place, "", spouseName?[spouseName]:[]);
+        }
+
+        if (events.length===0) continue;
+        events.sort((a,b)=>(a.year||0)-(b.year||0));
+        contextPeople.push({ id, fullName, relationship, birthYear, deathYear, events });
+      }
+
+      const relOrder = {Spouse:0,Parent:1,Child:2};
+      contextPeople.sort((a,b)=>{
+        const oa=relOrder[a.relationship]??3, ob=relOrder[b.relationship]??3;
+        if (oa!==ob) return oa-ob;
+        return (a.birthYear||9999)-(b.birthYear||9999);
+      });
+      return contextPeople;
+    }
+
+    return { persons, buildMemories, buildContextMemories };
   }
 
   function handleGedFile(e) {
@@ -3310,19 +3475,38 @@ function App() {
       knownLocations: [...new Set(mems.map(m=>m.location).filter(Boolean))],
     };
     setGedPreview({ subj: newSubj, mems });
+    // Build context — overlapping people and their events
+    const contextPeople = gedPersons.buildContextMemories(person);
+    // Default: all events selected, all people expanded
+    const allEventIds = new Set(contextPeople.flatMap(p=>p.events.map(e=>e.id)));
+    setGedContext(contextPeople.map(p=>({...p,expanded:true})));
+    setGedContextSel(allEventIds);
   }
 
   function commitGedImport() {
     if (!gedPreview) return;
     const { subj, mems } = gedPreview;
+    // Collect selected context events
+    const contextMems = gedContext.flatMap(p=>p.events.filter(e=>gedContextSel.has(e.id)));
+    const allMems = [...mems, ...contextMems].sort((a,b)=>(a.year||0)-(b.year||0));
+    // Add context people to knownPeople
+    const contextPeople = gedContext.map(p=>p.fullName);
+    const allPeople = [...new Set([...subj.knownPeople,...contextPeople,...allMems.flatMap(m=>m.people)])].sort();
+    const allLocations = [...new Set([...subj.knownLocations,...allMems.map(m=>m.location).filter(Boolean)])].sort();
+    // Build relationship map
+    const rels = {};
+    gedContext.forEach(p=>{ if(p.relationship) rels[p.fullName]=p.relationship; });
+    const finalSubj = { ...subj, memories:allMems, knownPeople:allPeople, knownLocations:allLocations,
+      peopleRelationships:{...subj.peopleRelationships,...rels} };
     setData(prev => ({
       ...prev,
-      subjects: [...prev.subjects, { ...subj, memories: mems }],
+      subjects: [...prev.subjects, finalSubj],
       activeSubjectId: subj.id,
     }));
     setGedPersons(null); setGedPicked(null); setGedPreview(null);
+    setGedContext([]); setGedContextSel(new Set());
     setView("life");
-    alert(`Imported ${mems.length} memories for ${subj.name}. You can now add notes and photos to each event.`);
+    alert(`Imported ${allMems.length} memories for ${subj.name} — ${mems.length} personal events and ${contextMems.length} from ${gedContext.length} overlapping people.`);
   }
 
   function importBackup(e) {
@@ -4067,6 +4251,46 @@ function App() {
           React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:S.input})
         ),
 
+        // ── Public Profile ──
+        isSubscriber&&React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+          React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
+            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},"������ Public Profile"),
+            profileState&&React.createElement("span",{style:{fontSize:"0.72rem",background:"#4a7a5a",color:"#fff",padding:"2px 9px",borderRadius:"20px",letterSpacing:"0.04em"}},"LIVE")
+          ),
+          profileState
+            ? React.createElement("div",null,
+                React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"4px"}},
+                  "✓ Live at ",
+                  React.createElement("a",{href:profileState.url,target:"_blank",rel:"noopener",style:{color:"#a8885a"}},profileState.url)
+                ),
+                profileState.lastPublished&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},
+                  "Last published: "+new Date(profileState.lastPublished).toLocaleDateString()
+                ),
+                React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",marginBottom:"12px"}},
+                  memories.filter(m=>m.visibility&&m.visibility!=="private").length+" memories on your profile."
+                ),
+                React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
+                  React.createElement("button",{onClick:publishProfile,disabled:profilePublishing,style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem",opacity:profilePublishing?0.6:1}},profilePublishing?"Publishing…":"Update profile"),
+                  React.createElement("button",{onClick:unpublishProfile,disabled:profilePublishing,style:{...S.btnOutline,padding:"7px 14px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Take offline")
+                )
+              )
+            : React.createElement("div",null,
+                React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,marginBottom:"12px"}},
+                  "Publish selected memories to a public profile at remembory.net. Set the visibility on each memory in its edit form — private memories never leave your device."
+                ),
+                memories.filter(m=>m.visibility&&m.visibility!=="private").length>0
+                  ? React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"12px"}},memories.filter(m=>m.visibility&&m.visibility!=="private").length+" memories ready to publish.")
+                  : React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"No memories set to public yet. Edit any memory and change its visibility."),
+                React.createElement("button",{onClick:publishProfile,
+                  disabled:profilePublishing||memories.filter(m=>m.visibility&&m.visibility!=="private").length===0,
+                  style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem",
+                    opacity:(profilePublishing||memories.filter(m=>m.visibility&&m.visibility!=="private").length===0)?0.5:1}},
+                  profilePublishing?"Publishing…":"Publish profile")
+              ),
+          profileMsg&&React.createElement("p",{style:{fontSize:"0.82rem",marginTop:"10px",
+            color:profileMsg.startsWith("✓")?"#4a7a5a":"#c4858a",fontStyle:"italic"}},profileMsg)
+        ),
+
         // ── Subscription ──
         React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
           React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
@@ -4348,31 +4572,109 @@ function App() {
                   [gedPicked.birtYear&&`b. ${gedPicked.birtYear}`, gedPicked.deatYear&&`d. ${gedPicked.deatYear}`].filter(Boolean).join("  ·  ")
                 )
               ),
-              React.createElement("button",{onClick:()=>{setGedPicked(null);setGedPreview(null);},style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",textDecoration:"underline"}},"← Back")
+              React.createElement("button",{
+                onClick:()=>{setGedPicked(null);setGedPreview(null);setGedContext([]);setGedContextSel(new Set());},
+                style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",textDecoration:"underline"}
+              },"← Back")
             ),
-            React.createElement("p",{style:{fontSize:"0.88rem",color:"#4a7a5a",marginBottom:"12px"}},
-              `${gedPreview.mems.length} ${gedPreview.mems.length===1?"memory":"memories"} ready to import:`
-            ),
-            React.createElement("div",{style:{maxHeight:"300px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px",marginBottom:"16px"}},
-              gedPreview.mems.map((m,i)=>React.createElement("div",{key:m.id,style:{padding:"8px 14px",borderBottom:"1px solid #ede0cc",display:"flex",justifyContent:"space-between",gap:"12px",background:i%2===0?"transparent":"rgba(200,184,154,0.08)"}},
-                React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.88rem",color:"#1a1208"}},m.title),
-                React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",whiteSpace:"nowrap"}},
-                  m.fuzzy==="day"?`${m.day}/${m.month}/${m.year}`:m.fuzzy==="month"?`${m.month}/${m.year}`:String(m.year)
+            React.createElement("div",{style:{marginBottom:"20px"}},
+              React.createElement("p",{style:{fontSize:"0.82rem",fontWeight:600,color:"#2c2416",marginBottom:"8px"}},
+                gedPicked.fullName+" own events ("+gedPreview.mems.length+")"
+              ),
+              React.createElement("div",{style:{maxHeight:"200px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px"}},
+                gedPreview.mems.map((m,i)=>
+                  React.createElement("div",{key:m.id,style:{padding:"7px 14px",borderBottom:"1px solid #ede0cc",display:"flex",justifyContent:"space-between",gap:"12px",background:i%2===0?"transparent":"rgba(200,184,154,0.08)"}},
+                    React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.88rem",color:"#1a1208"}},m.title),
+                    React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",whiteSpace:"nowrap"}},
+                      m.fuzzy==="day"?`${m.day}/${m.month}/${m.year}`:m.fuzzy==="month"?`${m.month}/${m.year}`:String(m.year||"")
+                    )
+                  )
                 )
-              ))
+              )
             ),
-            gedPreview.subj.notes&&React.createElement("div",{style:{background:"rgba(200,184,154,0.15)",borderRadius:"3px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.82rem",color:"#6a5c48",fontStyle:"italic",lineHeight:1.6}},
+            gedContext.length>0&&React.createElement("div",{style:{marginBottom:"16px"}},
+              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px"}},
+                React.createElement("p",{style:{fontSize:"0.82rem",fontWeight:600,color:"#2c2416"}},
+                  gedContext.length+" overlapping "+(gedContext.length===1?"person":"people")+" — "+gedContextSel.size+" events selected"
+                ),
+                React.createElement("div",{style:{display:"flex",gap:"12px"}},
+                  React.createElement("button",{
+                    onClick:()=>setGedContextSel(new Set(gedContext.flatMap(p=>p.events.map(e=>e.id)))),
+                    style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem",padding:0}
+                  },"Select all"),
+                  React.createElement("button",{
+                    onClick:()=>setGedContextSel(new Set()),
+                    style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem",padding:0}
+                  },"Select none")
+                )
+              ),
+              React.createElement("div",{style:{border:"1px solid #d4c4a8",borderRadius:"3px",maxHeight:"380px",overflowY:"auto"}},
+                gedContext.map((person,pi)=>{
+                  const allSel=person.events.every(e=>gedContextSel.has(e.id));
+                  function togPerson(){
+                    setGedContextSel(prev=>{
+                      const next=new Set(prev);
+                      if(allSel) person.events.forEach(e=>next.delete(e.id));
+                      else person.events.forEach(e=>next.add(e.id));
+                      return next;
+                    });
+                  }
+                  return React.createElement("div",{key:person.id,
+                    style:{borderBottom:pi<gedContext.length-1?"1px solid #e8dfd0":"none"}},
+                    React.createElement("div",{
+                      style:{display:"flex",alignItems:"center",gap:"10px",padding:"9px 14px",background:"rgba(245,240,232,0.6)",cursor:"pointer"},
+                      onClick:()=>setGedContext(prev=>prev.map((p,ii)=>ii===pi?{...p,expanded:!p.expanded}:p))
+                    },
+                      React.createElement("input",{type:"checkbox",checked:allSel,onChange:togPerson,onClick:e=>e.stopPropagation(),style:{flexShrink:0}}),
+                      React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208",flex:1}},person.fullName),
+                      person.relationship&&React.createElement("span",{
+                        style:{fontSize:"0.72rem",color:"#7a6a58",background:"rgba(200,184,154,0.2)",border:"1px solid rgba(200,184,154,0.4)",borderRadius:"20px",padding:"1px 8px",fontStyle:"italic"}
+                      },person.relationship),
+                      React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460"}},
+                        [person.birthYear,person.deathYear].filter(Boolean).join("–")
+                      ),
+                      React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",marginLeft:"6px"}},person.expanded?"▲":"▼")
+                    ),
+                    person.expanded&&React.createElement("div",null,
+                      person.events.map((ev)=>
+                        React.createElement("label",{key:ev.id,
+                          style:{display:"flex",alignItems:"baseline",gap:"10px",padding:"6px 14px 6px 36px",cursor:"pointer",borderTop:"1px solid #ede0cc",
+                            background:gedContextSel.has(ev.id)?"rgba(122,158,138,0.06)":"transparent"}},
+                          React.createElement("input",{type:"checkbox",checked:gedContextSel.has(ev.id),
+                            onChange:()=>setGedContextSel(prev=>{const next=new Set(prev);next.has(ev.id)?next.delete(ev.id):next.add(ev.id);return next;}),
+                            style:{flexShrink:0,marginTop:"3px"}}),
+                          React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.86rem",color:"#1a1208",flex:1}},ev.title),
+                          React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",whiteSpace:"nowrap"}},
+                            ev.fuzzy==="day"?`${ev.day}/${ev.month}/${ev.year}`:ev.fuzzy==="month"?`${ev.month}/${ev.year}`:String(ev.year||"")
+                          )
+                        )
+                      )
+                    )
+                  );
+                })
+              )
+            ),
+            gedContext.length===0&&gedPicked.birtYear&&React.createElement("div",{
+              style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"16px",padding:"10px 14px",background:"rgba(200,184,154,0.1)",borderRadius:"3px"}
+            },
+              "No other people in this GEDCOM overlapped with "+gedPicked.fullName+"’s lifespan ("
+              +gedPicked.birtYear+"–"+(gedPicked.deatYear||"present")+")."
+            ),
+            gedPreview.subj.notes&&React.createElement("div",{
+              style:{background:"rgba(200,184,154,0.15)",borderRadius:"3px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.82rem",color:"#6a5c48",fontStyle:"italic",lineHeight:1.6}
+            },
               React.createElement("strong",{style:{fontStyle:"normal",display:"block",marginBottom:"4px"}},"Biographical notes:"),
-              gedPreview.subj.notes.length > 300 ? gedPreview.subj.notes.slice(0,300)+"…" : gedPreview.subj.notes
+              gedPreview.subj.notes.length>300?gedPreview.subj.notes.slice(0,300)+"…":gedPreview.subj.notes
             ),
             React.createElement("div",{style:{background:"rgba(196,133,138,0.1)",border:"1px solid rgba(196,133,138,0.3)",borderRadius:"3px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.8rem",color:"#8a3030",lineHeight:1.5}},
               "This will create a new subject in your Chronicle. You can add photos, notes and your own perspectives to each memory afterwards."
             ),
             React.createElement("button",{onClick:commitGedImport,style:{...S.btn,width:"100%",fontSize:"0.95rem",padding:"11px"}},
-              `Import ${gedPicked.fullName} →`
+              "Import "+gedPicked.fullName+" → "+(gedPreview.mems.length+gedContextSel.size)+" "+((gedPreview.mems.length+gedContextSel.size)===1?"memory":"memories")
             )
           )
         )
+
         ),
 
         importTab==="email"&&React.createElement("div",null,
@@ -4526,9 +4828,17 @@ function App() {
         const m=memories.find(x=>x.id===selected);
         if (!m) return null;
         return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
-          React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",fontSize:"1rem",margin:"0 0 6px"}},
-            fuzzyDateLabel(m),
-            [m.location,...(m.locations||[])].filter(Boolean).map(l=>` · ${l}`).join("")
+          React.createElement("div",{style:{display:"flex",flexWrap:"wrap",alignItems:"center",gap:"8px",margin:"0 0 6px"}},
+            React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",fontSize:"1rem",margin:0}},
+              fuzzyDateLabel(m),
+              [m.location,...(m.locations||[])].filter(Boolean).map(l=>` · ${l}`).join("")
+            ),
+            m.visibility&&m.visibility!=="private"&&React.createElement("span",{style:{
+              fontSize:"0.7rem",padding:"1px 8px",borderRadius:"20px",letterSpacing:"0.04em",
+              background:m.visibility==="public"?"rgba(74,122,90,0.15)":m.visibility==="subscriber"?"rgba(168,136,90,0.15)":"rgba(100,120,160,0.15)",
+              color:m.visibility==="public"?"#3a6b4a":m.visibility==="subscriber"?"#7a5a20":"#4a5a7a",
+              border:m.visibility==="public"?"1px solid rgba(74,122,90,0.3)":m.visibility==="subscriber"?"1px solid rgba(168,136,90,0.3)":"1px solid rgba(100,120,160,0.3)"
+            }},m.visibility==="public"?"������ Public":m.visibility==="subscriber"?"✨ Subscriber":m.visibility==="connected"?"������ Connected":"������ Tagged")
           ),
           React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:isMobile?"1.6rem":"2rem",margin:"0 0 14px",color:"#1a1208",lineHeight:1.2}},m.title),
           React.createElement("div",{style:{display:"flex",gap:"7px",flexWrap:"wrap",marginBottom:"18px"}},
@@ -4671,6 +4981,25 @@ function App() {
               React.createElement("button",{onClick:()=>fileInputRef.current?.click(),style:{width:"68px",height:"68px",border:"1px dashed #c8b89a",borderRadius:"2px",background:"transparent",cursor:"pointer",color:"#8a7460",fontSize:"1.3rem"}},"+")
             ),
             React.createElement("input",{ref:fileInputRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:handleMedia})
+          ),
+          React.createElement("div",{style:{marginBottom:"4px"}},
+            React.createElement("label",{style:S.label},"Visibility"),
+            React.createElement("select",{
+              value:form.visibility||"private",
+              onChange:e=>updateForm({visibility:e.target.value}),
+              style:{...S.select,width:"100%"}
+            },
+              React.createElement("option",{value:"private"},"������ Private — only on this device"),
+              React.createElement("option",{value:"public"},"������ Public — anyone with the link"),
+              React.createElement("option",{value:"subscriber"},"✨ Subscribers — Remembory subscribers only"),
+              React.createElement("option",{value:"connected"},"������ Connected — people linked to your profile"),
+              React.createElement("option",{value:"tagged"},"������ Present — only people tagged in this memory")
+            ),
+            React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"4px"}},
+              (form.visibility||"private")==="private"
+                ? "This memory stays on your device and never appears on your public profile."
+                : "This memory will appear on your public profile with the selected visibility."
+            )
           ),
           React.createElement("div",{style:{display:"flex",gap:"10px",paddingTop:"4px"}},
             React.createElement("button",{onClick:handleSubmit,style:S.btn},view==="edit"?"Save Changes":"Save to Chronicle"),
