@@ -4534,7 +4534,13 @@ function App() {
           React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:"12px"}},
             React.createElement("input",{type:"checkbox",id:"want-public",
               checked:wantPublicProfile,
-              onChange:e=>persistTop({wantPublicProfile:e.target.checked}),
+              onChange:e=>{
+                persistTop({wantPublicProfile:e.target.checked});
+                // If turning off and profile is live, take it offline
+                if (!e.target.checked && profileState) {
+                  unpublishProfile();
+                }
+              },
               disabled:!isSubscriber,
               style:{marginTop:"3px",flexShrink:0,cursor:isSubscriber?"pointer":"not-allowed"}}),
             React.createElement("div",null,
@@ -4741,7 +4747,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-28 13:06 UTC"
+          "Chronicle • build 2026-03-28 13:21 UTC"
         )
         ), // end account tab 4
       ),
