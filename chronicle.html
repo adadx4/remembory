@@ -3420,34 +3420,91 @@ function App() {
       familySet.delete(subject.id);
 
       // Step 3: detect relationship for each family member
+      // Helper: get parent IDs of a person
+      function parentIds(personId) {
+        const r = indiMap[personId]; if (!r) return [];
+        const out = [];
+        for (const fr of r.children.filter(n=>n.tag==="FAMC")) {
+          const f = famMap[fr.value]; if (!f) continue;
+          const h2=child(f,"HUSB"), w=child(f,"WIFE");
+          if (h2) out.push(h2); if (w) out.push(w);
+        }
+        return out;
+      }
+      // Helper: get child IDs of a person
+      function childIds(personId) {
+        const r = indiMap[personId]; if (!r) return [];
+        const out = [];
+        for (const fr of r.children.filter(n=>n.tag==="FAMS")) {
+          const f = famMap[fr.value]; if (!f) continue;
+          for (const cr of f.children.filter(n=>n.tag==="CHIL")) out.push(cr.value);
+        }
+        return out;
+      }
+      // Helper: get spouse IDs of a person
+      function spouseIds(personId) {
+        const r = indiMap[personId]; if (!r) return [];
+        const out = [];
+        for (const fr of r.children.filter(n=>n.tag==="FAMS")) {
+          const f = famMap[fr.value]; if (!f) continue;
+          const h2=child(f,"HUSB"), w=child(f,"WIFE");
+          if (h2 && h2!==personId) out.push(h2);
+          if (w  && w !==personId) out.push(w);
+        }
+        return out;
+      }
+      // Helper: sex of a person
+      function getSex(personId) {
+        const r = indiMap[personId]; if (!r) return "";
+        const s = r.children.find(n=>n.tag==="SEX"); return s ? s.value : "";
+      }
+
       function getRelationship(id) {
-        const rec = indiMap[id];
-        if (!rec) return "";
-        // Spouse of subject?
-        for (const famRef of rec.children.filter(n=>n.tag==="FAMS")) {
-          const fam = famMap[famRef.value];
-          if (!fam) continue;
-          if (child(fam,"HUSB")===subject.id||child(fam,"WIFE")===subject.id) return "Spouse";
-        }
-        // Child of subject?
-        for (const famRef of rec.children.filter(n=>n.tag==="FAMC")) {
-          const fam = famMap[famRef.value];
-          if (!fam) continue;
-          if (child(fam,"HUSB")===subject.id||child(fam,"WIFE")===subject.id) return "Child";
-        }
-        // Parent of subject?
-        for (const famRef of subject.rec.children.filter(n=>n.tag==="FAMC")) {
-          const fam = famMap[famRef.value];
-          if (!fam) continue;
-          if (child(fam,"HUSB")===id||child(fam,"WIFE")===id) return "Parent";
-        }
-        // Sibling?
-        for (const famRef of subject.rec.children.filter(n=>n.tag==="FAMC")) {
-          const fam = famMap[famRef.value];
-          if (!fam) continue;
-          const siblings = fam.children.filter(n=>n.tag==="CHIL").map(n=>n.value);
-          if (siblings.includes(id)) return "Sibling";
-        }
+        const sex = getSex(id);
+        const subParents  = parentIds(subject.id);
+        const subParents2 = subParents.flatMap(p=>parentIds(p)); // grandparents
+        const subParents3 = subParents2.flatMap(p=>parentIds(p)); // great-grandparents
+
+        // Spouse
+        if (spouseIds(subject.id).includes(id)) return "Spouse";
+        // Child
+        if (childIds(subject.id).includes(id)) return sex==="F"?"Daughter":sex==="M"?"Son":"Child";
+        // Parent
+        if (subParents.includes(id)) return sex==="F"?"Mother":sex==="M"?"Father":"Parent";
+        // Sibling
+        const subSiblings = subParents.flatMap(p=>childIds(p)).filter(x=>x!==subject.id);
+        if (subSiblings.includes(id)) return sex==="F"?"Sister":sex==="M"?"Brother":"Sibling";
+        // Grandparent
+        if (subParents2.includes(id)) return sex==="F"?"Grandmother":sex==="M"?"Grandfather":"Grandparent";
+        // Grandchild
+        const subGrandchildren = childIds(subject.id).flatMap(c=>childIds(c));
+        if (subGrandchildren.includes(id)) return sex==="F"?"Granddaughter":sex==="M"?"Grandson":"Grandchild";
+        // Aunt/Uncle
+        const subAuntsUncles = subParents.flatMap(p=>parentIds(p).flatMap(gp=>childIds(gp))).filter(x=>!subParents.includes(x)&&x!==subject.id);
+        if (subAuntsUncles.includes(id)) return sex==="F"?"Aunt":sex==="M"?"Uncle":"Aunt/Uncle";
+        // Niece/Nephew (siblings' children)
+        const subNiecesNephews = subSiblings.flatMap(s=>childIds(s));
+        if (subNiecesNephews.includes(id)) return sex==="F"?"Niece":sex==="M"?"Nephew":"Niece/Nephew";
+        // Cousin (children of aunts/uncles)
+        const subCousins = subAuntsUncles.flatMap(au=>childIds(au));
+        if (subCousins.includes(id)) return "Cousin";
+        // Great-grandparent
+        if (subParents3.includes(id)) return sex==="F"?"Great-grandmother":sex==="M"?"Great-grandfather":"Great-grandparent";
+        // Spouse of sibling (brother/sister-in-law)
+        const siblingSpouses = subSiblings.flatMap(s=>spouseIds(s));
+        if (siblingSpouses.includes(id)) return sex==="F"?"Sister-in-law":sex==="M"?"Brother-in-law":"Sibling-in-law";
+        // Spouse of child (son/daughter-in-law)
+        const childSpouses = childIds(subject.id).flatMap(c=>spouseIds(c));
+        if (childSpouses.includes(id)) return sex==="F"?"Daughter-in-law":sex==="M"?"Son-in-law":"Child-in-law";
+        // Parent of spouse (mother/father-in-law)
+        const spouseParents = spouseIds(subject.id).flatMap(s=>parentIds(s));
+        if (spouseParents.includes(id)) return sex==="F"?"Mother-in-law":sex==="M"?"Father-in-law":"Parent-in-law";
+        // Second cousin (children of cousins)
+        const subSecondCousins = subCousins.flatMap(c=>childIds(c));
+        if (subSecondCousins.includes(id)) return "Second cousin";
+        // Great-aunt/uncle (siblings of grandparents)
+        const subGreatAuntsUncles = subParents2.flatMap(gp=>parentIds(gp).flatMap(ggp=>childIds(ggp))).filter(x=>!subParents2.includes(x)&&!subParents3.includes(x));
+        if (subGreatAuntsUncles.includes(id)) return sex==="F"?"Great-aunt":sex==="M"?"Great-uncle":"Great-aunt/uncle";
         return "";
       }
 
@@ -3458,7 +3515,7 @@ function App() {
         if (!rec) continue;
         const nameNode = rec.children.find(n=>n.tag==="NAME");
         if (!nameNode) continue;
-        const fullName = fullText(nameNode).replace(/\/\//g,"").replace(/\s+/g," ").trim();
+        const fullName = fullText(nameNode).replace(/\//g,"").replace(/\s+/g," ").trim();
         if (!fullName) continue;
         const birt2 = rec.children.find(n=>n.tag==="BIRT");
         const deat2 = rec.children.find(n=>n.tag==="DEAT");
@@ -3481,7 +3538,8 @@ function App() {
           if (!yr) return;
           // Skip events outside subject's lifespan
           if (yr < subBirth || yr > subDeath) return;
-          const titleStr = fullName + " " + evTitle.charAt(0).toLowerCase() + evTitle.slice(1);
+          const relLabel = relationship ? " ["+relationship+"]" : "";
+          const titleStr = fullName + relLabel + " " + evTitle.charAt(0).toLowerCase() + evTitle.slice(1);
           const contentStr = [note, place ? "Place: "+place : ""].filter(Boolean).join("\n\n").trim();
 
           events.push({
@@ -3520,7 +3578,7 @@ function App() {
           let spouseName = null;
           if (spouseRec) {
             const sn = spouseRec.children.find(n=>n.tag==="NAME");
-            if (sn) spouseName = fullText(sn).replace(/\/\//g,"").replace(/\s+/g," ").trim();
+            if (sn) spouseName = fullText(sn).replace(/\//g,"").replace(/\s+/g," ").trim();
           }
           addCtxEvent(spouseName?"Married "+spouseName:"Married", dateObj, place, "", spouseName?[spouseName]:[]);
         }
