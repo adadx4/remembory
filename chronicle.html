@@ -3363,37 +3363,33 @@ function App() {
       }
       // roots now contains subject + all ancestors up to great-grandparents
 
-      // Step 2: from each root, collect ALL descendants (BFS down)
-      const familySet = new Set(roots);
-      const queue = [...roots];
+      // Step 2: from each blood ancestor/descendant, collect descendants only.
+      // Spouses are added to the result set but BFS does NOT continue through them —
+      // this prevents pulling in unrelated families connected only by marriage.
+      const familySet = new Set(roots);  // blood relatives found so far
+      const spouseSet = new Set();        // married-in spouses (not traversed)
+      const queue = [...roots];           // only blood relatives queued for traversal
       while (queue.length > 0) {
         const pid = queue.shift();
         const rec = indiMap[pid];
         if (!rec) continue;
-        // Walk through families where this person is a parent
+        // Walk families where this person is a parent (FAMS)
         for (const famRef of rec.children.filter(n=>n.tag==="FAMS")) {
           const fam = famMap[famRef.value];
           if (!fam) continue;
-          // Add spouse
+          // Record the spouse — but do NOT queue them for further traversal
           const husb = child(fam,"HUSB"); const wife = child(fam,"WIFE");
-          if (husb && !familySet.has(husb)) { familySet.add(husb); queue.push(husb); }
-          if (wife && !familySet.has(wife)) { familySet.add(wife); queue.push(wife); }
-          // Add children
+          if (husb && !familySet.has(husb)) spouseSet.add(husb);
+          if (wife && !familySet.has(wife)) spouseSet.add(wife);
+          // Queue children for blood-descent traversal
           for (const chilRef of fam.children.filter(n=>n.tag==="CHIL")) {
             const cid = chilRef.value;
             if (cid && !familySet.has(cid)) { familySet.add(cid); queue.push(cid); }
           }
         }
-        // Also include spouses from families where this person is a child
-        // (catches spouses of ancestors who married in)
-        for (const famRef of rec.children.filter(n=>n.tag==="FAMC")) {
-          const fam = famMap[famRef.value];
-          if (!fam) continue;
-          const husb = child(fam,"HUSB"); const wife = child(fam,"WIFE");
-          if (husb && !familySet.has(husb)) { familySet.add(husb); queue.push(husb); }
-          if (wife && !familySet.has(wife)) { familySet.add(wife); queue.push(wife); }
-        }
       }
+      // Merge spouses in — they appear as people but were not traversed
+      for (const sid of spouseSet) familySet.add(sid);
       // Remove the subject themselves
       familySet.delete(subject.id);
 
@@ -4650,15 +4646,15 @@ function App() {
                 style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",textDecoration:"underline"}
               },"← Back")
             ),
-            React.createElement("div",{style:{marginBottom:"20px"}},
-              React.createElement("p",{style:{fontSize:"0.82rem",fontWeight:600,color:"#2c2416",marginBottom:"8px"}},
-                gedPicked.fullName+" own events ("+gedPreview.mems.length+")"
+            React.createElement("div",{style:{marginBottom:"20px",background:"rgba(200,168,90,0.07)",border:"1px solid rgba(200,168,90,0.25)",borderRadius:"4px",padding:"12px 14px"}},
+              React.createElement("p",{style:{fontSize:"0.78rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#a8885a",fontWeight:600,marginBottom:"8px"}},
+                gedPicked.fullName+" — "+gedPreview.mems.length+" personal events"
               ),
-              React.createElement("div",{style:{maxHeight:"200px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px"}},
+              React.createElement("div",{style:{maxHeight:"200px",overflowY:"auto",borderRadius:"2px",border:"1px solid rgba(200,168,90,0.2)"}},
                 gedPreview.mems.map((m,i)=>
-                  React.createElement("div",{key:m.id,style:{padding:"7px 14px",borderBottom:"1px solid #ede0cc",display:"flex",justifyContent:"space-between",gap:"12px",background:i%2===0?"transparent":"rgba(200,184,154,0.08)"}},
+                  React.createElement("div",{key:m.id,style:{padding:"7px 14px",borderBottom:"1px solid rgba(200,168,90,0.15)",display:"flex",justifyContent:"space-between",gap:"12px",background:i%2===0?"rgba(255,252,245,0.6)":"rgba(245,235,210,0.4)"}},
                     React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.88rem",color:"#1a1208"}},m.title),
-                    React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",whiteSpace:"nowrap"}},
+                    React.createElement("span",{style:{fontSize:"0.78rem",color:"#a8885a",whiteSpace:"nowrap"}},
                       m.fuzzy==="day"?`${m.day}/${m.month}/${m.year}`:m.fuzzy==="month"?`${m.month}/${m.year}`:String(m.year||"")
                     )
                   )
