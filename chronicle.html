@@ -2687,7 +2687,20 @@ function App() {
   // Dev override: localStorage.setItem("chronicle-dev-mode","1") in console to bypass subscription
   const isDevMode = (()=>{try{return localStorage.getItem("chronicle-dev-mode")==="1";}catch(e){return false;}})();
   const isSubscriber = isDevMode || licenceStatus?.valid===true;
-  React.useEffect(()=>{if(licenceKey){validateLicenceKey(licenceKey).then(setLicenceStatus);}else{setLicenceStatus(null);}},[licenceKey]);
+  React.useEffect(()=>{
+    if(licenceKey){validateLicenceKey(licenceKey).then(s=>{
+      setLicenceStatus(s);
+      // Fetch mention notifications if we have an email
+      const email = s?.email || ownerEmail || carerEmail;
+      if(s?.valid && email){
+        fetch(WORKER_URL+"/mentions/"+encodeURIComponent(email))
+          .then(r=>r.ok?r.json():null)
+          .then(d=>{ if(d?.mentions?.length) setNotifications(d.mentions); })
+          .catch(()=>{});
+      }
+    });}
+    else{setLicenceStatus(null);}
+  },[licenceKey]);
   function saveLicenceKey(k){const c=k.trim();try{if(c)localStorage.setItem("chronicle-licence-key",c);else localStorage.removeItem("chronicle-licence-key");}catch(e){}clearLicenceCache();setLicenceKey(c);}
 
   // ── Public profile state ───────────────────────────────────────
@@ -2701,6 +2714,7 @@ function App() {
   const [profilePublishing, setProfilePublishing] = React.useState(false);
   const [profileMsg, setProfileMsg] = React.useState("");
   const [profileConfirm, setProfileConfirm] = React.useState(false);
+  const [notifications, setNotifications] = React.useState([]);  // [{identifier,displayName,url,addedAt}]
 
   async function publishProfile() {
     if (!licenceKey) return;
@@ -4254,7 +4268,16 @@ function App() {
           title:"Save backup file",
           style:{...S.btn,padding:"7px 13px",fontSize:"0.84rem",background:"#4a7a5a",opacity:saveBackupBusy?0.6:1}
         }, saveBackupBusy ? "Saving…" : "💾 Backup"),
-        !isMobile&&React.createElement("button",{onClick:()=>setView("settings"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"⚙ Settings"),
+        !isMobile&&React.createElement("button",{onClick:()=>setView("settings"),
+          style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem",position:"relative"}},
+          "⚙ Settings",
+          notifications.length>0&&React.createElement("span",{
+            style:{position:"absolute",top:"-5px",right:"-5px",background:"#c4858a",
+              color:"#fff",borderRadius:"50%",width:"16px",height:"16px",
+              fontSize:"0.65rem",display:"flex",alignItems:"center",justifyContent:"center",
+              fontFamily:"Arial,sans-serif",fontWeight:600,lineHeight:1}
+          },notifications.length)
+        ),
         !isMobile&&React.createElement("span",{style:{width:"1px",height:"20px",background:"#d4c4a8",margin:"0 4px",flexShrink:0}}),
         !isMobile&&React.createElement("a",{href:"https://remembory.lemonsqueezy.com/checkout/buy/669e695c-c63a-4bf6-8eaf-4d56d05bfbdf",target:"_blank",rel:"noopener",title:"Subscribe to Chronicle",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#7a6040",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#7a6040";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
         showBack&&React.createElement("button",{onClick:goBack,style:{...S.btnOutline,padding:isMobile?"8px 14px":"7px 13px",fontSize:"0.9rem"}},"← Back"),
@@ -4433,6 +4456,36 @@ function App() {
             subject.isSelf ? "Your name is shown when you share memories with others." : "The person whose memories this is."),
           React.createElement("input",{value:ownerName,onChange:e=>persistSubject({name:e.target.value}),placeholder:"Your name",style:{...S.input,marginBottom:"10px"}}),
           React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:S.input})
+        ),
+
+        // ── Notifications ──
+        notifications.length>0&&React.createElement("div",{
+          style:{background:"rgba(196,133,138,0.08)",border:"1px solid rgba(196,133,138,0.3)",
+            borderRadius:"3px",padding:"16px 20px",marginBottom:"20px"}},
+          React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
+            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#8a3030",margin:0}},
+              "������ You appear in "+(notifications.length===1?"a public memory":"public memories")),
+            React.createElement("button",{
+              onClick:()=>{
+                const email = licenceStatus?.email||ownerEmail||carerEmail;
+                if(email) fetch(WORKER_URL+"/mentions/"+encodeURIComponent(email)+"/clear",
+                  {method:"POST",headers:{"X-LS-Key":licenceKey}}).catch(()=>{});
+                setNotifications([]);
+              },
+              style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",
+                fontSize:"0.78rem",textDecoration:"underline"}
+            },"Dismiss")
+          ),
+          notifications.map((n,i)=>React.createElement("div",{
+            key:i,
+            style:{padding:"6px 0",borderBottom:i<notifications.length-1?"1px solid rgba(196,133,138,0.15)":"none"}
+          },
+            React.createElement("p",{style:{fontSize:"0.86rem",color:"#5a3030",margin:"0 0 2px"}},
+              (n.displayName||"Someone")+" has shared a memory that includes you."),
+            React.createElement("a",{href:n.url,target:"_blank",rel:"noopener",
+              style:{fontSize:"0.82rem",color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.3)"}},
+              "View profile →")
+          ))
         ),
 
         // ── Public Profile ──
