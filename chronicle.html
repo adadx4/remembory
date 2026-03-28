@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- Chronicle build: 2026-03-28 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Chronicle — Remembory</title>
 <meta name="description" content="A private, beautiful memory keeper. Record the stories that matter.">
 <meta name="theme-color" content="#2c2416">
@@ -4579,6 +4583,9 @@ function App() {
           "Unlock sharing & genealogy mode — ",
           React.createElement("a",{href:"https://remembory.lemonsqueezy.com/checkout/buy/669e695c-c63a-4bf6-8eaf-4d56d05bfbdf",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"✨ subscribe for $20/year"),
           "."
+        ),
+        React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
+          "Chronicle • build 2026-03-28"
         )
       ),
 
@@ -4742,13 +4749,13 @@ function App() {
                 style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",textDecoration:"underline"}
               },"← Back")
             ),
-            React.createElement("div",{style:{marginBottom:"20px",background:"rgba(200,168,90,0.07)",border:"1px solid rgba(200,168,90,0.25)",borderRadius:"4px",padding:"12px 14px"}},
-              React.createElement("p",{style:{fontSize:"0.78rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#a8885a",fontWeight:600,marginBottom:"8px"}},
+            React.createElement("div",{style:{marginBottom:"20px",background:"#fdf3dc",border:"2px solid #c8a050",borderRadius:"4px",padding:"12px 14px"}},
+              React.createElement("p",{style:{fontSize:"0.78rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#8a6010",fontWeight:700,marginBottom:"8px"}},
                 gedPicked.fullName+" — "+gedPreview.mems.length+" personal events"
               ),
-              React.createElement("div",{style:{maxHeight:"200px",overflowY:"auto",borderRadius:"2px",border:"1px solid rgba(200,168,90,0.2)"}},
+              React.createElement("div",{style:{maxHeight:"200px",overflowY:"auto",borderRadius:"2px",border:"1px solid #d4a840"}},
                 gedPreview.mems.map((m,i)=>
-                  React.createElement("div",{key:m.id,style:{padding:"7px 14px",borderBottom:"1px solid rgba(200,168,90,0.15)",display:"flex",justifyContent:"space-between",gap:"12px",background:i%2===0?"rgba(255,252,245,0.6)":"rgba(245,235,210,0.4)"}},
+                  React.createElement("div",{key:m.id,style:{padding:"7px 14px",borderBottom:"1px solid rgba(200,168,90,0.15)",display:"flex",justifyContent:"space-between",gap:"12px",background:i%2===0?"#fef8ec":"#faefd0"}},
                     React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.88rem",color:"#1a1208"}},m.title),
                     React.createElement("span",{style:{fontSize:"0.78rem",color:"#a8885a",whiteSpace:"nowrap"}},
                       m.fuzzy==="day"?`${m.day}/${m.month}/${m.year}`:m.fuzzy==="month"?`${m.month}/${m.year}`:String(m.year||"")
