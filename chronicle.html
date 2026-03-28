@@ -4498,13 +4498,14 @@ function App() {
             ? React.createElement("div",null,
                 React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"4px"}},
                   "✓ Live at ",
-                  React.createElement("a",{href:profileState.url,target:"_blank",rel:"noopener",style:{color:"#a8885a"}},profileState.url)
+                  React.createElement("a",{href:profileState.url+(licenceKey?"?key="+encodeURIComponent(licenceKey):""),target:"_blank",rel:"noopener",style:{color:"#a8885a"}},profileState.url)
                 ),
                 profileState.lastPublished&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},
                   "Last published: "+new Date(profileState.lastPublished).toLocaleDateString()
                 ),
                 React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",marginBottom:"12px"}},
-                  memories.filter(m=>m.visibility&&m.visibility!=="private").length+" memories on your profile."
+                  memories.filter(m=>m.visibility&&m.visibility!=="private").length+" memories on your profile "
+                  +"("+memories.filter(m=>m.visibility&&m.visibility!=="private").length+" of "+memories.length+" total have public visibility)."
                 ),
                 React.createElement("div",{style:{marginBottom:"12px"}},
                   React.createElement("label",{style:{...S.label,marginBottom:"4px",display:"block"}},"Public display name"),
