@@ -205,7 +205,7 @@ function sortKey(m) {
 }
 
 function newForm() {
-  return { title:"", content:"", year:new Date().getFullYear(), month:1, day:1, fuzzy:"day", season:"Early", location:"", locations:[], tags:[], people:[], orgs:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private" };
+  return { title:"", content:"", year:new Date().getFullYear(), month:1, day:1, fuzzy:"day", season:"Early", location:"", locations:[], tags:[], people:[], orgs:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"" };
 }
 
 // ── Storage ────────────────────────────────────────────────────
@@ -2488,6 +2488,14 @@ function PrintView({memories, ownerName, allDecades}) {
                 m.mediaUrls.slice(0,3).map((med,i)=>React.createElement(MediaImg,{key:i,med,alt:"",style:{maxWidth:"180px",maxHeight:"140px",objectFit:"cover",borderRadius:"2px",border:"1px solid #c8b89a"}}))
               ),
               m.content&&React.createElement("p",{style:{lineHeight:"1.85",fontSize:"1.05rem",whiteSpace:"pre-wrap",margin:0,color:"#2c2416"}},linkify(m.content)),
+          m.publicSummary&&m.visibility&&m.visibility!=="private"&&React.createElement("div",{
+            style:{background:"rgba(122,158,138,0.08)",border:"1px solid rgba(122,158,138,0.25)",
+              borderRadius:"3px",padding:"10px 14px",marginTop:"12px"}},
+            React.createElement("p",{style:{fontSize:"0.72rem",letterSpacing:"0.08em",textTransform:"uppercase",
+              color:"#4a7a5a",marginBottom:"6px",fontWeight:600}},"Public summary"),
+            React.createElement("p",{style:{fontSize:"0.95rem",color:"#2c2416",lineHeight:1.75,whiteSpace:"pre-wrap",margin:0}},
+              m.publicSummary)
+          ),
               (m.perspectives||[]).filter(p=>p.content).map(p=>
                 React.createElement("div",{key:p.author,style:{marginTop:"14px",borderLeft:"3px solid #e0d4be",paddingLeft:"14px"}},
                   React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",margin:"0 0 4px",fontStyle:"italic"}},`${p.author}'s perspective`),
@@ -5232,6 +5240,16 @@ function App() {
               (form.visibility||"private")==="private"
                 ? "This memory stays on your device and never appears on your public profile."
                 : "This memory will appear on your public profile with the selected visibility."
+            )
+          ),
+          (form.visibility&&form.visibility!=="private")&&React.createElement("div",{style:{marginBottom:"4px"}},
+            React.createElement("label",{style:S.label},"Public summary"),
+            React.createElement("textarea",{value:form.publicSummary||"",
+              onChange:e=>updateForm({publicSummary:e.target.value}),
+              placeholder:"Optional — a version of this memory for your public profile. If left blank, the full memory text is used instead.",
+              rows:4,style:{...S.input,resize:"vertical",lineHeight:"1.7"}}),
+            React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"3px"}},
+              "Write a version suitable for public sharing — shorter, with less personal detail. Only this text appears on your profile."
             )
           ),
           React.createElement("div",{style:{display:"flex",gap:"10px",paddingTop:"4px"}},
