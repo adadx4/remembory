@@ -3269,8 +3269,10 @@ function App() {
       let idx = 0;
 
       function addMem(title, dateObj, place, note, extraPeople) {
-        if (!dateObj && !place && !note && !title) return;
-        const year  = dateObj?.year  || 0;
+        // Skip events with no date
+        if (!dateObj) return;
+        if (!title) return;
+        const year  = dateObj.year;
         const month = dateObj?.month || 1;
         const day   = dateObj?.day   || 1;
         const fuzzy = dateObj?.fuzzy || "year";
@@ -3474,13 +3476,17 @@ function App() {
         function addCtxEvent(evTitle, dateObj, place, note, extraPeople) {
           if (!evTitle) return;
           const yr = dateObj?.year || null;
-          if (yr && (yr < subBirth || yr > subDeath)) return;
+          // Skip dateless events — no useful timeline placement
+          if (!yr) return;
+          // Skip events outside subject's lifespan
+          if (yr < subBirth || yr > subDeath) return;
           const titleStr = fullName + " " + evTitle.charAt(0).toLowerCase() + evTitle.slice(1);
           const contentStr = [note, place ? "Place: "+place : ""].filter(Boolean).join("\n\n").trim();
+
           events.push({
             id: "ged_ctx_" + id + "_" + (evIdx++),
             title: titleStr, content: contentStr,
-            year: yr || subBirth, month: dateObj?.month||1, day: dateObj?.day||1,
+            year: yr, month: dateObj?.month||1, day: dateObj?.day||1,
             fuzzy: dateObj?.fuzzy||"year", season:"Early",
             location: place||"", locations: place?[place]:[],
             tags:["genealogy"], people:[fullName,...extraPeople],
