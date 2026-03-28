@@ -4566,6 +4566,9 @@ function App() {
         settingsTab==="profile"&&React.createElement(React.Fragment,null,
 
         // ── Notifications ──
+        notifications.length===0&&React.createElement("div",{style:{textAlign:"center",padding:"32px 0",color:"#8a7460",fontStyle:"italic"}},
+          "No notifications yet. When someone shares a memory that includes you, it will appear here."
+        ),
         notifications.length>0&&React.createElement("div",{
           style:{background:"rgba(196,133,138,0.08)",border:"1px solid rgba(196,133,138,0.3)",
             borderRadius:"3px",padding:"16px 20px",marginBottom:"20px"}},
@@ -4748,13 +4751,20 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-28 13:51 UTC"
+          "Chronicle • build 2026-03-28 22:58 UTC"
         )
         ), // end account tab 4
       ),
 
       view==="public-profile"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"640px"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 8px",color:"#1a1208"}},"Public Profile"),
+        profileState?.url&&React.createElement("div",{style:{marginBottom:"12px"}},
+          React.createElement("a",{href:profileState.url+(licenceKey?"?key="+encodeURIComponent(licenceKey)+(ownerEmail||carerEmail?"&email="+encodeURIComponent(ownerEmail||carerEmail):""):""),
+            target:"_blank",rel:"noopener",
+            style:{fontFamily:"'Crimson Text',serif",fontSize:"0.9rem",color:"#a8885a",textDecoration:"none",
+              borderBottom:"1px solid rgba(168,136,90,0.3)",paddingBottom:"1px"}},
+            "◎ View your live profile →")
+        ),
         React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,marginBottom:"24px"}},
           "Manage what you share publicly. Memories must have their visibility set to something other than Private to appear here."),
 
