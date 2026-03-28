@@ -2675,6 +2675,7 @@ function App() {
   const carerMode           = data.carerMode || false;
   const suppressConnectRequests = data.suppressConnectRequests || [];
   const wantPublicProfile    = data.wantPublicProfile || false;
+  const profileAbout         = data.profileAbout || "";
 
   const [view, setView] = useState("life");
   const [selected, setSelected] = useState(null);
@@ -2731,7 +2732,7 @@ function App() {
       const res = await fetch(WORKER_URL + "/profile/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-LS-Key": licenceKey },
-        body: JSON.stringify({ ownerName: ownerName||carerName, displayName: profileDisplayName||ownerName||carerName, ownerEmail: ownerEmail||carerEmail, memories: publicMems, peopleEmails })
+        body: JSON.stringify({ ownerName: ownerName||carerName, displayName: profileDisplayName||ownerName||carerName, ownerEmail: ownerEmail||carerEmail, about: profileAbout||"", memories: publicMems, peopleEmails })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Server error");
@@ -4747,15 +4748,25 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-28 13:21 UTC"
+          "Chronicle • build 2026-03-28 13:51 UTC"
         )
         ), // end account tab 4
       ),
 
       view==="public-profile"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"640px"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 8px",color:"#1a1208"}},"Public Profile"),
-        React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,marginBottom:"28px"}},
+        React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,marginBottom:"24px"}},
           "Manage what you share publicly. Memories must have their visibility set to something other than Private to appear here."),
+
+        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+          React.createElement("label",{style:{...S.label,display:"block",marginBottom:"6px"}},"About (shown on your public profile)"),
+          React.createElement("textarea",{value:profileAbout,
+            onChange:e=>persistTop({profileAbout:e.target.value}),
+            placeholder:"Write a short bio for visitors to your profile…",
+            rows:3,style:{...S.input,resize:"vertical",lineHeight:"1.7",width:"100%"}}),
+          React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"3px"}},
+            "Appears in the left sidebar of your public profile. Max 500 characters.")
+        ),
 
         // ── Public Profile ──
 React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
