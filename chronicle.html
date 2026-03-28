@@ -4546,7 +4546,7 @@ function App() {
             ? React.createElement("div",null,
                 React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"4px"}},
                   "✓ Live at ",
-                  React.createElement("a",{href:profileState.url+(licenceKey?"?key="+encodeURIComponent(licenceKey):""),target:"_blank",rel:"noopener",style:{color:"#a8885a"}},profileState.url)
+                  React.createElement("a",{href:profileState.url+(licenceKey?"?key="+encodeURIComponent(licenceKey)+(ownerEmail||carerEmail?"&email="+encodeURIComponent(ownerEmail||carerEmail):""):""),target:"_blank",rel:"noopener",style:{color:"#a8885a"}},profileState.url)
                 ),
                 profileState.lastPublished&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},
                   "Last published: "+new Date(profileState.lastPublished).toLocaleDateString()
@@ -4745,7 +4745,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-28 10:42 UTC"
+          "Chronicle • build 2026-03-28 10:51 UTC"
         )
       ),
 
