@@ -3986,7 +3986,7 @@ function App() {
         : "You have no backup yet.";
       return React.createElement("div",{style:{background:"rgba(196,133,138,0.12)",borderBottom:"1px solid rgba(196,133,138,0.35)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
         React.createElement("p",{style:{margin:0,fontSize:"0.85rem",color:"#8a3030",lineHeight:1.4}},
-          "‚ö†Ô∏è "+nagMsg+" Download a backup to keep your memories safe."
+          "‚ö†Ô∏è "+nagMsg+"Download a backup to keep your memories safe."
         ),
         React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0}},
           React.createElement("button",{
@@ -4426,7 +4426,7 @@ function App() {
         // ‚îÄ‚îÄ Public Profile ‚îÄ‚îÄ
         isSubscriber&&React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
           React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
-            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},"Ì†ºÌºê Public Profile"),
+            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},"Public Profile"),
             profileState&&React.createElement("span",{style:{fontSize:"0.72rem",background:"#4a7a5a",color:"#fff",padding:"2px 9px",borderRadius:"20px",letterSpacing:"0.04em"}},"LIVE")
           ),
           profileState
@@ -5032,7 +5032,7 @@ function App() {
               background:m.visibility==="public"?"rgba(74,122,90,0.15)":m.visibility==="subscriber"?"rgba(168,136,90,0.15)":"rgba(100,120,160,0.15)",
               color:m.visibility==="public"?"#3a6b4a":m.visibility==="subscriber"?"#7a5a20":"#4a5a7a",
               border:m.visibility==="public"?"1px solid rgba(74,122,90,0.3)":m.visibility==="subscriber"?"1px solid rgba(168,136,90,0.3)":"1px solid rgba(100,120,160,0.3)"
-            }},m.visibility==="public"?"Ì†ºÌºç Public":m.visibility==="subscriber"?"‚ú® Subscriber":m.visibility==="connected"?"Ì†ΩÌ±• Connected":"Ì†ΩÌ±§ Tagged")
+            }},m.visibility==="public"?"Public":m.visibility==="subscriber"?"‚ú® Subscriber":m.visibility==="connected"?"Connected":"Tagged")
           ),
           React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:isMobile?"1.6rem":"2rem",margin:"0 0 14px",color:"#1a1208",lineHeight:1.2}},m.title),
           React.createElement("div",{style:{display:"flex",gap:"7px",flexWrap:"wrap",marginBottom:"18px"}},
@@ -5183,11 +5183,11 @@ function App() {
               onChange:e=>updateForm({visibility:e.target.value}),
               style:{...S.select,width:"100%"}
             },
-              React.createElement("option",{value:"private"},"Ì†ΩÌ¥í Private ‚Äî only on this device"),
-              React.createElement("option",{value:"public"},"Ì†ºÌºç Public ‚Äî anyone with the link"),
+              React.createElement("option",{value:"private"},"Private ‚Äî only on this device"),
+              React.createElement("option",{value:"public"},"Public ‚Äî anyone with the link"),
               React.createElement("option",{value:"subscriber"},"‚ú® Subscribers ‚Äî Remembory subscribers only"),
-              React.createElement("option",{value:"connected"},"Ì†ΩÌ±• Connected ‚Äî people linked to your profile"),
-              React.createElement("option",{value:"tagged"},"Ì†ΩÌ±§ Present ‚Äî only people tagged in this memory")
+              React.createElement("option",{value:"connected"},"Connected ‚Äî people linked to your profile"),
+              React.createElement("option",{value:"tagged"},"Present ‚Äî only people tagged in this memory")
             ),
             React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"4px"}},
               (form.visibility||"private")==="private"
@@ -5219,8 +5219,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(
   }
 </script>
 </body>
-</html>value:"private"},"Private ‚Äî only on this device"),
-              React.createElement("option",{value:"public"},"Public ‚Äî anyone with the link"),
-              React.createElement("option",{value:"subscriber"},"‚ú® Subscribers ‚Äî Remembory subscribers only"),
-              React.createElement("option",{value:"connected"},"Connected ‚Äî people linked to your profile"),
-              React.createElement("option",{value:"tagged"},"Present ‚Äî only people tagged in this memory")
+</html>
