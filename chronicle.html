@@ -2658,6 +2658,7 @@ function App() {
   const personLocations     = subject.personLocations || {};
   const personGroups        = subject.personGroups || {};
   const ownerName           = subject.name || "";
+  const profileDisplayName   = subject.profileDisplayName || "";
   const ownerEmail          = data.carerEmail || "";
   const carerName           = data.carerName || "";
   const carerEmail          = data.carerEmail || "";
@@ -2691,17 +2692,19 @@ function App() {
   }
   const [profilePublishing, setProfilePublishing] = React.useState(false);
   const [profileMsg, setProfileMsg] = React.useState("");
+  const [profileConfirm, setProfileConfirm] = React.useState(false);
 
   async function publishProfile() {
     if (!licenceKey) return;
     const publicMems = memories.filter(m => m.visibility && m.visibility !== "private");
     if (!publicMems.length) { setProfileMsg("No memories are set to a public visibility level yet."); return; }
+    if (!profileConfirm) { setProfileConfirm(true); return; }
     setProfilePublishing(true); setProfileMsg("");
     try {
       const res = await fetch(WORKER_URL + "/profile/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-LS-Key": licenceKey },
-        body: JSON.stringify({ ownerName: ownerName||carerName, ownerEmail: ownerEmail||carerEmail, memories: publicMems, peopleEmails })
+        body: JSON.stringify({ ownerName: ownerName||carerName, displayName: profileDisplayName||ownerName||carerName, ownerEmail: ownerEmail||carerEmail, memories: publicMems, peopleEmails })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Server error");
@@ -2709,6 +2712,7 @@ function App() {
       setProfileMsg("✓ Profile published at " + data.url);
     } catch(e) { setProfileMsg("Could not publish: " + e.message); }
     setProfilePublishing(false);
+    setProfileConfirm(false);
   }
 
   async function unpublishProfile() {
@@ -4441,6 +4445,15 @@ function App() {
                 React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",marginBottom:"12px"}},
                   memories.filter(m=>m.visibility&&m.visibility!=="private").length+" memories on your profile."
                 ),
+                React.createElement("div",{style:{marginBottom:"12px"}},
+                  React.createElement("label",{style:{...S.label,marginBottom:"4px",display:"block"}},"Public display name"),
+                  React.createElement("input",{value:profileDisplayName,
+                    onChange:e=>persistSubject({profileDisplayName:e.target.value}),
+                    placeholder:"e.g. “Grandma’s Chronicle” or leave blank to use your name",
+                    style:{...S.input,width:"100%",fontSize:"0.86rem"}}),
+                  React.createElement("p",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic",marginTop:"3px"}},
+                    "This is the only name shown on your public profile. Your real name is never published.")
+                ),
                 React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
                   React.createElement("button",{onClick:publishProfile,disabled:profilePublishing,style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem",opacity:profilePublishing?0.6:1}},profilePublishing?"Publishing…":"Update profile"),
                   React.createElement("button",{onClick:unpublishProfile,disabled:profilePublishing,style:{...S.btnOutline,padding:"7px 14px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Take offline")
@@ -4450,9 +4463,35 @@ function App() {
                 React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,marginBottom:"12px"}},
                   "Publish selected memories to a public profile at remembory.net. Set the visibility on each memory in its edit form — private memories never leave your device."
                 ),
-                memories.filter(m=>m.visibility&&m.visibility!=="private").length>0
-                  ? React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"12px"}},memories.filter(m=>m.visibility&&m.visibility!=="private").length+" memories ready to publish.")
-                  : React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"No memories set to public yet. Edit any memory and change its visibility."),
+                profileConfirm
+                  ? React.createElement("div",{style:{background:"rgba(196,133,138,0.08)",border:"1px solid rgba(196,133,138,0.25)",borderRadius:"3px",padding:"10px 14px",marginBottom:"12px"}},
+                      React.createElement("p",{style:{fontSize:"0.82rem",fontWeight:600,color:"#8a3030",marginBottom:"8px"}},"These memories will be publicly visible. Confirm?"),
+                      React.createElement("div",{style:{maxHeight:"140px",overflowY:"auto",marginBottom:"8px"}},
+                        memories.filter(m=>m.visibility&&m.visibility!=="private").map(m=>
+                          React.createElement("p",{key:m.id,style:{fontSize:"0.8rem",color:"#6a5840",padding:"2px 0",borderBottom:"1px solid rgba(200,184,154,0.2)"}},
+                            m.title+" — "+m.visibility)
+                        )
+                      ),
+                      React.createElement("div",{style:{display:"flex",gap:"8px"}},
+                        React.createElement("button",{onClick:publishProfile,disabled:profilePublishing,
+                          style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem",opacity:profilePublishing?0.6:1}},
+                          profilePublishing?"Publishing…":"Yes, publish"),
+                        React.createElement("button",{onClick:()=>setProfileConfirm(false),
+                          style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem"}},"Cancel")
+                      )
+                    )
+                  : memories.filter(m=>m.visibility&&m.visibility!=="private").length>0
+                    ? React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"12px"}},memories.filter(m=>m.visibility&&m.visibility!=="private").length+" memories ready to publish.")
+                    : React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"No memories set to public yet. Edit any memory and change its visibility."),
+                React.createElement("div",{style:{marginBottom:"12px"}},
+                  React.createElement("label",{style:{...S.label,marginBottom:"4px",display:"block"}},"Public display name"),
+                  React.createElement("input",{value:profileDisplayName,
+                    onChange:e=>persistSubject({profileDisplayName:e.target.value}),
+                    placeholder:"e.g. “Grandma’s Chronicle” or leave blank to use your name",
+                    style:{...S.input,width:"100%",fontSize:"0.86rem"}}),
+                  React.createElement("p",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic",marginTop:"3px"}},
+                    "This is the only name shown on your public profile. Your real name is never published.")
+                ),
                 React.createElement("button",{onClick:publishProfile,
                   disabled:profilePublishing||memories.filter(m=>m.visibility&&m.visibility!=="private").length===0,
                   style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem",
