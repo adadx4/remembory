@@ -3174,18 +3174,28 @@ function App() {
     // Parse a DATE value into {year, month, day, fuzzy}
     function parseDate(raw) {
       if (!raw) return null;
-      // Strip qualifiers: ABT, EST, CAL, BEF, AFT etc.
-      const s = raw.replace(/^(ABT|EST|CAL|BEF|AFT|CIR|FROM|TO|INT)\s*/i,"").trim();
       const months = {JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
+      // BET x AND y — use the first year as approximate
+      let bet = raw.match(/^BET\s+(.+?)\s+AND\s+/i);
+      if (bet) raw = bet[1].trim();
+      // FROM x TO y — use the FROM date
+      let from = raw.match(/^FROM\s+(.+?)(?:\s+TO\s+|$)/i);
+      if (from) raw = from[1].trim();
+      // Strip remaining single qualifiers: ABT, EST, CAL, BEF, AFT, CIR, TO, INT
+      const s = raw.replace(/^(ABT|EST|CAL|BEF|AFT|CIR|TO|INT|ABOUT|CIRCA|BEFORE|AFTER)\s*/i,"").trim();
+      if (!s) return null;
       // DD MON YYYY
-      let mr = s.match(/^(\d{1,2})\s+([A-Z]{3})\s+(\d{4})$/i);
-      if (mr) return {year:parseInt(mr[3]),month:months[mr[2].toUpperCase()]||1,day:parseInt(mr[1]),fuzzy:"day"};
+      let mr = s.match(/^(\d{1,2})\s+([A-Z]{3,})\s+(\d{3,4})$/i);
+      if (mr) return {year:parseInt(mr[3]),month:months[mr[2].slice(0,3).toUpperCase()]||1,day:parseInt(mr[1]),fuzzy:"day"};
       // MON YYYY
-      mr = s.match(/^([A-Z]{3})\s+(\d{4})$/i);
-      if (mr) return {year:parseInt(mr[2]),month:months[mr[1].toUpperCase()]||1,day:1,fuzzy:"month"};
-      // YYYY
-      mr = s.match(/^(\d{4})$/);
+      mr = s.match(/^([A-Z]{3,})\s+(\d{3,4})$/i);
+      if (mr) return {year:parseInt(mr[2]),month:months[mr[1].slice(0,3).toUpperCase()]||1,day:1,fuzzy:"month"};
+      // YYYY (3 or 4 digit year)
+      mr = s.match(/^(\d{3,4})$/);
       if (mr) return {year:parseInt(mr[1]),month:1,day:1,fuzzy:"year"};
+      // YYYY-MM-DD or YYYY/MM/DD (ISO-ish)
+      mr = s.match(/^(\d{3,4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+      if (mr) return {year:parseInt(mr[1]),month:parseInt(mr[2]),day:parseInt(mr[3]),fuzzy:"day"};
       return null;
     }
 
@@ -3247,10 +3257,10 @@ function App() {
 
       function addMem(title, dateObj, place, note, extraPeople) {
         if (!dateObj && !place && !note && !title) return;
-        const year  = dateObj?.year  || new Date().getFullYear();
+        const year  = dateObj?.year  || 0;
         const month = dateObj?.month || 1;
         const day   = dateObj?.day   || 1;
-        const fuzzy = dateObj?.fuzzy || (dateObj ? "year" : "year");
+        const fuzzy = dateObj?.fuzzy || "year";
         const loc   = place || "";
         const content = [note, place ? "Place: "+place : ""].filter(Boolean).join("\n\n").trim();
         mems.push({
