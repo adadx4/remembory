@@ -178,6 +178,7 @@ const S = {
 function fuzzyDateLabel(m) {
   const { year, month, day, fuzzy, season } = m;
   function startLabel() {
+    if (fuzzy==="uncertain") return year ? `${year}?` : "Date unknown";
     if (fuzzy==="decade") return `${Math.floor(year/10)*10}s`;
     if (fuzzy==="year") return `${year}`;
     if (fuzzy==="season") return `${season} ${year}`;
@@ -669,7 +670,7 @@ function DateFields({form, setForm}) {
   return React.createElement("div",{style:{background:"rgba(200,184,154,0.15)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"14px"}},
     React.createElement("label",{style:{...S.label,marginBottom:"10px",display:"block"}},"When?"),
     React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"10px",flexWrap:"wrap"}},
-      [["day","Exact"],["month","Month"],["season","Part of year"],["year","Year"],["decade","Decade"]].map(([val,label])=>
+      [["day","Exact"],["month","Month"],["season","Part of year"],["year","Year"],["decade","Decade"],["uncertain","Uncertain"]].map(([val,label])=>
         React.createElement("button",{key:val,onClick:()=>setForm({fuzzy:val}),style:{padding:"4px 10px",borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",background:form.fuzzy===val?"#2c2416":"transparent",color:form.fuzzy===val?"#f5f0e8":"#8a7460",border:`1px solid ${form.fuzzy===val?"#2c2416":"#c8b89a"}`}},label)
       )
     ),
@@ -1183,7 +1184,11 @@ function MemoryCard({m, onClick}) {
   return React.createElement("div",{
     onClick:()=>onClick(m.id),
     onMouseEnter:()=>setHov(true), onMouseLeave:()=>setHov(false),
-    style:{...S.card,background:hov?"rgba(255,252,245,1)":"rgba(255,252,245,0.85)",borderColor:hov?"#c8b89a":"#e0d4be",transform:hov?"translateX(4px)":"translateX(0)"}
+    style:{...S.card,
+      background:m.gedcomContext?(hov?"#eef4f0":"#f0f5f1"):(hov?"rgba(255,252,245,1)":"rgba(255,252,245,0.85)"),
+      borderColor:m.gedcomContext?(hov?"#7a9e8a":"#a8c4b0"):(hov?"#c8b89a":"#e0d4be"),
+      borderLeft:m.gedcomContext?"3px solid #7a9e8a":undefined,
+      transform:hov?"translateX(4px)":"translateX(0)"}
   },
     React.createElement("div",{style:{position:"absolute",left:"-18px",top:"50%",transform:"translateY(-50%)",width:"8px",height:"8px",borderRadius:"50%",background:m.tags[0]?TAG_COLORS[m.tags[0]]:"#c8b89a",border:"2px solid #f5f0e8",zIndex:1}}),
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"12px"}},
@@ -1717,16 +1722,19 @@ function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords }) {
   // Collect all unique locations, tracking primary vs secondary
   const locationMemories = {};
   const locationIsPrimary = {};
+  const locationIsContext = {}; // true if ALL memories at this location are gedcomContext
   memories.forEach(m => {
     if (m.location) {
-      if (!locationMemories[m.location]) { locationMemories[m.location] = []; locationIsPrimary[m.location] = false; }
+      if (!locationMemories[m.location]) { locationMemories[m.location] = []; locationIsPrimary[m.location] = false; locationIsContext[m.location] = true; }
       locationMemories[m.location].push(m);
-      locationIsPrimary[m.location] = true; // at least one memory has it as primary
+      locationIsPrimary[m.location] = true;
+      if (!m.gedcomContext) locationIsContext[m.location] = false;
     }
     (m.locations||[]).forEach(loc => {
       if (!loc) return;
-      if (!locationMemories[loc]) { locationMemories[loc] = []; locationIsPrimary[loc] = false; }
+      if (!locationMemories[loc]) { locationMemories[loc] = []; locationIsPrimary[loc] = false; locationIsContext[loc] = true; }
       if (!locationMemories[loc].includes(m)) locationMemories[loc].push(m);
+      if (!m.gedcomContext) locationIsContext[loc] = false;
     });
   });
   const uniqueLocations = Object.keys(locationMemories);
@@ -1771,8 +1779,9 @@ function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords }) {
         const count = mems.length;
         const size = Math.min(36, 20 + count * 3);
         const isPrimary = locationIsPrimary[loc];
-        const pinColor = isPrimary ? "#c8a87a" : "#8b9dc3";
-        const borderColor = isPrimary ? "#2c2416" : "#3a4a7a";
+        const isCtx = locationIsContext[loc];
+        const pinColor = isCtx ? "#7a9e8a" : isPrimary ? "#c8a87a" : "#8b9dc3";
+        const borderColor = isCtx ? "#2c5a3a" : isPrimary ? "#2c2416" : "#3a4a7a";
 
         const icon = L.divIcon({
           className: "",
@@ -2729,6 +2738,7 @@ function App() {
   const [gedPicked, setGedPicked]   = useState(null);   // selected person object
   const [gedPreview, setGedPreview] = useState(null);   // {subject, memories} ready to import
   const [gedBusy, setGedBusy]       = useState(false);
+  const [gedSearch, setGedSearch]    = useState("");
   const [gedContext, setGedContext]  = useState([]);    // [{id,fullName,relationship,events,expanded}]
   const [gedContextSel, setGedContextSel] = useState(new Set()); // selected event ids
 
@@ -3555,7 +3565,7 @@ function App() {
             tags:["genealogy"], people:[fullName,...extraPeople],
             orgs:[], mediaUrls:[], endFuzzy:null, endYear:null,
             endMonth:1, endDay:1, endSeason:"Early", endOngoing:false,
-            perspectives:[], fromGedcom:true, visibility:"private",
+            perspectives:[], fromGedcom:true, gedcomContext:true, visibility:"private",
           });
         }
         const skipTags2 = new Set(["NAME","SEX","FAMS","FAMC","CHAN","NOTE","SOUR","OBJE","SUBM"]);
@@ -3615,6 +3625,7 @@ function App() {
         setGedPersons(result);
         setGedPicked(null);
         setGedPreview(null);
+        setGedSearch("");
       } catch(err) {
         alert("Could not parse GEDCOM file: " + err.message);
       }
@@ -4714,24 +4725,35 @@ function App() {
 
           // Person picker
           gedPersons&&!gedPicked&&React.createElement("div",null,
-            React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}},
+            React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
               React.createElement("p",{style:{margin:0,fontSize:"0.9rem",color:"#4a7a5a",fontWeight:600}},
                 `Found ${gedPersons.persons.length} people — choose one to import:`
               ),
-              React.createElement("button",{onClick:()=>setGedPersons(null),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",textDecoration:"underline"}},"Start over")
+              React.createElement("button",{onClick:()=>{setGedPersons(null);setGedSearch("");},style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",textDecoration:"underline"}},"Start over")
             ),
-            React.createElement("div",{style:{maxHeight:"380px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px"}},
-              gedPersons.persons.map((p,i)=>React.createElement("div",{
-                key:p.id,
-                onClick:()=>handleGedPick(p),
-                style:{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #ede0cc",background:i%2===0?"transparent":"rgba(200,184,154,0.08)",display:"flex",justifyContent:"space-between",alignItems:"center"}
-              },
-                React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208"}},p.fullName),
-                React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},
-                  [p.birtYear, p.deatYear].filter(Boolean).join(" – ") ||
-                  (p.birtPlace ? p.birtPlace.split(",")[0] : "")
-                )
-              ))
+            React.createElement("input",{
+              value:gedSearch,
+              onChange:e=>setGedSearch(e.target.value),
+              placeholder:"Filter by name…",
+              style:{...S.input,width:"100%",marginBottom:"8px",fontSize:"0.88rem"}
+            }),
+            React.createElement("div",{style:{maxHeight:"340px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px"}},
+              (()=>{
+                const filtered = gedSearch.trim()
+                  ? gedPersons.persons.filter(p=>p.fullName.toLowerCase().includes(gedSearch.toLowerCase()))
+                  : gedPersons.persons;
+                if (!filtered.length) return React.createElement("p",{style:{padding:"12px 14px",color:"#8a7460",fontStyle:"italic",fontSize:"0.88rem",margin:0}},"No people match that name.");
+                return filtered.map((p,i)=>React.createElement("div",{
+                  key:p.id,
+                  onClick:()=>handleGedPick(p),
+                  style:{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #ede0cc",background:i%2===0?"transparent":"rgba(200,184,154,0.08)",display:"flex",justifyContent:"space-between",alignItems:"center"}
+                },
+                  React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208"}},p.fullName),
+                  React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},
+                    [p.birtYear,p.deatYear].filter(Boolean).join(" – ")||(p.birtPlace?p.birtPlace.split(",")[0]:"")
+                  )
+                ));
+              })()
             )
           ),
 
@@ -5102,7 +5124,7 @@ function App() {
               !form.endOngoing&&React.createElement("div",null,
                 React.createElement("label",{style:{...S.label,marginBottom:"8px"}},"End date"),
                 React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"8px",flexWrap:"wrap"}},
-                  [["day","Exact"],["month","Month"],["season","Part of year"],["year","Year"],["decade","Decade"]].map(([val,label])=>
+                  [["day","Exact"],["month","Month"],["season","Part of year"],["year","Year"],["decade","Decade"],["uncertain","Uncertain"]].map(([val,label])=>
                     React.createElement("button",{key:val,onClick:()=>updateForm({endFuzzy:val}),style:{padding:"4px 10px",borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",background:form.endFuzzy===val?"#2c2416":"transparent",color:form.endFuzzy===val?"#f5f0e8":"#8a7460",border:`1px solid ${form.endFuzzy===val?"#2c2416":"#c8b89a"}`}},label)
                   )
                 ),
@@ -5197,4 +5219,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(
   }
 </script>
 </body>
-</html>
+</html>value:"private"},"Private — only on this device"),
+              React.createElement("option",{value:"public"},"Public — anyone with the link"),
+              React.createElement("option",{value:"subscriber"},"✨ Subscribers — Remembory subscribers only"),
+              React.createElement("option",{value:"connected"},"Connected — people linked to your profile"),
+              React.createElement("option",{value:"tagged"},"Present — only people tagged in this memory")
