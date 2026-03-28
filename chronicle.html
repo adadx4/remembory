@@ -97,8 +97,9 @@ async function validateLicenceKey(key) {
   const clean = key.trim();
   if (!clean) return null;
 
-  // Check promo codes first — no API call needed
+  // Check promo codes first — no API call, no cache
   if (PROMO_CODES.includes(clean.toUpperCase())) {
+    clearLicenceCache(); // remove any stale invalid cache for this key
     return {valid:true, tier:"subscriber", expiresAt:null, promo:true};
   }
 
@@ -4408,12 +4409,20 @@ function App() {
                   licenceStatus.reason==="expired"?"Your licence key has expired — renew at remembory.net.":
                   licenceStatus.reason==="invalid"?"That key doesn’t look right — check for typos.":"Couldn’t validate that key."),
                 React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"10px"}},
-                  React.createElement("input",{value:licenceKey,onChange:e=>setLicenceKey(e.target.value),
+                  React.createElement("input",{value:licenceKey,
+                    onChange:e=>setLicenceKey(e.target.value),
                     onBlur:e=>saveLicenceKey(e.target.value),
-                    onKeyDown:e=>{if(e.key==="Enter")saveLicenceKey(licenceKey);},
+                    onKeyDown:e=>{if(e.key==="Enter")saveLicenceKey(e.target.value);},
+                    id:"licence-key-input",
                     placeholder:"Paste your Lemon Squeezy licence key…",
                     style:{...S.input,flex:1,fontSize:"0.88rem",fontFamily:"monospace",letterSpacing:"0.05em"}}),
-                  React.createElement("button",{onClick:()=>saveLicenceKey(licenceKey),style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem"}},"Apply")
+                  React.createElement("button",{
+                    onClick:()=>{
+                      const el=document.getElementById("licence-key-input");
+                      saveLicenceKey(el?el.value:licenceKey);
+                    },
+                    style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem"}
+                  },"Apply")
                 ),
                 React.createElement("a",{href:"https://remembory.lemonsqueezy.com/checkout/buy/669e695c-c63a-4bf6-8eaf-4d56d05bfbdf",target:"_blank",rel:"noopener",style:{fontSize:"0.82rem",color:"#a8885a",textDecoration:"underline"}},"Subscribe at Lemon Squeezy →")
               )
