@@ -3333,14 +3333,107 @@ function App() {
     }
 
     // ── Build context memories ────────────────────────────────
+    // Collect everyone descended from subject's great-grandparents,
+    // plus their spouses — i.e. the full family tree within 3 ancestor degrees.
     function buildContextMemories(subject) {
       const subBirth = subject.birtYear;
       const subDeath = subject.deatYear || new Date().getFullYear();
-      if (!subBirth) return [];
 
+      // Step 1: walk UP to great-grandparents (3 generations)
+      function getParents(personId) {
+        const rec = indiMap[personId];
+        if (!rec) return [];
+        const parents = [];
+        for (const famRef of rec.children.filter(n=>n.tag==="FAMC")) {
+          const fam = famMap[famRef.value];
+          if (!fam) continue;
+          const husb = child(fam,"HUSB"); const wife = child(fam,"WIFE");
+          if (husb) parents.push(husb);
+          if (wife) parents.push(wife);
+        }
+        return parents;
+      }
+
+      // Climb 3 levels to find great-grandparents
+      let roots = new Set([subject.id]);
+      for (let gen = 0; gen < 3; gen++) {
+        const nextRoots = new Set(roots);
+        for (const id of roots) getParents(id).forEach(p => nextRoots.add(p));
+        roots = nextRoots;
+      }
+      // roots now contains subject + all ancestors up to great-grandparents
+
+      // Step 2: from each root, collect ALL descendants (BFS down)
+      const familySet = new Set(roots);
+      const queue = [...roots];
+      while (queue.length > 0) {
+        const pid = queue.shift();
+        const rec = indiMap[pid];
+        if (!rec) continue;
+        // Walk through families where this person is a parent
+        for (const famRef of rec.children.filter(n=>n.tag==="FAMS")) {
+          const fam = famMap[famRef.value];
+          if (!fam) continue;
+          // Add spouse
+          const husb = child(fam,"HUSB"); const wife = child(fam,"WIFE");
+          if (husb && !familySet.has(husb)) { familySet.add(husb); queue.push(husb); }
+          if (wife && !familySet.has(wife)) { familySet.add(wife); queue.push(wife); }
+          // Add children
+          for (const chilRef of fam.children.filter(n=>n.tag==="CHIL")) {
+            const cid = chilRef.value;
+            if (cid && !familySet.has(cid)) { familySet.add(cid); queue.push(cid); }
+          }
+        }
+        // Also include spouses from families where this person is a child
+        // (catches spouses of ancestors who married in)
+        for (const famRef of rec.children.filter(n=>n.tag==="FAMC")) {
+          const fam = famMap[famRef.value];
+          if (!fam) continue;
+          const husb = child(fam,"HUSB"); const wife = child(fam,"WIFE");
+          if (husb && !familySet.has(husb)) { familySet.add(husb); queue.push(husb); }
+          if (wife && !familySet.has(wife)) { familySet.add(wife); queue.push(wife); }
+        }
+      }
+      // Remove the subject themselves
+      familySet.delete(subject.id);
+
+      // Step 3: detect relationship for each family member
+      function getRelationship(id) {
+        const rec = indiMap[id];
+        if (!rec) return "";
+        // Spouse of subject?
+        for (const famRef of rec.children.filter(n=>n.tag==="FAMS")) {
+          const fam = famMap[famRef.value];
+          if (!fam) continue;
+          if (child(fam,"HUSB")===subject.id||child(fam,"WIFE")===subject.id) return "Spouse";
+        }
+        // Child of subject?
+        for (const famRef of rec.children.filter(n=>n.tag==="FAMC")) {
+          const fam = famMap[famRef.value];
+          if (!fam) continue;
+          if (child(fam,"HUSB")===subject.id||child(fam,"WIFE")===subject.id) return "Child";
+        }
+        // Parent of subject?
+        for (const famRef of subject.rec.children.filter(n=>n.tag==="FAMC")) {
+          const fam = famMap[famRef.value];
+          if (!fam) continue;
+          if (child(fam,"HUSB")===id||child(fam,"WIFE")===id) return "Parent";
+        }
+        // Sibling?
+        for (const famRef of subject.rec.children.filter(n=>n.tag==="FAMC")) {
+          const fam = famMap[famRef.value];
+          if (!fam) continue;
+          const siblings = fam.children.filter(n=>n.tag==="CHIL").map(n=>n.value);
+          if (siblings.includes(id)) return "Sibling";
+        }
+        return "";
+      }
+
+      // Step 4: build context people array
       const contextPeople = [];
-      for (const [id, rec] of Object.entries(indiMap)) {
-        if (id === subject.id) continue;
+      for (const id of familySet) {
+        const rec = indiMap[id];
+        if (!rec) continue;
         const nameNode = rec.children.find(n=>n.tag==="NAME");
         if (!nameNode) continue;
         const fullName = fullText(nameNode).replace(/\/\//g,"").replace(/\s+/g," ").trim();
@@ -3349,31 +3442,12 @@ function App() {
         const deat2 = rec.children.find(n=>n.tag==="DEAT");
         const birthYear = birt2 ? parseDate(child(birt2,"DATE"))?.year : null;
         const deathYear = deat2 ? parseDate(child(deat2,"DATE"))?.year : null;
+        // Must overlap with subject lifespan
         const personBirth = birthYear || 0;
         const personDeath = deathYear || new Date().getFullYear();
         if (personDeath < subBirth || personBirth > subDeath) continue;
 
-        // Detect relationship
-        let relationship = "";
-        for (const famRef of rec.children.filter(n=>n.tag==="FAMS")) {
-          const fam = famMap[famRef.value];
-          if (!fam) continue;
-          if (child(fam,"HUSB")===subject.id||child(fam,"WIFE")===subject.id) { relationship="Spouse"; break; }
-        }
-        if (!relationship) {
-          for (const famRef of rec.children.filter(n=>n.tag==="FAMC")) {
-            const fam = famMap[famRef.value];
-            if (!fam) continue;
-            if (child(fam,"HUSB")===subject.id||child(fam,"WIFE")===subject.id) { relationship="Child"; break; }
-          }
-        }
-        if (!relationship) {
-          for (const famRef of subject.rec.children.filter(n=>n.tag==="FAMC")) {
-            const fam = famMap[famRef.value];
-            if (!fam) continue;
-            if (child(fam,"HUSB")===id||child(fam,"WIFE")===id) { relationship="Parent"; break; }
-          }
-        }
+        const relationship = getRelationship(id);
 
         // Extract events within subject lifespan
         const events = [];
@@ -3396,7 +3470,6 @@ function App() {
             perspectives:[], fromGedcom:true, visibility:"private",
           });
         }
-
         const skipTags2 = new Set(["NAME","SEX","FAMS","FAMC","CHAN","NOTE","SOUR","OBJE","SUBM"]);
         for (const node of rec.children) {
           if (skipTags2.has(node.tag)) continue;
@@ -3425,15 +3498,15 @@ function App() {
           }
           addCtxEvent(spouseName?"Married "+spouseName:"Married", dateObj, place, "", spouseName?[spouseName]:[]);
         }
-
         if (events.length===0) continue;
         events.sort((a,b)=>(a.year||0)-(b.year||0));
         contextPeople.push({ id, fullName, relationship, birthYear, deathYear, events });
       }
 
-      const relOrder = {Spouse:0,Parent:1,Child:2};
+      // Sort: Spouse, Parent, Child, Sibling first, then by birth year
+      const relOrder = {Spouse:0,Parent:1,Child:2,Sibling:3};
       contextPeople.sort((a,b)=>{
-        const oa=relOrder[a.relationship]??3, ob=relOrder[b.relationship]??3;
+        const oa=relOrder[a.relationship]??4, ob=relOrder[b.relationship]??4;
         if (oa!==ob) return oa-ob;
         return (a.birthYear||9999)-(b.birthYear||9999);
       });
