@@ -3175,27 +3175,40 @@ function App() {
     function parseDate(raw) {
       if (!raw) return null;
       const months = {JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
-      // BET x AND y — use the first year as approximate
+      function mnum(s) { return months[(s||"").replace(/\.$/,"").slice(0,3).toUpperCase()] || 0; }
+      // BET x AND y — take the first date
       let bet = raw.match(/^BET\s+(.+?)\s+AND\s+/i);
       if (bet) raw = bet[1].trim();
-      // FROM x TO y — use the FROM date
-      let from = raw.match(/^FROM\s+(.+?)(?:\s+TO\s+|$)/i);
-      if (from) raw = from[1].trim();
-      // Strip remaining single qualifiers: ABT, EST, CAL, BEF, AFT, CIR, TO, INT
-      const s = raw.replace(/^(ABT|EST|CAL|BEF|AFT|CIR|TO|INT|ABOUT|CIRCA|BEFORE|AFTER)\s*/i,"").trim();
+      // FROM x TO y — take FROM date
+      let frm = raw.match(/^FROM\s+(.+?)(?:\s+TO\s+|$)/i);
+      if (frm) raw = frm[1].trim();
+      // Strip leading qualifiers including those with trailing period: Abt. Bef. Aft.
+      let s = raw.replace(/^(ABT\.?|EST\.?|CAL\.?|BEF\.?|AFT\.?|CIR\.?|CIRCA|ABOUT|BEFORE|AFTER|TO|INT)\s*/i,"").trim();
+      // Take only first part of ambiguous ranges like "1786 or 1790"
+      s = s.replace(/\s+or\s+.*$/i,"").trim();
+      // Extract recognisable date from garbled strings like "IN ACTION 4 OCT 1918"
+      const embedded = s.match(/(\d{1,2})\s+([A-Z]+\.?)\s+(\d{3,4})/i);
+      if (embedded) s = embedded[0];
       if (!s) return null;
-      // DD MON YYYY
-      let mr = s.match(/^(\d{1,2})\s+([A-Z]{3,})\s+(\d{3,4})$/i);
-      if (mr) return {year:parseInt(mr[3]),month:months[mr[2].slice(0,3).toUpperCase()]||1,day:parseInt(mr[1]),fuzzy:"day"};
-      // MON YYYY
-      mr = s.match(/^([A-Z]{3,})\s+(\d{3,4})$/i);
-      if (mr) return {year:parseInt(mr[2]),month:months[mr[1].slice(0,3).toUpperCase()]||1,day:1,fuzzy:"month"};
-      // YYYY (3 or 4 digit year)
+      let mr;
+      // DD MON YYYY (various separators, month may have trailing period: "1 Oct. 1880", "23-Oct-1853", "11 Nov.1957")
+      mr = s.match(/^(\d{1,2})[-\s]+([A-Z]+\.?)[-\s]*(\d{3,4})$/i);
+      if (mr) { const m=mnum(mr[2]); if(m) return {year:parseInt(mr[3]),month:m,day:parseInt(mr[1]),fuzzy:"day"}; }
+      // DD/MM/YYYY or DD-MM-YYYY (numeric month)
+      mr = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{3,4})$/);
+      if (mr) return {year:parseInt(mr[3]),month:parseInt(mr[2]),day:parseInt(mr[1]),fuzzy:"day"};
+      // MON YYYY (month may have trailing period: "Oct. 1825")
+      mr = s.match(/^([A-Z]+\.?)\s+(\d{3,4})$/i);
+      if (mr) { const m=mnum(mr[1]); if(m) return {year:parseInt(mr[2]),month:m,day:1,fuzzy:"month"}; }
+      // YYYY only
       mr = s.match(/^(\d{3,4})$/);
       if (mr) return {year:parseInt(mr[1]),month:1,day:1,fuzzy:"year"};
-      // YYYY-MM-DD or YYYY/MM/DD (ISO-ish)
-      mr = s.match(/^(\d{3,4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
-      if (mr) return {year:parseInt(mr[1]),month:parseInt(mr[2]),day:parseInt(mr[3]),fuzzy:"day"};
+      // YYYY-YYYY range — take first year
+      mr = s.match(/^(\d{3,4})[-](\d{3,4})$/);
+      if (mr) return {year:parseInt(mr[1]),month:1,day:1,fuzzy:"year"};
+      // DD MM YYYY (all numeric, space-separated: "17 12 2011")
+      mr = s.match(/^(\d{1,2})\s+(\d{1,2})\s+(\d{3,4})$/);
+      if (mr) return {year:parseInt(mr[3]),month:parseInt(mr[2]),day:parseInt(mr[1]),fuzzy:"day"};
       return null;
     }
 
