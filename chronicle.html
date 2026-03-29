@@ -2676,6 +2676,8 @@ function App() {
   const suppressConnectRequests = data.suppressConnectRequests || [];
   const wantPublicProfile    = data.wantPublicProfile || false;
   const profileAbout         = data.profileAbout || "";
+  const allowFollowers       = data.allowFollowers !== false; // default true
+  const profileImageUrl      = data.profileImageUrl || "";
 
   const [view, setView] = useState("life");
   const [selected, setSelected] = useState(null);
@@ -2732,7 +2734,7 @@ function App() {
       const res = await fetch(WORKER_URL + "/profile/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-LS-Key": licenceKey },
-        body: JSON.stringify({ ownerName: ownerName||carerName, displayName: profileDisplayName||ownerName||carerName, ownerEmail: ownerEmail||carerEmail, about: profileAbout||"", memories: publicMems, peopleEmails })
+        body: JSON.stringify({ ownerName: ownerName||carerName, displayName: profileDisplayName||ownerName||carerName, ownerEmail: ownerEmail||carerEmail, about: profileAbout||"", imageUrl: profileImageUrl||"", allowFollowers: allowFollowers!==false, memories: publicMems, peopleEmails })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Server error");
@@ -4751,7 +4753,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-28 22:58 UTC"
+          "Chronicle • build 2026-03-29 00:07 UTC"
         )
         ), // end account tab 4
       ),
@@ -4765,6 +4767,27 @@ function App() {
               borderBottom:"1px solid rgba(168,136,90,0.3)",paddingBottom:"1px"}},
             "◎ View your live profile →")
         ),
+        React.createElement("div",{style:{display:"flex",gap:"20px",marginBottom:"16px",flexWrap:"wrap"}},
+          (()=>{
+            const total = memories.length;
+            const readyToPublish = memories.filter(m=>m.visibility&&m.visibility!=="private").length;
+            const published = profileState?.memoryCount||0;
+            return [
+              React.createElement("div",{key:"pub",style:{textAlign:"center"}},
+                React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:"#1a1208"}},published),
+                React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em"}},"Published")
+              ),
+              React.createElement("div",{key:"ready",style:{textAlign:"center",opacity:readyToPublish>published?1:0.4}},
+                React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:readyToPublish>published?"#a8885a":"#1a1208"}},readyToPublish-published>0?"+ "+(readyToPublish-published):readyToPublish),
+                React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em"}},readyToPublish>published?"Ready to add":"Ready")
+              ),
+              React.createElement("div",{key:"total",style:{textAlign:"center"}},
+                React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:"#1a1208"}},total),
+                React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em"}},"Total")
+              ),
+            ];
+          })()
+        ),
         React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,marginBottom:"24px"}},
           "Manage what you share publicly. Memories must have their visibility set to something other than Private to appear here."),
 
@@ -4776,6 +4799,41 @@ function App() {
             rows:3,style:{...S.input,resize:"vertical",lineHeight:"1.7",width:"100%"}}),
           React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"3px"}},
             "Appears in the left sidebar of your public profile. Max 500 characters.")
+        ),
+
+        // Profile image
+        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+          React.createElement("div",{style:{display:"flex",gap:"16px",alignItems:"flex-start"}},
+            profileImageUrl&&React.createElement("img",{src:profileImageUrl,alt:"Profile",
+              style:{width:"64px",height:"64px",borderRadius:"50%",objectFit:"cover",
+                border:"2px solid #d4c4a8",flexShrink:0}}),
+            React.createElement("div",{style:{flex:1}},
+              React.createElement("label",{style:{...S.label,display:"block",marginBottom:"6px"}},"Profile image URL"),
+              React.createElement("input",{type:"url",value:profileImageUrl,
+                onChange:e=>persistTop({profileImageUrl:e.target.value}),
+                placeholder:"https://example.com/photo.jpg",
+                style:{...S.input,width:"100%"}}),
+              React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"3px"}},
+                "Paste a link to any publicly accessible image. Shown as your avatar on your profile.")
+            )
+          )
+        ),
+
+        // Allow followers toggle
+        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+          React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:"12px"}},
+            React.createElement("input",{type:"checkbox",id:"allow-followers",
+              checked:allowFollowers,
+              onChange:e=>persistTop({allowFollowers:e.target.checked}),
+              style:{marginTop:"3px",flexShrink:0,cursor:"pointer"}}),
+            React.createElement("div",null,
+              React.createElement("label",{htmlFor:"allow-followers",
+                style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",cursor:"pointer",display:"block",marginBottom:"4px"}},
+                "Allow followers"),
+              React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,margin:0}},
+                "Show a Follow button on your profile. Followers save your profile locally in their Chronicle.")
+            )
+          )
         ),
 
         // ── Public Profile ──
