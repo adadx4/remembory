@@ -1601,11 +1601,13 @@ function GroupsManager({personGroups, knownPeople, memories, onSetGroups, onView
   );
 }
 
-function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,peopleNotes,orgNotes,personOrgs,personLocations,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onSetPersonOrgs,onSetPersonLocations,onViewPerson,onAddPerson,onAddOrg}) {
+function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,peopleNotes,orgNotes,personOrgs,personLocations,localConnections,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onSetPersonOrgs,onSetPersonLocations,onViewPerson,onAddPerson,onAddOrg}) {
   const [search, setSearch] = React.useState("");
   const [filterRel, setFilterRel] = React.useState(null);
   const [filterOrg, setFilterOrg] = React.useState(null);
   const [filterLoc, setFilterLoc] = React.useState(null);
+  const [filterConnected, setFilterConnected] = React.useState(false);
+  const connectedNames = React.useMemo(()=>new Set((localConnections||[]).map(c=>c.name.toLowerCase())),[localConnections]);
   const [addingPerson, setAddingPerson] = React.useState(false);
   const [addingOrg, setAddingOrg] = React.useState(false);
   const [newName, setNewName] = React.useState("");
@@ -1620,6 +1622,7 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
     if(filterRel&&(peopleRelationships?.[n]||"")!==filterRel) return false;
     if(filterOrg&&!(personOrgs?.[n]||[]).includes(filterOrg)) return false;
     if(filterLoc&&!(personLocations?.[n]||[]).includes(filterLoc)) return false;
+    if(filterConnected&&!connectedNames.has(n.toLowerCase())) return false;
     return true;
   });
   filteredPeople=[...filteredPeople].sort((a,b)=>{const ca=personCount(a),cb=personCount(b);if(ca===0&&cb>0)return -1;if(cb===0&&ca>0)return 1;return a.localeCompare(b);});
@@ -1636,6 +1639,11 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
       ),
       (allFilterRels.length>0||allFilterOrgs.length>0||allFilterLocs.length>0)&&React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"5px",alignItems:"center"}},
         React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic",marginRight:"2px"}},"Filter:"),
+        (localConnections||[]).length>0&&React.createElement("button",{
+          key:"connected",onClick:()=>setFilterConnected(!filterConnected),
+          style:{...chipStyle(filterConnected),background:filterConnected?"#4a7a5a":"transparent",
+            borderColor:filterConnected?"#4a7a5a":"#c8b89a",color:filterConnected?"#fff":"#6a5840"}},
+          "✓ Connected"+(filterConnected?" ×":"")),
         allFilterRels.map(r=>React.createElement("button",{key:r,onClick:()=>setFilterRel(filterRel===r?null:r),style:chipStyle(filterRel===r)},r)),
         allFilterOrgs.map(o=>React.createElement("button",{key:"o"+o,onClick:()=>setFilterOrg(filterOrg===o?null:o),style:chipStyle(filterOrg===o)},"🏛 ",o)),
         allFilterLocs.map(l=>React.createElement("button",{key:"l"+l,onClick:()=>setFilterLoc(filterLoc===l?null:l),style:chipStyle(filterLoc===l)},"📍 ",l)),
@@ -4229,6 +4237,17 @@ function App() {
                     method:"POST",
                     headers:{"Content-Type":"application/json","X-LS-Key":licenceKey},
                     body:JSON.stringify({myEmail,theirEmail:pendingConnectRequest.email})
+                  }).then(()=>{
+                    // Store connection locally for People index filter
+                    const name = pendingConnectRequest.name;
+                    const email = pendingConnectRequest.email;
+                    if (name && email) {
+                      const conns = JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
+                      if (!conns.find(c=>c.email===email)) {
+                        conns.push({name, email, connectedAt: new Date().toISOString()});
+                        localStorage.setItem("chronicle-connections", JSON.stringify(conns));
+                      }
+                    }
                   }).catch(()=>{});
                 }
                 setPendingConnectRequest(null);
@@ -4500,7 +4519,7 @@ function App() {
       })(),
 
       // ── PEOPLE & ORGS ──
-      view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,peopleNotes,orgNotes,onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");},onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});}}),
+      view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,peopleNotes,orgNotes,localConnections:JSON.parse(localStorage.getItem("chronicle-connections")||"[]"),onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");},onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});}}),
 
       // ── PRINT VIEW ──
       view==="settings"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"720px"}},
@@ -4568,38 +4587,10 @@ function App() {
         // ── Profile tab ──
         settingsTab==="profile"&&React.createElement(React.Fragment,null,
 
-        // ── Notifications ──
-        notifications.length===0&&React.createElement("div",{style:{textAlign:"center",padding:"32px 0",color:"#8a7460",fontStyle:"italic"}},
-          "No notifications yet. When someone shares a memory that includes you, it will appear here."
-        ),
-        notifications.length>0&&React.createElement("div",{
-          style:{background:"rgba(196,133,138,0.08)",border:"1px solid rgba(196,133,138,0.3)",
-            borderRadius:"3px",padding:"16px 20px",marginBottom:"20px"}},
-          React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
-            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#8a3030",margin:0}},
-              "������ You appear in "+(notifications.length===1?"a public memory":"public memories")),
-            React.createElement("button",{
-              onClick:()=>{
-                const email = licenceStatus?.email||ownerEmail||carerEmail;
-                if(email) fetch(WORKER_URL+"/mentions/"+encodeURIComponent(email)+"/clear",
-                  {method:"POST",headers:{"X-LS-Key":licenceKey}}).catch(()=>{});
-                setNotifications([]);
-              },
-              style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",
-                fontSize:"0.78rem",textDecoration:"underline"}
-            },"Dismiss")
-          ),
-          notifications.map((n,i)=>React.createElement("div",{
-            key:i,
-            style:{padding:"6px 0",borderBottom:i<notifications.length-1?"1px solid rgba(196,133,138,0.15)":"none"}
-          },
-            React.createElement("p",{style:{fontSize:"0.86rem",color:"#5a3030",margin:"0 0 2px"}},
-              (n.displayName||"Someone")+" has shared a memory that includes you."),
-            React.createElement("a",{href:n.url,target:"_blank",rel:"noopener",
-              style:{fontSize:"0.82rem",color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.3)"}},
-              "View profile →")
-          ))
-        ),        ), // end profile tab
+        React.createElement("div",{style:{textAlign:"center",padding:"40px 0",color:"#8a7460",fontStyle:"italic",fontSize:"0.9rem"}},
+          "Notification settings will appear here in a future update."
+        )
+                ), // end profile tab
 
         settingsTab==="account"&&React.createElement(React.Fragment,null,
 
@@ -4754,7 +4745,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-29 09:29 UTC"
+          "Chronicle • build 2026-03-29 09:39 UTC"
         )
         ), // end account tab 4
       ),
@@ -4768,6 +4759,40 @@ function App() {
               borderBottom:"1px solid rgba(168,136,90,0.3)",paddingBottom:"1px"}},
             "◎ View your live profile →")
         ),
+        // ── Notifications ──
+        // ── Notifications ──
+        notifications.length===0&&React.createElement("div",{style:{textAlign:"center",padding:"32px 0",color:"#8a7460",fontStyle:"italic"}},
+          "No notifications yet. When someone shares a memory that includes you, it will appear here."
+        ),
+        notifications.length>0&&React.createElement("div",{
+          style:{background:"rgba(196,133,138,0.08)",border:"1px solid rgba(196,133,138,0.3)",
+            borderRadius:"3px",padding:"16px 20px",marginBottom:"20px"}},
+          React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
+            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#8a3030",margin:0}},
+              "������ You appear in "+(notifications.length===1?"a public memory":"public memories")),
+            React.createElement("button",{
+              onClick:()=>{
+                const email = licenceStatus?.email||ownerEmail||carerEmail;
+                if(email) fetch(WORKER_URL+"/mentions/"+encodeURIComponent(email)+"/clear",
+                  {method:"POST",headers:{"X-LS-Key":licenceKey}}).catch(()=>{});
+                setNotifications([]);
+              },
+              style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",
+                fontSize:"0.78rem",textDecoration:"underline"}
+            },"Dismiss")
+          ),
+          notifications.map((n,i)=>React.createElement("div",{
+            key:i,
+            style:{padding:"6px 0",borderBottom:i<notifications.length-1?"1px solid rgba(196,133,138,0.15)":"none"}
+          },
+            React.createElement("p",{style:{fontSize:"0.86rem",color:"#5a3030",margin:"0 0 2px"}},
+              (n.displayName||"Someone")+" has shared a memory that includes you."),
+            React.createElement("a",{href:n.url,target:"_blank",rel:"noopener",
+              style:{fontSize:"0.82rem",color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.3)"}},
+              "View profile →")
+          ))
+        ),
+
         React.createElement("div",{style:{display:"flex",gap:"20px",marginBottom:"16px",flexWrap:"wrap"}},
           (()=>{
             const total = memories.length;
