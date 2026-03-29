@@ -2738,7 +2738,7 @@ function App() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Server error");
-      saveProfileState({ identifier: data.identifier, url: data.url, lastPublished: new Date().toISOString() });
+      saveProfileState({ identifier: data.identifier, url: data.url, lastPublished: new Date().toISOString(), memoryCount: publicMems.length });
       setProfileMsg("✓ Profile published at " + data.url);
     } catch(e) { setProfileMsg("Could not publish: " + e.message); }
     setProfilePublishing(false);
@@ -4753,7 +4753,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-29 00:07 UTC"
+          "Chronicle • build 2026-03-29 02:55 UTC"
         )
         ), // end account tab 4
       ),
@@ -4772,14 +4772,19 @@ function App() {
             const total = memories.length;
             const readyToPublish = memories.filter(m=>m.visibility&&m.visibility!=="private").length;
             const published = profileState?.memoryCount||0;
+            const unpublishedReady = Math.max(0, readyToPublish - published);
             return [
               React.createElement("div",{key:"pub",style:{textAlign:"center"}},
-                React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:"#1a1208"}},published),
-                React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em"}},"Published")
+                React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:"#1a1208"}},readyToPublish),
+                React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em"}},"Set to publish")
               ),
-              React.createElement("div",{key:"ready",style:{textAlign:"center",opacity:readyToPublish>published?1:0.4}},
-                React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:readyToPublish>published?"#a8885a":"#1a1208"}},readyToPublish-published>0?"+ "+(readyToPublish-published):readyToPublish),
-                React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em"}},readyToPublish>published?"Ready to add":"Ready")
+              React.createElement("div",{key:"live",style:{textAlign:"center"}},
+                React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:published>0?"#4a7a5a":"#1a1208"}},published),
+                React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em"}},"Live")
+              ),
+              unpublishedReady>0&&React.createElement("div",{key:"new",style:{textAlign:"center"}},
+                React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:"#a8885a"}},"+"+unpublishedReady),
+                React.createElement("div",{style:{fontSize:"0.72rem",color:"#a8885a",textTransform:"uppercase",letterSpacing:"0.06em"}},"New since last publish")
               ),
               React.createElement("div",{key:"total",style:{textAlign:"center"}},
                 React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:"#1a1208"}},total),
