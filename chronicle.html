@@ -1973,7 +1973,7 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
 }
 
 // ── ShareButton component ──────────────────────────────────────
-function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, shareHistory, onRecordShare}) {
+function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, shareHistory, localConnections, onRecordShare}) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState("compose");
   const [senderName, setSenderName] = useState(ownerName||"");
@@ -2070,11 +2070,12 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
           : React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"6px"}},
               allPeople.map(person => {
                 const sel = selectedPeople.includes(person);
+                const isConn = (localConnections||[]).some(c=>c.name===person);
                 return React.createElement("button",{
                   key:person,
                   onClick:()=>togglePerson(person),
-                  style:{padding:"5px 12px",borderRadius:"20px",border:sel?"1px solid #7a9e8a":"1px solid #d4c4a8",background:sel?"rgba(122,158,138,0.15)":"rgba(255,252,245,0.8)",color:sel?"#4a7a5a":"#6a5c48",cursor:"pointer",fontSize:"0.88rem",fontWeight:sel?600:400}
-                },person);
+                  style:{padding:"5px 12px",borderRadius:"20px",border:sel?"1px solid #7a9e8a":isConn?"1px solid #a8885a":"1px solid #d4c4a8",background:sel?"rgba(122,158,138,0.15)":isConn?"rgba(168,136,90,0.08)":"rgba(255,252,245,0.8)",color:sel?"#4a7a5a":isConn?"#7a5a20":"#6a5c48",cursor:"pointer",fontSize:"0.88rem",fontWeight:sel?600:400}
+                },isConn?"✓ "+person:person);
               })
             ),
         selectedPeople.length > 0 && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",marginTop:"6px",fontStyle:"italic"}},
@@ -2126,6 +2127,9 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
         )
       ),
 
+      selectedPeople.some(p=>(localConnections||[]).some(c=>c.name===p))&&React.createElement("div",{
+        style:{background:"rgba(168,136,90,0.08)",border:"1px solid rgba(168,136,90,0.25)",borderRadius:"3px",padding:"10px 14px",marginBottom:"12px",fontSize:"0.82rem",color:"#7a5a20",lineHeight:1.6}
+      },React.createElement("strong",null,"✓ Connected")," — This person is in your connections. "),
       React.createElement("button",{
         onClick:handleGetLink,
         disabled:!canShare,
@@ -4973,7 +4977,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-29 23:33 UTC"
+          "Chronicle • build 2026-03-29 23:54 UTC"
         )
         ), // end account tab 4
       ),
@@ -5644,7 +5648,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
             React.createElement("button",{onClick:()=>handleEdit(m),style:S.btn},"Edit"),
             React.createElement("button",{onClick:()=>handleDelete(m.id),style:{...S.btnOutline,color:"#c4858a",borderColor:"#c4858a"}},"Delete"),
             isSubscriber
-              ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,onRecordShare:recordShare})
+              ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,localConnections:JSON.parse(localStorage.getItem("chronicle-connections")||"[]"),onRecordShare:recordShare})
               : React.createElement("div",{style:{position:"relative",display:"inline-block"}},
                   React.createElement("button",{disabled:true,style:{...S.btnOutline,opacity:0.4,cursor:"not-allowed",fontSize:"0.86rem",padding:"7px 14px"}},"✉ Share"),
                   React.createElement("div",{style:{position:"absolute",bottom:"calc(100% + 6px)",left:"50%",transform:"translateX(-50%)",background:"#2c2416",color:"#f5f0e8",fontSize:"0.72rem",padding:"5px 9px",borderRadius:"3px",whiteSpace:"nowrap",zIndex:10,lineHeight:1.4,pointerEvents:"none"}},
