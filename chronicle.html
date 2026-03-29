@@ -4502,6 +4502,18 @@ function App() {
         !isMobile&&view!=="import"&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("import"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"↑ Import Media"),
         !isMobile&&view!=="prompt"&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("prompt"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"✦ Prompt"),
         !isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("map"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"🗺 Map"),
+        !isMobile&&!["add","edit"].includes(view)&&isSubscriber&&wantPublicProfile&&React.createElement("a",{
+          href:(()=>{
+            const base="https://share.remembory.net/explore";
+            const params=[];
+            if(licenceKey) params.push("key="+encodeURIComponent(licenceKey));
+            if(profileState?.identifier) params.push("id="+profileState.identifier);
+            return params.length?base+"?"+params.join("&"):base;
+          })(),
+          target:"_blank",rel:"noopener",
+          style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem",
+            textDecoration:"none",display:"inline-flex",alignItems:"center"}
+        },"Explore"),
         !isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("print"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"🖨 Print"),
         !isMobile&&React.createElement("button",{
           onClick: async ()=>{
@@ -4962,7 +4974,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-29 10:54 UTC"
+          "Chronicle • build 2026-03-29 11:08 UTC"
         )
         ), // end account tab 4
       ),
