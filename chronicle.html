@@ -2731,6 +2731,9 @@ function App() {
   const [profileMsg, setProfileMsg] = React.useState("");
   const [profileConfirm, setProfileConfirm] = React.useState(false);
   const [settingsTab, setSettingsTab] = React.useState("account");
+  const [syncFileHandle, setSyncFileHandle] = React.useState(null);
+  const [syncStatus, setSyncStatus] = React.useState(""); // "", "syncing", "done", "error"
+  const [syncInfo, setSyncInfo] = React.useState(() => { try { return JSON.parse(localStorage.getItem("chronicle-sync-info")||"null"); } catch(e) { return null; } }); // {name, lastSync}
   const [notifications, setNotifications] = React.useState([]);  // [{identifier,displayName,url,addedAt}]
 
   async function publishProfile() {
@@ -3131,6 +3134,152 @@ function App() {
     else if (incomingMems.length > 0) { setSelected(incomingMems[0].id); setView("detail"); }
   }
 
+  // ── Cloud sync functions ─────────────────────────────────────────────────
+
+  async function chooseSyncFile() {
+    if (!window.showOpenFilePicker) {
+      alert("Cloud sync requires Chrome or Edge on desktop. Use manual backup/restore instead.");
+      return;
+    }
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{ description: "Chronicle sync file", accept: { "application/json": [".json"] } }],
+        multiple: false
+      });
+      setSyncFileHandle(handle);
+      const info = { name: handle.name, lastSync: null };
+      setSyncInfo(info);
+      localStorage.setItem("chronicle-sync-info", JSON.stringify(info));
+      // Immediately do a first sync
+      await doSync(handle);
+    } catch(e) {
+      if (e.name !== "AbortError") console.error("chooseSyncFile:", e);
+    }
+  }
+
+  async function createSyncFile() {
+    if (!window.showSaveFilePicker) {
+      alert("Cloud sync requires Chrome or Edge on desktop. Use manual backup/restore instead.");
+      return;
+    }
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: "chronicle-sync.json",
+        types: [{ description: "Chronicle sync file", accept: { "application/json": [".json"] } }]
+      });
+      setSyncFileHandle(handle);
+      const info = { name: handle.name, lastSync: null };
+      setSyncInfo(info);
+      localStorage.setItem("chronicle-sync-info", JSON.stringify(info));
+      // Write current data to the new file
+      const json = await buildBackupJson();
+      const writable = await handle.createWritable();
+      await writable.write(json);
+      await writable.close();
+      const now = new Date().toISOString();
+      const updated = { ...info, lastSync: now };
+      setSyncInfo(updated);
+      localStorage.setItem("chronicle-sync-info", JSON.stringify(updated));
+      setSyncStatus("done");
+      setTimeout(() => setSyncStatus(""), 3000);
+    } catch(e) {
+      if (e.name !== "AbortError") { console.error("createSyncFile:", e); setSyncStatus("error"); }
+    }
+  }
+
+  async function doSync(handle) {
+    const h = handle || syncFileHandle;
+    if (!h) return;
+    setSyncStatus("syncing");
+    try {
+      // 1. Read the sync file
+      const file = await h.getFile();
+      const text = await file.text();
+      let remote;
+      try { remote = JSON.parse(text); } catch(e) { remote = null; }
+
+      // 2. Get local data as JSON
+      const localJson = await buildBackupJson();
+      const local = JSON.parse(localJson);
+
+      // 3. Merge: if remote has content, merge it into local
+      let mergedJson = localJson;
+      if (remote && remote.memories) {
+        // Use importBackup logic: merge by memory ID
+        const remoteIds = new Set((remote.memories||[]).map(m => m.id));
+        const localIds = new Set((local.memories||[]).map(m => m.id));
+        const toAdd = (remote.memories||[]).filter(m => !localIds.has(m.id));
+        const merged = local.memories.map(m => {
+          const rem = (remote.memories||[]).find(r => r.id === m.id);
+          if (!rem) return m;
+          // Merge perspectives
+          const existing = m.perspectives || [];
+          const newP = (rem.perspectives||[]).filter(p => !existing.some(e => e.author === p.author));
+          return newP.length ? {...m, perspectives: [...existing, ...newP]} : m;
+        });
+        const finalMems = [...merged, ...toAdd].sort((a,b) => sortKey(a)-sortKey(b));
+        // Merge people/orgs/locations/tags
+        const mergedPeople = [...new Set([...(local.knownPeople||[]),...(remote.knownPeople||[])])].sort();
+        const mergedOrgs = [...new Set([...(local.knownOrgs||[]),...(remote.knownOrgs||[])])].sort();
+        const mergedLocs = [...new Set([...(local.knownLocations||[]),...(remote.knownLocations||[])])].sort();
+        const mergedTags = [...new Set([...(local.customTags||[]),...(remote.customTags||[])])];
+        const mergedRelationships = {...(remote.peopleRelationships||{}), ...(local.peopleRelationships||{})};
+        const mergedPeopleNotes = {...(remote.peopleNotes||{}), ...(local.peopleNotes||{})};
+        const mergedOrgNotes = {...(remote.orgNotes||{}), ...(local.orgNotes||{})};
+        const mergedLocNotes = {...(remote.locationNotes||{}), ...(local.locationNotes||{})};
+        const mergedLocCoords = {...(remote.locationCoords||{}), ...(local.locationCoords||{})};
+        const mergedPersonOrgs = {...(remote.personOrgs||{}), ...(local.personOrgs||{})};
+        const mergedPersonLocs = {...(remote.personLocations||{}), ...(local.personLocations||{})};
+        const mergedPersonGroups = {...(remote.personGroups||{}), ...(local.personGroups||{})};
+        // Apply merged data to local state
+        const subjectPatch = {
+          memories: finalMems, knownPeople: mergedPeople, knownOrgs: mergedOrgs,
+          knownLocations: mergedLocs, customTags: mergedTags,
+          peopleRelationships: mergedRelationships, peopleNotes: mergedPeopleNotes,
+          orgNotes: mergedOrgNotes, locationNotes: mergedLocNotes,
+          locationCoords: mergedLocCoords, personOrgs: mergedPersonOrgs,
+          personLocations: mergedPersonLocs, personGroups: mergedPersonGroups,
+        };
+        setData(prev => {
+          const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
+          const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
+          const newData = {...prev, subjects: newSubjects};
+          if (activePassword) saveEncrypted(activePassword, newData);
+          else saveData(newData);
+          return newData;
+        });
+        // Rebuild merged JSON with the new merged data
+        mergedJson = JSON.stringify({
+          ...local, memories: finalMems, knownPeople: mergedPeople, knownOrgs: mergedOrgs,
+          knownLocations: mergedLocs, customTags: mergedTags,
+          exported: new Date().toISOString()
+        }, null, 2);
+      }
+
+      // 4. Write merged result back to sync file
+      const writable = await h.createWritable();
+      await writable.write(mergedJson);
+      await writable.close();
+
+      const now = new Date().toISOString();
+      const updated = { name: h.name, lastSync: now };
+      setSyncInfo(updated);
+      localStorage.setItem("chronicle-sync-info", JSON.stringify(updated));
+      setSyncStatus("done");
+      setTimeout(() => setSyncStatus(""), 3000);
+    } catch(e) {
+      console.error("doSync:", e);
+      setSyncStatus("error");
+      setTimeout(() => setSyncStatus(""), 4000);
+    }
+  }
+
+  async function clearSyncFile() {
+    setSyncFileHandle(null);
+    setSyncInfo(null);
+    localStorage.removeItem("chronicle-sync-info");
+  }
+
   async function buildBackupJson() {
     // Re-embed media blobs as base64 so the backup is self-contained
     const allMedia = await idbGetAll();
@@ -3145,7 +3294,8 @@ function App() {
       }));
       return {...m, mediaUrls: urls};
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory}, null, 2);
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, // Top-level profile & settings fields
+    wantPublicProfile:data.wantPublicProfile||false, profileAbout:data.profileAbout||"", profileImageUrl:data.profileImageUrl||"", allowFollowers:data.allowFollowers!==false, profilePrivacy:data.profilePrivacy||"open", profileDisplayName:data.profileDisplayName||"", carerMode:data.carerMode||false, carerName:data.carerName||"", carerEmail:data.carerEmail||"", suppressConnectRequests:data.suppressConnectRequests||[]}, null, 2);
   }
 
   async function buildBackupBlob(backupPassword) {
@@ -3806,7 +3956,19 @@ function App() {
       setData(prev => {
         const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
         const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
-        const newData = {...prev, subjects: newSubjects};
+        // Restore top-level settings fields if present in backup
+        const topPatch = {};
+        if (d.wantPublicProfile!==undefined) topPatch.wantPublicProfile=d.wantPublicProfile;
+        if (d.profileAbout!==undefined) topPatch.profileAbout=d.profileAbout;
+        if (d.profileImageUrl!==undefined) topPatch.profileImageUrl=d.profileImageUrl;
+        if (d.allowFollowers!==undefined) topPatch.allowFollowers=d.allowFollowers;
+        if (d.profilePrivacy!==undefined) topPatch.profilePrivacy=d.profilePrivacy;
+        if (d.profileDisplayName!==undefined) topPatch.profileDisplayName=d.profileDisplayName;
+        if (d.carerMode!==undefined) topPatch.carerMode=d.carerMode;
+        if (d.carerName!==undefined) topPatch.carerName=d.carerName;
+        if (d.carerEmail!==undefined) topPatch.carerEmail=d.carerEmail;
+        if (d.suppressConnectRequests!==undefined) topPatch.suppressConnectRequests=d.suppressConnectRequests;
+        const newData = {...prev, ...topPatch, subjects: newSubjects};
         if (activePassword) {
           saveEncrypted(activePassword, newData);
         } else {
@@ -4637,6 +4799,52 @@ function App() {
         // ── Backup tab ──
         settingsTab==="backup"&&React.createElement(React.Fragment,null,
 
+        // ── Cloud Sync ──
+        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"☁ Cloud Sync"),
+          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.6}},
+            "Keep Chronicle in sync across devices using a file in your cloud storage folder (iCloud Drive, Dropbox, Google Drive, OneDrive etc.). "
+            + "Works in Chrome and Edge on desktop."
+          ),
+          syncInfo
+            ? React.createElement("div",null,
+                React.createElement("div",{style:{background:"rgba(74,122,90,0.08)",border:"1px solid rgba(74,122,90,0.2)",borderRadius:"3px",padding:"10px 14px",marginBottom:"12px",fontSize:"0.84rem"}},
+                  React.createElement("div",{style:{color:"#1a1208",fontWeight:600,marginBottom:"2px"}},"������ "+syncInfo.name),
+                  React.createElement("div",{style:{color:"#8a7460"}},
+                    syncInfo.lastSync
+                      ? "Last synced: "+new Date(syncInfo.lastSync).toLocaleString()
+                      : "Not yet synced"
+                  )
+                ),
+                React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
+                  React.createElement("button",{
+                    onClick:()=>doSync(),
+                    disabled:syncStatus==="syncing",
+                    style:{...S.btn,flex:1,opacity:syncStatus==="syncing"?0.6:1}
+                  },
+                    syncStatus==="syncing"?"Syncing…":
+                    syncStatus==="done"?"✓ Synced":
+                    syncStatus==="error"?"Sync failed":
+                    "⇄ Sync now"
+                  ),
+                  React.createElement("button",{
+                    onClick:clearSyncFile,
+                    style:{...S.btnOutline,padding:"9px 14px",fontSize:"0.84rem"}
+                  },"Disconnect")
+                )
+              )
+            : React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
+                React.createElement("button",{
+                  onClick:createSyncFile,
+                  style:{...S.btn,flex:1}
+                },"➕ Create sync file"),
+                React.createElement("button",{
+                  onClick:chooseSyncFile,
+                  style:{...S.btnOutline,flex:1,padding:"9px 14px",fontSize:"0.84rem"}
+                },"������ Open existing sync file")
+              )
+        ),
+
         // ── Backup ──
         React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
           React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Backup"),
@@ -4733,7 +4941,7 @@ function App() {
           React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#8a3030",margin:"0 0 8px"}},"Reset"),
           React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px"}},"Permanently deletes all memories and cannot be undone. Download a backup first if you want to keep a copy."),
           React.createElement("button",{
-            onClick:()=>{ if(window.confirm(`Delete all ${memories.length} memories? This cannot be undone.\n\nDownload a backup first.`)) { persistSubject({memories:[],knownPeople:[],knownOrgs:[]}); setView("life"); }},
+            onClick:()=>{ if(window.confirm(`Delete all ${memories.length} memories? This cannot be undone.\n\nDownload a backup first.`)) { persistSubject({memories:[],knownPeople:[],knownOrgs:[],knownLocations:[],customTags:[],peopleEmails:{},peopleRelationships:{},peopleNotes:{},orgNotes:{},locationNotes:{},locationCoords:{},personOrgs:{},personLocations:{},personGroups:{},shareHistory:[],lastBackup:null,lastImport:null}); setView("life"); }},
             style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}
           },"🗑 Clear all memories")
         ),
@@ -4745,7 +4953,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-29 09:39 UTC"
+          "Chronicle • build 2026-03-29 09:29 UTC"
         )
         ), // end account tab 4
       ),
