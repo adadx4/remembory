@@ -1193,7 +1193,15 @@ function MemoryCard({m, onClick}) {
     React.createElement("div",{style:{position:"absolute",left:"-18px",top:"50%",transform:"translateY(-50%)",width:"8px",height:"8px",borderRadius:"50%",background:m.tags[0]?TAG_COLORS[m.tags[0]]:"#c8b89a",border:"2px solid #f5f0e8",zIndex:1}}),
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"12px"}},
       React.createElement("div",{style:{flex:1}},
-        React.createElement("p",{style:{margin:"0 0 3px",fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},fuzzyDateLabel(m),(m.location?` · ${m.location}`:""),(m.dominantAuthor?` · ${m.dominantAuthor}`:"")),
+        React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"7px",flexWrap:"wrap",margin:"0 0 3px"}},
+          React.createElement("p",{style:{margin:0,fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},fuzzyDateLabel(m),(m.location?` · ${m.location}`:""),(m.dominantAuthor?` · ${m.dominantAuthor}`:"")),
+          React.createElement("span",{style:{
+            fontSize:"0.68rem",padding:"1px 7px",borderRadius:"20px",letterSpacing:"0.04em",flexShrink:0,
+            background:(!m.visibility||m.visibility==="private")?"transparent":m.visibility==="public"?"rgba(74,122,90,0.15)":m.visibility==="subscriber"?"rgba(168,136,90,0.15)":"rgba(100,120,160,0.15)",
+            color:(!m.visibility||m.visibility==="private")?"#c0b0a0":m.visibility==="public"?"#2d6b3a":m.visibility==="subscriber"?"#7a5a20":"#3a4a7a",
+            border:(!m.visibility||m.visibility==="private")?"1px dashed rgba(180,160,140,0.4)":m.visibility==="public"?"1px solid rgba(74,122,90,0.35)":m.visibility==="subscriber"?"1px solid rgba(168,136,90,0.35)":"1px solid rgba(100,120,160,0.35)"
+          }},(!m.visibility||m.visibility==="private")?"Private":m.visibility==="public"?"Public":m.visibility==="subscriber"?"Subscribers":m.visibility==="connected"?"Connected":"Tagged")
+        ),
         React.createElement("h4",{style:{margin:"0 0 5px",fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",fontWeight:700}},m.title),
         m.content && React.createElement("p",{style:{margin:0,fontSize:"0.88rem",color:"#6a5c48",lineHeight:1.5,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}},m.content)
       ),
@@ -4085,6 +4093,7 @@ function App() {
     }
     if (filter.sharing==="sent" && !(shareHistory||[]).some(h=>h.memIds.includes(m.id))) return false;
     if (filter.sharing==="received" && !m.sharedBy) return false;
+    if (filter.sharing==="published" && (!m.visibility || m.visibility==="private")) return false;
     return true;
   });
   const filtByDec={};
@@ -4953,7 +4962,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-29 10:32 UTC"
+          "Chronicle • build 2026-03-29 10:54 UTC"
         )
         ), // end account tab 4
       ),
@@ -5559,9 +5568,9 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         ),
         (shareHistory?.length>0||memories.some(m=>m.sharedBy))&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"14px",flexWrap:"wrap",alignItems:"center"}},
           React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic",marginRight:"2px"}},"Filter:"),
-          [["sent","\u2709 Sent","sent"],["received","\u2709 Received","received"]].map(([val,label,key])=>{
+          [["sent","\u2709 Sent","sent"],["received","\u2709 Received","received"],["published","Published","published"]].map(([val,label,key])=>{
             const active=filter.sharing===val;
-            const show=val==="sent"?shareHistory?.length>0:memories.some(m=>m.sharedBy);
+            const show=val==="sent"?shareHistory?.length>0:val==="received"?memories.some(m=>m.sharedBy):wantPublicProfile;
             if(!show) return null;
             return React.createElement("button",{key,onClick:()=>setFilter(f=>({...f,sharing:active?null:val})),
               style:{padding:"3px 12px",borderRadius:"20px",border:"1px solid",cursor:"pointer",fontSize:"0.78rem",
@@ -5598,10 +5607,10 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
             ),
             React.createElement("span",{style:{
               fontSize:"0.7rem",padding:"1px 8px",borderRadius:"20px",letterSpacing:"0.04em",
-              background:(m.visibility==="public")?"rgba(74,122,90,0.15)":(m.visibility==="subscriber")?"rgba(168,136,90,0.15)":(m.visibility==="connected"||m.visibility==="tagged")?"rgba(100,120,160,0.15)":"rgba(180,160,140,0.1)",
-              color:(m.visibility==="public")?"#3a6b4a":(m.visibility==="subscriber")?"#7a5a20":(m.visibility==="connected"||m.visibility==="tagged")?"#4a5a7a":"#9a8a7a",
-              border:(m.visibility==="public")?"1px solid rgba(74,122,90,0.3)":(m.visibility==="subscriber")?"1px solid rgba(168,136,90,0.3)":(m.visibility==="connected"||m.visibility==="tagged")?"1px solid rgba(100,120,160,0.3)":"1px dashed rgba(180,160,140,0.4)"
-            }},m.visibility==="public"?"Public":m.visibility==="subscriber"?"Subscribers":m.visibility==="connected"?"Connected":m.visibility==="tagged"?"Tagged":null)
+              background:(!m.visibility||m.visibility==="private")?"transparent":(m.visibility==="public")?"rgba(74,122,90,0.15)":(m.visibility==="subscriber")?"rgba(168,136,90,0.15)":"rgba(100,120,160,0.15)",
+              color:(!m.visibility||m.visibility==="private")?"#c0b0a0":(m.visibility==="public")?"#2d6b3a":(m.visibility==="subscriber")?"#7a5a20":"#3a4a7a",
+              border:(!m.visibility||m.visibility==="private")?"1px dashed rgba(180,160,140,0.4)":(m.visibility==="public")?"1px solid rgba(74,122,90,0.35)":(m.visibility==="subscriber")?"1px solid rgba(168,136,90,0.35)":"1px solid rgba(100,120,160,0.35)"
+            }},(!m.visibility||m.visibility==="private")?"Private":m.visibility==="public"?"Public":m.visibility==="subscriber"?"Subscribers":m.visibility==="connected"?"Connected":"Tagged")
           ),
           React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:isMobile?"1.6rem":"2rem",margin:"0 0 14px",color:"#1a1208",lineHeight:1.2}},m.title),
           React.createElement("div",{style:{display:"flex",gap:"7px",flexWrap:"wrap",marginBottom:"18px"}},
