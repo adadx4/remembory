@@ -1678,13 +1678,13 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
   const allFilterLocs=[...new Set(Object.values(personLocations||{}).flat())].sort();
   let filteredPeople = knownPeople.filter(n=>{
     if(q&&!n.toLowerCase().includes(q)) return false;
-  filteredPeople = filteredPeople.sort((a,b)=>a.localeCompare(b));
     if(filterRel&&(peopleRelationships?.[n]||"")!==filterRel) return false;
     if(filterOrg&&!(personOrgs?.[n]||[]).includes(filterOrg)) return false;
     if(filterLoc&&!(personLocations?.[n]||[]).includes(filterLoc)) return false;
     if(filterConnected&&!connectedNames.has(n.toLowerCase())) return false;
     return true;
   });
+  filteredPeople = filteredPeople.sort((a,b)=>a.localeCompare(b));
   filteredPeople=[...filteredPeople].sort((a,b)=>a.localeCompare(b));
   const filteredOrgs = q ? knownOrgs.filter(n=>n.toLowerCase().includes(q)) : knownOrgs;
   const activeFilters=[filterRel,filterOrg,filterLoc].filter(Boolean);
@@ -5079,7 +5079,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-30 05:34 UTC"
+          "Chronicle • build 2026-03-30 08:52 UTC"
         )
         ), // end account tab 4
       ),
