@@ -1772,7 +1772,8 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
 }
 
 // ── Geocode cache (persisted in localStorage) ─────────────────
-const GEOCODE_CACHE_KEY = "chronicle-geocode-cache";
+const GEOCODE_CACHE_KEY = "chronicle-geocode-cache".sort((a,b)=>a.localeCompare(b));
+;
 function loadGeocodeCache() { try { return JSON.parse(localStorage.getItem(GEOCODE_CACHE_KEY)||"{}"); } catch(e) { return {}; } }
 function saveGeocodeCache(cache) { try { localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache)); } catch(e) {} }
 
@@ -2944,7 +2945,10 @@ function App() {
     const updPOrgs={...personOrgs}; if(updPOrgs[oldName]!==undefined){updPOrgs[n]=updPOrgs[oldName];delete updPOrgs[oldName];}
     const updPLocs={...personLocations}; if(updPLocs[oldName]!==undefined){updPLocs[n]=updPLocs[oldName];delete updPLocs[oldName];}
     const updGroups=renamePersonInGroups(oldName,n);
-    persistSubject({memories:updMems,knownPeople:updKnown,peopleRelationships:updRels,peopleNotes:updNotes,personOrgs:updPOrgs,personLocations:updPLocs,personGroups:updGroups});
+    const updEmails={...peopleEmails}; if(updEmails[oldName]!==undefined){updEmails[n]=updEmails[oldName];delete updEmails[oldName];}
+    // Also rename in localConnections
+    try { const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]"); const ci=conns.findIndex(c=>c.name===oldName); if(ci>=0){conns[ci]={...conns[ci],name:n};localStorage.setItem("chronicle-connections",JSON.stringify(conns));setLocalConnections(conns);} } catch(e){}
+    persistSubject({memories:updMems,knownPeople:updKnown,peopleRelationships:updRels,peopleNotes:updNotes,personOrgs:updPOrgs,personLocations:updPLocs,personGroups:updGroups,peopleEmails:updEmails});
   }
   function deletePerson(name) {
     const updMems=memories.map(m=>({...m,people:m.people?.filter(p=>p!==name)||[]}));
@@ -5071,7 +5075,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-30 03:27 UTC"
+          "Chronicle • build 2026-03-30 05:00 UTC"
         )
         ), // end account tab 4
       ),
