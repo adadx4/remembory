@@ -1215,7 +1215,7 @@ function MemoryCard({m, onClick}) {
 
 // ── Main App ───────────────────────────────────────────────────
 
-function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, knownLocations, onRename, onDelete, onSetRelationship, onSetNotes, onSetOrgs, onSetLocs, onViewMemories, allRelationships=[]}) {
+function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, knownLocations, onRename, onDelete, onSetRelationship, onSetNotes, onSetOrgs, onSetLocs, onViewMemories, allRelationships=[], connectionEntry, onSetConnection}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(name);
   const [editingRel, setEditingRel] = React.useState(false);
@@ -5016,7 +5016,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-30 01:29 UTC"
+          "Chronicle • build 2026-03-30 01:36 UTC"
         )
         ), // end account tab 4
       ),
