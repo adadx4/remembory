@@ -1450,6 +1450,13 @@ function LocationRow({name, count, notes, coords, onRename, onDelete, onSetNotes
   const [editingCoords, setEditingCoords] = React.useState(false);
   const [coordDraft, setCoordDraft] = React.useState(coords ? coords.lat.toFixed(6)+","+coords.lng.toFixed(6) : "");
   const hasCoords = coords && coords.lat != null && coords.lng != null;
+  const nameParts = name.split(",").map(s=>s.trim());
+  const [editingStructured, setEditingStructured] = React.useState(false);
+  const [sStreet, setSStreet] = React.useState(nameParts[0]||"");
+  const [sTown,   setStown]   = React.useState(nameParts.length>1?nameParts[1]:"");
+  const [sState,  setSstate]  = React.useState(nameParts.length===4?nameParts[2]:"");
+  const [sCountry,setSCountry]= React.useState(nameParts.length>1?nameParts[nameParts.length-1]:"");
+  function commitStructured(){const parts=[sStreet,sTown,sState,sCountry].filter(v=>v.trim());const newName=parts.join(", ");if(newName&&newName!==name)onRename(name,newName);setEditingStructured(false);}
 
   function commitRename() { if(draft.trim()&&draft.trim()!==name) onRename(name,draft.trim()); setRenaming(false); }
   function commitNotes() { onSetNotes(name, notesDraft); }
@@ -1482,7 +1489,8 @@ function LocationRow({name, count, notes, coords, onRename, onDelete, onSetNotes
           style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:hasCoords?"#4a6a9a":"#c4858a",borderColor:hasCoords?"#8ab0d8":"#e0c8c8"}},
           hasCoords?"Coords":"⚠ Set coords"),
         React.createElement("button",{onClick:()=>setShowNotes(s=>!s),style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:notes?"#4a7a5a":"#8a7460",borderColor:notes?"#7a9e8a":"#c8b89a"}},showNotes?"Hide notes":(notes?"✓ Notes":"+ Notes")),
-        React.createElement("button",{onClick:()=>{if(window.confirm("Remove “"+name+"” from all memories?"))onDelete(name);},style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove")
+        React.createElement("button",{onClick:()=>{if(window.confirm("Remove “"+name+"” from all memories?"))onDelete(name);},style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove"),
+        React.createElement("button",{onClick:()=>setEditingStructured(s=>!s),style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#a8885a",borderColor:"rgba(168,136,90,0.4)"}},editingStructured?"Close":"Format")
       )
     ),
     editingCoords&&React.createElement("div",{style:{marginTop:"8px",display:"flex",gap:"6px",alignItems:"center",flexWrap:"wrap"}},
@@ -1493,6 +1501,18 @@ function LocationRow({name, count, notes, coords, onRename, onDelete, onSetNotes
       React.createElement("button",{onClick:commitCoords,style:{...S.btn,padding:"5px 12px",fontSize:"0.84rem"}},"Save"),
       hasCoords&&React.createElement("button",{onClick:()=>{onSetCoords(name,null);setCoordDraft("");setEditingCoords(false);},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.84rem",color:"#c4858a"}},"Clear"),
       React.createElement("button",{onClick:()=>setEditingCoords(false),style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.84rem"}},"Cancel")
+    ),
+    editingStructured&&React.createElement("div",{style:{background:"rgba(168,136,90,0.06)",border:"1px solid rgba(168,136,90,0.2)",borderRadius:"3px",padding:"10px 14px",margin:"8px 0"}},
+      React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",marginBottom:"8px",lineHeight:1.5}},"Format for map accuracy. ★ Town and Country needed for geocoding."),
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginBottom:"6px"}},
+        React.createElement("input",{value:sStreet,onChange:e=>setSStreet(e.target.value),placeholder:"Street / place name",style:{...S.input,fontSize:"0.86rem"}}),
+        React.createElement("input",{value:sTown,onChange:e=>setStown(e.target.value),placeholder:"Town / City ★",style:{...S.input,fontSize:"0.86rem"}})
+      ),
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginBottom:"8px"}},
+        React.createElement("input",{value:sState,onChange:e=>setSstate(e.target.value),placeholder:"State / Region",style:{...S.input,fontSize:"0.86rem"}}),
+        React.createElement("input",{value:sCountry,onChange:e=>setSCountry(e.target.value),placeholder:"Country ★",style:{...S.input,fontSize:"0.86rem"}})
+      ),
+      React.createElement("button",{onClick:commitStructured,style:{...S.btn,padding:"6px 16px",fontSize:"0.86rem"}},"Save")
     ),
     showNotes&&React.createElement("div",{style:{marginTop:"8px"}},
       React.createElement("textarea",{value:notesDraft,onChange:e=>setNotesDraft(e.target.value),onBlur:commitNotes,placeholder:"Notes about this location…",rows:3,style:{...S.input,width:"100%",resize:"vertical",fontSize:"0.88rem",fontFamily:"'Crimson Text',Georgia,serif",lineHeight:1.6}}),
@@ -1691,7 +1711,7 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
     React.createElement("div",{style:{marginBottom:"36px"}},
       React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"4px"}},
         knownPeople.length>0&&React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:0}},"People"),
-        !addingPerson&&React.createElement("button",{onClick:()=>{setNewName("");setAddingPerson(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add person")
+        knownOrgs.length===0&&!addingPerson&&React.createElement("button",{onClick:()=>{setNewName("");setAddingPerson(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add person")
       ),
       addingPerson&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"10px"}},
         React.createElement("input",{autoFocus:true,value:newName,onChange:e=>setNewName(e.target.value),
@@ -1714,9 +1734,9 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
         connectionEntry:(localConnections||[]).find(c=>c.name===name)||null,
         onSetConnection,
         onViewMemories:()=>onViewPerson(name)})),
-      knownPeople.length===0&&!addingPerson&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No people recorded yet.")
+      knownOrgs.length===0&&knownPeople.length===0&&!addingPerson&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No people recorded yet.")
     ),
-    React.createElement("div",null,
+    (knownOrgs.length>0||addingOrg)&&React.createElement("div",null,
       React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"4px"}},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:0}},"Organisations"),
         !addingOrg&&React.createElement("button",{onClick:()=>{setNewName("");setAddingOrg(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add org")
@@ -5021,7 +5041,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-30 01:49 UTC"
+          "Chronicle • build 2026-03-30 02:12 UTC"
         )
         ), // end account tab 4
       ),
