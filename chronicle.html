@@ -1258,7 +1258,31 @@ function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, kno
           style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:notes?"#4a7a5a":"#8a7460",borderColor:notes?"#7a9e8a":"#c8b89a"}},
           showNotes ? "Hide notes" : (notes ? "\u2713 Notes" : "+ Notes")),
         React.createElement("button",{onClick:()=>{if(window.confirm(`Remove "${name}" from all memories?`))onDelete(name);},
-          style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove")
+          style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove"),
+        connectionEntry
+          ? React.createElement("span",{style:{fontSize:"0.78rem",color:connectionEntry.preConnected?"#7a5a20":"#4a7a5a",background:connectionEntry.preConnected?"rgba(168,136,90,0.1)":"rgba(74,122,90,0.1)",border:connectionEntry.preConnected?"1px solid rgba(168,136,90,0.3)":"1px solid rgba(74,122,90,0.3)",borderRadius:"20px",padding:"2px 9px",cursor:"default"}},
+              connectionEntry.preConnected?"✉ email on file":"✓ Connected")
+          : React.createElement("button",{onClick:()=>setAddingConn(a=>!a),
+              style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.78rem",color:"#a8885a",borderColor:"rgba(168,136,90,0.4)"}},
+              addingConn?"Cancel":"✚ Connect")
+      )
+    ),
+    addingConn&&!connectionEntry&&React.createElement("div",{style:{background:"rgba(168,136,90,0.06)",border:"1px solid rgba(168,136,90,0.2)",borderRadius:"3px",padding:"10px 14px",margin:"6px 0",display:"flex",flexDirection:"column",gap:"6px"}},
+      React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",lineHeight:1.5}},
+        "Enter "+name+"\u2019s email. You\u2019ll be recognised as connected if they join Chronicle."
+      ),
+      React.createElement("div",{style:{display:"flex",gap:"6px"}},
+        React.createElement("input",{type:"email",value:connEmail,
+          onChange:e=>setConnEmail(e.target.value),
+          onKeyDown:e=>{if(e.key==="Enter"&&connEmail.includes("@")){onSetConnection(name,connEmail);setAddingConn(false);}},
+          placeholder:"their@email.com",autoFocus:true,
+          style:{...S.input,flex:1,fontSize:"0.88rem"}
+        }),
+        React.createElement("button",{
+          onClick:()=>{if(connEmail.includes("@")){onSetConnection(name,connEmail);setAddingConn(false);}},
+          disabled:!connEmail.includes("@"),
+          style:{...S.btn,padding:"7px 14px",opacity:connEmail.includes("@")?1:0.4}
+        },"Save")
       )
     ),
     showNotes && React.createElement("div",{style:{marginTop:"8px",paddingLeft:"2px"}},
@@ -1681,6 +1705,14 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
         locs:personLocations?.[name]||[],knownLocations:knownLocations||[],onSetLocs:onSetPersonLocations,
         allRelationships:Object.values(peopleRelationships).filter(Boolean),
         onSetRelationship,onSetNotes:onSetPersonNotes,onRename:onRenamePerson,onDelete:onDeletePerson,
+        connectionEntry:(localConnections||[]).find(c=>c.name===name)||null,
+        onSetConnection:(pName,email)=>{
+          const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
+          if(!conns.find(c=>c.name===pName)){
+            conns.push({name:pName,email,preConnected:true,connectedAt:new Date().toISOString()});
+            localStorage.setItem("chronicle-connections",JSON.stringify(conns));
+          }
+        },
         onViewMemories:()=>onViewPerson(name)})),
       knownPeople.length===0&&!addingPerson&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No people recorded yet.")
     ),
@@ -3059,9 +3091,11 @@ function App() {
       const d = {...dRaw, memories: restoredMems};
       const isShared = !!d.sharedBy;
       const senderName = d.sharedBy || null;
+      // Compute existingIds early so incomingMems.map can skip content-wrapping for already-owned memories
+      const existingIds = new Set(memories.map(m=>m.id));
       const senderEmail2 = d.sharedByEmail || '';
       const incomingMems = d.memories.map(m => {
-        if (!isShared || !m.content) return m;
+        if (!isShared || !m.content || existingIds.has(m.id)) return m; // skip content-wrap if we already own this memory
         const existingPerspectives = m.perspectives || [];
         const alreadyHasSender = existingPerspectives.some(p=>p.author===senderName);
         const perspectives = alreadyHasSender ? existingPerspectives : [
@@ -3072,7 +3106,6 @@ function App() {
         const people = senderName && !existingPeople.includes(senderName) ? [...existingPeople, senderName] : existingPeople;
         return {...m, content:"", perspectives, sharedBy:senderName, sharedByEmail:senderEmail2, sharedAt:d.sharedAt, people};
       });
-      const existingIds = new Set(memories.map(m=>m.id));
       const toAdd = incomingMems.filter(m=>!existingIds.has(m.id));
       const merged = memories.map(m=>{
         const incoming = incomingMems.find(im=>im.id===m.id);
@@ -3103,9 +3136,11 @@ function App() {
   function acceptShare(d) {
     const isShared = !!d.sharedBy;
     const senderName = d.sharedBy || null;
+    // Compute existingIds early so incomingMems.map can skip content-wrapping for already-owned memories
+    const existingIds = new Set(memories.map(m=>m.id));
     const senderEmail = d.sharedByEmail || null;
     const incomingMems = d.memories.map(m => {
-      if (!isShared || !m.content) return m;
+      if (!isShared || !m.content || existingIds.has(m.id)) return m; // skip content-wrap if we already own this memory
       const existingPerspectives = m.perspectives || [];
       const alreadyHasSender = existingPerspectives.some(p=>p.author===senderName);
       const perspectives = alreadyHasSender ? existingPerspectives : [
@@ -3116,7 +3151,6 @@ function App() {
       const people = senderName && !existingPeople.includes(senderName) ? [...existingPeople, senderName] : existingPeople;
       return {...m, content:"", perspectives, sharedBy:senderName, sharedByEmail:senderEmail, sharedAt:d.sharedAt, people};
     });
-    const existingIds = new Set(memories.map(m=>m.id));
     const toAdd = incomingMems.filter(m=>!existingIds.has(m.id));
     const merged = memories.map(m=>{
       const incoming = incomingMems.find(im=>im.id===m.id);
@@ -3136,6 +3170,14 @@ function App() {
       peopleEmails:updatedEmails
     });
     setPendingShare(null);
+    // Upgrade pre-connection if sender email matches
+    if (senderEmail) {
+      try {
+        const conns = JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
+        const preIdx = conns.findIndex(c=>c.email===senderEmail&&c.preConnected);
+        if (preIdx>=0) { conns[preIdx]={...conns[preIdx],preConnected:false,connectedAt:new Date().toISOString()}; localStorage.setItem("chronicle-connections",JSON.stringify(conns)); }
+      } catch(e) {}
+    }
     // Show connection request if sender requested it and not suppressed
     if (d.requestConnect && senderEmail && !suppressConnectRequests.includes(senderEmail)) {
       setPendingConnectRequest({ name: senderName, email: senderEmail });
@@ -3912,11 +3954,13 @@ function App() {
       d = {...d, memories: restoredMems};
       const isShared = !!d.sharedBy;
       const senderName = d.sharedBy || null;
+      // Compute existingIds early so incomingMems.map can skip content-wrapping for already-owned memories
+      const existingIds = new Set(memories.map(m=>m.id));
       const senderEmail = d.sharedByEmail || null;
 
       // For shared memories
       const incomingMems = d.memories.map(m => {
-        if (!isShared || !m.content) return m;
+        if (!isShared || !m.content || existingIds.has(m.id)) return m; // skip content-wrap if we already own this memory
         // Move content into a named perspective, clear it from the main body
         const existingPerspectives = m.perspectives || [];
         const alreadyHasSender = existingPerspectives.some(p=>p.author===senderName);
@@ -3931,7 +3975,6 @@ function App() {
       });
 
       // Merge: if a memory with same id exists, merge perspectives into it; otherwise add new
-      const existingIds = new Set(memories.map(m=>m.id));
       const toAdd = incomingMems.filter(m=>!existingIds.has(m.id));
       let mergedPerspectivesCount = 0;
       const merged = memories.map(m=>{
@@ -4977,7 +5020,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-29 23:54 UTC"
+          "Chronicle • build 2026-03-30 00:40 UTC"
         )
         ), // end account tab 4
       ),
