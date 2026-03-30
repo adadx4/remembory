@@ -205,7 +205,7 @@ function sortKey(m) {
 }
 
 function newForm() {
-  return { title:"", content:"", year:new Date().getFullYear(), month:1, day:1, fuzzy:"day", season:"Early", location:"", locations:[], tags:[], people:[], orgs:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"" };
+  return { title:"", content:"", year:new Date().getFullYear(), month:1, day:1, fuzzy:"day", season:"Early", location:"", locations:[], tags:[], people:[], orgs:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town" };
 }
 
 // ── Storage ────────────────────────────────────────────────────
@@ -1666,6 +1666,7 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
   const [filterLoc, setFilterLoc] = React.useState(null);
   const [filterConnected, setFilterConnected] = React.useState(false);
   const connectedNames = React.useMemo(()=>new Set((localConnections||[]).map(c=>c.name.toLowerCase())),[localConnections]);
+  const [openDrop, setOpenDrop] = React.useState(null);
   const [addingPerson, setAddingPerson] = React.useState(false);
   const [addingOrg, setAddingOrg] = React.useState(false);
   const [newName, setNewName] = React.useState("");
@@ -1695,17 +1696,31 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
         React.createElement("span",{style:{position:"absolute",left:"10px",top:"50%",transform:"translateY(-50%)",color:"#7a6a58",fontSize:"0.9rem",pointerEvents:"none"}},"🔍"),
         search&&React.createElement("button",{onClick:()=>setSearch(""),style:{position:"absolute",right:"8px",top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"1rem",lineHeight:1}},"×")
       ),
-      (allFilterRels.length>0||allFilterOrgs.length>0||allFilterLocs.length>0)&&React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"5px",alignItems:"center"}},
-        React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic",marginRight:"2px"}},"Filter:"),
-        (localConnections||[]).length>0&&React.createElement("button",{
-          key:"connected",onClick:()=>setFilterConnected(!filterConnected),
-          style:{...chipStyle(filterConnected),background:filterConnected?"#4a7a5a":"transparent",
-            borderColor:filterConnected?"#4a7a5a":"#c8b89a",color:filterConnected?"#fff":"#6a5840"}},
-          "✓ Connected"+(filterConnected?" ×":"")),
-        allFilterRels.map(r=>React.createElement("button",{key:r,onClick:()=>setFilterRel(filterRel===r?null:r),style:chipStyle(filterRel===r)},r)),
-        allFilterOrgs.map(o=>React.createElement("button",{key:"o"+o,onClick:()=>setFilterOrg(filterOrg===o?null:o),style:chipStyle(filterOrg===o)},"🏛 ",o)),
-        allFilterLocs.map(l=>React.createElement("button",{key:"l"+l,onClick:()=>setFilterLoc(filterLoc===l?null:l),style:chipStyle(filterLoc===l)},"📍 ",l)),
-        activeFilters.length>0&&React.createElement("button",{onClick:()=>{setFilterRel(null);setFilterOrg(null);setFilterLoc(null);},style:{...chipStyle(false),color:"#c4858a",borderColor:"#e0c8c8"}},"clear")
+      React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"5px",alignItems:"center",marginBottom:"8px"}},
+        filterConnected&&React.createElement("span",{onClick:()=>setFilterConnected(false),style:{...chipStyle(true),background:"#4a7a5a",color:"#fff",borderColor:"#4a7a5a",cursor:"pointer"}},"✓ Connected ×"),
+        filterRel&&React.createElement("span",{onClick:()=>setFilterRel(null),style:{...chipStyle(true),cursor:"pointer"}},filterRel+" ×"),
+        filterOrg&&React.createElement("span",{onClick:()=>setFilterOrg(null),style:{...chipStyle(true),cursor:"pointer"}},filterOrg+" ×"),
+        filterLoc&&React.createElement("span",{onClick:()=>setFilterLoc(null),style:{...chipStyle(true),cursor:"pointer"}},filterLoc+" ×"),
+        !filterRel&&allFilterRels.length>0&&React.createElement("div",{style:{position:"relative"}},
+          React.createElement("button",{onClick:()=>setOpenDrop(openDrop==="rel"?null:"rel"),style:{...chipStyle(false),fontSize:"0.74rem"}},"Relationship ▾"),
+          openDrop==="rel"&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"3px",zIndex:50,minWidth:"150px",boxShadow:"0 4px 12px rgba(0,0,0,.1)",padding:"4px 0"}},
+            allFilterRels.map(r=>React.createElement("div",{key:r,onClick:()=>{setFilterRel(r);setOpenDrop(null);},style:{padding:"7px 12px",cursor:"pointer",fontSize:"0.86rem",color:"#2c2416"},onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",onMouseLeave:e=>e.currentTarget.style.background="transparent"},r))
+          )
+        ),
+        !filterOrg&&allFilterOrgs.length>0&&React.createElement("div",{style:{position:"relative"}},
+          React.createElement("button",{onClick:()=>setOpenDrop(openDrop==="org"?null:"org"),style:{...chipStyle(false),fontSize:"0.74rem"}},"Organisation ▾"),
+          openDrop==="org"&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"3px",zIndex:50,minWidth:"150px",boxShadow:"0 4px 12px rgba(0,0,0,.1)",padding:"4px 0"}},
+            allFilterOrgs.map(o=>React.createElement("div",{key:o,onClick:()=>{setFilterOrg(o);setOpenDrop(null);},style:{padding:"7px 12px",cursor:"pointer",fontSize:"0.86rem",color:"#2c2416"},onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",onMouseLeave:e=>e.currentTarget.style.background="transparent"},o))
+          )
+        ),
+        !filterLoc&&allFilterLocs.length>0&&React.createElement("div",{style:{position:"relative"}},
+          React.createElement("button",{onClick:()=>setOpenDrop(openDrop==="loc"?null:"loc"),style:{...chipStyle(false),fontSize:"0.74rem"}},"Location ▾"),
+          openDrop==="loc"&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"3px",zIndex:50,minWidth:"150px",boxShadow:"0 4px 12px rgba(0,0,0,.1)",padding:"4px 0"}},
+            allFilterLocs.map(l=>React.createElement("div",{key:l,onClick:()=>{setFilterLoc(l);setOpenDrop(null);},style:{padding:"7px 12px",cursor:"pointer",fontSize:"0.86rem",color:"#2c2416"},onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",onMouseLeave:e=>e.currentTarget.style.background="transparent"},l))
+          )
+        ),
+        (localConnections||[]).length>0&&!filterConnected&&React.createElement("button",{onClick:()=>setFilterConnected(true),style:{...chipStyle(false),fontSize:"0.74rem"}},"✓ Connected"),
+        (filterRel||filterOrg||filterLoc||filterConnected)&&React.createElement("span",{onClick:()=>{setFilterRel(null);setFilterOrg(null);setFilterLoc(null);setFilterConnected(false);setOpenDrop(null);},style:{...chipStyle(false),color:"#c4858a",borderColor:"#e0c8c8",cursor:"pointer"}},"clear all")
       )
     ),
     React.createElement("div",{style:{marginBottom:"36px"}},
@@ -3009,6 +3024,10 @@ function App() {
 
   function handleSubmit() {
     if (!form.title.trim()) return;
+    if (form.locationTown||form.locationState||form.locationCountry) {
+      const parts=[form.location,form.locationTown,form.locationState,form.locationCountry].filter(v=>v&&v.trim());
+      if(parts.length>1) updateForm({location:parts.join(", ")});
+    }
     const primaryId = editingId || (Date.now().toString()+Math.random().toString(36).slice(2));
     const primary = {...form, id:primaryId};
 
@@ -5024,6 +5043,17 @@ function App() {
 
         settingsTab==="account"&&React.createElement(React.Fragment,null,
 
+        // ── Receive shared memories ──
+        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Receive shared memories"),
+          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 12px",lineHeight:1.6}},"Enter a share code from someone\u2019s message or the bridge page."),
+          React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"8px"}},
+            React.createElement("input",{type:"text",value:shareCodeInput,onChange:e=>setShareCodeInput(e.target.value.trim()),onKeyDown:e=>e.key==="Enter"&&importFromCode(),placeholder:"e.g. a1b2c3d4",style:{...S.input,flex:1,fontFamily:"monospace",fontSize:"1rem",letterSpacing:"0.05em"}}),
+            React.createElement("button",{onClick:importFromCode,disabled:!shareCodeInput.trim()||shareCodeStatus==="Fetching\u2026",style:{...S.btn,padding:"9px 18px",whiteSpace:"nowrap",opacity:shareCodeInput.trim()?1:0.4}},shareCodeStatus==="Fetching\u2026"?"Fetching\u2026":"Import")
+          ),
+          shareCodeStatus&&React.createElement("p",{style:{fontSize:"0.84rem",color:shareCodeStatus.startsWith("\u2713")?"#4a7a5a":"#c4858a",fontStyle:"italic"}},shareCodeStatus)
+        ),
+
         // ── Danger zone ──
         React.createElement("div",{style:{background:"rgba(255,245,245,0.7)",border:"1px solid #e0c8c8",borderRadius:"3px",padding:"20px"}},
           React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#8a3030",margin:"0 0 8px"}},"Reset"),
@@ -5041,7 +5071,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-30 02:12 UTC"
+          "Chronicle • build 2026-03-30 03:27 UTC"
         )
         ), // end account tab 4
       ),
@@ -5784,7 +5814,23 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
           ),
           React.createElement("div",null,
             React.createElement("label",{style:S.label},"Primary Location"),
-            React.createElement(LocationAutocomplete,{value:form.location,onChange:v=>updateForm({location:v}),knownLocations,placeholder:"Where were you? (optional)"})
+            React.createElement(LocationAutocomplete,{value:form.location,onChange:v=>updateForm({location:v}),knownLocations,placeholder:"Street address or place name (optional)"}),
+            form.location&&!form.location.includes(",")&&!(form.locationTown||form.locationCountry)&&
+              React.createElement("p",{style:{fontSize:"0.74rem",color:"#a8885a",fontStyle:"italic",marginTop:"4px"}},"⚠ For map accuracy, add Town and Country below."),
+            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginTop:"6px"}},
+              React.createElement("input",{value:form.locationTown||"",onChange:e=>updateForm({locationTown:e.target.value}),placeholder:"Town / City",style:{...S.input,fontSize:"0.88rem"}}),
+              React.createElement("input",{value:form.locationState||"",onChange:e=>updateForm({locationState:e.target.value}),placeholder:"State / Region (optional)",style:{...S.input,fontSize:"0.88rem"}})
+            ),
+            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginTop:"6px"}},
+              React.createElement("input",{value:form.locationCountry||"",onChange:e=>updateForm({locationCountry:e.target.value}),placeholder:"Country",style:{...S.input,fontSize:"0.88rem"}}),
+              React.createElement("select",{value:form.locationPrivacy||"town",onChange:e=>updateForm({locationPrivacy:e.target.value}),style:{...S.input,fontSize:"0.82rem",color:"#8a7460"},title:"Location detail to show when publishing"},
+                React.createElement("option",{value:"full"},"Publish: Full address"),
+                React.createElement("option",{value:"town"},"Publish: Town + Country"),
+                React.createElement("option",{value:"state"},"Publish: State + Country"),
+                React.createElement("option",{value:"country"},"Publish: Country only"),
+                React.createElement("option",{value:"none"},"Publish: Don\u2019t show")
+              )
+            )
           ),
           React.createElement("div",null,
             React.createElement("label",{style:S.label},"Additional Locations"),
