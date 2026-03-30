@@ -1262,8 +1262,12 @@ function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, kno
         React.createElement("button",{onClick:()=>{if(window.confirm(`Remove "${name}" from all memories?`))onDelete(name);},
           style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove"),
         connectionEntry
-          ? React.createElement("span",{style:{fontSize:"0.78rem",color:connectionEntry.preConnected?"#7a5a20":"#4a7a5a",background:connectionEntry.preConnected?"rgba(168,136,90,0.1)":"rgba(74,122,90,0.1)",border:connectionEntry.preConnected?"1px solid rgba(168,136,90,0.3)":"1px solid rgba(74,122,90,0.3)",borderRadius:"20px",padding:"2px 9px",cursor:"default"}},
-              connectionEntry.preConnected?"✉ email on file":"✓ Connected")
+          ? React.createElement(React.Fragment,null,
+              React.createElement("span",{style:{fontSize:"0.78rem",color:connectionEntry.preConnected?"#7a5a20":"#4a7a5a",background:connectionEntry.preConnected?"rgba(168,136,90,0.1)":"rgba(74,122,90,0.1)",border:connectionEntry.preConnected?"1px solid rgba(168,136,90,0.3)":"1px solid rgba(74,122,90,0.3)",borderRadius:"20px",padding:"2px 9px"}},
+                connectionEntry.preConnected?"✉ email on file":"✓ Connected"),
+              React.createElement("button",{onClick:()=>onSetConnection(name,null),
+                style:{background:"transparent",border:"none",color:"#c4858a",cursor:"pointer",fontSize:"0.76rem",padding:"0 4px",textDecoration:"underline"}},"disconnect")
+            )
           : React.createElement("button",{onClick:()=>setAddingConn(a=>!a),
               style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.78rem",color:"#a8885a",borderColor:"rgba(168,136,90,0.4)"}},
               addingConn?"Cancel":"✚ Connect")
@@ -1686,7 +1690,7 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
     ),
     React.createElement("div",{style:{marginBottom:"36px"}},
       React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"4px"}},
-        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:0}},"People"),
+        knownPeople.length>0&&React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:0}},"People"),
         !addingPerson&&React.createElement("button",{onClick:()=>{setNewName("");setAddingPerson(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add person")
       ),
       addingPerson&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"10px"}},
@@ -2772,7 +2776,8 @@ function App() {
   const [profileConfirm, setProfileConfirm] = React.useState(false);
   const [settingsTab, setSettingsTab] = React.useState("account");
   const [syncFileHandle, setSyncFileHandle] = React.useState(null);
-  const [syncStatus, setSyncStatus] = React.useState(""); // "", "syncing", "done", "error"
+  const [syncStatus, setSyncStatus] = React.useState("");
+  const [localConnections, setLocalConnections] = React.useState(()=>{ try{return JSON.parse(localStorage.getItem("chronicle-connections")||"[]");}catch(e){return[];} }); // "", "syncing", "done", "error"
   const [syncInfo, setSyncInfo] = React.useState(() => { try { return JSON.parse(localStorage.getItem("chronicle-sync-info")||"null"); } catch(e) { return null; } }); // {name, lastSync}
   const [notifications, setNotifications] = React.useState([]);  // [{identifier,displayName,url,addedAt}]
 
@@ -4692,13 +4697,13 @@ function App() {
           ),
           // People tab renders the full manager inline
           indexTab==="people"
-            ? React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,
+            ? React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs:[],knownLocations,memories,peopleRelationships,personOrgs,personLocations,
                 onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,
                 onRenamePerson:renamePerson,onDeletePerson:deletePerson,
                 onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
                 onViewPerson:name=>setIndexFilter({type:"people",value:name}),
                 onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},
-                onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:JSON.parse(localStorage.getItem("chronicle-connections")||"[]"),onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(!conns.find(c=>c.name===pName)){conns.push({name:pName,email,preConnected:true,connectedAt:new Date().toISOString()});localStorage.setItem("chronicle-connections",JSON.stringify(conns));}},})
+                onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},})
             : indexTab==="orgs"
             ? React.createElement(PeopleOrgsManager,{knownPeople:[],knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,
                 onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,
@@ -4706,7 +4711,7 @@ function App() {
                 onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
                 onViewPerson:name=>setIndexFilter({type:"orgs",value:name}),
                 onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},
-                onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:JSON.parse(localStorage.getItem("chronicle-connections")||"[]"),onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(!conns.find(c=>c.name===pName)){conns.push({name:pName,email,preConnected:true,connectedAt:new Date().toISOString()});localStorage.setItem("chronicle-connections",JSON.stringify(conns));}},})
+                onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},})
             : indexTab==="locations"
             ? React.createElement(LocationsPanel,{knownLocations,memories,locationNotes,locationCoords,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setIndexFilter,persistSubject})
             : indexTab==="relationships"
@@ -4744,7 +4749,7 @@ function App() {
       })(),
 
       // ── PEOPLE & ORGS ──
-      view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,peopleNotes,orgNotes,localConnections:JSON.parse(localStorage.getItem("chronicle-connections")||"[]"),onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");},onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:JSON.parse(localStorage.getItem("chronicle-connections")||"[]"),onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(!conns.find(c=>c.name===pName)){conns.push({name:pName,email,preConnected:true,connectedAt:new Date().toISOString()});localStorage.setItem("chronicle-connections",JSON.stringify(conns));}},}),
+      view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,peopleNotes,orgNotes,localConnections:localConnections,onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");},onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},}),
 
       // ── PRINT VIEW ──
       view==="settings"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"720px"}},
@@ -5016,7 +5021,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-30 01:36 UTC"
+          "Chronicle • build 2026-03-30 01:49 UTC"
         )
         ), // end account tab 4
       ),
@@ -5687,7 +5692,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
             React.createElement("button",{onClick:()=>handleEdit(m),style:S.btn},"Edit"),
             React.createElement("button",{onClick:()=>handleDelete(m.id),style:{...S.btnOutline,color:"#c4858a",borderColor:"#c4858a"}},"Delete"),
             isSubscriber
-              ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,localConnections:JSON.parse(localStorage.getItem("chronicle-connections")||"[]"),onRecordShare:recordShare})
+              ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,localConnections:localConnections,onRecordShare:recordShare})
               : React.createElement("div",{style:{position:"relative",display:"inline-block"}},
                   React.createElement("button",{disabled:true,style:{...S.btnOutline,opacity:0.4,cursor:"not-allowed",fontSize:"0.86rem",padding:"7px 14px"}},"✉ Share"),
                   React.createElement("div",{style:{position:"absolute",bottom:"calc(100% + 6px)",left:"50%",transform:"translateX(-50%)",background:"#2c2416",color:"#f5f0e8",fontSize:"0.72rem",padding:"5px 9px",borderRadius:"3px",whiteSpace:"nowrap",zIndex:10,lineHeight:1.4,pointerEvents:"none"}},
