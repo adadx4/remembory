@@ -1678,13 +1678,14 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
   const allFilterLocs=[...new Set(Object.values(personLocations||{}).flat())].sort();
   let filteredPeople = knownPeople.filter(n=>{
     if(q&&!n.toLowerCase().includes(q)) return false;
+  filteredPeople = filteredPeople.sort((a,b)=>a.localeCompare(b));
     if(filterRel&&(peopleRelationships?.[n]||"")!==filterRel) return false;
     if(filterOrg&&!(personOrgs?.[n]||[]).includes(filterOrg)) return false;
     if(filterLoc&&!(personLocations?.[n]||[]).includes(filterLoc)) return false;
     if(filterConnected&&!connectedNames.has(n.toLowerCase())) return false;
     return true;
   });
-  filteredPeople=[...filteredPeople].sort((a,b)=>{const ca=personCount(a),cb=personCount(b);if(ca===0&&cb>0)return -1;if(cb===0&&ca>0)return 1;return a.localeCompare(b);});
+  filteredPeople=[...filteredPeople].sort((a,b)=>a.localeCompare(b));
   const filteredOrgs = q ? knownOrgs.filter(n=>n.toLowerCase().includes(q)) : knownOrgs;
   const activeFilters=[filterRel,filterOrg,filterLoc].filter(Boolean);
   const chipStyle=(active)=>({display:"inline-flex",alignItems:"center",gap:"4px",padding:"3px 10px",borderRadius:"20px",fontSize:"0.78rem",cursor:"pointer",border:"1px solid",fontFamily:"'Crimson Text',serif",background:active?"#2c2416":"transparent",color:active?"#f5f0e8":"#6a5840",borderColor:active?"#2c2416":"#c8b89a"});
@@ -1772,7 +1773,7 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
 }
 
 // ── Geocode cache (persisted in localStorage) ─────────────────
-const GEOCODE_CACHE_KEY = "chronicle-geocode-cache".sort((a,b)=>a.localeCompare(b));
+const GEOCODE_CACHE_KEY = "chronicle-geocode-cache";
 ;
 function loadGeocodeCache() { try { return JSON.parse(localStorage.getItem(GEOCODE_CACHE_KEY)||"{}"); } catch(e) { return {}; } }
 function saveGeocodeCache(cache) { try { localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache)); } catch(e) {} }
@@ -3028,12 +3029,15 @@ function App() {
 
   function handleSubmit() {
     if (!form.title.trim()) return;
+    // Build canonical location from sub-fields synchronously
+    let canonicalLocation = form.location;
     if (form.locationTown||form.locationState||form.locationCountry) {
       const parts=[form.location,form.locationTown,form.locationState,form.locationCountry].filter(v=>v&&v.trim());
-      if(parts.length>1) updateForm({location:parts.join(", ")});
+      if(parts.length>1) canonicalLocation = parts.join(", ");
     }
+    const formWithLoc = canonicalLocation !== form.location ? {...form, location:canonicalLocation} : form;
     const primaryId = editingId || (Date.now().toString()+Math.random().toString(36).slice(2));
-    const primary = {...form, id:primaryId};
+    const primary = {...formWithLoc, id:primaryId};
 
     // If there's an end date, offer to create a second memory for it
     if ((form.endFuzzy || form.endOngoing) && !editingId) {
@@ -5075,7 +5079,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-30 05:00 UTC"
+          "Chronicle • build 2026-03-30 05:34 UTC"
         )
         ), // end account tab 4
       ),
