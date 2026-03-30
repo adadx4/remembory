@@ -71,7 +71,7 @@ function useWindowSize() {
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const TAGS = ["childhood","family","travel","education","work","love","health","milestone","home","friendship","adventure","loss"];
 // ← Replace this with your Worker URL after deploying to Cloudflare
-const WORKER_URL = "https://share.remembory.net";
+const WORKER_URL = "https://social.remembory.net";
 
 // ── Licence key validation (Lemon Squeezy) ────────────────────
 // Keys are issued by Lemon Squeezy. We validate against their API on first use,
@@ -4618,7 +4618,7 @@ function App() {
         !isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("map"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"🗺 Map"),
         !isMobile&&!["add","edit"].includes(view)&&isSubscriber&&wantPublicProfile&&React.createElement("a",{
           href:(()=>{
-            const base="https://share.remembory.net/explore";
+            const base="https://social.remembory.net/";
             const params=[];
             if(licenceKey) params.push("key="+encodeURIComponent(licenceKey));
             if(profileState?.identifier) params.push("id="+profileState.identifier);

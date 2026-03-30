@@ -41,7 +41,7 @@ self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
 
   // Cloudflare Worker — never cache
-  if (url.hostname.includes("share.remembory.net") || url.hostname.includes("workers.dev")) return;
+  if (url.hostname.includes("social.remembory.net") || url.hostname.includes("share.remembory.net") || url.hostname.includes("workers.dev")) return;
 
   // Geocoding — never cache
   if (url.hostname.includes("nominatim.openstreetmap.org")) return;
