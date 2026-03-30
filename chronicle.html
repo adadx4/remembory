@@ -1231,6 +1231,8 @@ function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, kno
   const [locSearch, setLocSearch] = React.useState("");
   const locSugs = locSearch.length>0 ? (knownLocations||[]).filter(l=>l.toLowerCase().includes(locSearch.toLowerCase())&&!(locs||[]).includes(l)) : [];
 
+  const [addingConn, setAddingConn] = React.useState(false);
+  const [connEmail, setConnEmail] = React.useState(connectionEntry?.email||"");
   function commitRename() { if(draft.trim()&&draft.trim()!==name) onRename(name,draft.trim()); setRenaming(false); }
   function commitRel() { onSetRelationship(name, relDraft.trim()); setEditingRel(false); setShowRelSugs(false); }
   function commitNotes() { onSetNotes(name, notesDraft); }
@@ -1633,7 +1635,7 @@ function GroupsManager({personGroups, knownPeople, memories, onSetGroups, onView
   );
 }
 
-function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,peopleNotes,orgNotes,personOrgs,personLocations,localConnections,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onSetPersonOrgs,onSetPersonLocations,onViewPerson,onAddPerson,onAddOrg}) {
+function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,peopleNotes,orgNotes,personOrgs,personLocations,localConnections,onSetConnection,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onSetPersonOrgs,onSetPersonLocations,onViewPerson,onAddPerson,onAddOrg}) {
   const [search, setSearch] = React.useState("");
   const [filterRel, setFilterRel] = React.useState(null);
   const [filterOrg, setFilterOrg] = React.useState(null);
@@ -1706,13 +1708,7 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
         allRelationships:Object.values(peopleRelationships).filter(Boolean),
         onSetRelationship,onSetNotes:onSetPersonNotes,onRename:onRenamePerson,onDelete:onDeletePerson,
         connectionEntry:(localConnections||[]).find(c=>c.name===name)||null,
-        onSetConnection:(pName,email)=>{
-          const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
-          if(!conns.find(c=>c.name===pName)){
-            conns.push({name:pName,email,preConnected:true,connectedAt:new Date().toISOString()});
-            localStorage.setItem("chronicle-connections",JSON.stringify(conns));
-          }
-        },
+        onSetConnection,
         onViewMemories:()=>onViewPerson(name)})),
       knownPeople.length===0&&!addingPerson&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No people recorded yet.")
     ),
@@ -5020,7 +5016,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-30 01:23 UTC"
+          "Chronicle • build 2026-03-30 01:29 UTC"
         )
         ), // end account tab 4
       ),
