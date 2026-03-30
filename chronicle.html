@@ -1451,11 +1451,17 @@ function LocationRow({name, count, notes, coords, onRename, onDelete, onSetNotes
   const [coordDraft, setCoordDraft] = React.useState(coords ? coords.lat.toFixed(6)+","+coords.lng.toFixed(6) : "");
   const hasCoords = coords && coords.lat != null && coords.lng != null;
   const nameParts = name.split(",").map(s=>s.trim());
+  // Parse based on part count:
+  // 1 part: treat as street/place (user will add town/country)
+  // 2 parts: Town, Country
+  // 3 parts: Town, State, Country
+  // 4+ parts: Street, Town, State, Country
+  const np = nameParts;
   const [editingStructured, setEditingStructured] = React.useState(false);
-  const [sStreet, setSStreet] = React.useState(nameParts[0]||"");
-  const [sTown,   setStown]   = React.useState(nameParts.length>1?nameParts[1]:"");
-  const [sState,  setSstate]  = React.useState(nameParts.length===4?nameParts[2]:"");
-  const [sCountry,setSCountry]= React.useState(nameParts.length>1?nameParts[nameParts.length-1]:"");
+  const [sStreet, setSStreet] = React.useState(np.length>=4?np[0]:np.length===1?np[0]:"");
+  const [sTown,   setStown]   = React.useState(np.length>=4?np[1]:np.length>=2?np[0]:"");
+  const [sState,  setSstate]  = React.useState(np.length>=4?np[2]:np.length===3?np[1]:"");
+  const [sCountry,setSCountry]= React.useState(np.length>=2?np[np.length-1]:"");
   function commitStructured(){const parts=[sStreet,sTown,sState,sCountry].filter(v=>v.trim());const newName=parts.join(", ");if(newName&&newName!==name)onRename(name,newName);setEditingStructured(false);}
 
   function commitRename() { if(draft.trim()&&draft.trim()!==name) onRename(name,draft.trim()); setRenaming(false); }
@@ -3080,7 +3086,21 @@ function App() {
     setPendingEndMemory(null);
   }
 
-  function handleEdit(m) { setForm({...m}); setEditingId(m.id); setView("edit"); }
+  function handleEdit(m) {
+    // Pre-parse location string into sub-fields if not already split
+    let editForm = {...m};
+    if (m.location && !m.locationTown && !m.locationCountry) {
+      const np = m.location.split(",").map(s=>s.trim());
+      if (np.length >= 4) {
+        editForm = {...editForm, locationTown:np[1], locationState:np[2], locationCountry:np[np.length-1]};
+      } else if (np.length === 3) {
+        editForm = {...editForm, locationTown:np[0], locationState:np[1], locationCountry:np[2]};
+      } else if (np.length === 2) {
+        editForm = {...editForm, locationTown:np[0], locationCountry:np[1]};
+      }
+    }
+    setForm(editForm); setEditingId(m.id); setView("edit");
+  }
 
   function handleDelete(id) {
     if (!confirm("Delete this memory?")) return;
@@ -5079,7 +5099,7 @@ function App() {
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-30 08:52 UTC"
+          "Chronicle • build 2026-03-30 09:22 UTC"
         )
         ), // end account tab 4
       ),
