@@ -3,31 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Remembory: A private, offline-first life journal. Preserve your stories, photos, and memories without the cloud. No accounts, no tracking.">
-<meta name="theme-color" content="#f5f0e8">
-
-<!-- Open Graph / Facebook -->
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://remembory.net/">
-<meta property="og:title" content="Remembory — Tools for preserving the stories that matter">
-<meta property="og:description" content="Your life story deserves to be kept. Privately, beautifully, and entirely on your own terms.">
-<meta property="og:image" content="https://remembory.net/og-image.jpg">
-
-<!-- Twitter -->
-<meta property="twitter:card" content="summary_large_image">
-<meta property="twitter:url" content="https://remembory.net/">
-<meta property="twitter:title" content="Remembory — Tools for preserving the stories that matter">
-<meta property="twitter:description" content="Your life story deserves to be kept. Privately, beautifully, and entirely on your own terms.">
-<meta property="twitter:image" content="https://remembory.net/og-image.jpg">
-
-<link rel="canonical" href="https://remembory.net/">
-
 <title>Remembory — Tools for preserving the stories that matter</title>
-
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
-
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -38,8 +16,7 @@
     --ink: #1a1208;
     --ink-mid: #2c2416;
     --ink-light: #6a5c48;
-    /* Improved contrast for faint text (was #8a7460, now #6a5c48) */
-    --ink-faint: #5a4d3a; 
+    --ink-faint: #8a7460;
     --gold: #c8a87a;
     --gold-dark: #a8885a;
     --sage: #7a9e8a;
@@ -53,7 +30,6 @@
     font-family: 'Crimson Text', Georgia, serif;
     color: var(--ink-mid);
     overflow-x: hidden;
-    line-height: 1.6;
   }
 
   /* ── Texture overlay ── */
@@ -693,8 +669,6 @@
 
   .mailing-form input:focus {
     border-color: var(--gold);
-    outline: 2px solid var(--gold);
-    outline-offset: -2px;
   }
 
   .mailing-form input::placeholder {
@@ -717,11 +691,6 @@
 
   .mailing-form button:hover {
     background: var(--ink);
-  }
-
-  .mailing-form button:focus {
-    outline: 2px solid var(--gold);
-    outline-offset: 2px;
   }
 
   .mailing-note {
@@ -937,12 +906,12 @@
 </head>
 <body>
 
-<div id="iab-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(44,36,22,0.95);padding:14px 20px;align-items:flex-start;gap:14px;box-shadow:0 2px 12px rgba(0,0,0,0.4)">
+<div id="iab-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(44,36,22,0.95);padding:14px 20px;display:none;align-items:flex-start;gap:14px;box-shadow:0 2px 12px rgba(0,0,0,0.4)">
   <div style="flex:1">
     <p id="iab-title" style="margin:0 0 4px;font-size:0.9rem;color:#f5f0e8;font-weight:600;font-family:'Playfair Display',serif"></p>
     <p id="iab-instruction" style="margin:0;font-size:0.8rem;color:#c8b89a;line-height:1.5;font-family:'Crimson Text',serif"></p>
   </div>
-  <button id="iab-close-btn" style="background:transparent;border:1px solid rgba(200,184,154,0.4);border-radius:3px;color:#c8b89a;cursor:pointer;font-size:0.78rem;padding:5px 12px;white-space:nowrap;flex-shrink:0;font-family:'Crimson Text',serif">Continue anyway</button>
+  <button onclick="document.getElementById('iab-banner').style.display='none'" style="background:transparent;border:1px solid rgba(200,184,154,0.4);border-radius:3px;color:#c8b89a;cursor:pointer;font-size:0.78rem;padding:5px 12px;white-space:nowrap;flex-shrink:0;font-family:'Crimson Text',serif">Continue anyway</button>
 </div>
 <script>
 (function(){
@@ -968,29 +937,18 @@
   document.getElementById("iab-instruction").textContent = how;
   var banner = document.getElementById("iab-banner");
   banner.style.display = "flex";
+  // Push nav down so banner doesnt cover it
   document.documentElement.style.paddingTop = banner.offsetHeight + "px";
-  
-  // Moved onclick handler to script
-  var closeBtn = document.getElementById("iab-close-btn");
-  if (closeBtn) {
-    closeBtn.addEventListener("click", function() {
-      banner.style.display = "none";
-    });
-  }
 })();
 </script>
 
 <!-- Nav -->
-<nav>
-  <a href="#" class="nav-brand">Remem<span>bory</span></a>
-  <ul class="nav-links">
-    <li><a href="manual.html">Manual</a></li>
-    <li><a href="tips.html">Tips &amp; Tricks</a></li>
-    <li><a href="https://social.remembory.net/" target="_blank" rel="noopener" class="nav-cta">Remembory Social</a></li>
-    <li><a href="https://remembory.lemonsqueezy.com/checkout/buy/669e695c-c63a-4bf6-8eaf-4d56d05bfbdf" target="_blank" rel="noopener" class="nav-cta">Subscribe</a></li>
-    <li><a href="https://remembory.net/chronicle.html" target="_blank" rel="noopener" class="nav-cta">Your Private Chronicle</a></li>
-  </ul>
-</nav>
+<ul class="nav-links">
+  <li><a href="manual.html">Manual</a></li>
+  <li><a href="tips.html">Tips &amp; Tricks</a></li>
+  <li><a href="#subscribe" style="color: var(--gold-dark);">Coming Soon</a></li>
+  <li><a href="https://remembory.net/chronicle.html" target="_blank" rel="noopener" class="nav-cta">Your Private Chronicle</a></li>
+</ul>
 
 <!-- Hero -->
 <section class="hero">
@@ -1001,7 +959,7 @@
   <div class="hero-actions">
     <a href="https://remembory.net/chronicle.html" target="_blank" rel="noopener" class="btn-primary">Your Private Chronicle</a>
   </div>
-  <p class="hero-note">Chronicle is a single HTML file — no account, no cloud, completely private. Remembory Social lets you share memories publicly with subscribers.</p>
+  <p class="hero-note">Chronicle is a single HTML file — no account, no cloud, completely private. Remembory Social (coming soon) will allow you to share memories with loved ones.</p>
   <p class="hero-note" style="margin-top:10px; animation-delay:0.9s;">If Chronicle means something to you — <a href="https://ko-fi.com/remembory" target="_blank" rel="noopener" style="color:var(--gold-dark); text-decoration:none; border-bottom:1px solid rgba(168,136,90,0.35);">buy us a coffee ☕</a></p>
 </section>
 
@@ -1128,8 +1086,8 @@
 
       <div class="feature">
         <span class="feature-icon">◎</span>
-        <h3>Remembory Social — optional</h3>
-        <p>When you're ready to share, publish a public profile at social.remembory.net. Choose exactly which memories are public, subscriber-only, or connected-only. Your private Chronicle stays private — sharing is always opt-in, memory by memory.</p>
+        <h3>Remembory Social <span class="coming-soon">Soon</span></h3>
+        <p>We are currently developing a way to share specific memories with family and friends while keeping your main Chronicle 100% private. Stay tuned.</p>
       </div>
 
       <div class="feature">
@@ -1144,8 +1102,8 @@
       </div>
       <div class="feature">
         <span class="feature-icon">🌳</span>
-        <h3>Genealogy mode</h3>
-        <p>Import a GEDCOM file from Ancestry, MyHeritage, or FamilySearch. Select your subject and Chronicle finds everyone in the same branch of the family tree whose life overlapped with theirs — parents, siblings, cousins, in-laws — and imports their key events alongside your subject's own. Requires a subscription.</p>
+        <h3>Genealogy Mode <span class="coming-soon">Soon</span></h3>
+        <p>Future support for GEDCOM imports to automatically sync your family tree overlaps into your personal timeline.</p>
       </div>
     </div>
   </div>
@@ -1193,41 +1151,35 @@
 <section class="subscription" id="subscribe">
   <div class="subscription-inner">
     <div class="subscription-header reveal">
-      <span class="section-label">Subscribe</span>
-      <h2>A small subscription. A big difference.</h2>
-      <p>Chronicle is free forever as a private journal. A subscription unlocks Remembory Social — public profiles, the explore feed, followers, and connections.</p>
+      <span class="section-label">The Roadmap</span>
+      <h2>Chronicle is free. Social is coming.</h2>
+      <p>The core Chronicle app will always be free for personal use. We are hard at work building the social and genealogy features below.</p>
     </div>
     <div class="subscription-cards reveal">
       <div class="sub-card sub-card--free">
-        <div class="sub-card-label">Free</div>
-        <div class="sub-card-price">$0 <span>forever</span></div>
+        <div class="sub-card-label">Available Now</div>
+        <div class="sub-card-price">Free <span>forever</span></div>
         <ul class="sub-features">
           <li>✓ Complete life timeline journal</li>
           <li>✓ Photos, people, places &amp; tags</li>
-          <li>✓ People groups &amp; location linking</li>
-          <li>✓ Map view &amp; coordinates</li>
-          <li>✓ Print &amp; export</li>
-          <li>✓ Receive shared memories</li>
+          <li>✓ Map view &amp; print export</li>
           <li>✓ Works offline, always</li>
-          <li>✓ No account ever required</li>
+          <li>✓ No account required</li>
         </ul>
+        <a href="https://remembory.net/chronicle.html" class="btn-subscribe" style="background:var(--parchment); color:var(--ink-mid);">Open Chronicle</a>
       </div>
-      <div class="sub-card sub-card--subscriber">
-        <div class="sub-card-label">Subscriber</div>
-        <div class="sub-card-price">$20 <span>/ year</span></div>
+      <div class="sub-card sub-card--subscriber" style="opacity: 0.8;">
+        <div class="sub-card-label">In Development</div>
+        <div class="sub-card-price">Social <span>Coming Soon</span></div>
         <ul class="sub-features">
-          <li>✓ Everything in free</li>
-          <li>✓ <strong>Send</strong> shared memories</li>
-          <li>✓ <strong>Genealogy mode</strong> — contextual GEDCOM import</li>
-          <li>✓ <strong>Public profile</strong> — share your Chronicle at social.remembory.net</li>
-          <li>✓ <strong>Explore feed</strong> — see memories from other subscribers</li>
-          <li>✓ <strong>Followers</strong> — let people follow your profile</li>
-          <li>✓ <strong>Connections</strong> — link with people in your memories</li>
-          <li>✓ Cloud sync across devices</li>
-          <li>✓ Supports ongoing development</li>
+          <li>✓ <strong>Genealogy</strong> — GEDCOM imports</li>
+          <li>✓ <strong>Public profiles</strong> — Share your story</li>
+          <li>✓ <strong>Connections</strong> — Link with family</li>
+          <li>✓ <strong>Cloud Sync</strong> — Access anywhere</li>
         </ul>
-        <a href="https://remembory.lemonsqueezy.com/checkout/buy/669e695c-c63a-4bf6-8eaf-4d56d05bfbdf" class="btn-subscribe" target="_blank" rel="noopener">Subscribe — $20/year →</a>
-        <p class="sub-note">Secure checkout via Lemon Squeezy. After subscribing, you'll receive a licence key by email within a few minutes.</p>
+        <div style="text-align:center; padding: 15px; border: 1px dashed var(--gold-dark); border-radius: 4px; font-style: italic;">
+          Subscriptions are currently paused while we finalize these features.
+        </div>
       </div>
     </div>
   </div>
@@ -1266,15 +1218,13 @@
 <section class="mailing">
   <h3>Stay in the loop</h3>
   <p>New releases, new tools, and occasional thoughts on memory and preservation.</p>
-  
-  <form class="mailing-form" id="newsletter-form" aria-label="Newsletter signup">
+  <form class="mailing-form" name="mailing-list" method="POST" data-netlify="true" onsubmit="handleSignup(event)">
+    <input type="hidden" name="form-name" value="mailing-list">
     <input type="email" name="email" placeholder="your@email.com" id="email-input" required>
     <button type="submit">Subscribe</button>
   </form>
-  
   <p class="mailing-note">No spam. Unsubscribe any time.</p>
   <p class="success-msg" id="success-msg">✓ You're on the list. Thank you.</p>
-  <p class="error-msg" id="error-msg" style="display:none; color: var(--rust);">Something went wrong. Please try again.</p>
 </section>
 
 <!-- Footer -->
@@ -1299,83 +1249,34 @@
   }, { threshold: 0.1 });
   reveals.forEach(el => observer.observe(el));
 
-  // Smooth nav background on scroll
-  const nav = document.querySelector('nav');
-  window.addEventListener('scroll', () => {
-    nav.style.boxShadow = window.scrollY > 40
-      ? '0 2px 20px rgba(26,18,8,0.08)'
-      : 'none';
-  });
-</script>
-<script>
-  // Scroll reveal
-  const reveals = document.querySelectorAll('.reveal');
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry, i) => {
-      if (entry.isIntersecting) {
-        setTimeout(() => entry.target.classList.add('visible'), i * 80);
-        observer.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.1 });
-  reveals.forEach(el => observer.observe(el));
-
-  // Smooth nav background on scroll
-  const nav = document.querySelector('nav');
-  window.addEventListener('scroll', () => {
-    nav.style.boxShadow = window.scrollY > 40
-      ? '0 2px 20px rgba(26,18,8,0.08)'
-      : 'none';
-  });
-
-  // Newsletter form handler
-  const form = document.getElementById('newsletter-form');
-  const emailInput = document.getElementById('email-input');
-  const successMsg = document.getElementById('success-msg');
-  const errorMsg = document.getElementById('error-msg');
-  const submitButton = form.querySelector('button[type="submit"]');
-
-  // REPLACE THIS WITH YOUR WORKER URL
-  const WORKER_URL = 'https://mailing-list.adadx4.workers.dev';
-
-  form.addEventListener('submit', async (e) => {
+  // Mailing list (replace with your actual form handler e.g. Netlify Forms, Mailchimp etc.)
+  function handleSignup(e) {
     e.preventDefault();
-    
-    const email = emailInput.value.trim();
-    if (!email) return;
+    const form = e.target;
+    const email = document.getElementById('email-input').value;
+    fetch('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ 'form-name': 'mailing-list', email }).toString()
+    })
+    .then(() => {
+      document.querySelector('.mailing-form').style.display = 'none';
+      document.querySelector('.mailing-note').style.display = 'none';
+      document.getElementById('success-msg').style.display = 'block';
+    })
+    .catch(() => {
+      // Submit failed — fall back to native form submission
+      form.removeEventListener('submit', handleSignup);
+      form.submit();
+    });
+  }
 
-    // Disable button during submission
-    submitButton.disabled = true;
-    submitButton.textContent = 'Subscribing...';
-
-    try {
-      const response = await fetch(WORKER_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({ email }).toString(),
-      });
-
-      if (response.ok) {
-        form.style.display = 'none';
-        successMsg.style.display = 'block';
-      } else {
-        const text = await response.text();
-        if (text === 'Already subscribed') {
-          form.style.display = 'none';
-          successMsg.textContent = '✓ Already subscribed. Thank you!';
-          successMsg.style.display = 'block';
-        } else {
-          throw new Error(text);
-        }
-      }
-    } catch (err) {
-      console.error('Subscription error:', err);
-      errorMsg.style.display = 'block';
-      submitButton.disabled = false;
-      submitButton.textContent = 'Subscribe';
-    }
+  // Smooth nav background on scroll
+  const nav = document.querySelector('nav');
+  window.addEventListener('scroll', () => {
+    nav.style.boxShadow = window.scrollY > 40
+      ? '0 2px 20px rgba(26,18,8,0.08)'
+      : 'none';
   });
 </script>
 </body>
