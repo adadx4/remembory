@@ -3,9 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Remembory: A private, offline-first life journal. Preserve your stories, photos, and memories without the cloud. No accounts, no tracking.">
+<meta name="theme-color" content="#f5f0e8">
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://remembory.net/">
+<meta property="og:title" content="Remembory — Tools for preserving the stories that matter">
+<meta property="og:description" content="Your life story deserves to be kept. Privately, beautifully, and entirely on your own terms.">
+<meta property="og:image" content="https://remembory.net/og-image.jpg">
+
+<!-- Twitter -->
+<meta property="twitter:card" content="summary_large_image">
+<meta property="twitter:url" content="https://remembory.net/">
+<meta property="twitter:title" content="Remembory — Tools for preserving the stories that matter">
+<meta property="twitter:description" content="Your life story deserves to be kept. Privately, beautifully, and entirely on your own terms.">
+<meta property="twitter:image" content="https://remembory.net/og-image.jpg">
+
+<link rel="canonical" href="https://remembory.net/">
+
 <title>Remembory — Tools for preserving the stories that matter</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -16,7 +38,8 @@
     --ink: #1a1208;
     --ink-mid: #2c2416;
     --ink-light: #6a5c48;
-    --ink-faint: #8a7460;
+    /* Improved contrast for faint text (was #8a7460, now #6a5c48) */
+    --ink-faint: #5a4d3a; 
     --gold: #c8a87a;
     --gold-dark: #a8885a;
     --sage: #7a9e8a;
@@ -30,6 +53,7 @@
     font-family: 'Crimson Text', Georgia, serif;
     color: var(--ink-mid);
     overflow-x: hidden;
+    line-height: 1.6;
   }
 
   /* ── Texture overlay ── */
@@ -669,6 +693,8 @@
 
   .mailing-form input:focus {
     border-color: var(--gold);
+    outline: 2px solid var(--gold);
+    outline-offset: -2px;
   }
 
   .mailing-form input::placeholder {
@@ -691,6 +717,11 @@
 
   .mailing-form button:hover {
     background: var(--ink);
+  }
+
+  .mailing-form button:focus {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
   }
 
   .mailing-note {
@@ -906,12 +937,12 @@
 </head>
 <body>
 
-<div id="iab-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(44,36,22,0.95);padding:14px 20px;display:none;align-items:flex-start;gap:14px;box-shadow:0 2px 12px rgba(0,0,0,0.4)">
+<div id="iab-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(44,36,22,0.95);padding:14px 20px;align-items:flex-start;gap:14px;box-shadow:0 2px 12px rgba(0,0,0,0.4)">
   <div style="flex:1">
     <p id="iab-title" style="margin:0 0 4px;font-size:0.9rem;color:#f5f0e8;font-weight:600;font-family:'Playfair Display',serif"></p>
     <p id="iab-instruction" style="margin:0;font-size:0.8rem;color:#c8b89a;line-height:1.5;font-family:'Crimson Text',serif"></p>
   </div>
-  <button onclick="document.getElementById('iab-banner').style.display='none'" style="background:transparent;border:1px solid rgba(200,184,154,0.4);border-radius:3px;color:#c8b89a;cursor:pointer;font-size:0.78rem;padding:5px 12px;white-space:nowrap;flex-shrink:0;font-family:'Crimson Text',serif">Continue anyway</button>
+  <button id="iab-close-btn" style="background:transparent;border:1px solid rgba(200,184,154,0.4);border-radius:3px;color:#c8b89a;cursor:pointer;font-size:0.78rem;padding:5px 12px;white-space:nowrap;flex-shrink:0;font-family:'Crimson Text',serif">Continue anyway</button>
 </div>
 <script>
 (function(){
@@ -937,8 +968,15 @@
   document.getElementById("iab-instruction").textContent = how;
   var banner = document.getElementById("iab-banner");
   banner.style.display = "flex";
-  // Push nav down so banner doesnt cover it
   document.documentElement.style.paddingTop = banner.offsetHeight + "px";
+  
+  // Moved onclick handler to script
+  var closeBtn = document.getElementById("iab-close-btn");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", function() {
+      banner.style.display = "none";
+    });
+  }
 })();
 </script>
 
@@ -1228,13 +1266,15 @@
 <section class="mailing">
   <h3>Stay in the loop</h3>
   <p>New releases, new tools, and occasional thoughts on memory and preservation.</p>
-  <form class="mailing-form" name="mailing-list" method="POST" data-netlify="true" onsubmit="handleSignup(event)">
-    <input type="hidden" name="form-name" value="mailing-list">
+  
+  <form class="mailing-form" id="newsletter-form" aria-label="Newsletter signup">
     <input type="email" name="email" placeholder="your@email.com" id="email-input" required>
     <button type="submit">Subscribe</button>
   </form>
+  
   <p class="mailing-note">No spam. Unsubscribe any time.</p>
   <p class="success-msg" id="success-msg">✓ You're on the list. Thank you.</p>
+  <p class="error-msg" id="error-msg" style="display:none; color: var(--rust);">Something went wrong. Please try again.</p>
 </section>
 
 <!-- Footer -->
@@ -1259,27 +1299,26 @@
   }, { threshold: 0.1 });
   reveals.forEach(el => observer.observe(el));
 
-  // Mailing list (replace with your actual form handler e.g. Netlify Forms, Mailchimp etc.)
-  function handleSignup(e) {
-    e.preventDefault();
-    const form = e.target;
-    const email = document.getElementById('email-input').value;
-    fetch('/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ 'form-name': 'mailing-list', email }).toString()
-    })
-    .then(() => {
-      document.querySelector('.mailing-form').style.display = 'none';
-      document.querySelector('.mailing-note').style.display = 'none';
-      document.getElementById('success-msg').style.display = 'block';
-    })
-    .catch(() => {
-      // Submit failed — fall back to native form submission
-      form.removeEventListener('submit', handleSignup);
-      form.submit();
+  // Smooth nav background on scroll
+  const nav = document.querySelector('nav');
+  window.addEventListener('scroll', () => {
+    nav.style.boxShadow = window.scrollY > 40
+      ? '0 2px 20px rgba(26,18,8,0.08)'
+      : 'none';
+  });
+</script>
+<script>
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry, i) => {
+      if (entry.isIntersecting) {
+        setTimeout(() => entry.target.classList.add('visible'), i * 80);
+        observer.unobserve(entry.target);
+      }
     });
-  }
+  }, { threshold: 0.1 });
+  reveals.forEach(el => observer.observe(el));
 
   // Smooth nav background on scroll
   const nav = document.querySelector('nav');
@@ -1287,6 +1326,56 @@
     nav.style.boxShadow = window.scrollY > 40
       ? '0 2px 20px rgba(26,18,8,0.08)'
       : 'none';
+  });
+
+  // Newsletter form handler
+  const form = document.getElementById('newsletter-form');
+  const emailInput = document.getElementById('email-input');
+  const successMsg = document.getElementById('success-msg');
+  const errorMsg = document.getElementById('error-msg');
+  const submitButton = form.querySelector('button[type="submit"]');
+
+  // REPLACE THIS WITH YOUR WORKER URL
+  const WORKER_URL = 'https://mailing-list.adadx4.workers.dev';
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const email = emailInput.value.trim();
+    if (!email) return;
+
+    // Disable button during submission
+    submitButton.disabled = true;
+    submitButton.textContent = 'Subscribing...';
+
+    try {
+      const response = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ email }).toString(),
+      });
+
+      if (response.ok) {
+        form.style.display = 'none';
+        successMsg.style.display = 'block';
+      } else {
+        const text = await response.text();
+        if (text === 'Already subscribed') {
+          form.style.display = 'none';
+          successMsg.textContent = '✓ Already subscribed. Thank you!';
+          successMsg.style.display = 'block';
+        } else {
+          throw new Error(text);
+        }
+      }
+    } catch (err) {
+      console.error('Subscription error:', err);
+      errorMsg.style.display = 'block';
+      submitButton.disabled = false;
+      submitButton.textContent = 'Subscribe';
+    }
   });
 </script>
 </body>
