@@ -4656,7 +4656,7 @@ function App() {
           },notifications.length)
         ),
         !isMobile&&React.createElement("span",{style:{width:"1px",height:"20px",background:"#d4c4a8",margin:"0 4px",flexShrink:0}}),
-        !isMobile&&React.createElement("a",{href:"https://remembory.lemonsqueezy.com/checkout/buy/669e695c-c63a-4bf6-8eaf-4d56d05bfbdf",target:"_blank",rel:"noopener",title:"Subscribe to Chronicle",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#7a6040",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#7a6040";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
+        !isMobile&&React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",title:"Subscribe to Chronicle",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#7a6040",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#7a6040";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
         showBack&&React.createElement("button",{onClick:goBack,style:{...S.btnOutline,padding:isMobile?"8px 14px":"7px 13px",fontSize:"0.9rem"}},"← Back"),
         showAdd&&React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView("add"); },style:{...S.btn,padding:isMobile?"8px 16px":"7px 15px",fontSize:"0.9rem"}},"+ Add")
       )
@@ -4872,7 +4872,7 @@ function App() {
                 isSubscriber
                   ? "Enables visibility controls on memories and your public profile page."
                   : React.createElement(React.Fragment,null,"Requires a subscription. ",
-                      React.createElement("a",{href:"https://remembory.lemonsqueezy.com/checkout/buy/669e695c-c63a-4bf6-8eaf-4d56d05bfbdf",
+                      React.createElement("a",{href:"https://ko-fi.com/remembory",
                         target:"_blank",rel:"noopener",style:{color:"#a8885a"}},"Subscribe →"))
               )
             )
@@ -4939,12 +4939,11 @@ function App() {
           React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Cloud Sync"),
           React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.6}},
             "Keep Chronicle in sync across devices using a file in your cloud storage folder (iCloud Drive, Dropbox, Google Drive, OneDrive etc.). "
-            + "Works in Chrome and Edge on desktop."
           ),
           syncInfo
             ? React.createElement("div",null,
                 React.createElement("div",{style:{background:"rgba(74,122,90,0.08)",border:"1px solid rgba(74,122,90,0.2)",borderRadius:"3px",padding:"10px 14px",marginBottom:"12px",fontSize:"0.84rem"}},
-                  React.createElement("div",{style:{color:"#1a1208",fontWeight:600,marginBottom:"2px"}},"������ "+syncInfo.name),
+                  React.createElement("div",{style:{color:"#1a1208",fontWeight:600,marginBottom:"2px"}},syncInfo.name),
                   React.createElement("div",{style:{color:"#8a7460"}},
                     syncInfo.lastSync
                       ? "Last synced: "+new Date(syncInfo.lastSync).toLocaleString()
@@ -4976,7 +4975,7 @@ function App() {
                 React.createElement("button",{
                   onClick:chooseSyncFile,
                   style:{...S.btnOutline,flex:1,padding:"9px 14px",fontSize:"0.84rem"}
-                },"������ Open existing sync file")
+                },"Open existing sync file")
               )
         ),
 
@@ -5095,7 +5094,7 @@ function App() {
         // ── Support ──
         !isSubscriber&&React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
           "Unlock sharing & genealogy mode — ",
-          React.createElement("a",{href:"https://remembory.lemonsqueezy.com/checkout/buy/669e695c-c63a-4bf6-8eaf-4d56d05bfbdf",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"✨ subscribe for $20/year"),
+          React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"✨ subscribe for $20/year"),
           "."
         ),
         React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
@@ -5406,7 +5405,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
               React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",fontStyle:"italic",color:"#1a1208",marginBottom:"10px"}},"Genealogy Mode"),
               React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,maxWidth:"380px",margin:"0 auto 16px"}},
                 "GEDCOM import requires a Remembory subscription. Import a family tree, flesh out your ancestors’ lives, and connect genealogy research to narrative."),
-              React.createElement("a",{href:"https://remembory.lemonsqueezy.com/checkout/buy/669e695c-c63a-4bf6-8eaf-4d56d05bfbdf",target:"_blank",rel:"noopener",style:{...S.btn,display:"inline-block",padding:"10px 24px",textDecoration:"none",fontSize:"0.9rem"}},
+              React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{...S.btn,display:"inline-block",padding:"10px 24px",textDecoration:"none",fontSize:"0.9rem"}},
                 "Learn about subscribing →")
             )
           : React.createElement("div",null,
