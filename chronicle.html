@@ -28,32 +28,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #f5f0e8; font-family: 'Crimson Text', Georgia, serif; color: #2c2416; }
-  input::placeholder, textarea::placeholder { color: #7a6a58; font-style: italic; }
-  input[type=number]::-webkit-inner-spin-button { opacity: 1; }
-  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #f5f0e8; } ::-webkit-scrollbar-thumb { background: #c8b89a; border-radius: 3px; }
-  .chronicle-map { width: 100%; height: 500px; border-radius: 4px; border: 1px solid #c8b89a; z-index: 1; }
-  .leaflet-popup-content { font-family: 'Crimson Text', Georgia, serif; font-size: 0.95rem; min-width: 160px; }
-  .leaflet-popup-content h4 { font-family: 'Playfair Display', serif; font-size: 1.05rem; margin: 0 0 4px; color: #1a1208; }
-  .leaflet-popup-content p { margin: 0; color: #8a7460; font-style: italic; font-size: 0.85rem; }
-  .leaflet-popup-content button { margin-top: 8px; background: #2c2416; color: #f5f0e8; border: none; padding: 5px 12px; border-radius: 2px; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 0.88rem; width: 100%; }
-  @media (max-width: 767px) {
-    input, textarea, select { font-size: 16px !important; } /* prevent iOS zoom */
-    button { min-height: 40px; }
-    .chronicle-map { height: 320px; }
-  }
-  @media print {
-    body { background: #fff !important; }
-    header, nav, .chronicle-print-options, .no-print { display: none !important; }
-    .chronicle-print-root { border: none !important; padding: 0 !important; box-shadow: none !important; }
-    h1, h2, h3 { page-break-after: avoid; }
-    img { max-width: 180px !important; }
-    a { text-decoration: none; color: inherit; }
-  }
-</style>
+<link rel="stylesheet" href="chronicle.css">
 </head>
 <body>
 <div id="root"></div>
@@ -1502,7 +1477,20 @@ function RelationshipIndex({memories, peopleRelationships, onView, onRenameRelat
 function LocationsPanel({knownLocations,memories,locationNotes,locationCoords,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setIndexFilter,persistSubject}) {
   const [addingLoc, setAddingLoc] = React.useState(false);
   const [newLoc, setNewLoc] = React.useState("");
-  function commitAdd(){const v=newLoc.trim();if(!v)return;if(!knownLocations.includes(v))persistSubject({knownLocations:[...knownLocations,v].sort()});setNewLoc("");setAddingLoc(false);}
+  function commitAdd(){
+    const v=newLoc.trim();
+    if(!v)return;
+    const existing = knownLocations.find(l => (typeof l === 'string' ? l === v : l.label === v));
+    if(!existing){
+      persistSubject({knownLocations: [...knownLocations, v].sort((a,b) => {
+        const na = typeof a === 'string' ? a : a.label;
+        const nb = typeof b === 'string' ? b : b.label;
+        return na.localeCompare(nb);
+      })});
+    }
+    setNewLoc("");
+    setAddingLoc(false);
+  }
   return React.createElement("div",null,
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px"}},
       React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},knownLocations.length+" location"+(knownLocations.length===1?"":"s")+" · click a name to see its memories"),
@@ -1516,7 +1504,8 @@ function LocationsPanel({knownLocations,memories,locationNotes,locationCoords,re
       React.createElement("button",{onClick:()=>{setAddingLoc(false);setNewLoc("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.86rem"}},"Cancel")
     ),
     knownLocations.length===0&&!addingLoc&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No locations recorded yet."),
-    knownLocations.map(name=>{
+    knownLocations.map(loc=>{
+      const name = typeof loc === 'string' ? loc : loc.label;
       const count=memories.filter(m=>m.location===name||m.locations?.includes(name)).length;
       return React.createElement(LocationRow,{key:name,name,count,notes:locationNotes?.[name],
         coords:locationCoords?.[name]||null,
@@ -3861,14 +3850,33 @@ function App() {
   function renameLocation(oldName, newName) {
     const n=newName.trim(); if(!n||n===oldName) return;
     const updMems=memories.map(m=>({...m,location:m.location===oldName?n:m.location,locations:(m.locations||[]).map(l=>l===oldName?n:l)}));
-    const updKnown=[...new Set([...knownLocations.filter(l=>l!==oldName),n])].sort();
+    const updKnown = knownLocations.map(l => {
+      if (typeof l === 'string') {
+        return l === oldName ? n : l;
+      } else if (l.label === oldName) {
+        return {...l, label: n};
+      } else {
+        return l;
+      }
+    }).filter((l, i, arr) => arr.findIndex(x => (typeof x === 'string' ? x : x.label) === (typeof l === 'string' ? l : l.label)) === i)
+    .sort((a,b) => {
+      const na = typeof a === 'string' ? a : a.label;
+      const nb = typeof b === 'string' ? b : b.label;
+      return na.localeCompare(nb);
+    });
     const updNotes={...locationNotes}; if(updNotes[oldName]!==undefined){updNotes[n]=updNotes[oldName];delete updNotes[oldName];}
     const updCoords={...locationCoords}; if(updCoords[oldName]!==undefined){updCoords[n]=updCoords[oldName];delete updCoords[oldName];}
     persistSubject({memories:updMems,knownLocations:updKnown,locationNotes:updNotes,locationCoords:updCoords});
   }
   function deleteLocation(name) {
     const updMems=memories.map(m=>({...m,location:m.location===name?"":m.location,locations:(m.locations||[]).filter(l=>l!==name)}));
-    const updKnown=knownLocations.filter(l=>l!==name);
+    const updKnown=knownLocations.filter(l => {
+      if (typeof l === 'string') {
+        return l !== name;
+      } else {
+        return l.label !== name;
+      }
+    });
     persistSubject({memories:updMems,knownLocations:updKnown});
   }
   function setPersonNotes(name, notes) { persistSubject({peopleNotes:{...peopleNotes, [name]: notes}}); }
@@ -3908,7 +3916,15 @@ function App() {
     const updated={}; Object.entries(peopleRelationships).forEach(([k,v])=>{updated[k]=(v||"").trim()===oldRel?n:v;}); persistSubject({peopleRelationships:updated});
   }
   function registerOrgs(names) { const merged=[...new Set([...knownOrgs,...names])].sort(); persistSubject({knownOrgs:merged}); }
-  function registerLocations(names) { const merged=[...new Set([...knownLocations,...names])].sort(); persistSubject({knownLocations:merged}); }
+  function registerLocations(names) {
+    const currentLabels = knownLocations.map(l => typeof l === 'string' ? l : l.label);
+    const mergedLabels = [...new Set([...currentLabels, ...names])].sort();
+    const merged = mergedLabels.map(label => {
+      const existing = knownLocations.find(l => (typeof l === 'string' ? l === label : l.label === label));
+      return existing || label;
+    });
+    persistSubject({knownLocations: merged});
+  }
 
   // ── Memory ops ───────────────────────────────────────────────
   function updateForm(updates) { setForm(f=>({...f,...updates})); }
