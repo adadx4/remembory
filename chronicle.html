@@ -3932,11 +3932,12 @@ function App() {
   function handleSubmit() {
     if (!form.title.trim()) return;
 
-    const primaryId = editingId || (Date.now().toString()+Math.random().toString(36).slice(2));
-    const primary = {...formWithLoc, id:primaryId};
     // Use label as the location string saved on the memory
     const locationLabel = (form.locationLabel || "").trim();
     const formWithLoc = {...form, location: locationLabel};
+
+    const primaryId = editingId || (Date.now().toString()+Math.random().toString(36).slice(2));
+    const primary = {...formWithLoc, id:primaryId};
     // Update knownLocations with structured address data
     if (locationLabel) {
       const locObj = { label: locationLabel, street: (form.locationStreet||"").trim(), town: (form.locationTown||"").trim(), state: (form.locationState||"").trim(), country: (form.locationCountry||"").trim() };
