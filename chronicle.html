@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- Chronicle build: 2026-03-28 -->
+<!-- Chronicle build: 2026-04-03 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -70,7 +70,6 @@ function useWindowSize() {
 // ── Constants ──────────────────────────────────────────────────
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const TAGS = ["childhood","family","travel","education","work","love","health","milestone","home","friendship","adventure","loss"];
-// ← Replace this with your Worker URL after deploying to Cloudflare
 const WORKER_URL = "https://social.remembory.net";
 
 // ── Licence key validation (Lemon Squeezy) ────────────────────
@@ -710,7 +709,7 @@ const RELATIONSHIP_SUGGESTIONS = [
   "Partner","Spouse","Ex-partner","Parent","Mother","Father",
   "Child","Son","Daughter","Sibling","Brother","Sister",
   "Grandparent","Grandmother","Grandfather","Grandchild",
-  "Aunt","Uncle","Cousin","In-law",
+  "Aunt","Uncle","Cousin","In-law", "Wife", "Husband",
   "Friend","Best friend","Childhood friend","Old friend",
   "Colleague","Manager","Mentor","Mentee",
   "Neighbour","Flatmate","Housemate",
@@ -2706,13 +2705,10 @@ function isInAppBrowser() {
   if (/Twitter/i.test(ua)) return "twitter";
   return null;
 }
+ 
 // ════════════════════════════════════════════════════════════════
 // EXTRACTED COMPONENT: SettingsView
 // ════════════════════════════════════════════════════════════════
-// Paste this BEFORE `function App() {` in chronicle.html
-// Then replace the inline settings render in App with the call shown at the bottom.
-// ════════════════════════════════════════════════════════════════
-
 function SettingsView({
   subject, subjects, ownerName, ownerEmail, carerEmail,
   activePassword, data, memories,
@@ -2949,11 +2945,6 @@ function SettingsView({
 // ════════════════════════════════════════════════════════════════
 // EXTRACTED COMPONENT: ImportView
 // ════════════════════════════════════════════════════════════════
-// Paste this BEFORE `function App() {` in chronicle.html
-// (after SettingsView, before App)
-// Then replace the inline import render in App with the call shown at the bottom.
-// ════════════════════════════════════════════════════════════════
-
 function ImportView({
   // Import tab state
   importTab, setImportTab, importSaved,
@@ -3218,47 +3209,6 @@ function ImportView({
   );
 }
 
-
-// ════════════════════════════════════════════════════════════════
-// IN THE APP RENDER: Replace the entire inline import block with:
-// ════════════════════════════════════════════════════════════════
-//
-//       view==="import"&&React.createElement(ImportView,{
-//         importTab, setImportTab, importSaved,
-//         photoQueue, photoDragOver, setPhotoDragOver, photoImportRef,
-//         processPhotos, updatePhoto, savePhotos,
-//         emailForm, setEmailForm, emailDragOver, setEmailDragOver, emlImportRef,
-//         handleEmailText, saveEmail,
-//         isSubscriber, gedPersons, gedPicked, gedPreview, gedBusy,
-//         gedSearch, setGedSearch, gedContext, setGedContext,
-//         gedContextSel, setGedContextSel,
-//         handleGedFile, handleGedPick, commitGedImport,
-//         knownPeople, peopleEmails, peopleRelationships, persistSubject,
-//       }),
-//
-// ════════════════════════════════════════════════════════════════
-// ════════════════════════════════════════════════════════════════
-// IN THE APP RENDER: Replace the entire inline settings block with:
-// ════════════════════════════════════════════════════════════════
-//
-//       view==="settings"&&React.createElement(SettingsView,{
-//         subject, subjects, ownerName, ownerEmail, carerEmail,
-//         activePassword, data, memories,
-//         wantPublicProfile, isSubscriber, licenceKey, licenceStatus,
-//         legacyMessage, setLegacyMessage,
-//         profileState, unpublishProfile,
-//         persistSubject, persistTop, setActivePassword, setLocked, setData,
-//         saveLicenceKey, setView, setShowSubjectMgr, exportBackup,
-//         importBackup, shareCodeInput, setShareCodeInput,
-//         shareCodeStatus, importFromCode,
-//         saveBackupBusy, setSaveBackupBusy,
-//         syncInfo, syncStatus, chooseSyncFile, createSyncFile, doSync, clearSyncFile,
-//       }),
-//
-// ════════════════════════════════════════════════════════════════
- 
- 
- 
 function App() {
   const winW = useWindowSize();
   const isMobile = winW < 768;
