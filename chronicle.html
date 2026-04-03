@@ -2946,7 +2946,297 @@ function SettingsView({
   );
 }
 
+// ════════════════════════════════════════════════════════════════
+// EXTRACTED COMPONENT: ImportView
+// ════════════════════════════════════════════════════════════════
+// Paste this BEFORE `function App() {` in chronicle.html
+// (after SettingsView, before App)
+// Then replace the inline import render in App with the call shown at the bottom.
+// ════════════════════════════════════════════════════════════════
 
+function ImportView({
+  // Import tab state
+  importTab, setImportTab, importSaved,
+  // Photo state & handlers
+  photoQueue, photoDragOver, setPhotoDragOver, photoImportRef,
+  processPhotos, updatePhoto, savePhotos,
+  // Email state & handlers
+  emailForm, setEmailForm, emailDragOver, setEmailDragOver, emlImportRef,
+  handleEmailText, saveEmail,
+  // GEDCOM state & handlers
+  isSubscriber, gedPersons, gedPicked, gedPreview, gedBusy, gedSearch, setGedSearch,
+  gedContext, setGedContext, gedContextSel, setGedContextSel,
+  handleGedFile, handleGedPick, commitGedImport,
+  // Shared data
+  knownPeople, peopleEmails, peopleRelationships, persistSubject,
+}) {
+  return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
+    React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Import"),
+    React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"22px",fontSize:"0.95rem"}},"Bring in old photos or emails and turn them into memories."),
+    importSaved>0&&React.createElement("div",{style:{background:"#e8f4e8",border:"1px solid #89b08a",borderRadius:"3px",padding:"12px 16px",marginBottom:"18px",color:"#3a6b3a",fontSize:"0.95rem"}},"\u2713 "+importSaved+" "+(importSaved===1?"memory":"memories")+" saved."),
+
+    // ── Tabs ──
+    React.createElement("div",{style:{display:"flex",borderBottom:"1px solid #c8b89a",marginBottom:"24px"}},
+      [["photos","\ud83d\udcf7  Photos"],["email","\u2709\ufe0f  Email"],["gedcom","\ud83c\udf33  Family Tree"]].map(([tab,label])=>React.createElement("button",{key:tab,onClick:()=>setImportTab(tab),style:{padding:"10px 20px",border:"none",borderBottom:importTab===tab?"2px solid #2c2416":"2px solid transparent",background:"transparent",color:importTab===tab?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"1rem",marginBottom:"-1px"}},label))
+    ),
+
+    // ══════════════ PHOTOS TAB ══════════════
+    importTab==="photos"&&React.createElement("div",null,
+      React.createElement("div",{onDragOver:e=>{e.preventDefault();setPhotoDragOver(true);},onDragLeave:()=>setPhotoDragOver(false),onDrop:e=>{e.preventDefault();setPhotoDragOver(false);processPhotos(Array.from(e.dataTransfer.files));},onClick:()=>photoImportRef.current?.click(),style:{border:"2px dashed "+(photoDragOver?"#2c2416":"#c8b89a"),borderRadius:"6px",padding:"36px 24px",textAlign:"center",cursor:"pointer",background:photoDragOver?"rgba(200,184,154,0.2)":"rgba(255,252,245,0.5)",marginBottom:"20px"}},
+        React.createElement("div",{style:{fontSize:"2rem",marginBottom:"8px",opacity:0.5}},"\ud83d\uddbc"),
+        React.createElement("p",{style:{margin:"0 0 5px",fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208"}},"Drop photos here"),
+        React.createElement("p",{style:{margin:0,fontSize:"0.86rem",color:"#8a7460",fontStyle:"italic"}},"JPEG EXIF dates extracted automatically \u00b7 click to browse")
+      ),
+      React.createElement("input",{ref:photoImportRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:e=>processPhotos(Array.from(e.target.files))}),
+      photoQueue.length>0&&React.createElement("div",null,
+        React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}},
+          React.createElement("p",{style:{margin:0,fontSize:"0.9rem",color:"#8a7460"}},photoQueue.filter(p=>p.keep).length+" of "+photoQueue.length+" selected"),
+          React.createElement("div",{style:{display:"flex",gap:"8px"}},
+            React.createElement("button",{onClick:()=>savePhotos(),style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem"}},"Save "+photoQueue.filter(p=>p.keep).length+" \u2192")
+          )
+        ),
+        photoQueue.map(item=>React.createElement("div",{key:item.id,style:{display:"flex",gap:"12px",background:item.keep?"rgba(255,252,245,0.9)":"rgba(230,225,215,0.4)",border:"1px solid "+(item.keep?"#d4c4a8":"#e8e0d0"),borderRadius:"4px",padding:"12px",marginBottom:"10px",opacity:item.keep?1:0.5}},
+          React.createElement("div",{style:{flexShrink:0,width:"80px"}},
+            React.createElement("img",{src:item.url,alt:"",style:{width:"80px",height:"80px",objectFit:"cover",borderRadius:"2px",border:"1px solid #c8b89a",display:"block"}}),
+            React.createElement("button",{onClick:()=>updatePhoto(item.id,{keep:!item.keep}),style:{marginTop:"5px",width:"100%",background:item.keep?"#e8f4e8":"transparent",color:item.keep?"#3a6b3a":"#c4858a",border:"1px solid "+(item.keep?"#89b08a":"#c4858a"),padding:"3px",borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.76rem"}},item.keep?"\u2713 Include":"Skip")
+          ),
+          React.createElement("div",{style:{flex:1,display:"grid",gap:"8px"}},
+            React.createElement("div",null,React.createElement("label",{style:S.label},"Title"),React.createElement("input",{value:item.title,onChange:e=>updatePhoto(item.id,{title:e.target.value}),style:{...S.input,padding:"7px 10px"}})),
+            React.createElement(DateFields,{form:item,setForm:u=>updatePhoto(item.id,u)}),
+            React.createElement("div",null,React.createElement("label",{style:S.label},"Location"),React.createElement("input",{value:item.location,onChange:e=>updatePhoto(item.id,{location:e.target.value}),placeholder:"optional",style:{...S.input,padding:"7px 10px"}})),
+            React.createElement("div",null,React.createElement("label",{style:S.label},"Tags"),React.createElement(TagPicker,{tags:item.tags,onToggle:tag=>updatePhoto(item.id,{tags:item.tags.includes(tag)?item.tags.filter(t=>t!==tag):[...item.tags,tag]})})),
+            React.createElement("div",null,
+              React.createElement("label",{style:S.label},"People"),
+              React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:item.people||[],allValues:knownPeople,onChange:v=>updatePhoto(item.id,{people:v}),placeholder:"Add a person\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
+            ),
+            React.createElement("p",{style:{margin:0,fontSize:"0.76rem",color:item.exifDate?"#89b08a":"#c4858a",fontStyle:"italic"}},item.exifDate?"\u2713 Date from EXIF":"\u26a0 No EXIF date \u2014 set manually")
+          )
+        ))
+      )
+    ),
+
+    // ══════════════ GEDCOM TAB ══════════════
+    importTab==="gedcom"&&(!isSubscriber
+      ? React.createElement("div",{style:{textAlign:"center",padding:"48px 24px",border:"1px solid #d4c4a8",borderRadius:"6px",background:"rgba(255,252,245,0.5)"}},
+          React.createElement("div",{style:{fontSize:"2.5rem",marginBottom:"12px",opacity:0.5}},"\ud83c\udf33"),
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",fontStyle:"italic",color:"#1a1208",marginBottom:"10px"}},"Genealogy Mode"),
+          React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,maxWidth:"380px",margin:"0 auto 16px"}},
+            "GEDCOM import requires a Remembory subscription. Import a family tree, flesh out your ancestors' lives, and connect genealogy research to narrative."),
+          React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{...S.btn,display:"inline-block",padding:"10px 24px",textDecoration:"none",fontSize:"0.9rem"}},
+            "Learn about subscribing \u2192")
+        )
+      : React.createElement("div",null,
+      // No file loaded yet
+      !gedPersons&&React.createElement("div",null,
+        React.createElement("div",{
+          onClick:()=>document.getElementById("ged-file-input").click(),
+          style:{border:"2px dashed #c8b89a",borderRadius:"6px",padding:"36px 24px",textAlign:"center",cursor:"pointer",background:"rgba(255,252,245,0.5)",marginBottom:"16px"}
+        },
+          React.createElement("div",{style:{fontSize:"2rem",marginBottom:"8px",opacity:0.6}},"\ud83c\udf33"),
+          React.createElement("p",{style:{margin:"0 0 5px",fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208"}},"Drop a GEDCOM file here"),
+          React.createElement("p",{style:{margin:0,fontSize:"0.86rem",color:"#8a7460",fontStyle:"italic"}},"Export from Ancestry, MyHeritage, FamilySearch or any genealogy app \u00b7 .ged files only"),
+          React.createElement("input",{id:"ged-file-input",type:"file",accept:".ged,.GED",style:{display:"none"},onChange:handleGedFile})
+        ),
+        gedBusy&&React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",textAlign:"center"}},"Parsing\u2026")
+      ),
+
+      // Person picker
+      gedPersons&&!gedPicked&&React.createElement("div",null,
+        React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
+          React.createElement("p",{style:{margin:0,fontSize:"0.9rem",color:"#4a7a5a",fontWeight:600}},
+            "Found "+gedPersons.persons.length+" people \u2014 choose one to import:"
+          ),
+          React.createElement("button",{onClick:()=>{setGedSearch("");},style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",textDecoration:"underline"}},"Start over")
+        ),
+        React.createElement("input",{
+          value:gedSearch,
+          onChange:e=>setGedSearch(e.target.value),
+          placeholder:"Filter by name\u2026",
+          style:{...S.input,width:"100%",marginBottom:"8px",fontSize:"0.88rem"}
+        }),
+        React.createElement("div",{style:{maxHeight:"340px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px"}},
+          (()=>{
+            const filtered = gedSearch.trim()
+              ? gedPersons.persons.filter(p=>p.fullName.toLowerCase().includes(gedSearch.toLowerCase()))
+              : gedPersons.persons;
+            if (!filtered.length) return React.createElement("p",{style:{padding:"12px 14px",color:"#8a7460",fontStyle:"italic",fontSize:"0.88rem",margin:0}},"No people match that name.");
+            return filtered.map((p,i)=>React.createElement("div",{
+              key:p.id,
+              onClick:()=>handleGedPick(p),
+              style:{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #ede0cc",background:i%2===0?"transparent":"rgba(200,184,154,0.08)",display:"flex",justifyContent:"space-between",alignItems:"center"}
+            },
+              React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208"}},p.fullName),
+              React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},
+                [p.birtYear,p.deatYear].filter(Boolean).join(" \u2013 ")||(p.birtPlace?p.birtPlace.split(",")[0]:"")
+              )
+            ));
+          })()
+        )
+      ),
+
+      // Preview before importing
+      gedPreview&&gedPicked&&React.createElement("div",null,
+        React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}},
+          React.createElement("div",null,
+            React.createElement("p",{style:{margin:"0 0 2px",fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208"}},gedPicked.fullName),
+            React.createElement("p",{style:{margin:0,fontSize:"0.82rem",color:"#8a7460"}},
+              [gedPicked.birtYear&&("b. "+gedPicked.birtYear), gedPicked.deatYear&&("d. "+gedPicked.deatYear)].filter(Boolean).join("  \u00b7  ")
+            )
+          ),
+          React.createElement("button",{
+            onClick:()=>handleGedPick(null),
+            style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",textDecoration:"underline"}
+          },"\u2190 Back")
+        ),
+        React.createElement("div",{style:{marginBottom:"20px",background:"#fdf3dc",border:"2px solid #c8a050",borderRadius:"4px",padding:"12px 14px"}},
+          React.createElement("p",{style:{fontSize:"0.78rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#8a6010",fontWeight:700,marginBottom:"8px"}},
+            gedPicked.fullName+" \u2014 "+gedPreview.mems.length+" personal events"
+          ),
+          React.createElement("div",{style:{maxHeight:"200px",overflowY:"auto",borderRadius:"2px",border:"1px solid #d4a840"}},
+            gedPreview.mems.map((m,i)=>
+              React.createElement("div",{key:m.id,style:{padding:"7px 14px",borderBottom:"1px solid rgba(200,168,90,0.15)",display:"flex",justifyContent:"space-between",gap:"12px",background:i%2===0?"#fef8ec":"#faefd0"}},
+                React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.88rem",color:"#1a1208"}},m.title),
+                React.createElement("span",{style:{fontSize:"0.78rem",color:"#a8885a",whiteSpace:"nowrap"}},
+                  m.fuzzy==="day"?m.day+"/"+m.month+"/"+m.year:m.fuzzy==="month"?m.month+"/"+m.year:String(m.year||"")
+                )
+              )
+            )
+          )
+        ),
+        gedContext.length>0&&React.createElement("div",{style:{marginBottom:"16px"}},
+          React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px"}},
+            React.createElement("p",{style:{fontSize:"0.82rem",fontWeight:600,color:"#2c2416"}},
+              gedContext.length+" overlapping "+(gedContext.length===1?"person":"people")+" \u2014 "+gedContextSel.size+" events selected"
+            ),
+            React.createElement("div",{style:{display:"flex",gap:"12px"}},
+              React.createElement("button",{
+                onClick:()=>setGedContextSel(new Set(gedContext.flatMap(p=>p.events.map(e=>e.id)))),
+                style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem",padding:0}
+              },"Select all"),
+              React.createElement("button",{
+                onClick:()=>setGedContextSel(new Set()),
+                style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem",padding:0}
+              },"Select none")
+            )
+          ),
+          React.createElement("div",{style:{border:"1px solid #d4c4a8",borderRadius:"3px",maxHeight:"380px",overflowY:"auto"}},
+            gedContext.map((person,pi)=>{
+              const allSel=person.events.every(e=>gedContextSel.has(e.id));
+              function togPerson(){
+                setGedContextSel(prev=>{
+                  const next=new Set(prev);
+                  if(allSel) person.events.forEach(e=>next.delete(e.id));
+                  else person.events.forEach(e=>next.add(e.id));
+                  return next;
+                });
+              }
+              return React.createElement("div",{key:person.id,
+                style:{borderBottom:pi<gedContext.length-1?"1px solid #e8dfd0":"none"}},
+                React.createElement("div",{
+                  style:{display:"flex",alignItems:"center",gap:"10px",padding:"9px 14px",background:"rgba(245,240,232,0.6)",cursor:"pointer"},
+                  onClick:()=>setGedContext(prev=>prev.map((p,ii)=>ii===pi?{...p,expanded:!p.expanded}:p))
+                },
+                  React.createElement("input",{type:"checkbox",checked:allSel,onChange:togPerson,onClick:e=>e.stopPropagation(),style:{flexShrink:0}}),
+                  React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208",flex:1}},person.fullName),
+                  person.relationship&&React.createElement("span",{
+                    style:{fontSize:"0.72rem",color:"#7a6a58",background:"rgba(200,184,154,0.2)",border:"1px solid rgba(200,184,154,0.4)",borderRadius:"20px",padding:"1px 8px",fontStyle:"italic"}
+                  },person.relationship),
+                  React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460"}},
+                    [person.birthYear,person.deathYear].filter(Boolean).join("\u2013")
+                  ),
+                  React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",marginLeft:"6px"}},person.expanded?"\u25b2":"\u25bc")
+                ),
+                person.expanded&&React.createElement("div",null,
+                  person.events.map((ev)=>
+                    React.createElement("label",{key:ev.id,
+                      style:{display:"flex",alignItems:"baseline",gap:"10px",padding:"6px 14px 6px 36px",cursor:"pointer",borderTop:"1px solid #ede0cc",
+                        background:gedContextSel.has(ev.id)?"rgba(122,158,138,0.06)":"transparent"}},
+                      React.createElement("input",{type:"checkbox",checked:gedContextSel.has(ev.id),
+                        onChange:()=>setGedContextSel(prev=>{const next=new Set(prev);next.has(ev.id)?next.delete(ev.id):next.add(ev.id);return next;}),
+                        style:{flexShrink:0,marginTop:"3px"}}),
+                      React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.86rem",color:"#1a1208",flex:1}},ev.title),
+                      React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",whiteSpace:"nowrap"}},
+                        ev.fuzzy==="day"?ev.day+"/"+ev.month+"/"+ev.year:ev.fuzzy==="month"?ev.month+"/"+ev.year:String(ev.year||"")
+                      )
+                    )
+                  )
+                )
+              );
+            })
+          )
+        ),
+        gedContext.length===0&&gedPicked.birtYear&&React.createElement("div",{
+          style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"16px",padding:"10px 14px",background:"rgba(200,184,154,0.1)",borderRadius:"3px"}
+        },
+          "No other people in this GEDCOM overlapped with "+gedPicked.fullName+"\u2019s lifespan ("
+          +gedPicked.birtYear+"\u2013"+(gedPicked.deatYear||"present")+")."
+        ),
+        gedPreview.subj.notes&&React.createElement("div",{
+          style:{background:"rgba(200,184,154,0.15)",borderRadius:"3px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.82rem",color:"#6a5c48",fontStyle:"italic",lineHeight:1.6}
+        },
+          React.createElement("strong",{style:{fontStyle:"normal",display:"block",marginBottom:"4px"}},"Biographical notes:"),
+          gedPreview.subj.notes.length>300?gedPreview.subj.notes.slice(0,300)+"\u2026":gedPreview.subj.notes
+        ),
+        React.createElement("div",{style:{background:"rgba(196,133,138,0.1)",border:"1px solid rgba(196,133,138,0.3)",borderRadius:"3px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.8rem",color:"#8a3030",lineHeight:1.5}},
+          "This will create a new subject in your Chronicle. You can add photos, notes and your own perspectives to each memory afterwards."
+        ),
+        React.createElement("button",{onClick:commitGedImport,style:{...S.btn,width:"100%",fontSize:"0.95rem",padding:"11px"}},
+          "Import "+gedPicked.fullName+" \u2192 "+(gedPreview.mems.length+gedContextSel.size)+" "+((gedPreview.mems.length+gedContextSel.size)===1?"memory":"memories")
+        )
+      )
+    )
+    ),
+
+    // ══════════════ EMAIL TAB ══════════════
+    importTab==="email"&&React.createElement("div",null,
+      React.createElement("p",{style:{fontSize:"0.92rem",color:"#8a7460",marginBottom:"14px",fontStyle:"italic"}},"Export email as .eml from your mail client, or paste raw email text below."),
+      React.createElement("div",{onDragOver:e=>{e.preventDefault();setEmailDragOver(true);},onDragLeave:()=>setEmailDragOver(false),onDrop:e=>{ e.preventDefault();setEmailDragOver(false);const f=e.dataTransfer.files[0];if(f){const r=new FileReader();r.onload=ev=>handleEmailText(ev.target.result);r.readAsText(f);}},onClick:()=>emlImportRef.current?.click(),style:{border:"2px dashed "+(emailDragOver?"#2c2416":"#c8b89a"),borderRadius:"6px",padding:"24px",textAlign:"center",cursor:"pointer",background:emailDragOver?"rgba(200,184,154,0.2)":"rgba(255,252,245,0.5)",marginBottom:"12px"}},
+        React.createElement("div",{style:{fontSize:"1.6rem",marginBottom:"6px",opacity:0.5}},"\u2709"),
+        React.createElement("p",{style:{margin:0,fontSize:"1rem",color:"#1a1208"}},"Drop .eml file here or click to browse")
+      ),
+      React.createElement("input",{ref:emlImportRef,type:"file",accept:".eml,.txt",style:{display:"none"},onChange:e=>{ const f=e.target.files[0];if(f){const r=new FileReader();r.onload=ev=>handleEmailText(ev.target.result);r.readAsText(f);}}}),
+      React.createElement("div",{style:{textAlign:"center",color:"#7a6a58",margin:"10px 0",fontSize:"0.86rem"}},"\u2014 or paste text \u2014"),
+      React.createElement("textarea",{placeholder:"Paste raw email text here\u2026",rows:4,onChange:e=>{ if(e.target.value.length>50) handleEmailText(e.target.value); },style:{...S.input,resize:"vertical",lineHeight:"1.5",marginBottom:"18px",fontSize:"0.86rem",fontFamily:"monospace",color:"#6a5c48"}}),
+      emailForm.title&&React.createElement("div",{style:{background:"rgba(255,252,245,0.9)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"18px"}},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",margin:"0 0 14px",color:"#1a1208"}},"Parsed \u2014 review & save"),
+        emailForm.from&&React.createElement("p",{style:{margin:"0 0 12px",fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic"}},"From: "+emailForm.from+(emailForm.rawDate?" \u00b7 "+emailForm.rawDate:"")),
+        React.createElement("div",{style:{display:"grid",gap:"12px"}},
+          React.createElement("div",null,React.createElement("label",{style:S.label},"Title"),React.createElement("input",{value:emailForm.title,onChange:e=>setEmailForm(f=>({...f,title:e.target.value})),style:S.input})),
+          React.createElement(DateFields,{form:emailForm,setForm:u=>setEmailForm(f=>({...f,...u}))}),
+          React.createElement("div",null,React.createElement("label",{style:S.label},"Location"),React.createElement("input",{value:emailForm.location,onChange:e=>setEmailForm(f=>({...f,location:e.target.value})),placeholder:"optional",style:S.input})),
+          React.createElement("div",null,React.createElement("label",{style:S.label},"Content"),React.createElement("textarea",{value:emailForm.content,onChange:e=>setEmailForm(f=>({...f,content:e.target.value})),rows:6,style:{...S.input,resize:"vertical",lineHeight:"1.65"}})),
+          React.createElement("div",null,React.createElement("label",{style:S.label},"Tags"),React.createElement(TagPicker,{tags:emailForm.tags,onToggle:tag=>setEmailForm(f=>({...f,tags:f.tags.includes(tag)?f.tags.filter(t=>t!==tag):[...f.tags,tag]}))})),
+          React.createElement("div",null,
+            React.createElement("label",{style:S.label},"People"),
+            React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 6px"}},"Sender added automatically. Add anyone else mentioned in the email."),
+            React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:emailForm.people||[],allValues:knownPeople,onChange:v=>setEmailForm(f=>({...f,people:v})),placeholder:"Add a person\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
+          ),
+          React.createElement("button",{onClick:saveEmail,style:{...S.btn,justifySelf:"start"}},"Save to Chronicle")
+        )
+      )
+    )
+  );
+}
+
+
+// ════════════════════════════════════════════════════════════════
+// IN THE APP RENDER: Replace the entire inline import block with:
+// ════════════════════════════════════════════════════════════════
+//
+//       view==="import"&&React.createElement(ImportView,{
+//         importTab, setImportTab, importSaved,
+//         photoQueue, photoDragOver, setPhotoDragOver, photoImportRef,
+//         processPhotos, updatePhoto, savePhotos,
+//         emailForm, setEmailForm, emailDragOver, setEmailDragOver, emlImportRef,
+//         handleEmailText, saveEmail,
+//         isSubscriber, gedPersons, gedPicked, gedPreview, gedBusy,
+//         gedSearch, setGedSearch, gedContext, setGedContext,
+//         gedContextSel, setGedContextSel,
+//         handleGedFile, handleGedPick, commitGedImport,
+//         knownPeople, peopleEmails, peopleRelationships, persistSubject,
+//       }),
+//
+// ════════════════════════════════════════════════════════════════
 // ════════════════════════════════════════════════════════════════
 // IN THE APP RENDER: Replace the entire inline settings block with:
 // ════════════════════════════════════════════════════════════════
@@ -5346,252 +5636,19 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         }
       }),
 
-      // ── IMPORT ──
-      view==="import"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
-        React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Import"),
-        React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"22px",fontSize:"0.95rem"}},"Bring in old photos or emails and turn them into memories."),
-        importSaved>0&&React.createElement("div",{style:{background:"#e8f4e8",border:"1px solid #89b08a",borderRadius:"3px",padding:"12px 16px",marginBottom:"18px",color:"#3a6b3a",fontSize:"0.95rem"}},`✓ ${importSaved} ${importSaved===1?"memory":"memories"} saved.`),
-        // Tabs
-        React.createElement("div",{style:{display:"flex",borderBottom:"1px solid #c8b89a",marginBottom:"24px"}},
-          [["photos","📷  Photos"],["email","✉️  Email"],["gedcom","🌳  Family Tree"]].map(([tab,label])=>React.createElement("button",{key:tab,onClick:()=>setImportTab(tab),style:{padding:"10px 20px",border:"none",borderBottom:importTab===tab?"2px solid #2c2416":"2px solid transparent",background:"transparent",color:importTab===tab?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"1rem",marginBottom:"-1px"}},label))
-        ),
-        // Photo tab
-        importTab==="photos"&&React.createElement("div",null,
-          React.createElement("div",{onDragOver:e=>{e.preventDefault();setPhotoDragOver(true);},onDragLeave:()=>setPhotoDragOver(false),onDrop:e=>{e.preventDefault();setPhotoDragOver(false);processPhotos(Array.from(e.dataTransfer.files));},onClick:()=>photoImportRef.current?.click(),style:{border:`2px dashed ${photoDragOver?"#2c2416":"#c8b89a"}`,borderRadius:"6px",padding:"36px 24px",textAlign:"center",cursor:"pointer",background:photoDragOver?"rgba(200,184,154,0.2)":"rgba(255,252,245,0.5)",marginBottom:"20px"}},
-            React.createElement("div",{style:{fontSize:"2rem",marginBottom:"8px",opacity:0.5}},"🖼"),
-            React.createElement("p",{style:{margin:"0 0 5px",fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208"}},"Drop photos here"),
-            React.createElement("p",{style:{margin:0,fontSize:"0.86rem",color:"#8a7460",fontStyle:"italic"}},"JPEG EXIF dates extracted automatically · click to browse")
-          ),
-          React.createElement("input",{ref:photoImportRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:e=>processPhotos(Array.from(e.target.files))}),
-          photoQueue.length>0&&React.createElement("div",null,
-            React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}},
-              React.createElement("p",{style:{margin:0,fontSize:"0.9rem",color:"#8a7460"}},`${photoQueue.filter(p=>p.keep).length} of ${photoQueue.length} selected`),
-              React.createElement("div",{style:{display:"flex",gap:"8px"}},
-                React.createElement("button",{onClick:()=>setPhotoQueue([]),style:{...S.btnOutline,padding:"6px 12px",fontSize:"0.84rem",color:"#c4858a",borderColor:"#c4858a"}},"Clear"),
-                React.createElement("button",{onClick:savePhotos,style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem"}},`Save ${photoQueue.filter(p=>p.keep).length} →`)
-              )
-            ),
-            photoQueue.map(item=>React.createElement("div",{key:item.id,style:{display:"flex",gap:"12px",background:item.keep?"rgba(255,252,245,0.9)":"rgba(230,225,215,0.4)",border:`1px solid ${item.keep?"#d4c4a8":"#e8e0d0"}`,borderRadius:"4px",padding:"12px",marginBottom:"10px",opacity:item.keep?1:0.5}},
-              React.createElement("div",{style:{flexShrink:0,width:"80px"}},
-                React.createElement("img",{src:item.url,alt:"",style:{width:"80px",height:"80px",objectFit:"cover",borderRadius:"2px",border:"1px solid #c8b89a",display:"block"}}),
-                React.createElement("button",{onClick:()=>updatePhoto(item.id,{keep:!item.keep}),style:{marginTop:"5px",width:"100%",background:item.keep?"#e8f4e8":"transparent",color:item.keep?"#3a6b3a":"#c4858a",border:`1px solid ${item.keep?"#89b08a":"#c4858a"}`,padding:"3px",borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.76rem"}},item.keep?"✓ Include":"Skip")
-              ),
-              React.createElement("div",{style:{flex:1,display:"grid",gap:"8px"}},
-                React.createElement("div",null,React.createElement("label",{style:S.label},"Title"),React.createElement("input",{value:item.title,onChange:e=>updatePhoto(item.id,{title:e.target.value}),style:{...S.input,padding:"7px 10px"}})),
-                React.createElement(DateFields,{form:item,setForm:u=>updatePhoto(item.id,u)}),
-                React.createElement("div",null,React.createElement("label",{style:S.label},"Location"),React.createElement("input",{value:item.location,onChange:e=>updatePhoto(item.id,{location:e.target.value}),placeholder:"optional",style:{...S.input,padding:"7px 10px"}})),
-                React.createElement("div",null,React.createElement("label",{style:S.label},"Tags"),React.createElement(TagPicker,{tags:item.tags,onToggle:tag=>updatePhoto(item.id,{tags:item.tags.includes(tag)?item.tags.filter(t=>t!==tag):[...item.tags,tag]})})),
-                React.createElement("div",null,
-                  React.createElement("label",{style:S.label},"People"),
-                  React.createElement(PeopleOrgField,{icon:"👤",values:item.people||[],allValues:knownPeople,onChange:v=>updatePhoto(item.id,{people:v}),placeholder:"Add a person…",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
-                ),
-                React.createElement("p",{style:{margin:0,fontSize:"0.76rem",color:item.exifDate?"#89b08a":"#c4858a",fontStyle:"italic"}},item.exifDate?"✓ Date from EXIF":"⚠ No EXIF date — set manually")
-              )
-            ))
-          )
-        ),
-        // Email tab
-        importTab==="gedcom"&&(!isSubscriber
-          ? React.createElement("div",{style:{textAlign:"center",padding:"48px 24px",border:"1px solid #d4c4a8",borderRadius:"6px",background:"rgba(255,252,245,0.5)"}},
-              React.createElement("div",{style:{fontSize:"2.5rem",marginBottom:"12px",opacity:0.5}},"🌳"),
-              React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",fontStyle:"italic",color:"#1a1208",marginBottom:"10px"}},"Genealogy Mode"),
-              React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,maxWidth:"380px",margin:"0 auto 16px"}},
-                "GEDCOM import requires a Remembory subscription. Import a family tree, flesh out your ancestors’ lives, and connect genealogy research to narrative."),
-              React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{...S.btn,display:"inline-block",padding:"10px 24px",textDecoration:"none",fontSize:"0.9rem"}},
-                "Learn about subscribing →")
-            )
-          : React.createElement("div",null,
-          // No file loaded yet
-          !gedPersons&&React.createElement("div",null,
-            React.createElement("div",{
-              onClick:()=>document.getElementById("ged-file-input").click(),
-              style:{border:"2px dashed #c8b89a",borderRadius:"6px",padding:"36px 24px",textAlign:"center",cursor:"pointer",background:"rgba(255,252,245,0.5)",marginBottom:"16px"}
-            },
-              React.createElement("div",{style:{fontSize:"2rem",marginBottom:"8px",opacity:0.6}},"🌳"),
-              React.createElement("p",{style:{margin:"0 0 5px",fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208"}},"Drop a GEDCOM file here"),
-              React.createElement("p",{style:{margin:0,fontSize:"0.86rem",color:"#8a7460",fontStyle:"italic"}},"Export from Ancestry, MyHeritage, FamilySearch or any genealogy app · .ged files only"),
-              React.createElement("input",{id:"ged-file-input",type:"file",accept:".ged,.GED",style:{display:"none"},onChange:handleGedFile})
-            ),
-            gedBusy&&React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",textAlign:"center"}},"Parsing…")
-          ),
-
-          // Person picker
-          gedPersons&&!gedPicked&&React.createElement("div",null,
-            React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
-              React.createElement("p",{style:{margin:0,fontSize:"0.9rem",color:"#4a7a5a",fontWeight:600}},
-                `Found ${gedPersons.persons.length} people — choose one to import:`
-              ),
-              React.createElement("button",{onClick:()=>{setGedPersons(null);setGedSearch("");},style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",textDecoration:"underline"}},"Start over")
-            ),
-            React.createElement("input",{
-              value:gedSearch,
-              onChange:e=>setGedSearch(e.target.value),
-              placeholder:"Filter by name…",
-              style:{...S.input,width:"100%",marginBottom:"8px",fontSize:"0.88rem"}
-            }),
-            React.createElement("div",{style:{maxHeight:"340px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px"}},
-              (()=>{
-                const filtered = gedSearch.trim()
-                  ? gedPersons.persons.filter(p=>p.fullName.toLowerCase().includes(gedSearch.toLowerCase()))
-                  : gedPersons.persons;
-                if (!filtered.length) return React.createElement("p",{style:{padding:"12px 14px",color:"#8a7460",fontStyle:"italic",fontSize:"0.88rem",margin:0}},"No people match that name.");
-                return filtered.map((p,i)=>React.createElement("div",{
-                  key:p.id,
-                  onClick:()=>handleGedPick(p),
-                  style:{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #ede0cc",background:i%2===0?"transparent":"rgba(200,184,154,0.08)",display:"flex",justifyContent:"space-between",alignItems:"center"}
-                },
-                  React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208"}},p.fullName),
-                  React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},
-                    [p.birtYear,p.deatYear].filter(Boolean).join(" – ")||(p.birtPlace?p.birtPlace.split(",")[0]:"")
-                  )
-                ));
-              })()
-            )
-          ),
-
-          // Preview before importing
-          gedPreview&&gedPicked&&React.createElement("div",null,
-            React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}},
-              React.createElement("div",null,
-                React.createElement("p",{style:{margin:"0 0 2px",fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208"}},gedPicked.fullName),
-                React.createElement("p",{style:{margin:0,fontSize:"0.82rem",color:"#8a7460"}},
-                  [gedPicked.birtYear&&`b. ${gedPicked.birtYear}`, gedPicked.deatYear&&`d. ${gedPicked.deatYear}`].filter(Boolean).join("  ·  ")
-                )
-              ),
-              React.createElement("button",{
-                onClick:()=>{setGedPicked(null);setGedPreview(null);setGedContext([]);setGedContextSel(new Set());},
-                style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",textDecoration:"underline"}
-              },"← Back")
-            ),
-            React.createElement("div",{style:{marginBottom:"20px",background:"#fdf3dc",border:"2px solid #c8a050",borderRadius:"4px",padding:"12px 14px"}},
-              React.createElement("p",{style:{fontSize:"0.78rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#8a6010",fontWeight:700,marginBottom:"8px"}},
-                gedPicked.fullName+" — "+gedPreview.mems.length+" personal events"
-              ),
-              React.createElement("div",{style:{maxHeight:"200px",overflowY:"auto",borderRadius:"2px",border:"1px solid #d4a840"}},
-                gedPreview.mems.map((m,i)=>
-                  React.createElement("div",{key:m.id,style:{padding:"7px 14px",borderBottom:"1px solid rgba(200,168,90,0.15)",display:"flex",justifyContent:"space-between",gap:"12px",background:i%2===0?"#fef8ec":"#faefd0"}},
-                    React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.88rem",color:"#1a1208"}},m.title),
-                    React.createElement("span",{style:{fontSize:"0.78rem",color:"#a8885a",whiteSpace:"nowrap"}},
-                      m.fuzzy==="day"?`${m.day}/${m.month}/${m.year}`:m.fuzzy==="month"?`${m.month}/${m.year}`:String(m.year||"")
-                    )
-                  )
-                )
-              )
-            ),
-            gedContext.length>0&&React.createElement("div",{style:{marginBottom:"16px"}},
-              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px"}},
-                React.createElement("p",{style:{fontSize:"0.82rem",fontWeight:600,color:"#2c2416"}},
-                  gedContext.length+" overlapping "+(gedContext.length===1?"person":"people")+" — "+gedContextSel.size+" events selected"
-                ),
-                React.createElement("div",{style:{display:"flex",gap:"12px"}},
-                  React.createElement("button",{
-                    onClick:()=>setGedContextSel(new Set(gedContext.flatMap(p=>p.events.map(e=>e.id)))),
-                    style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem",padding:0}
-                  },"Select all"),
-                  React.createElement("button",{
-                    onClick:()=>setGedContextSel(new Set()),
-                    style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem",padding:0}
-                  },"Select none")
-                )
-              ),
-              React.createElement("div",{style:{border:"1px solid #d4c4a8",borderRadius:"3px",maxHeight:"380px",overflowY:"auto"}},
-                gedContext.map((person,pi)=>{
-                  const allSel=person.events.every(e=>gedContextSel.has(e.id));
-                  function togPerson(){
-                    setGedContextSel(prev=>{
-                      const next=new Set(prev);
-                      if(allSel) person.events.forEach(e=>next.delete(e.id));
-                      else person.events.forEach(e=>next.add(e.id));
-                      return next;
-                    });
-                  }
-                  return React.createElement("div",{key:person.id,
-                    style:{borderBottom:pi<gedContext.length-1?"1px solid #e8dfd0":"none"}},
-                    React.createElement("div",{
-                      style:{display:"flex",alignItems:"center",gap:"10px",padding:"9px 14px",background:"rgba(245,240,232,0.6)",cursor:"pointer"},
-                      onClick:()=>setGedContext(prev=>prev.map((p,ii)=>ii===pi?{...p,expanded:!p.expanded}:p))
-                    },
-                      React.createElement("input",{type:"checkbox",checked:allSel,onChange:togPerson,onClick:e=>e.stopPropagation(),style:{flexShrink:0}}),
-                      React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208",flex:1}},person.fullName),
-                      person.relationship&&React.createElement("span",{
-                        style:{fontSize:"0.72rem",color:"#7a6a58",background:"rgba(200,184,154,0.2)",border:"1px solid rgba(200,184,154,0.4)",borderRadius:"20px",padding:"1px 8px",fontStyle:"italic"}
-                      },person.relationship),
-                      React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460"}},
-                        [person.birthYear,person.deathYear].filter(Boolean).join("–")
-                      ),
-                      React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",marginLeft:"6px"}},person.expanded?"▲":"▼")
-                    ),
-                    person.expanded&&React.createElement("div",null,
-                      person.events.map((ev)=>
-                        React.createElement("label",{key:ev.id,
-                          style:{display:"flex",alignItems:"baseline",gap:"10px",padding:"6px 14px 6px 36px",cursor:"pointer",borderTop:"1px solid #ede0cc",
-                            background:gedContextSel.has(ev.id)?"rgba(122,158,138,0.06)":"transparent"}},
-                          React.createElement("input",{type:"checkbox",checked:gedContextSel.has(ev.id),
-                            onChange:()=>setGedContextSel(prev=>{const next=new Set(prev);next.has(ev.id)?next.delete(ev.id):next.add(ev.id);return next;}),
-                            style:{flexShrink:0,marginTop:"3px"}}),
-                          React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.86rem",color:"#1a1208",flex:1}},ev.title),
-                          React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",whiteSpace:"nowrap"}},
-                            ev.fuzzy==="day"?`${ev.day}/${ev.month}/${ev.year}`:ev.fuzzy==="month"?`${ev.month}/${ev.year}`:String(ev.year||"")
-                          )
-                        )
-                      )
-                    )
-                  );
-                })
-              )
-            ),
-            gedContext.length===0&&gedPicked.birtYear&&React.createElement("div",{
-              style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"16px",padding:"10px 14px",background:"rgba(200,184,154,0.1)",borderRadius:"3px"}
-            },
-              "No other people in this GEDCOM overlapped with "+gedPicked.fullName+"’s lifespan ("
-              +gedPicked.birtYear+"–"+(gedPicked.deatYear||"present")+")."
-            ),
-            gedPreview.subj.notes&&React.createElement("div",{
-              style:{background:"rgba(200,184,154,0.15)",borderRadius:"3px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.82rem",color:"#6a5c48",fontStyle:"italic",lineHeight:1.6}
-            },
-              React.createElement("strong",{style:{fontStyle:"normal",display:"block",marginBottom:"4px"}},"Biographical notes:"),
-              gedPreview.subj.notes.length>300?gedPreview.subj.notes.slice(0,300)+"…":gedPreview.subj.notes
-            ),
-            React.createElement("div",{style:{background:"rgba(196,133,138,0.1)",border:"1px solid rgba(196,133,138,0.3)",borderRadius:"3px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.8rem",color:"#8a3030",lineHeight:1.5}},
-              "This will create a new subject in your Chronicle. You can add photos, notes and your own perspectives to each memory afterwards."
-            ),
-            React.createElement("button",{onClick:commitGedImport,style:{...S.btn,width:"100%",fontSize:"0.95rem",padding:"11px"}},
-              "Import "+gedPicked.fullName+" → "+(gedPreview.mems.length+gedContextSel.size)+" "+((gedPreview.mems.length+gedContextSel.size)===1?"memory":"memories")
-            )
-          )
-        )
-
-        ),
-
-        importTab==="email"&&React.createElement("div",null,
-          React.createElement("p",{style:{fontSize:"0.92rem",color:"#8a7460",marginBottom:"14px",fontStyle:"italic"}},"Export email as .eml from your mail client, or paste raw email text below."),
-          React.createElement("div",{onDragOver:e=>{e.preventDefault();setEmailDragOver(true);},onDragLeave:()=>setEmailDragOver(false),onDrop:e=>{ e.preventDefault();setEmailDragOver(false);const f=e.dataTransfer.files[0];if(f){const r=new FileReader();r.onload=ev=>handleEmailText(ev.target.result);r.readAsText(f);}},onClick:()=>emlImportRef.current?.click(),style:{border:`2px dashed ${emailDragOver?"#2c2416":"#c8b89a"}`,borderRadius:"6px",padding:"24px",textAlign:"center",cursor:"pointer",background:emailDragOver?"rgba(200,184,154,0.2)":"rgba(255,252,245,0.5)",marginBottom:"12px"}},
-            React.createElement("div",{style:{fontSize:"1.6rem",marginBottom:"6px",opacity:0.5}},"✉"),
-            React.createElement("p",{style:{margin:0,fontSize:"1rem",color:"#1a1208"}},"Drop .eml file here or click to browse")
-          ),
-          React.createElement("input",{ref:emlImportRef,type:"file",accept:".eml,.txt",style:{display:"none"},onChange:e=>{ const f=e.target.files[0];if(f){const r=new FileReader();r.onload=ev=>handleEmailText(ev.target.result);r.readAsText(f);}}}),
-          React.createElement("div",{style:{textAlign:"center",color:"#7a6a58",margin:"10px 0",fontSize:"0.86rem"}},"— or paste text —"),
-          React.createElement("textarea",{placeholder:"Paste raw email text here…",rows:4,onChange:e=>{ if(e.target.value.length>50) handleEmailText(e.target.value); },style:{...S.input,resize:"vertical",lineHeight:"1.5",marginBottom:"18px",fontSize:"0.86rem",fontFamily:"monospace",color:"#6a5c48"}}),
-          emailForm.title&&React.createElement("div",{style:{background:"rgba(255,252,245,0.9)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"18px"}},
-            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",margin:"0 0 14px",color:"#1a1208"}},"Parsed — review & save"),
-            emailForm.from&&React.createElement("p",{style:{margin:"0 0 12px",fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic"}},`From: ${emailForm.from}${emailForm.rawDate?` · ${emailForm.rawDate}`:""}`),
-            React.createElement("div",{style:{display:"grid",gap:"12px"}},
-              React.createElement("div",null,React.createElement("label",{style:S.label},"Title"),React.createElement("input",{value:emailForm.title,onChange:e=>setEmailForm(f=>({...f,title:e.target.value})),style:S.input})),
-              React.createElement(DateFields,{form:emailForm,setForm:u=>setEmailForm(f=>({...f,...u}))}),
-              React.createElement("div",null,React.createElement("label",{style:S.label},"Location"),React.createElement("input",{value:emailForm.location,onChange:e=>setEmailForm(f=>({...f,location:e.target.value})),placeholder:"optional",style:S.input})),
-              React.createElement("div",null,React.createElement("label",{style:S.label},"Content"),React.createElement("textarea",{value:emailForm.content,onChange:e=>setEmailForm(f=>({...f,content:e.target.value})),rows:6,style:{...S.input,resize:"vertical",lineHeight:"1.65"}})),
-              React.createElement("div",null,React.createElement("label",{style:S.label},"Tags"),React.createElement(TagPicker,{tags:emailForm.tags,onToggle:tag=>setEmailForm(f=>({...f,tags:f.tags.includes(tag)?f.tags.filter(t=>t!==tag):[...f.tags,tag]}))})),
-              React.createElement("div",null,
-                React.createElement("label",{style:S.label},"People"),
-                React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 6px"}},"Sender added automatically. Add anyone else mentioned in the email."),
-                React.createElement(PeopleOrgField,{icon:"👤",values:emailForm.people||[],allValues:knownPeople,onChange:v=>setEmailForm(f=>({...f,people:v})),placeholder:"Add a person…",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
-              ),
-              React.createElement("button",{onClick:saveEmail,style:{...S.btn,justifySelf:"start"}},"Save to Chronicle")
-            )
-          )
-        )
-      ),
-
+      view==="import"&&React.createElement(ImportView,{
+        importTab, setImportTab, importSaved,
+        photoQueue, photoDragOver, setPhotoDragOver, photoImportRef,
+        processPhotos, updatePhoto, savePhotos,
+        emailForm, setEmailForm, emailDragOver, setEmailDragOver, emlImportRef,
+        handleEmailText, saveEmail,
+        isSubscriber, gedPersons, gedPicked, gedPreview, gedBusy,
+        gedSearch, setGedSearch, gedContext, setGedContext,
+        gedContextSel, setGedContextSel,
+        handleGedFile, handleGedPick, commitGedImport,
+        knownPeople, peopleEmails, peopleRelationships, persistSubject,
+      }),
+                        
       // ── LIFE VIEW ──
       view==="life"&&React.createElement("div",{style:{animation:"fadeIn 0.35s ease"}},
         React.createElement("p",{style:{fontStyle:"italic",color:"#8a7460",marginBottom:"22px",fontSize:"0.95rem"}},memories.length===0?"Your story begins here.":`${memories.length} ${memories.length===1?"memory":"memories"} across ${allDecades.length} ${allDecades.length===1?"decade":"decades"}`),
