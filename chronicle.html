@@ -2731,7 +2731,7 @@ function SettingsView({
 
     // ── Tab bar ──
     React.createElement("div",{style:{display:"flex",gap:"0",marginBottom:"28px",borderBottom:"2px solid #e0d4be"}},
-      [["account","Account"],["backup","Backup & Restore"],["legacy","Legacy"]].map(([tab,label])=>
+        [["account","Account"],["backup","Backup & Restore"],["legacy","Legacy"],["print","Print"]].map(([tab,label])=>
         React.createElement("button",{
           key:tab,onClick:()=>setSettingsTab(tab),
           style:{padding:"8px 20px",border:"none",background:"transparent",cursor:"pointer",
@@ -2939,6 +2939,16 @@ function SettingsView({
         React.createElement("button",{onClick:()=>setView("legacy"),style:{...S.btn,padding:"9px 16px",fontSize:"0.88rem"}},"\ud83c\udf1f Preview Legacy View")
       )
     ) // end legacy tab
+    ,
+    // ══════════════ PRINT TAB ══════════════
+    settingsTab==="print"&&React.createElement(React.Fragment,null,
+      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Print / Export"),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.6}},
+          "Print your chronicle or save it as a PDF. Choose which memories to include, the level of detail, and whether to show photos and people."),
+        React.createElement("button",{onClick:()=>setView("print"),style:{...S.btn,padding:"9px 16px",fontSize:"0.88rem"}},"🖨 Open Print View")
+      )
+    )
   );
 }
 
@@ -3298,13 +3308,6 @@ function DetailView({
     )
   );
 }
-// ════════════════════════════════════════════════════════════════
-// EXTRACTED COMPONENT: AddEditForm
-// ════════════════════════════════════════════════════════════════
-// Paste this BEFORE `function App() {` in chronicle.html
-// (after DetailView, before App)
-// Then replace the inline add/edit render in App with the call shown at the bottom.
-// ════════════════════════════════════════════════════════════════
 
 function AddEditForm({
   view, form, updateForm, editingId,
@@ -5368,14 +5371,19 @@ function App() {
       React.createElement("div",{style:{display:"flex",gap:"6px",alignItems:"center",flexShrink:0}},
         saveStatus==="saved"&&React.createElement("span",{style:{fontSize:"0.75rem",color:"#89b08a"}},"✓"),
         saveStatus==="error"&&React.createElement("span",{style:{fontSize:"0.75rem",color:"#c4858a"}},"⚠"),
-        // On desktop show all nav; on mobile collapse to just Back/Add/Settings
+// On desktop show all nav; on mobile collapse to just Back/Add/Settings
         !isMobile&&!["add","edit"].includes(view)&&React.createElement("div",{style:{display:"flex",border:"1px solid #c8b89a",borderRadius:"2px",overflow:"hidden"}},
           [["life","◉ Life"],["timeline","≡ List"]].map(([v,label])=>React.createElement("button",{key:v,onClick:()=>setView(v),style:{padding:"7px 12px",border:"none",borderRight:v==="life"?"1px solid #c8b89a":"none",background:view===v?"#2c2416":"transparent",color:view===v?"#f5f0e8":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem"}},label))
         ),
         !isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>{setIndexFilter(null);setView("index");},style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"☰ Index"),
-        !isMobile&&view!=="import"&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("import"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"↑ Import Media"),
-        !isMobile&&view!=="prompt"&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("prompt"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"✦ Prompt"),
         !isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("map"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"🗺 Map"),
+        !isMobile&&!["add","edit"].includes(view)&&isSubscriber&&wantPublicProfile&&React.createElement("button",{
+          onClick:()=>setView("public-profile"),
+          style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem",
+            background:view==="public-profile"?"#2c2416":"transparent",
+            color:view==="public-profile"?"#f5f0e8":undefined,
+            borderColor:view==="public-profile"?"#2c2416":undefined}},
+          "◎ Profile"),
         !isMobile&&!["add","edit"].includes(view)&&isSubscriber&&wantPublicProfile&&React.createElement("a",{
           href:(()=>{
             const base="https://social.remembory.net/";
@@ -5387,24 +5395,9 @@ function App() {
           target:"_blank",rel:"noopener",
           style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem",
             textDecoration:"none",display:"inline-flex",alignItems:"center"}
-        },"Explore"),
-        !isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("print"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"🖨 Print"),
-        !isMobile&&React.createElement("button",{
-          onClick: async ()=>{
-            setSaveBackupBusy(true);
-            await exportBackup();
-            setSaveBackupBusy(false);
-          },
-          title:"Save backup file",
-          style:{...S.btn,padding:"7px 13px",fontSize:"0.84rem",background:"#4a7a5a",opacity:saveBackupBusy?0.6:1}
-        }, saveBackupBusy ? "Saving…" : "💾 Backup"),
-        !isMobile&&isSubscriber&&wantPublicProfile&&React.createElement("button",{
-          onClick:()=>setView("public-profile"),
-          style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem",
-            background:view==="public-profile"?"#2c2416":"transparent",
-            color:view==="public-profile"?"#f5f0e8":undefined,
-            borderColor:view==="public-profile"?"#2c2416":undefined}},
-          "◎ Profile"),
+        },"Explore ↗"),
+        !isMobile&&view!=="prompt"&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("prompt"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"✦ Prompt"),
+        !isMobile&&React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",title:"Subscribe to Chronicle",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#7a6040",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#7a6040";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
         !isMobile&&React.createElement("button",{onClick:()=>setView("settings"),
           style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem",position:"relative"}},
           "⚙ Settings",
@@ -5416,32 +5409,27 @@ function App() {
           },notifications.length)
         ),
         !isMobile&&React.createElement("span",{style:{width:"1px",height:"20px",background:"#d4c4a8",margin:"0 4px",flexShrink:0}}),
-        !isMobile&&React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",title:"Subscribe to Chronicle",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#7a6040",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#7a6040";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
+        !isMobile&&view!=="import"&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("import"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"↑ Import"),
         showBack&&React.createElement("button",{onClick:goBack,style:{...S.btnOutline,padding:isMobile?"8px 14px":"7px 13px",fontSize:"0.9rem"}},"← Back"),
         showAdd&&React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView("add"); },style:{...S.btn,padding:isMobile?"8px 16px":"7px 15px",fontSize:"0.9rem"}},"+ Add")
       )
     ),
 
-    // ── MOBILE BOTTOM NAV ──
+// ── MOBILE BOTTOM NAV ──
     isMobile&&!["add","edit"].includes(view)&&React.createElement("nav",{style:{position:"fixed",bottom:0,left:0,right:0,zIndex:200,background:"rgba(245,240,232,0.97)",borderTop:"1px solid #c8b89a",display:"flex",backdropFilter:"blur(8px)",paddingBottom:"env(safe-area-inset-bottom, 0px)"}},
       [
         ["life","◉","Life"],
         ["timeline","≡","List"],
         ["index","☰","Index"],
         ["map","🗺","Map"],
-        ["prompt","✦","Prompt"],
         ["settings","⚙","Settings"],
-            ["legacy","🌟","Legacy"],
       ].map(([v,icon,label])=>React.createElement("button",{key:v,onClick:()=>{ setIndexFilter(null); setView(v); },style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:view===v?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:view===v?"2px solid #2c2416":"2px solid transparent"}},
         React.createElement("span",{style:{fontSize:"1.1rem",lineHeight:1}},icon),
         label
       )),
-      React.createElement("button",{
-        onClick:async()=>{ setSaveBackupBusy(true); await exportBackup(); setSaveBackupBusy(false); },
-        style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:"#4a7a5a",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:"2px solid transparent"}
-      },
-        React.createElement("span",{style:{fontSize:"1.1rem",lineHeight:1}},saveBackupBusy?"…":"💾"),
-        saveBackupBusy?"Saving…":"Backup"
+      isSubscriber&&wantPublicProfile&&React.createElement("button",{key:"profile",onClick:()=>setView("public-profile"),style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:view==="public-profile"?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:view==="public-profile"?"2px solid #2c2416":"2px solid transparent"}},
+        React.createElement("span",{style:{fontSize:"1.1rem",lineHeight:1}},"◎"),
+        "Profile"
       )
     ),
 
