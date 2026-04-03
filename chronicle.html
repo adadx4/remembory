@@ -2706,7 +2706,267 @@ function isInAppBrowser() {
   if (/Twitter/i.test(ua)) return "twitter";
   return null;
 }
+// ════════════════════════════════════════════════════════════════
+// EXTRACTED COMPONENT: SettingsView
+// ════════════════════════════════════════════════════════════════
+// Paste this BEFORE `function App() {` in chronicle.html
+// Then replace the inline settings render in App with the call shown at the bottom.
+// ════════════════════════════════════════════════════════════════
 
+function SettingsView({
+  subject, subjects, ownerName, ownerEmail, carerEmail,
+  activePassword, data, memories,
+  wantPublicProfile, isSubscriber, licenceKey, licenceStatus,
+  legacyMessage, setLegacyMessage,
+  profileState,
+  persistSubject, persistTop, setActivePassword, setLocked, setData,
+  saveLicenceKey, setView, setShowSubjectMgr, exportBackup,
+  importBackup, shareCodeInput, setShareCodeInput,
+  shareCodeStatus, importFromCode,
+  saveBackupBusy, setSaveBackupBusy,
+  syncInfo, syncStatus, chooseSyncFile, createSyncFile, doSync, clearSyncFile,
+  unpublishProfile,
+}) {
+
+  return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"720px"}},
+    React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 16px",color:"#1a1208"}},"Settings"),
+
+    // ── Tab bar ──
+    React.createElement("div",{style:{display:"flex",gap:"0",marginBottom:"28px",borderBottom:"2px solid #e0d4be"}},
+      [["account","Account"],["backup","Backup & Restore"],["legacy","Legacy"]].map(([tab,label])=>
+        React.createElement("button",{
+          key:tab,onClick:()=>setSettingsTab(tab),
+          style:{padding:"8px 20px",border:"none",background:"transparent",cursor:"pointer",
+            fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",marginBottom:"-2px",
+            borderBottom:settingsTab===tab?"2px solid #2c2416":"2px solid transparent",
+            color:settingsTab===tab?"#1a1208":"#8a7460",fontWeight:settingsTab===tab?600:400}
+        },label)
+      )
+    ),
+
+    // ══════════════ ACCOUNT TAB ══════════════
+    settingsTab==="account"&&React.createElement(React.Fragment,null,
+
+      // ── Identity ──
+      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+        React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},subject.isSelf?"Your name":"Subject name"),
+          React.createElement("button",{onClick:()=>setShowSubjectMgr(true),style:{background:"transparent",border:"none",fontSize:"0.76rem",color:"#a8885a",cursor:"pointer",padding:0,fontFamily:"'Crimson Text',serif"}},
+            subjects.length>1 ? `Switch (${subjects.length} people) \u2192` : "Manage people \u2192")
+        ),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 12px"}},
+          subject.isSelf ? "Your name is shown when you share memories with others." : "The person whose memories this is."),
+        React.createElement("input",{value:ownerName,onChange:e=>persistSubject({name:e.target.value}),placeholder:"Your name",style:{...S.input,marginBottom:"10px"}}),
+        React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:S.input})
+      ),
+
+      // ── Public profile toggle ──
+      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+        React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:"12px"}},
+          React.createElement("input",{type:"checkbox",id:"want-public",
+            checked:wantPublicProfile,
+            onChange:e=>{
+              persistTop({wantPublicProfile:e.target.checked});
+              if (!e.target.checked && profileState) unpublishProfile();
+            },
+            disabled:!isSubscriber,
+            style:{marginTop:"3px",flexShrink:0,cursor:isSubscriber?"pointer":"not-allowed"}}),
+          React.createElement("div",null,
+            React.createElement("label",{htmlFor:"want-public",
+              style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",
+                cursor:isSubscriber?"pointer":"default",display:"block",marginBottom:"4px"}},
+              "Enable public profile"),
+            React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,margin:0}},
+              isSubscriber
+                ? "Enables visibility controls on memories and your public profile page."
+                : React.createElement(React.Fragment,null,"Requires a subscription. ",
+                    React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{color:"#a8885a"}},"Subscribe \u2192"))
+            )
+          )
+        )
+      ),
+
+      // ── Subscription ──
+      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+        React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},"\u2728 Subscription"),
+          isSubscriber&&React.createElement("span",{style:{fontSize:"0.72rem",background:"#4a7a5a",color:"#fff",padding:"2px 9px",borderRadius:"20px",letterSpacing:"0.04em"}},"ACTIVE")
+        ),
+        isSubscriber
+          ? React.createElement("div",null,
+              React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"6px"}},licenceStatus.promo ? "\u2713 Subscriber (promo)" : licenceStatus.expiresAt ? "\u2713 Subscriber \u00b7 expires "+licenceStatus.expiresAt : "\u2713 Subscriber"),
+              React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"Sharing and Genealogy Mode are enabled."),
+              React.createElement("button",{onClick:()=>saveLicenceKey(""),style:{...S.btnOutline,fontSize:"0.82rem",padding:"5px 12px",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove key")
+            )
+          : React.createElement("div",null,
+              React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,marginBottom:"12px"}},
+                "A subscription unlocks sharing memories with others, Genealogy Mode, and public timelines. The core app is always free \u2014 no account ever required."),
+              licenceStatus&&!licenceStatus.valid&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#c4858a",marginBottom:"8px",fontStyle:"italic"}},
+                licenceStatus.reason==="expired"?"Your licence key has expired \u2014 renew at remembory.net.":
+                licenceStatus.reason==="invalid"?"That key doesn\u2019t look right \u2014 check for typos.":"Couldn\u2019t validate that key."),
+              React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"10px"}},
+                React.createElement("input",{value:licenceKey,
+                  onChange:e=>saveLicenceKey(e.target.value),
+                  onKeyDown:e=>{if(e.key==="Enter")saveLicenceKey(e.target.value);},
+                  id:"licence-key-input",
+                  placeholder:"Paste your Lemon Squeezy licence key\u2026",
+                  style:{...S.input,flex:1,fontSize:"0.88rem",fontFamily:"monospace",letterSpacing:"0.05em"}}),
+                React.createElement("button",{
+                  onClick:()=>{ const el=document.getElementById("licence-key-input"); saveLicenceKey(el?el.value:licenceKey); },
+                  style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem"}
+                },"Apply")
+              ),
+              React.createElement("a",{href:"https://remembory.lemonsqueezy.com/checkout/buy/669e695c-c63a-4bf6-8eaf-4d56d05bfbdf",target:"_blank",rel:"noopener",style:{fontSize:"0.82rem",color:"#a8885a",textDecoration:"underline"}},"Subscribe at Lemon Squeezy \u2192")
+            )
+      ),
+
+      // ── Password / lock ──
+      React.createElement(PasswordCard,{activePassword,data,setActivePassword,setLocked,setData}),
+
+      // ── Receive shared memories ──
+      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Receive shared memories"),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 12px",lineHeight:1.6}},"Enter a share code from someone\u2019s message or the bridge page."),
+        React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"8px"}},
+          React.createElement("input",{type:"text",value:shareCodeInput,onChange:e=>setShareCodeInput(e.target.value.trim()),onKeyDown:e=>e.key==="Enter"&&importFromCode(),placeholder:"e.g. a1b2c3d4",style:{...S.input,flex:1,fontFamily:"monospace",fontSize:"1rem",letterSpacing:"0.05em"}}),
+          React.createElement("button",{onClick:importFromCode,disabled:!shareCodeInput.trim()||shareCodeStatus==="Fetching\u2026",style:{...S.btn,padding:"9px 18px",whiteSpace:"nowrap",opacity:shareCodeInput.trim()?1:0.4}},shareCodeStatus==="Fetching\u2026"?"Fetching\u2026":"Import")
+        ),
+        shareCodeStatus&&React.createElement("p",{style:{fontSize:"0.84rem",color:shareCodeStatus.startsWith("\u2713")?"#4a7a5a":"#c4858a",fontStyle:"italic"}},shareCodeStatus)
+      ),
+
+      // ── Danger zone ──
+      React.createElement("div",{style:{background:"rgba(255,245,245,0.7)",border:"1px solid #e0c8c8",borderRadius:"3px",padding:"20px"}},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#8a3030",margin:"0 0 8px"}},"Reset"),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px"}},"Permanently deletes all memories and cannot be undone. Download a backup first if you want to keep a copy."),
+        React.createElement("button",{
+          onClick:()=>{ if(window.confirm("Delete all "+memories.length+" memories? This cannot be undone.\n\nDownload a backup first.")) { persistSubject({memories:[],knownPeople:[],knownOrgs:[],knownLocations:[],customTags:[],peopleEmails:{},peopleRelationships:{},peopleNotes:{},orgNotes:{},locationNotes:{},locationCoords:{},personOrgs:{},personLocations:{},personGroups:{},shareHistory:[],lastBackup:null,lastImport:null}); setView("life"); }},
+          style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}
+        },"\ud83d\uddd1 Clear all memories")
+      ),
+
+      !isSubscriber&&React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
+        "Unlock sharing & genealogy mode \u2014 ",
+        React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"\u2728 subscribe for $20/year"),
+        "."
+      ),
+      React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
+        "Chronicle \u2022 build 2026-04-03 UTC"
+      )
+    ), // end account tab
+
+    // ══════════════ BACKUP TAB ══════════════
+    settingsTab==="backup"&&React.createElement(React.Fragment,null,
+
+      // ── Cloud Sync ──
+      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Cloud Sync"),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.6}},
+          "Keep Chronicle in sync across devices using a file in your cloud storage folder (iCloud Drive, Dropbox, Google Drive, OneDrive etc.). "),
+        syncInfo
+          ? React.createElement("div",null,
+              React.createElement("div",{style:{background:"rgba(74,122,90,0.08)",border:"1px solid rgba(74,122,90,0.2)",borderRadius:"3px",padding:"10px 14px",marginBottom:"12px",fontSize:"0.84rem"}},
+                React.createElement("div",{style:{color:"#1a1208",fontWeight:600,marginBottom:"2px"}},syncInfo.name),
+                React.createElement("div",{style:{color:"#8a7460"}}, syncInfo.lastSync ? "Last synced: "+new Date(syncInfo.lastSync).toLocaleString() : "Not yet synced")
+              ),
+              React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
+                React.createElement("button",{onClick:()=>doSync(),disabled:syncStatus==="syncing",style:{...S.btn,flex:1,opacity:syncStatus==="syncing"?0.6:1}},
+                  syncStatus==="syncing"?"Syncing\u2026":syncStatus==="done"?"Synced":syncStatus==="error"?"Sync failed":"Sync now"),
+                React.createElement("button",{onClick:clearSyncFile,style:{...S.btnOutline,padding:"9px 14px",fontSize:"0.84rem"}},"Disconnect")
+              )
+            )
+          : React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
+              React.createElement("button",{onClick:createSyncFile,style:{...S.btn,flex:1}},"Create sync file"),
+              React.createElement("button",{onClick:chooseSyncFile,style:{...S.btnOutline,flex:1,padding:"9px 14px",fontSize:"0.84rem"}},"Open existing sync file")
+            )
+      ),
+
+      // ── Backup ──
+      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Backup"),
+        (()=>{
+          const photoCount = memories.reduce((n,m)=>n+(m.mediaUrls||[]).length,0);
+          const photoNote = photoCount > 0 ? " \u00b7 "+photoCount+" photo"+(photoCount===1?"":"s")+" included" : "";
+          let statusMsg, statusColor;
+          if (!subject.lastBackup) { statusMsg = "Not yet backed up \u2014 your backup includes all memories and photos"; statusColor = "#b0804a"; }
+          else {
+            const days = Math.floor((Date.now() - new Date(subject.lastBackup)) / 86400000);
+            if (days === 0) { statusMsg = "\u2713 Backed up today"+photoNote; statusColor = "#4a7a5a"; }
+            else if (days === 1) { statusMsg = "\u2713 Backed up yesterday"+photoNote; statusColor = "#6a5c48"; }
+            else if (days < 7)  { statusMsg = "Backed up "+days+" days ago"+photoNote; statusColor = "#6a5c48"; }
+            else if (days < 30) { statusMsg = "\u26a0 Last backup "+days+" days ago \u2014 save a fresh copy"; statusColor = "#b0804a"; }
+            else { statusMsg = "\u26a0 Last backup was "+days+" days ago \u2014 please back up soon"; statusColor = "#c4858a"; }
+          }
+          const importLine = subject.lastImport ? (()=>{ const id2=Math.floor((Date.now()-new Date(subject.lastImport))/86400000); return "Last synced: "+(id2===0?"today":id2===1?"yesterday":id2+" days ago"); })() : null;
+          return React.createElement(React.Fragment, null,
+            React.createElement("p",{style:{fontSize:"0.82rem",color:statusColor,fontStyle:"italic",margin:"0 0 4px"}}, statusMsg),
+            importLine && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px"}}, importLine)
+          );
+        })(),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.5}},
+          "Your backup file is self-contained \u2014 memories, photos, and all. Open it on any device to restore everything."),
+        React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 6px"}},"Backup password (optional) \u2014 encrypts the downloaded file only. This is separate from your Chronicle lock password."),
+        React.createElement("input",{type:"password",value:subject.backupPassword||"",onChange:e=>persistSubject({backupPassword:e.target.value}),placeholder:"Password for this backup file",style:{...S.input,marginBottom:"12px",fontSize:"0.88rem"}}),
+        React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap"}},
+          React.createElement("button",{
+            onClick:async()=>{ setSaveBackupBusy(true); await exportBackup(); setSaveBackupBusy(false); },
+            style:{...S.btn,padding:"9px 16px",fontSize:"0.88rem",background:"#4a7a5a",flex:1}
+          }, saveBackupBusy ? "Saving\u2026" : "\ud83d\udcbe Download backup"),
+          React.createElement("label",{style:{...S.btnOutline,padding:"9px 16px",fontSize:"0.88rem",cursor:"pointer",flex:1,textAlign:"center"}},
+            "\u2b06 Restore from file",
+            React.createElement("input",{type:"file",accept:".json",style:{display:"none"},onChange:importBackup})
+          )
+        )
+      )
+    ), // end backup tab
+
+    // ══════════════ LEGACY TAB ══════════════
+    settingsTab==="legacy"&&React.createElement(React.Fragment,null,
+
+      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"\ud83c\udf1f Legacy View"),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.6}},
+          "Choose which memories to include in your Legacy View \u2014 a curated life story you can share or preserve as a memorial. Toggle individual memories from their detail view."),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:memories.filter(m=>m.inLegacy).length>0?"#4a7a5a":"#b0804a",fontStyle:"italic",margin:"0 0 14px"}},
+          memories.filter(m=>m.inLegacy).length>0
+            ? "\u2713 "+memories.filter(m=>m.inLegacy).length+" "+(memories.filter(m=>m.inLegacy).length===1?"memory":"memories")+" included"
+            : "No memories included yet \u2014 open any memory and tick \"Include in Legacy View\""),
+        React.createElement("label",{style:{...S.label,display:"block",marginBottom:"4px"}},"A message to leave with your Legacy"),
+        React.createElement("textarea",{
+          value:legacyMessage||"",
+          onChange:e=>setLegacyMessage(e.target.value),
+          placeholder:"Something you\u2019d like people to know, remember, or carry forward\u2026",
+          rows:4,
+          style:{...S.input,resize:"vertical",lineHeight:1.6,fontSize:"0.9rem",marginBottom:"12px"}
+        }),
+        React.createElement("button",{onClick:()=>setView("legacy"),style:{...S.btn,padding:"9px 16px",fontSize:"0.88rem"}},"\ud83c\udf1f Preview Legacy View")
+      )
+    ) // end legacy tab
+  );
+}
+
+
+// ════════════════════════════════════════════════════════════════
+// IN THE APP RENDER: Replace the entire inline settings block with:
+// ════════════════════════════════════════════════════════════════
+//
+//       view==="settings"&&React.createElement(SettingsView,{
+//         subject, subjects, ownerName, ownerEmail, carerEmail,
+//         activePassword, data, memories,
+//         wantPublicProfile, isSubscriber, licenceKey, licenceStatus,
+//         legacyMessage, setLegacyMessage,
+//         profileState, unpublishProfile,
+//         persistSubject, persistTop, setActivePassword, setLocked, setData,
+//         saveLicenceKey, setView, setShowSubjectMgr, exportBackup,
+//         importBackup, shareCodeInput, setShareCodeInput,
+//         shareCodeStatus, importFromCode,
+//         saveBackupBusy, setSaveBackupBusy,
+//         syncInfo, syncStatus, chooseSyncFile, createSyncFile, doSync, clearSyncFile,
+//       }),
+//
+// ════════════════════════════════════════════════════════════════
+ 
+ 
+ 
 function App() {
   const winW = useWindowSize();
   const isMobile = winW < 768;
@@ -4818,290 +5078,20 @@ function App() {
       // ── PEOPLE & ORGS ──
       view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,peopleNotes,orgNotes,localConnections:localConnections,onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");},onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},}),
 
-      // ── PRINT VIEW ──
-      view==="settings"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"720px"}},
-        React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 16px",color:"#1a1208"}},"Settings"),
-        React.createElement("div",{style:{display:"flex",gap:"0",marginBottom:"28px",borderBottom:"2px solid #e0d4be"}},
-          [["account","Account"],["backup","Backup & Restore"],["legacy","Legacy"]].map(([tab,label])=>
-            React.createElement("button",{
-              key:tab,onClick:()=>setSettingsTab(tab),
-              style:{padding:"8px 20px",border:"none",background:"transparent",cursor:"pointer",
-                fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",marginBottom:"-2px",
-                borderBottom:settingsTab===tab?"2px solid #2c2416":"2px solid transparent",
-                color:settingsTab===tab?"#1a1208":"#8a7460",fontWeight:settingsTab===tab?600:400}
-            },label)
-          )
-        ),
+      view==="settings"&&React.createElement(SettingsView,{
+        subject, subjects, ownerName, ownerEmail, carerEmail,
+        activePassword, data, memories,
+        wantPublicProfile, isSubscriber, licenceKey, licenceStatus,
+        legacyMessage, setLegacyMessage,
+        profileState, unpublishProfile,
+        persistSubject, persistTop, setActivePassword, setLocked, setData,
+        saveLicenceKey, setView, setShowSubjectMgr, exportBackup,
+        importBackup, shareCodeInput, setShareCodeInput,
+        shareCodeStatus, importFromCode,
+        saveBackupBusy, setSaveBackupBusy,
+        syncInfo, syncStatus, chooseSyncFile, createSyncFile, doSync, clearSyncFile,
+      }),
 
-        // ── Account tab ──
-        settingsTab==="account"&&React.createElement(React.Fragment,null,
-
-        // ── Identity ──
-        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-          React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
-            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},subject.isSelf?"Your name":"Subject name"),
-            React.createElement("button",{onClick:()=>setShowSubjectMgr(true),style:{background:"transparent",border:"none",fontSize:"0.76rem",color:"#a8885a",cursor:"pointer",padding:0,fontFamily:"'Crimson Text',serif"}},
-              subjects.length>1 ? `Switch (${subjects.length} people) →` : "Manage people →")
-          ),
-          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 12px"}},
-            subject.isSelf ? "Your name is shown when you share memories with others." : "The person whose memories this is."),
-          React.createElement("input",{value:ownerName,onChange:e=>persistSubject({name:e.target.value}),placeholder:"Your name",style:{...S.input,marginBottom:"10px"}}),
-          React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:S.input})
-        ),
-
-        // ── Public profile toggle ──
-        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-          React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:"12px"}},
-            React.createElement("input",{type:"checkbox",id:"want-public",
-              checked:wantPublicProfile,
-              onChange:e=>{
-                persistTop({wantPublicProfile:e.target.checked});
-                // If turning off and profile is live, take it offline
-                if (!e.target.checked && profileState) {
-                  unpublishProfile();
-                }
-              },
-              disabled:!isSubscriber,
-              style:{marginTop:"3px",flexShrink:0,cursor:isSubscriber?"pointer":"not-allowed"}}),
-            React.createElement("div",null,
-              React.createElement("label",{htmlFor:"want-public",
-                style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",
-                  cursor:isSubscriber?"pointer":"default",display:"block",marginBottom:"4px"}},
-                "Enable public profile"),
-              React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,margin:0}},
-                isSubscriber
-                  ? "Enables visibility controls on memories and your public profile page."
-                  : React.createElement(React.Fragment,null,"Requires a subscription. ",
-                      React.createElement("a",{href:"https://ko-fi.com/remembory",
-                        target:"_blank",rel:"noopener",style:{color:"#a8885a"}},"Subscribe →"))
-              )
-            )
-          )
-        ),
-
-        ), // end account tab
-
-        // ── Profile tab ──
-        settingsTab==="profile"&&React.createElement(React.Fragment,null,
-
-        React.createElement("div",{style:{textAlign:"center",padding:"40px 0",color:"#8a7460",fontStyle:"italic",fontSize:"0.9rem"}},
-          "Notification settings will appear here in a future update."
-        )
-                ), // end profile tab
-
-        settingsTab==="account"&&React.createElement(React.Fragment,null,
-
-        // ── Subscription ──
-        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-          React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
-            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},"✨ Subscription"),
-            isSubscriber&&React.createElement("span",{style:{fontSize:"0.72rem",background:"#4a7a5a",color:"#fff",padding:"2px 9px",borderRadius:"20px",letterSpacing:"0.04em"}},"ACTIVE")
-          ),
-          isSubscriber
-            ? React.createElement("div",null,
-                React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"6px"}},licenceStatus.promo ? "✓ Subscriber (promo)" : licenceStatus.expiresAt ? "✓ Subscriber · expires "+licenceStatus.expiresAt : "✓ Subscriber"),
-                React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"Sharing and Genealogy Mode are enabled."),
-                React.createElement("button",{onClick:()=>saveLicenceKey(""),style:{...S.btnOutline,fontSize:"0.82rem",padding:"5px 12px",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove key")
-              )
-            : React.createElement("div",null,
-                React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,marginBottom:"12px"}},
-                  "A subscription unlocks sharing memories with others, Genealogy Mode, and public timelines. The core app is always free — no account ever required."),
-                licenceStatus&&!licenceStatus.valid&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#c4858a",marginBottom:"8px",fontStyle:"italic"}},
-                  licenceStatus.reason==="expired"?"Your licence key has expired — renew at remembory.net.":
-                  licenceStatus.reason==="invalid"?"That key doesn’t look right — check for typos.":"Couldn’t validate that key."),
-                React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"10px"}},
-                  React.createElement("input",{value:licenceKey,
-                    onChange:e=>setLicenceKey(e.target.value),
-                    onBlur:e=>saveLicenceKey(e.target.value),
-                    onKeyDown:e=>{if(e.key==="Enter")saveLicenceKey(e.target.value);},
-                    id:"licence-key-input",
-                    placeholder:"Paste your Lemon Squeezy licence key…",
-                    style:{...S.input,flex:1,fontSize:"0.88rem",fontFamily:"monospace",letterSpacing:"0.05em"}}),
-                  React.createElement("button",{
-                    onClick:()=>{
-                      const el=document.getElementById("licence-key-input");
-                      saveLicenceKey(el?el.value:licenceKey);
-                    },
-                    style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem"}
-                  },"Apply")
-                ),
-                React.createElement("a",{href:"https://remembory.lemonsqueezy.com/checkout/buy/669e695c-c63a-4bf6-8eaf-4d56d05bfbdf",target:"_blank",rel:"noopener",style:{fontSize:"0.82rem",color:"#a8885a",textDecoration:"underline"}},"Subscribe at Lemon Squeezy →")
-              )
-        ),
-
-        ), // end account tab 2
-
-        // ── Backup tab ──
-        settingsTab==="backup"&&React.createElement(React.Fragment,null,
-
-        // ── Cloud Sync ──
-        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Cloud Sync"),
-          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.6}},
-            "Keep Chronicle in sync across devices using a file in your cloud storage folder (iCloud Drive, Dropbox, Google Drive, OneDrive etc.). "
-          ),
-          syncInfo
-            ? React.createElement("div",null,
-                React.createElement("div",{style:{background:"rgba(74,122,90,0.08)",border:"1px solid rgba(74,122,90,0.2)",borderRadius:"3px",padding:"10px 14px",marginBottom:"12px",fontSize:"0.84rem"}},
-                  React.createElement("div",{style:{color:"#1a1208",fontWeight:600,marginBottom:"2px"}},syncInfo.name),
-                  React.createElement("div",{style:{color:"#8a7460"}},
-                    syncInfo.lastSync
-                      ? "Last synced: "+new Date(syncInfo.lastSync).toLocaleString()
-                      : "Not yet synced"
-                  )
-                ),
-                React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
-                  React.createElement("button",{
-                    onClick:()=>doSync(),
-                    disabled:syncStatus==="syncing",
-                    style:{...S.btn,flex:1,opacity:syncStatus==="syncing"?0.6:1}
-                  },
-                    syncStatus==="syncing"?"Syncing…":
-                    syncStatus==="done"?"Synced":
-                    syncStatus==="error"?"Sync failed":
-                    "Sync now"
-                  ),
-                  React.createElement("button",{
-                    onClick:clearSyncFile,
-                    style:{...S.btnOutline,padding:"9px 14px",fontSize:"0.84rem"}
-                  },"Disconnect")
-                )
-              )
-            : React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
-                React.createElement("button",{
-                  onClick:createSyncFile,
-                  style:{...S.btn,flex:1}
-                },"Create sync file"),
-                React.createElement("button",{
-                  onClick:chooseSyncFile,
-                  style:{...S.btnOutline,flex:1,padding:"9px 14px",fontSize:"0.84rem"}
-                },"Open existing sync file")
-              )
-        ),
-
-        // ── Backup ──
-        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Backup"),
-          (()=>{
-            const photoCount = memories.reduce((n,m)=>n+(m.mediaUrls||[]).length,0);
-            const photoNote = photoCount > 0 ? ` · ${photoCount} photo${photoCount===1?"":"s"} included` : "";
-            let statusMsg, statusColor;
-            if (!subject.lastBackup) {
-              statusMsg = "Not yet backed up — your backup includes all memories and photos";
-              statusColor = "#b0804a";
-            } else {
-              const days = Math.floor((Date.now() - new Date(subject.lastBackup)) / 86400000);
-              if (days === 0) { statusMsg = `✓ Backed up today${photoNote}`; statusColor = "#4a7a5a"; }
-              else if (days === 1) { statusMsg = `✓ Backed up yesterday${photoNote}`; statusColor = "#6a5c48"; }
-              else if (days < 7)  { statusMsg = `Backed up ${days} days ago${photoNote}`; statusColor = "#6a5c48"; }
-              else if (days < 30) { statusMsg = `⚠ Last backup ${days} days ago — save a fresh copy`; statusColor = "#b0804a"; }
-              else { statusMsg = `⚠ Last backup was ${days} days ago — please back up soon`; statusColor = "#c4858a"; }
-            }
-            const importLine = subject.lastImport ? (()=>{
-              const id = Math.floor((Date.now()-new Date(subject.lastImport))/86400000);
-              return "Last synced: " + (id===0?"today":id===1?"yesterday":id+" days ago");
-            })() : null;
-            return React.createElement(React.Fragment, null,
-              React.createElement("p",{style:{fontSize:"0.82rem",color:statusColor,fontStyle:"italic",margin:"0 0 4px"}}, statusMsg),
-              importLine && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px"}}, importLine)
-            );
-          })(),
-          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.5}},
-            "Your backup file is self-contained — memories, photos, and all. Open it on any device to restore everything."
-          ),
-          React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 6px"}},"Backup password (optional) — encrypts the downloaded file only. This is separate from your Chronicle lock password."),
-          React.createElement("input",{
-            type:"password",
-            value:subject.backupPassword||"",
-            onChange:e=>persistSubject({backupPassword:e.target.value}),
-            placeholder:"Password for this backup file",
-            style:{...S.input,marginBottom:"12px",fontSize:"0.88rem"}
-          }),
-          React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap"}},
-            React.createElement("button",{
-              onClick:async()=>{ setSaveBackupBusy(true); await exportBackup(); setSaveBackupBusy(false); },
-              style:{...S.btn,padding:"9px 16px",fontSize:"0.88rem",background:"#4a7a5a",flex:1}
-            }, saveBackupBusy ? "Saving…" : "💾 Download backup"),
-            React.createElement("label",{style:{...S.btnOutline,padding:"9px 16px",fontSize:"0.88rem",cursor:"pointer",flex:1,textAlign:"center"}},
-              "⬆ Restore from file",
-              React.createElement("input",{type:"file",accept:".json",style:{display:"none"},onChange:importBackup})
-            )
-          )
-        ),
-
-        ), // end backup tab
-
-        settingsTab==="account"&&React.createElement(React.Fragment,null,
-
-        // ── Password / lock ──
-        React.createElement(PasswordCard,{activePassword,data,setActivePassword,setLocked,setData}),
-
-        ), // end account tab 3
-
-        // ── Legacy tab ──
-        settingsTab==="legacy"&&React.createElement(React.Fragment,null,
-
-        // ── Legacy View ──
-        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"🌟 Legacy View"),
-          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.6}},
-            "Choose which memories to include in your Legacy View — a curated life story you can share or preserve as a memorial. Toggle individual memories from their detail view."
-          ),
-          React.createElement("p",{style:{fontSize:"0.82rem",color:memories.filter(m=>m.inLegacy).length>0?"#4a7a5a":"#b0804a",fontStyle:"italic",margin:"0 0 14px"}},
-            memories.filter(m=>m.inLegacy).length>0
-              ? `✓ ${memories.filter(m=>m.inLegacy).length} ${memories.filter(m=>m.inLegacy).length===1?"memory":"memories"} included`
-              : "No memories included yet — open any memory and tick \"Include in Legacy View\""
-          ),
-          React.createElement("label",{style:{...S.label,display:"block",marginBottom:"4px"}},"A message to leave with your Legacy"),
-          React.createElement("textarea",{
-            value:legacyMessage,
-            onChange:e=>setLegacyMessage(e.target.value),
-            placeholder:"Something you'd like people to know, remember, or carry forward…",
-            rows:4,
-            style:{...S.input,resize:"vertical",lineHeight:1.6,fontSize:"0.9rem",marginBottom:"12px"}
-          }),
-          React.createElement("button",{
-            onClick:()=>setView("legacy"),
-            style:{...S.btn,padding:"9px 16px",fontSize:"0.88rem"}
-          },"🌟 Preview Legacy View")
-        ),
-
-        ), // end legacy tab
-
-        settingsTab==="account"&&React.createElement(React.Fragment,null,
-
-        // ── Receive shared memories ──
-        React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Receive shared memories"),
-          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 12px",lineHeight:1.6}},"Enter a share code from someone\u2019s message or the bridge page."),
-          React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"8px"}},
-            React.createElement("input",{type:"text",value:shareCodeInput,onChange:e=>setShareCodeInput(e.target.value.trim()),onKeyDown:e=>e.key==="Enter"&&importFromCode(),placeholder:"e.g. a1b2c3d4",style:{...S.input,flex:1,fontFamily:"monospace",fontSize:"1rem",letterSpacing:"0.05em"}}),
-            React.createElement("button",{onClick:importFromCode,disabled:!shareCodeInput.trim()||shareCodeStatus==="Fetching\u2026",style:{...S.btn,padding:"9px 18px",whiteSpace:"nowrap",opacity:shareCodeInput.trim()?1:0.4}},shareCodeStatus==="Fetching\u2026"?"Fetching\u2026":"Import")
-          ),
-          shareCodeStatus&&React.createElement("p",{style:{fontSize:"0.84rem",color:shareCodeStatus.startsWith("\u2713")?"#4a7a5a":"#c4858a",fontStyle:"italic"}},shareCodeStatus)
-        ),
-
-        // ── Danger zone ──
-        React.createElement("div",{style:{background:"rgba(255,245,245,0.7)",border:"1px solid #e0c8c8",borderRadius:"3px",padding:"20px"}},
-          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#8a3030",margin:"0 0 8px"}},"Reset"),
-          React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px"}},"Permanently deletes all memories and cannot be undone. Download a backup first if you want to keep a copy."),
-          React.createElement("button",{
-            onClick:()=>{ if(window.confirm(`Delete all ${memories.length} memories? This cannot be undone.\n\nDownload a backup first.`)) { persistSubject({memories:[],knownPeople:[],knownOrgs:[],knownLocations:[],customTags:[],peopleEmails:{},peopleRelationships:{},peopleNotes:{},orgNotes:{},locationNotes:{},locationCoords:{},personOrgs:{},personLocations:{},personGroups:{},shareHistory:[],lastBackup:null,lastImport:null}); setView("life"); }},
-            style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}
-          },"🗑 Clear all memories")
-        ),
-
-        // ── Support ──
-        !isSubscriber&&React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
-          "Unlock sharing & genealogy mode — ",
-          React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"✨ subscribe for $20/year"),
-          "."
-        ),
-        React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
-          "Chronicle • build 2026-03-30 09:40 UTC"
-        )
-        ), // end account tab 4
-      ),
 
       view==="public-profile"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"640px"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 8px",color:"#1a1208"}},"Public Profile"),
