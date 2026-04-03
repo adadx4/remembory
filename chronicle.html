@@ -3208,7 +3208,15 @@ function ImportView({
     )
   );
 }
-
+ 
+function DetailView({
+  selected, memories, isMobile,
+  peopleEmails, personOrgs, shareHistory,
+  isSubscriber, ownerName, ownerEmail, localConnections,
+  handleEdit, handleDelete, handleSavePerspectives,
+  recordShare, removeShareRecord, toggleLegacy,
+}) {
+ 
 function App() {
   const winW = useWindowSize();
   const isMobile = winW < 768;
