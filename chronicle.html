@@ -203,8 +203,52 @@ function sortKey(m) {
   return m.year*10000 + mv*100 + (m.fuzzy==="day"?m.day||1:1);
 }
 
+// ── Location helpers ───────────────────────────────────────────
+// knownLocations is now an array of objects: { label, street, town, state, country }
+// m.location and m.locations remain plain label strings
+
+function migrateKnownLocation(loc) {
+  // Already an object with label? Return as-is
+  if (loc && typeof loc === 'object' && loc.label) return loc;
+  // String → parse into object
+  if (typeof loc !== 'string' || !loc.trim()) return null;
+  const s = loc.trim();
+  const parts = s.split(",").map(p => p.trim());
+  if (parts.length >= 4) return { label: s, street: parts[0], town: parts[1], state: parts[2], country: parts[parts.length-1] };
+  if (parts.length === 3) return { label: s, town: parts[0], state: parts[1], country: parts[2] };
+  if (parts.length === 2) return { label: s, town: parts[0], country: parts[1] };
+  return { label: s, street: "", town: "", state: "", country: "" };
+}
+
+function migrateKnownLocations(arr) {
+  if (!arr || !arr.length) return [];
+  // If first item is already an object, assume migrated
+  if (typeof arr[0] === 'object' && arr[0].label) return arr;
+  return arr.map(migrateKnownLocation).filter(Boolean);
+}
+
+function knownLocationLabels(knownLocations) {
+  return (knownLocations || []).map(l => typeof l === 'string' ? l : l.label).filter(Boolean);
+}
+
+function findKnownLocation(knownLocations, label) {
+  if (!label) return null;
+  return (knownLocations || []).find(l =>
+    (typeof l === 'string' ? l : l.label) === label
+  ) || null;
+}
+
+function knownLocationValues(knownLocations, field) {
+  // Get unique values for a specific field (town, state, country) across all known locations
+  return [...new Set(
+    (knownLocations || [])
+      .map(l => typeof l === 'object' ? l[field] : "")
+      .filter(Boolean)
+  )].sort();
+}
+
 function newForm() {
-  return { title:"", content:"", year:new Date().getFullYear(), month:1, day:1, fuzzy:"day", season:"Early", location:"", locations:[], tags:[], people:[], orgs:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town" };
+  return { title:"", content:"", year:new Date().getFullYear(), month:1, day:1, fuzzy:"day", season:"Early", location:"", locations:[], tags:[], people:[], orgs:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town" };
 }
 
 // ── Storage ────────────────────────────────────────────────────
@@ -392,13 +436,26 @@ function saveData(data) {
 
 function seedSubject(s) {
   const mems = s.memories || [];
+  // Migrate knownLocations from string array to object array
+  const existingLocs = migrateKnownLocations(s.knownLocations || []);
+  const existingLabels = new Set(existingLocs.map(l => l.label));
+  // Add any location labels from memories that aren't already known
+  const memLabels = mems.flatMap(m => [m.location, ...(m.locations || [])].filter(Boolean));
+  const newLocs = [...memLabels].filter(label => !existingLabels.has(label));
+  const allLocs = [...existingLocs, ...newLocs.map(label => migrateKnownLocation(label))].filter(Boolean);
+  // Deduplicate by label
+  const seen = new Set();
+  const dedupedLocs = allLocs.filter(l => { if (seen.has(l.label)) return false; seen.add(l.label); return true; });
+  dedupedLocs.sort((a, b) => a.label.localeCompare(b.label));
+
   return {
     ...s,
     knownPeople:    [...new Set([...(s.knownPeople||[]),    ...mems.flatMap(m=>m.people||[])])].sort(),
     knownOrgs:      [...new Set([...(s.knownOrgs||[]),      ...mems.flatMap(m=>m.orgs||[])])].sort(),
-    knownLocations: [...new Set([...(s.knownLocations||[]), ...mems.flatMap(m=>[m.location,...(m.locations||[])].filter(Boolean))])].sort(),
+    knownLocations: dedupedLocs,
   };
 }
+
 // legacy alias used by importBackup
 function seedData(data) { return data; }
 
@@ -3798,16 +3855,21 @@ function App() {
 
   function handleSubmit() {
     if (!form.title.trim()) return;
-    // Build canonical location from sub-fields synchronously
-    let canonicalLocation = form.location;
-    if (form.locationTown||form.locationState||form.locationCountry) {
-      const parts=[form.location,form.locationTown,form.locationState,form.locationCountry].filter(v=>v&&v.trim());
-      if(parts.length>1) canonicalLocation = parts.join(", ");
-    }
-    const formWithLoc = canonicalLocation !== form.location ? {...form, location:canonicalLocation} : form;
+
     const primaryId = editingId || (Date.now().toString()+Math.random().toString(36).slice(2));
     const primary = {...formWithLoc, id:primaryId};
-
+    // Use label as the location string saved on the memory
+    const locationLabel = (form.locationLabel || "").trim();
+    const formWithLoc = {...form, location: locationLabel};
+    // Update knownLocations with structured address data
+    if (locationLabel) {
+      const locObj = { label: locationLabel, street: (form.locationStreet||"").trim(), town: (form.locationTown||"").trim(), state: (form.locationState||"").trim(), country: (form.locationCountry||"").trim() };
+      const existingIdx = knownLocations.findIndex(l => l.label === locationLabel);
+      const updatedLocs = existingIdx >= 0
+        ? knownLocations.map((l, i) => i === existingIdx ? {...l, ...locObj} : l)
+        : [...knownLocations, locObj].sort((a,b) => a.label.localeCompare(b.label));
+      persistSubject({knownLocations: updatedLocs});
+    }
     // If there's an end date, offer to create a second memory for it
     if ((form.endFuzzy || form.endOngoing) && !editingId) {
       const secondary = {
@@ -3849,17 +3911,17 @@ function App() {
     setPendingEndMemory(null);
   }
 
-  function handleEdit(m) {
-    // Pre-parse location string into sub-fields if not already split
-    let editForm = {...m};
-    if (m.location && !m.locationTown && !m.locationCountry) {
-      const np = m.location.split(",").map(s=>s.trim());
-      if (np.length >= 4) {
-        editForm = {...editForm, locationTown:np[1], locationState:np[2], locationCountry:np[np.length-1]};
-      } else if (np.length === 3) {
-        editForm = {...editForm, locationTown:np[0], locationState:np[1], locationCountry:np[2]};
-      } else if (np.length === 2) {
-        editForm = {...editForm, locationTown:np[0], locationCountry:np[1]};
+function handleEdit(m) {
+    // Look up structured address from knownLocations
+    let editForm = {...m, locationLabel: m.location || "", locationStreet: "", locationTown: "", locationState: "", locationCountry: "", locationPrivacy: m.locationPrivacy || "town"};
+    if (m.location) {
+      const known = findKnownLocation(knownLocations, m.location);
+      if (known && typeof known === 'object') {
+        editForm.locationLabel = known.label || m.location;
+        editForm.locationStreet = known.street || "";
+        editForm.locationTown = known.town || "";
+        editForm.locationState = known.state || "";
+        editForm.locationCountry = known.country || "";
       }
     }
     setForm(editForm); setEditingId(m.id); setView("edit");
