@@ -2728,6 +2728,8 @@ function SettingsView({
   unpublishProfile,
 }) {
 
+ const [settingsTab, setSettingsTab] = React.useState("account");
+
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"720px"}},
     React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 16px",color:"#1a1208"}},"Settings"),
 
