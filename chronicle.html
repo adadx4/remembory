@@ -3298,7 +3298,175 @@ function DetailView({
     )
   );
 }
- 
+// ════════════════════════════════════════════════════════════════
+// EXTRACTED COMPONENT: AddEditForm
+// ════════════════════════════════════════════════════════════════
+// Paste this BEFORE `function App() {` in chronicle.html
+// (after DetailView, before App)
+// Then replace the inline add/edit render in App with the call shown at the bottom.
+// ════════════════════════════════════════════════════════════════
+
+function AddEditForm({
+  view, form, updateForm, editingId,
+  handleSubmit, handleMedia, fileInputRef,
+  knownPeople, knownOrgs, knownLocations,
+  peopleEmails, peopleRelationships, personGroups,
+  customTags, addCustomTag, removeCustomTag,
+  wantPublicProfile, persistSubject,
+  setForm, newForm, setEditingId, setView,
+}) {
+  return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
+    React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.6rem",fontStyle:"italic",marginBottom:form._promptHint?"10px":"20px",color:"#1a1208"}},view==="edit"?"Edit Memory":"Record a Memory"),
+    form._promptHint&&React.createElement("div",{style:{
+      background:"rgba(196,170,130,0.12)",border:"1px solid rgba(196,170,130,0.35)",
+      borderRadius:"3px",padding:"10px 14px",marginBottom:"20px",
+      display:"flex",alignItems:"flex-start",gap:"10px"
+    }},
+      React.createElement("span",{style:{fontSize:"1rem",flexShrink:0,marginTop:"1px"}},"\u2726"),
+      React.createElement("span",{style:{fontSize:"0.9rem",color:"#6a5048",fontStyle:"italic",lineHeight:1.6}},form._promptHint)
+    ),
+    React.createElement("div",{style:{display:"grid",gap:"15px"}},
+      React.createElement("div",null,React.createElement("label",{style:S.label},"Title *"),React.createElement("input",{value:form.title,onChange:e=>updateForm({title:e.target.value}),placeholder:"What do you want to call this memory?",style:S.input})),
+      React.createElement(DateFields,{form,setForm:updateForm}),
+      // \u2500\u2500 End date (optional) \u2500\u2500
+      React.createElement("div",{style:{background:"rgba(200,184,154,0.1)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px"}},
+        React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:form.endFuzzy||form.endOngoing?"12px":0}},
+          React.createElement("label",{style:{...S.label,margin:0,cursor:"pointer",display:"flex",alignItems:"center",gap:"8px",userSelect:"none"}},
+            React.createElement("input",{type:"checkbox",checked:!!form.endFuzzy||form.endOngoing,
+              onChange:e=>updateForm(e.target.checked
+                ? {endFuzzy:form.fuzzy, endYear:form.year, endMonth:form.month, endDay:form.day, endSeason:form.season, endOngoing:false}
+                : {endFuzzy:null, endOngoing:false}),
+              style:{accentColor:"#2c2416",cursor:"pointer"}}),
+            "Has an end date",
+            React.createElement("span",{style:{fontWeight:"normal",textTransform:"none",fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",letterSpacing:0}},"\u2014 for jobs, addresses, relationships\u2026")
+          )
+        ),
+        (form.endFuzzy||form.endOngoing)&&React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"10px"}},
+          React.createElement("label",{style:{...S.label,cursor:"pointer",display:"flex",alignItems:"center",gap:"8px",marginBottom:0,userSelect:"none"}},
+            React.createElement("input",{type:"checkbox",checked:!!form.endOngoing,
+              onChange:e=>updateForm({endOngoing:e.target.checked, endFuzzy:e.target.checked?null:form.fuzzy}),
+              style:{accentColor:"#2c2416",cursor:"pointer"}}),
+            "Still ongoing (present)"
+          ),
+          !form.endOngoing&&React.createElement("div",null,
+            React.createElement("label",{style:{...S.label,marginBottom:"8px"}},"End date"),
+            React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"8px",flexWrap:"wrap"}},
+              [["day","Exact"],["month","Month"],["season","Part of year"],["year","Year"],["decade","Decade"],["uncertain","Uncertain"]].map(([val,label])=>
+                React.createElement("button",{key:val,onClick:()=>updateForm({endFuzzy:val}),style:{padding:"4px 10px",borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",background:form.endFuzzy===val?"#2c2416":"transparent",color:form.endFuzzy===val?"#f5f0e8":"#8a7460",border:`1px solid ${form.endFuzzy===val?"#2c2416":"#c8b89a"}`}},label)
+              )
+            ),
+            React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
+              form.endFuzzy==="decade"
+                ? React.createElement("select",{value:form.endYear||new Date().getFullYear(),onChange:e=>updateForm({endYear:+e.target.value}),style:S.select},[1940,1950,1960,1970,1980,1990,2000,2010,2020].map(d=>React.createElement("option",{key:d,value:d},`${d}s`)))
+                : React.createElement("input",{type:"number",value:form.endYear||new Date().getFullYear(),min:1900,max:new Date().getFullYear()+10,onChange:e=>updateForm({endYear:+e.target.value}),style:{...S.select,width:"88px"}}),
+              (form.endFuzzy==="month"||form.endFuzzy==="day")&&React.createElement("select",{value:form.endMonth||1,onChange:e=>updateForm({endMonth:+e.target.value}),style:S.select},MONTHS.map((m,i)=>React.createElement("option",{key:m,value:i+1},m))),
+              form.endFuzzy==="season"&&React.createElement("select",{value:form.endSeason||"Early",onChange:e=>updateForm({endSeason:e.target.value}),style:S.select},["Early","Mid","Late"].map(s=>React.createElement("option",{key:s},s))),
+              form.endFuzzy==="day"&&React.createElement("input",{type:"number",value:form.endDay||1,min:1,max:31,onChange:e=>updateForm({endDay:+e.target.value}),style:{...S.select,width:"68px"}})
+            )
+          )
+        )
+      ),
+      React.createElement("div",null,
+        React.createElement("label",{style:S.label},"Primary Location"),
+        React.createElement(LocationAutocomplete,{value:form.location,onChange:v=>updateForm({location:v}),knownLocations,placeholder:"Street address or place name (optional)"}),
+        form.location&&!form.location.includes(",")&&!(form.locationTown||form.locationCountry)&&
+          React.createElement("p",{style:{fontSize:"0.74rem",color:"#a8885a",fontStyle:"italic",marginTop:"4px"}},"\u26a0 For map accuracy, add Town and Country below."),
+        React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginTop:"6px"}},
+          React.createElement("input",{value:form.locationTown||"",onChange:e=>updateForm({locationTown:e.target.value}),placeholder:"Town / City",style:{...S.input,fontSize:"0.88rem"}}),
+          React.createElement("input",{value:form.locationState||"",onChange:e=>updateForm({locationState:e.target.value}),placeholder:"State / Region (optional)",style:{...S.input,fontSize:"0.88rem"}})
+        ),
+        React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginTop:"6px"}},
+          React.createElement("input",{value:form.locationCountry||"",onChange:e=>updateForm({locationCountry:e.target.value}),placeholder:"Country",style:{...S.input,fontSize:"0.88rem"}}),
+          React.createElement("select",{value:form.locationPrivacy||"town",onChange:e=>updateForm({locationPrivacy:e.target.value}),style:{...S.input,fontSize:"0.82rem",color:"#8a7460"},title:"Location detail to show when publishing"},
+            React.createElement("option",{value:"full"},"Publish: Full address"),
+            React.createElement("option",{value:"town"},"Publish: Town + Country"),
+            React.createElement("option",{value:"state"},"Publish: State + Country"),
+            React.createElement("option",{value:"country"},"Publish: Country only"),
+            React.createElement("option",{value:"none"},"Publish: Don\u2019t show")
+          )
+        )
+      ),
+      React.createElement("div",null,
+        React.createElement("label",{style:S.label},"Additional Locations"),
+        React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 6px"}},"For road trips, multi-city visits, or any memory spanning several places"),
+        React.createElement(PeopleOrgField,{icon:"\ud83d\udccd",values:form.locations||[],allValues:knownLocations,onChange:v=>updateForm({locations:v}),placeholder:"Add another location\u2026"})
+      ),
+      React.createElement("div",null,React.createElement("label",{style:S.label},"The Memory"),React.createElement("textarea",{value:form.content,onChange:e=>updateForm({content:e.target.value}),placeholder:"Write as much or as little as you remember\u2026",rows:6,style:{...S.input,resize:"vertical",lineHeight:"1.7"}})),
+      React.createElement("div",null,React.createElement("label",{style:S.label},"Topic Tags"),React.createElement(TagPicker,{tags:form.tags,onToggle:tag=>updateForm({tags:form.tags.includes(tag)?form.tags.filter(t=>t!==tag):[...form.tags,tag]}),customTags,onAddCustom:addCustomTag,onRemoveCustom:removeCustomTag})),
+      React.createElement("div",null,
+        React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"4px"}},
+          React.createElement("label",{style:{...S.label,margin:0}},"People"),
+          Object.keys(personGroups||{}).length>0&&React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap"}},
+            Object.entries(personGroups||{}).map(([gName,gData])=>
+              React.createElement("button",{key:gName,
+                onClick:()=>{const newPeople=[...new Set([...(form.people||[]),...(gData.members||[])])];updateForm({people:newPeople});},
+                style:{background:"rgba(100,110,140,0.08)",border:"1px solid rgba(100,110,140,0.25)",borderRadius:"20px",padding:"1px 10px",fontSize:"0.75rem",cursor:"pointer",color:"#4a5a7a",fontFamily:"'Crimson Text',serif",whiteSpace:"nowrap"}},
+                "+ ",gName)
+            )
+          )
+        ),
+        React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:form.people||[],allValues:knownPeople,onChange:v=>updateForm({people:v}),placeholder:"Add a person\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
+      ),
+      React.createElement("div",null,React.createElement("label",{style:S.label},"Organisations"),React.createElement(PeopleOrgField,{icon:"\ud83c\udfdb",values:form.orgs||[],allValues:knownOrgs,onChange:v=>updateForm({orgs:v}),placeholder:"Add an organisation\u2026"})),
+      React.createElement("div",null,
+        React.createElement("label",{style:S.label},"Photos & Media"),
+        React.createElement("div",{style:{display:"flex",gap:"9px",flexWrap:"wrap",marginBottom:"7px"}},
+          form.mediaUrls.map((med,i)=>React.createElement("div",{key:i,style:{position:"relative"}},
+            React.createElement(MediaImg,{med,alt:"",style:{width:"68px",height:"68px",objectFit:"cover",borderRadius:"2px",border:"1px solid #c8b89a"}}),
+            React.createElement("button",{onClick:()=>{ const med=form.mediaUrls[i]; if(med.mediaId) idbDelete(med.mediaId); updateForm({mediaUrls:form.mediaUrls.filter((_,j)=>j!==i)}); },style:{position:"absolute",top:"-5px",right:"-5px",background:"#2c2416",color:"#f5f0e8",border:"none",borderRadius:"50%",width:"16px",height:"16px",cursor:"pointer",fontSize:"10px",display:"flex",alignItems:"center",justifyContent:"center"}},"\u00d7")
+          )),
+          React.createElement("button",{onClick:()=>fileInputRef.current?.click(),style:{width:"68px",height:"68px",border:"1px dashed #c8b89a",borderRadius:"2px",background:"transparent",cursor:"pointer",color:"#8a7460",fontSize:"1.3rem"}},"+")
+        ),
+        React.createElement("input",{ref:fileInputRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:handleMedia})
+      ),
+      wantPublicProfile&&React.createElement("div",{style:{marginBottom:"4px"}},
+        React.createElement("label",{style:S.label},"Visibility"),
+        React.createElement("select",{
+          value:form.visibility||"private",
+          onChange:e=>updateForm({visibility:e.target.value}),
+          style:{...S.select,width:"100%"}
+        },
+          React.createElement("option",{value:"private"},"Private \u2014 only on this device"),
+          React.createElement("option",{value:"public"},"Public \u2014 anyone with the link"),
+          React.createElement("option",{value:"subscriber"},"\u2728 Subscribers \u2014 Remembory subscribers only"),
+          React.createElement("option",{value:"connected"},"Connected \u2014 people linked to your profile"),
+          React.createElement("option",{value:"tagged"},"Present \u2014 only people tagged in this memory")
+        ),
+        React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"4px"}},
+          (form.visibility||"private")==="private"
+            ? "This memory stays on your device and never appears on your public profile."
+            : "This memory will appear on your public profile with the selected visibility."
+        )
+      ),
+      (form.visibility&&form.visibility!=="private")&&React.createElement("div",{style:{marginBottom:"4px"}},
+        React.createElement("label",{style:S.label},"Public summary"),
+        React.createElement("div",{style:{position:"relative"}},
+          React.createElement("textarea",{
+            value:form.publicSummary!==undefined&&form.publicSummary!==null ? form.publicSummary : (form.content||""),
+            onChange:e=>updateForm({publicSummary:e.target.value}),
+            placeholder:"This defaults to your full memory text. Edit here to create a shorter public version.",
+            rows:4,style:{...S.input,resize:"vertical",lineHeight:"1.7",
+              borderColor:(form.publicSummary&&form.publicSummary!==form.content)?"#a8885a":undefined}}),
+          (form.publicSummary&&form.publicSummary!==form.content)&&React.createElement("span",{
+            style:{position:"absolute",top:"6px",right:"8px",fontSize:"0.68rem",
+              background:"#a8885a",color:"#fff",padding:"1px 7px",borderRadius:"20px",
+              letterSpacing:"0.04em",pointerEvents:"none"}
+          },"Edited")
+        ),
+        React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"3px"}},
+          (form.publicSummary&&form.publicSummary!==form.content)
+            ? "Custom public version active \u2014 differs from your private memory text."
+            : "Defaults to your full memory text. Edit to create a shorter public version."
+        )
+      ),
+      React.createElement("div",{style:{display:"flex",gap:"10px",paddingTop:"4px"}},
+        React.createElement("button",{onClick:handleSubmit,style:S.btn},view==="edit"?"Save Changes":"Save to Chronicle"),
+        React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView(view==="edit"?"detail":"life"); },style:S.btnOutline},"Cancel")
+      )
+    )
+  );
+}
+
 function App() {
   const winW = useWindowSize();
   const isMobile = winW < 768;
@@ -5813,161 +5981,16 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         handleEdit, handleDelete, handleSavePerspectives,
         recordShare, removeShareRecord, toggleLegacy,
       }),
+      (view==="add"||view==="edit")&&React.createElement(AddEditForm,{
+        view, form, updateForm, editingId,
+        handleSubmit, handleMedia, fileInputRef,
+        knownPeople, knownOrgs, knownLocations,
+        peopleEmails, peopleRelationships, personGroups,
+        customTags, addCustomTag, removeCustomTag,
+        wantPublicProfile, persistSubject,
+        setForm, newForm, setEditingId, setView,
+      }),
 
-      // ── ADD / EDIT FORM ──
-      (view==="add"||view==="edit")&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
-        React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.6rem",fontStyle:"italic",marginBottom:form._promptHint?"10px":"20px",color:"#1a1208"}},view==="edit"?"Edit Memory":"Record a Memory"),
-        form._promptHint&&React.createElement("div",{style:{
-          background:"rgba(196,170,130,0.12)",border:"1px solid rgba(196,170,130,0.35)",
-          borderRadius:"3px",padding:"10px 14px",marginBottom:"20px",
-          display:"flex",alignItems:"flex-start",gap:"10px"
-        }},
-          React.createElement("span",{style:{fontSize:"1rem",flexShrink:0,marginTop:"1px"}},"✦"),
-          React.createElement("span",{style:{fontSize:"0.9rem",color:"#6a5048",fontStyle:"italic",lineHeight:1.6}},form._promptHint)
-        ),
-        React.createElement("div",{style:{display:"grid",gap:"15px"}},
-          React.createElement("div",null,React.createElement("label",{style:S.label},"Title *"),React.createElement("input",{value:form.title,onChange:e=>updateForm({title:e.target.value}),placeholder:"What do you want to call this memory?",style:S.input})),
-          React.createElement(DateFields,{form,setForm:updateForm}),
-          // ── End date (optional) ──
-          React.createElement("div",{style:{background:"rgba(200,184,154,0.1)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px"}},
-            React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:form.endFuzzy||form.endOngoing?"12px":0}},
-              React.createElement("label",{style:{...S.label,margin:0,cursor:"pointer",display:"flex",alignItems:"center",gap:"8px",userSelect:"none"}},
-                React.createElement("input",{type:"checkbox",checked:!!form.endFuzzy||form.endOngoing,
-                  onChange:e=>updateForm(e.target.checked
-                    ? {endFuzzy:form.fuzzy, endYear:form.year, endMonth:form.month, endDay:form.day, endSeason:form.season, endOngoing:false}
-                    : {endFuzzy:null, endOngoing:false}),
-                  style:{accentColor:"#2c2416",cursor:"pointer"}}),
-                "Has an end date",
-                React.createElement("span",{style:{fontWeight:"normal",textTransform:"none",fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",letterSpacing:0}},"— for jobs, addresses, relationships…")
-              )
-            ),
-            (form.endFuzzy||form.endOngoing)&&React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"10px"}},
-              React.createElement("label",{style:{...S.label,cursor:"pointer",display:"flex",alignItems:"center",gap:"8px",marginBottom:0,userSelect:"none"}},
-                React.createElement("input",{type:"checkbox",checked:!!form.endOngoing,
-                  onChange:e=>updateForm({endOngoing:e.target.checked, endFuzzy:e.target.checked?null:form.fuzzy}),
-                  style:{accentColor:"#2c2416",cursor:"pointer"}}),
-                "Still ongoing (present)"
-              ),
-              !form.endOngoing&&React.createElement("div",null,
-                React.createElement("label",{style:{...S.label,marginBottom:"8px"}},"End date"),
-                React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"8px",flexWrap:"wrap"}},
-                  [["day","Exact"],["month","Month"],["season","Part of year"],["year","Year"],["decade","Decade"],["uncertain","Uncertain"]].map(([val,label])=>
-                    React.createElement("button",{key:val,onClick:()=>updateForm({endFuzzy:val}),style:{padding:"4px 10px",borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",background:form.endFuzzy===val?"#2c2416":"transparent",color:form.endFuzzy===val?"#f5f0e8":"#8a7460",border:`1px solid ${form.endFuzzy===val?"#2c2416":"#c8b89a"}`}},label)
-                  )
-                ),
-                React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
-                  form.endFuzzy==="decade"
-                    ? React.createElement("select",{value:form.endYear||new Date().getFullYear(),onChange:e=>updateForm({endYear:+e.target.value}),style:S.select},[1940,1950,1960,1970,1980,1990,2000,2010,2020].map(d=>React.createElement("option",{key:d,value:d},`${d}s`)))
-                    : React.createElement("input",{type:"number",value:form.endYear||new Date().getFullYear(),min:1900,max:new Date().getFullYear()+10,onChange:e=>updateForm({endYear:+e.target.value}),style:{...S.select,width:"88px"}}),
-                  (form.endFuzzy==="month"||form.endFuzzy==="day")&&React.createElement("select",{value:form.endMonth||1,onChange:e=>updateForm({endMonth:+e.target.value}),style:S.select},MONTHS.map((m,i)=>React.createElement("option",{key:m,value:i+1},m))),
-                  form.endFuzzy==="season"&&React.createElement("select",{value:form.endSeason||"Early",onChange:e=>updateForm({endSeason:e.target.value}),style:S.select},["Early","Mid","Late"].map(s=>React.createElement("option",{key:s},s))),
-                  form.endFuzzy==="day"&&React.createElement("input",{type:"number",value:form.endDay||1,min:1,max:31,onChange:e=>updateForm({endDay:+e.target.value}),style:{...S.select,width:"68px"}})
-                )
-              )
-            )
-          ),
-          React.createElement("div",null,
-            React.createElement("label",{style:S.label},"Primary Location"),
-            React.createElement(LocationAutocomplete,{value:form.location,onChange:v=>updateForm({location:v}),knownLocations,placeholder:"Street address or place name (optional)"}),
-            form.location&&!form.location.includes(",")&&!(form.locationTown||form.locationCountry)&&
-              React.createElement("p",{style:{fontSize:"0.74rem",color:"#a8885a",fontStyle:"italic",marginTop:"4px"}},"⚠ For map accuracy, add Town and Country below."),
-            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginTop:"6px"}},
-              React.createElement("input",{value:form.locationTown||"",onChange:e=>updateForm({locationTown:e.target.value}),placeholder:"Town / City",style:{...S.input,fontSize:"0.88rem"}}),
-              React.createElement("input",{value:form.locationState||"",onChange:e=>updateForm({locationState:e.target.value}),placeholder:"State / Region (optional)",style:{...S.input,fontSize:"0.88rem"}})
-            ),
-            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginTop:"6px"}},
-              React.createElement("input",{value:form.locationCountry||"",onChange:e=>updateForm({locationCountry:e.target.value}),placeholder:"Country",style:{...S.input,fontSize:"0.88rem"}}),
-              React.createElement("select",{value:form.locationPrivacy||"town",onChange:e=>updateForm({locationPrivacy:e.target.value}),style:{...S.input,fontSize:"0.82rem",color:"#8a7460"},title:"Location detail to show when publishing"},
-                React.createElement("option",{value:"full"},"Publish: Full address"),
-                React.createElement("option",{value:"town"},"Publish: Town + Country"),
-                React.createElement("option",{value:"state"},"Publish: State + Country"),
-                React.createElement("option",{value:"country"},"Publish: Country only"),
-                React.createElement("option",{value:"none"},"Publish: Don\u2019t show")
-              )
-            )
-          ),
-          React.createElement("div",null,
-            React.createElement("label",{style:S.label},"Additional Locations"),
-            React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 6px"}},"For road trips, multi-city visits, or any memory spanning several places"),
-            React.createElement(PeopleOrgField,{icon:"📍",values:form.locations||[],allValues:knownLocations,onChange:v=>updateForm({locations:v}),placeholder:"Add another location…"})
-          ),
-          React.createElement("div",null,React.createElement("label",{style:S.label},"The Memory"),React.createElement("textarea",{value:form.content,onChange:e=>updateForm({content:e.target.value}),placeholder:"Write as much or as little as you remember…",rows:6,style:{...S.input,resize:"vertical",lineHeight:"1.7"}})),
-          React.createElement("div",null,React.createElement("label",{style:S.label},"Topic Tags"),React.createElement(TagPicker,{tags:form.tags,onToggle:tag=>updateForm({tags:form.tags.includes(tag)?form.tags.filter(t=>t!==tag):[...form.tags,tag]}),customTags,onAddCustom:addCustomTag,onRemoveCustom:removeCustomTag})),
-          React.createElement("div",null,
-  React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"4px"}},
-    React.createElement("label",{style:{...S.label,margin:0}},"People"),
-    Object.keys(personGroups||{}).length>0&&React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap"}},
-      Object.entries(personGroups||{}).map(([gName,gData])=>
-        React.createElement("button",{key:gName,
-          onClick:()=>{const newPeople=[...new Set([...(form.people||[]),...(gData.members||[])])];updateForm({people:newPeople});},
-          style:{background:"rgba(100,110,140,0.08)",border:"1px solid rgba(100,110,140,0.25)",borderRadius:"20px",padding:"1px 10px",fontSize:"0.75rem",cursor:"pointer",color:"#4a5a7a",fontFamily:"'Crimson Text',serif",whiteSpace:"nowrap"}},
-          "+ ",gName)
-      )
-    )
-  ),
-  React.createElement(PeopleOrgField,{icon:"👤",values:form.people||[],allValues:knownPeople,onChange:v=>updateForm({people:v}),placeholder:"Add a person…",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
-),
-          React.createElement("div",null,React.createElement("label",{style:S.label},"Organisations"),React.createElement(PeopleOrgField,{icon:"🏛",values:form.orgs||[],allValues:knownOrgs,onChange:v=>updateForm({orgs:v}),placeholder:"Add an organisation…"})),
-          React.createElement("div",null,
-            React.createElement("label",{style:S.label},"Photos & Media"),
-            React.createElement("div",{style:{display:"flex",gap:"9px",flexWrap:"wrap",marginBottom:"7px"}},
-              form.mediaUrls.map((med,i)=>React.createElement("div",{key:i,style:{position:"relative"}},
-                React.createElement(MediaImg,{med,alt:"",style:{width:"68px",height:"68px",objectFit:"cover",borderRadius:"2px",border:"1px solid #c8b89a"}}),
-                React.createElement("button",{onClick:()=>{ const med=form.mediaUrls[i]; if(med.mediaId) idbDelete(med.mediaId); updateForm({mediaUrls:form.mediaUrls.filter((_,j)=>j!==i)}); },style:{position:"absolute",top:"-5px",right:"-5px",background:"#2c2416",color:"#f5f0e8",border:"none",borderRadius:"50%",width:"16px",height:"16px",cursor:"pointer",fontSize:"10px",display:"flex",alignItems:"center",justifyContent:"center"}},"×")
-              )),
-              React.createElement("button",{onClick:()=>fileInputRef.current?.click(),style:{width:"68px",height:"68px",border:"1px dashed #c8b89a",borderRadius:"2px",background:"transparent",cursor:"pointer",color:"#8a7460",fontSize:"1.3rem"}},"+")
-            ),
-            React.createElement("input",{ref:fileInputRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:handleMedia})
-          ),
-          wantPublicProfile&&React.createElement("div",{style:{marginBottom:"4px"}},
-            React.createElement("label",{style:S.label},"Visibility"),
-            React.createElement("select",{
-              value:form.visibility||"private",
-              onChange:e=>updateForm({visibility:e.target.value}),
-              style:{...S.select,width:"100%"}
-            },
-              React.createElement("option",{value:"private"},"Private — only on this device"),
-              React.createElement("option",{value:"public"},"Public — anyone with the link"),
-              React.createElement("option",{value:"subscriber"},"✨ Subscribers — Remembory subscribers only"),
-              React.createElement("option",{value:"connected"},"Connected — people linked to your profile"),
-              React.createElement("option",{value:"tagged"},"Present — only people tagged in this memory")
-            ),
-            React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"4px"}},
-              (form.visibility||"private")==="private"
-                ? "This memory stays on your device and never appears on your public profile."
-                : "This memory will appear on your public profile with the selected visibility."
-            )
-          ),
-          (form.visibility&&form.visibility!=="private")&&React.createElement("div",{style:{marginBottom:"4px"}},
-            React.createElement("label",{style:S.label},"Public summary"),
-            React.createElement("div",{style:{position:"relative"}},
-              React.createElement("textarea",{
-                value:form.publicSummary!==undefined&&form.publicSummary!==null ? form.publicSummary : (form.content||""),
-                onChange:e=>updateForm({publicSummary:e.target.value}),
-                placeholder:"This defaults to your full memory text. Edit here to create a shorter public version.",
-                rows:4,style:{...S.input,resize:"vertical",lineHeight:"1.7",
-                  borderColor:(form.publicSummary&&form.publicSummary!==form.content)?"#a8885a":undefined}}),
-              (form.publicSummary&&form.publicSummary!==form.content)&&React.createElement("span",{
-                style:{position:"absolute",top:"6px",right:"8px",fontSize:"0.68rem",
-                  background:"#a8885a",color:"#fff",padding:"1px 7px",borderRadius:"20px",
-                  letterSpacing:"0.04em",pointerEvents:"none"}
-              },"Edited")
-            ),
-            React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"3px"}},
-              (form.publicSummary&&form.publicSummary!==form.content)
-                ? "Custom public version active — differs from your private memory text."
-                : "Defaults to your full memory text. Edit to create a shorter public version."
-            )
-          ),
-          React.createElement("div",{style:{display:"flex",gap:"10px",paddingTop:"4px"}},
-            React.createElement("button",{onClick:handleSubmit,style:S.btn},view==="edit"?"Save Changes":"Save to Chronicle"),
-            React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView(view==="edit"?"detail":"life"); },style:S.btnOutline},"Cancel")
-          )
-        )
-      )
-    )
-  );
-}
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
