@@ -741,23 +741,52 @@ function DateFields({form, setForm}) {
   );
 }
 
-
-function LocationAutocomplete({value, onChange, knownLocations, placeholder}) {
+function LocationAutocomplete({value, onChange, knownLocations, placeholder, onSelect, style:customStyle}) {
   const [showSugs, setShowSugs] = React.useState(false);
-  const suggestions = (knownLocations||[]).filter(v=>v.toLowerCase().includes(value.toLowerCase())&&v!==value&&value.length>0);
+  // Support both old string arrays and new object arrays
+  const labels = (knownLocations||[]).map(l => typeof l === 'string' ? l : l.label).filter(Boolean);
+  const suggestions = labels.filter(v=>v.toLowerCase().includes(value.toLowerCase())&&v!==value&&value.length>0);
+  function handlePick(label) {
+    onChange(label);
+    setShowSugs(false);
+    if (onSelect) {
+      const loc = (knownLocations||[]).find(l => (typeof l === 'string' ? l : l.label) === label);
+      if (loc && typeof loc === 'object') onSelect(loc);
+    }
+  }
   return React.createElement("div",{style:{position:"relative"}},
     React.createElement("input",{
       value, onChange:e=>{onChange(e.target.value);setShowSugs(true);},
       onKeyDown:e=>{if(e.key==="Escape")setShowSugs(false);},
       onBlur:()=>setTimeout(()=>setShowSugs(false),150),
       onFocus:()=>value&&setShowSugs(true),
-      placeholder, style:S.input
+      placeholder, style:customStyle||S.input
     }),
     showSugs&&suggestions.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,right:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",maxHeight:"180px",overflowY:"auto"}},
-      suggestions.map(s=>React.createElement("div",{key:s,onMouseDown:()=>{onChange(s);setShowSugs(false);},style:{padding:"8px 12px",cursor:"pointer",fontSize:"0.9rem",color:"#2c2416"},
+      suggestions.map(s=>React.createElement("div",{key:s,onMouseDown:()=>handlePick(s),style:{padding:"8px 12px",cursor:"pointer",fontSize:"0.9rem",color:"#2c2416"},
         onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
         onMouseLeave:e=>e.currentTarget.style.background="transparent"
-      },"📍 ",s))
+      },"\ud83d\udccd ",s))
+    )
+  );
+}
+
+function FieldAutocomplete({value, onChange, suggestions:allSugs, placeholder, style:customStyle}) {
+  const [showSugs, setShowSugs] = React.useState(false);
+  const suggestions = (allSugs||[]).filter(v=>v.toLowerCase().includes(value.toLowerCase())&&v!==value&&value.length>0);
+  return React.createElement("div",{style:{position:"relative"}},
+    React.createElement("input",{
+      value, onChange:e=>{onChange(e.target.value);setShowSugs(true);},
+      onKeyDown:e=>{if(e.key==="Escape")setShowSugs(false);},
+      onBlur:()=>setTimeout(()=>setShowSugs(false),150),
+      onFocus:()=>value&&setShowSugs(true),
+      placeholder, style:customStyle||{...S.input,fontSize:"0.88rem"}
+    }),
+    showSugs&&suggestions.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,right:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",maxHeight:"140px",overflowY:"auto"}},
+      suggestions.map(s=>React.createElement("div",{key:s,onMouseDown:()=>{onChange(s);setShowSugs(false);},style:{padding:"7px 12px",cursor:"pointer",fontSize:"0.85rem",color:"#2c2416"},
+        onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+        onMouseLeave:e=>e.currentTarget.style.background="transparent"
+      },s))
     )
   );
 }
@@ -3386,7 +3415,9 @@ function AddEditForm({
       React.createElement("span",{style:{fontSize:"0.9rem",color:"#6a5048",fontStyle:"italic",lineHeight:1.6}},form._promptHint)
     ),
     React.createElement("div",{style:{display:"grid",gap:"15px"}},
-      React.createElement("div",null,React.createElement("label",{style:S.label},"Title *"),React.createElement("input",{value:form.title,onChange:e=>updateForm({title:e.target.value}),placeholder:"What do you want to call this memory?",style:S.input})),
+      React.createElement("div",null,
+      React.createElement("label",{style:S.label},"Title *"),
+      React.createElement("input",{value:form.title,onChange:e=>updateForm({title:e.target.value}),placeholder:"What do you want to call this memory?",style:S.input})),
       React.createElement(DateFields,{form,setForm:updateForm}),
       // \u2500\u2500 End date (optional) \u2500\u2500
       React.createElement("div",{style:{background:"rgba(200,184,154,0.1)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px"}},
@@ -3427,30 +3458,59 @@ function AddEditForm({
         )
       ),
       React.createElement("div",null,
-        React.createElement("label",{style:S.label},"Primary Location"),
-        React.createElement(LocationAutocomplete,{value:form.location,onChange:v=>updateForm({location:v}),knownLocations,placeholder:"Street address or place name (optional)"}),
-        form.location&&!form.location.includes(",")&&!(form.locationTown||form.locationCountry)&&
-          React.createElement("p",{style:{fontSize:"0.74rem",color:"#a8885a",fontStyle:"italic",marginTop:"4px"}},"\u26a0 For map accuracy, add Town and Country below."),
-        React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginTop:"6px"}},
-          React.createElement("input",{value:form.locationTown||"",onChange:e=>updateForm({locationTown:e.target.value}),placeholder:"Town / City",style:{...S.input,fontSize:"0.88rem"}}),
-          React.createElement("input",{value:form.locationState||"",onChange:e=>updateForm({locationState:e.target.value}),placeholder:"State / Region (optional)",style:{...S.input,fontSize:"0.88rem"}})
-        ),
-        React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginTop:"6px"}},
-          React.createElement("input",{value:form.locationCountry||"",onChange:e=>updateForm({locationCountry:e.target.value}),placeholder:"Country",style:{...S.input,fontSize:"0.88rem"}}),
-          React.createElement("select",{value:form.locationPrivacy||"town",onChange:e=>updateForm({locationPrivacy:e.target.value}),style:{...S.input,fontSize:"0.82rem",color:"#8a7460"},title:"Location detail to show when publishing"},
-            React.createElement("option",{value:"full"},"Publish: Full address"),
-            React.createElement("option",{value:"town"},"Publish: Town + Country"),
-            React.createElement("option",{value:"state"},"Publish: State + Country"),
-            React.createElement("option",{value:"country"},"Publish: Country only"),
-            React.createElement("option",{value:"none"},"Publish: Don\u2019t show")
+        React.createElement("label",{style:S.label},"Location"),
+        // Label field with autocomplete — picks from known location labels
+        React.createElement(LocationAutocomplete,{
+          value:form.locationLabel||"",
+          onChange:v=>updateForm({locationLabel:v}),
+          knownLocations,
+          placeholder:"e.g. Bob\u2019s house, Grandma\u2019s kitchen, that caf\u00e9 in Paris\u2026",
+          onSelect:loc=>{
+            // Auto-fill address fields from known location
+            updateForm({
+              locationLabel:loc.label||"",
+              locationStreet:loc.street||"",
+              locationTown:loc.town||"",
+              locationState:loc.state||"",
+              locationCountry:loc.country||""
+            });
+          }
+        }),
+        // Duplicate label warning
+        (()=>{
+          const label = (form.locationLabel||"").trim();
+          const editingLabel = form.location||""; // original label when editing
+          if (label && label !== editingLabel) {
+            const existing = (knownLocations||[]).find(l => (typeof l === 'string' ? l : l.label) === label);
+            if (existing) return React.createElement("p",{style:{fontSize:"0.74rem",color:"#c4858a",fontStyle:"italic",marginTop:"4px"}},
+              "\u26a0 A location called \u201c"+label+"\u201d already exists. Saving will update its address details.");
+          }
+          return null;
+        })(),
+        // Address sub-fields (collapsible — show when label has content)
+        (form.locationLabel||"").trim()&&React.createElement("div",{style:{marginTop:"8px",padding:"10px 12px",background:"rgba(200,184,154,0.08)",border:"1px solid #e0d4be",borderRadius:"3px"}},
+          React.createElement("p",{style:{fontSize:"0.74rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px"}},"Address details (optional \u2014 needed for map & public posting)"),
+          React.createElement(FieldAutocomplete,{value:form.locationStreet||"",onChange:v=>updateForm({locationStreet:v}),suggestions:knownLocationValues(knownLocations,"street"),placeholder:"Street address"}),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginTop:"6px"}},
+            React.createElement(FieldAutocomplete,{value:form.locationTown||"",onChange:v=>updateForm({locationTown:v}),suggestions:knownLocationValues(knownLocations,"town"),placeholder:"Town / City"}),
+            React.createElement(FieldAutocomplete,{value:form.locationState||"",onChange:v=>updateForm({locationState:v}),suggestions:knownLocationValues(knownLocations,"state"),placeholder:"State / Region"})
+          ),
+          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginTop:"6px"}},
+            React.createElement(FieldAutocomplete,{value:form.locationCountry||"",onChange:v=>updateForm({locationCountry:v}),suggestions:knownLocationValues(knownLocations,"country"),placeholder:"Country"}),
+            React.createElement("select",{value:form.locationPrivacy||"town",onChange:e=>updateForm({locationPrivacy:e.target.value}),style:{...S.input,fontSize:"0.82rem",color:"#8a7460"},title:"Location detail to show when publishing"},
+              React.createElement("option",{value:"full"},"Publish: Full address"),
+              React.createElement("option",{value:"town"},"Publish: Town + Country"),
+              React.createElement("option",{value:"state"},"Publish: State + Country"),
+              React.createElement("option",{value:"country"},"Publish: Country only"),
+              React.createElement("option",{value:"none"},"Publish: Don\u2019t show")
+            )
           )
         )
       ),
       React.createElement("div",null,
         React.createElement("label",{style:S.label},"Additional Locations"),
         React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 6px"}},"For road trips, multi-city visits, or any memory spanning several places"),
-        React.createElement(PeopleOrgField,{icon:"\ud83d\udccd",values:form.locations||[],allValues:knownLocations,onChange:v=>updateForm({locations:v}),placeholder:"Add another location\u2026"})
-      ),
+        React.createElement(PeopleOrgField,{icon:"\ud83d\udccd",values:form.locations||[],allValues:knownLocationLabels(knownLocations),onChange:v=>updateForm({locations:v}),placeholder:"Add another location\u2026"})      ),
       React.createElement("div",null,React.createElement("label",{style:S.label},"The Memory"),React.createElement("textarea",{value:form.content,onChange:e=>updateForm({content:e.target.value}),placeholder:"Write as much or as little as you remember\u2026",rows:6,style:{...S.input,resize:"vertical",lineHeight:"1.7"}})),
       React.createElement("div",null,React.createElement("label",{style:S.label},"Topic Tags"),React.createElement(TagPicker,{tags:form.tags,onToggle:tag=>updateForm({tags:form.tags.includes(tag)?form.tags.filter(t=>t!==tag):[...form.tags,tag]}),customTags,onAddCustom:addCustomTag,onRemoveCustom:removeCustomTag})),
       React.createElement("div",null,
