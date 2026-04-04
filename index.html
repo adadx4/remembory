@@ -1215,8 +1215,7 @@
 <section class="mailing">
   <h3>Stay in the loop</h3>
   <p>New releases, new tools, and occasional thoughts on memory and preservation.</p>
-  <form class="mailing-form" name="mailing-list" method="POST" data-netlify="true" onsubmit="handleSignup(event)">
-    <input type="hidden" name="form-name" value="mailing-list">
+  <form class="mailing-form" onsubmit="handleSignup(event)">
     <input type="email" name="email" placeholder="your@email.com" id="email-input" required>
     <button type="submit">Subscribe</button>
   </form>
@@ -1246,25 +1245,22 @@
   }, { threshold: 0.1 });
   reveals.forEach(el => observer.observe(el));
 
-  // Mailing list (replace with your actual form handler e.g. Netlify Forms, Mailchimp etc.)
   function handleSignup(e) {
     e.preventDefault();
-    const form = e.target;
     const email = document.getElementById('email-input').value;
-    fetch('/', {
+    fetch('https://buttondown.email/api/emails/embed-subscribe/remembory', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ 'form-name': 'mailing-list', email }).toString()
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
     })
-    .then(() => {
+    .then(res => {
+      if (!res.ok) throw new Error();
       document.querySelector('.mailing-form').style.display = 'none';
       document.querySelector('.mailing-note').style.display = 'none';
       document.getElementById('success-msg').style.display = 'block';
     })
     .catch(() => {
-      // Submit failed — fall back to native form submission
-      form.removeEventListener('submit', handleSignup);
-      form.submit();
+      alert('Something went wrong — please try again.');
     });
   }
 
