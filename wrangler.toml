@@ -1,0 +1,24 @@
+name = "remembory-share"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# KV namespace for storing share payloads
+# After running `wrangler kv namespace create SHARES`, paste the id below
+[[kv_namespaces]]
+binding = "SHARES"
+id = "24f7cd3fa472486dbbf4283831d8790c"
+
+# Keep share.remembory.net active for existing share links
+[[routes]]
+pattern = "share.remembory.net/*"
+zone_name = "remembory.net"
+
+# New social domain
+[[routes]]
+pattern = "social.remembory.net/*"
+zone_name = "remembory.net"
+
+# Mailing List
+[[kv_namespaces]]
+binding = "MAILING_LIST"
+id = "e9a03844192b46828417a458140de7f6"

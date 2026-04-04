@@ -4149,7 +4149,13 @@ function App() {
       if(s?.valid && email){
         fetch(WORKER_URL+"/mentions/"+encodeURIComponent(email))
           .then(r=>r.ok?r.json():null)
-          .then(d=>{ if(d?.mentions?.length) setNotifications(d.mentions); })
+          .then(d=>{
+            if (!d) return;
+            const mentions = (d.mentions||[]).map(n=>({...n, type:"mention"}));
+            const placeMatches = (d.placeMatches||[]).map(n=>({...n, type:"place-match"}));
+            const all = [...mentions, ...placeMatches];
+            if (all.length) setNotifications(all);
+          })
           .catch(()=>{});
       }
     });}
@@ -4181,10 +4187,20 @@ function App() {
     if (!publicMems.length) { setProfileMsg("No memories are set to a public visibility level yet."); return; }
     setProfilePublishing(true); setProfileMsg("");
     try {
+      // Compact presence index for place-time matching — time/location of public memories only
+      const presenceIndex = publicMems
+        .filter(m => m.year)
+        .map(m => ({
+          year: m.year,
+          yearEnd: m.endYear || m.year,
+          locations: [m.location, m.locationLabel, ...(m.locations||[])].filter(Boolean),
+          visibility: m.visibility
+        }))
+        .filter(p => p.locations.length > 0);
       const res = await fetch(WORKER_URL + "/profile/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-LS-Key": licenceKey },
-        body: JSON.stringify({ ownerName: ownerName||carerName, displayName: profileDisplayName||ownerName||carerName, ownerEmail: ownerEmail||carerEmail, about: profileAbout||"", imageUrl: profileImageUrl||"", allowFollowers: allowFollowers!==false, profilePrivacy: profilePrivacy||"open", memories: publicMems, peopleEmails })
+        body: JSON.stringify({ ownerName: ownerName||carerName, displayName: profileDisplayName||ownerName||carerName, ownerEmail: ownerEmail||carerEmail, about: profileAbout||"", imageUrl: profileImageUrl||"", allowFollowers: allowFollowers!==false, profilePrivacy: profilePrivacy||"open", memories: publicMems, peopleEmails, presenceIndex })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Server error");
@@ -6302,38 +6318,69 @@ function handleEdit(m) {
             "◎ View your live profile →")
         ),
         // ── Notifications ──
-        // ── Notifications ──
-        notifications.length===0&&React.createElement("div",{style:{textAlign:"center",padding:"32px 0",color:"#8a7460",fontStyle:"italic"}},
-          "No notifications yet. When someone shares a memory that includes you, it will appear here."
-        ),
-        notifications.length>0&&React.createElement("div",{
-          style:{background:"rgba(196,133,138,0.08)",border:"1px solid rgba(196,133,138,0.3)",
-            borderRadius:"3px",padding:"16px 20px",marginBottom:"20px"}},
-          React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
-            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#8a3030",margin:0}},
-              "������ You appear in "+(notifications.length===1?"a public memory":"public memories")),
-            React.createElement("button",{
-              onClick:()=>{
-                const email = licenceStatus?.email||ownerEmail||carerEmail;
-                if(email) fetch(WORKER_URL+"/mentions/"+encodeURIComponent(email)+"/clear",
-                  {method:"POST",headers:{"X-LS-Key":licenceKey}}).catch(()=>{});
-                setNotifications([]);
-              },
-              style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",
-                fontSize:"0.78rem",textDecoration:"underline"}
-            },"Dismiss")
-          ),
-          notifications.map((n,i)=>React.createElement("div",{
-            key:i,
-            style:{padding:"6px 0",borderBottom:i<notifications.length-1?"1px solid rgba(196,133,138,0.15)":"none"}
-          },
-            React.createElement("p",{style:{fontSize:"0.86rem",color:"#5a3030",margin:"0 0 2px"}},
-              (n.displayName||"Someone")+" has shared a memory that includes you."),
-            React.createElement("a",{href:n.url,target:"_blank",rel:"noopener",
-              style:{fontSize:"0.82rem",color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.3)"}},
-              "View profile →")
-          ))
-        ),
+        (()=>{
+          const mentionNotifs = notifications.filter(n=>n.type!=="place-match");
+          const placeMatchNotifs = notifications.filter(n=>n.type==="place-match");
+          const clearAll = ()=>{
+            const email = licenceStatus?.email||ownerEmail||carerEmail;
+            if(email) fetch(WORKER_URL+"/mentions/"+encodeURIComponent(email)+"/clear",
+              {method:"POST",headers:{"X-LS-Key":licenceKey}}).catch(()=>{});
+            setNotifications([]);
+          };
+          return React.createElement(React.Fragment,null,
+            notifications.length===0&&React.createElement("div",{style:{textAlign:"center",padding:"32px 0",color:"#8a7460",fontStyle:"italic"}},
+              "No notifications yet. When someone shares a memory that includes you, it will appear here."
+            ),
+
+            // Mention notifications
+            mentionNotifs.length>0&&React.createElement("div",{
+              style:{background:"rgba(196,133,138,0.08)",border:"1px solid rgba(196,133,138,0.3)",
+                borderRadius:"3px",padding:"16px 20px",marginBottom:"16px"}},
+              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
+                React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#8a3030",margin:0}},
+                  "💬 You appear in "+(mentionNotifs.length===1?"a public memory":"public memories")),
+                React.createElement("button",{onClick:clearAll,
+                  style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem",textDecoration:"underline"}
+                },"Dismiss all")
+              ),
+              mentionNotifs.map((n,i)=>React.createElement("div",{key:i,
+                style:{padding:"6px 0",borderBottom:i<mentionNotifs.length-1?"1px solid rgba(196,133,138,0.15)":"none"}},
+                React.createElement("p",{style:{fontSize:"0.86rem",color:"#5a3030",margin:"0 0 2px"}},
+                  (n.displayName||"Someone")+" has shared a memory that includes you."),
+                React.createElement("a",{href:n.url,target:"_blank",rel:"noopener",
+                  style:{fontSize:"0.82rem",color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.3)"}},
+                  "View profile →")
+              ))
+            ),
+
+            // Place-time match notifications
+            placeMatchNotifs.length>0&&React.createElement("div",{
+              style:{background:"rgba(122,158,138,0.08)",border:"1px solid rgba(122,158,138,0.3)",
+                borderRadius:"3px",padding:"16px 20px",marginBottom:"16px"}},
+              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}},
+                React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#2d6b3a",margin:0}},
+                  "📍 Someone was in the same place at the same time"),
+                React.createElement("button",{onClick:clearAll,
+                  style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem",textDecoration:"underline"}
+                },"Dismiss all")
+              ),
+              React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",fontStyle:"italic",marginBottom:"10px",lineHeight:1.5}},
+                "These subscribers published memories at the same time and place as you. You may have crossed paths."
+              ),
+              placeMatchNotifs.map((n,i)=>React.createElement("div",{key:i,
+                style:{padding:"8px 0",borderBottom:i<placeMatchNotifs.length-1?"1px solid rgba(122,158,138,0.15)":"none"}},
+                React.createElement("p",{style:{fontSize:"0.86rem",color:"#2c3a2c",margin:"0 0 2px"}},
+                  (n.displayName||"Someone"),
+                  n.location&&React.createElement("span",{style:{color:"#8a7460"}}," · "+n.location),
+                  n.year&&React.createElement("span",{style:{color:"#8a7460"}}," · "+(n.yearEnd&&n.yearEnd!==n.year?n.year+"–"+n.yearEnd:n.year))
+                ),
+                React.createElement("a",{href:n.url,target:"_blank",rel:"noopener",
+                  style:{fontSize:"0.82rem",color:"#4a7a5a",textDecoration:"none",borderBottom:"1px solid rgba(74,122,90,0.3)"}},
+                  "View their profile →")
+              ))
+            )
+          );
+        })(),
 
         React.createElement("div",{style:{display:"flex",gap:"20px",marginBottom:"16px",flexWrap:"wrap"}},
           (()=>{
