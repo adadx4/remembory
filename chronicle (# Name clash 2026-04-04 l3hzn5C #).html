@@ -151,13 +151,14 @@ const S = {
 // ── Helpers ────────────────────────────────────────────────────
 function fuzzyDateLabel(m) {
   const { year, month, day, fuzzy, season } = m;
+  const unc = m.dateUncertain && fuzzy !== "uncertain";
   function startLabel() {
     if (fuzzy==="uncertain") return year ? `${year}?` : "Date unknown";
-    if (fuzzy==="decade") return `${Math.floor(year/10)*10}s`;
-    if (fuzzy==="year") return `${year}`;
-    if (fuzzy==="season") return `${season} ${year}`;
-    if (fuzzy==="month") return `${MONTHS[month-1]} ${year}`;
-    return `${MONTHS[month-1]} ${day}, ${year}`;
+    if (fuzzy==="decade") return `${Math.floor(year/10)*10}s${unc?"?":""}`;
+    if (fuzzy==="year") return `${year}${unc?"?":""}`;
+    if (fuzzy==="season") return `${season} ${year}${unc?"?":""}`;
+    if (fuzzy==="month") return `${MONTHS[month-1]} ${year}${unc?"?":""}`;
+    return `${MONTHS[month-1]} ${day}, ${year}${unc?"?":""}`;
   }
   if (!m.endFuzzy) return startLabel();
   if (m.endOngoing) return `${startLabel()} – present`;
@@ -781,14 +782,17 @@ const RELATIONSHIP_SUGGESTIONS = [
   "Teacher","Tutor","Doctor","Therapist","Coach",
 ];
 
-function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPerson, onNewPersonRelationship, allRelationships=[]}) {
+function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPerson, onNewPersonRelationship, allRelationships=[], groups={}}) {
   const [input, setInput] = React.useState("");
   const [showSugs, setShowSugs] = React.useState(false);
   const [step, setStep] = React.useState(null); // null | "email" | "relationship"
   const [pendingName, setPendingName] = React.useState(null);
   const [relInput, setRelInput] = React.useState("");
   const [showRelSugs, setShowRelSugs] = React.useState(false);
-  const suggestions=allValues.filter(v=>v.toLowerCase().includes(input.toLowerCase())&&!values.includes(v)&&input.length>0);
+  const groupNames = Object.keys(groups);
+  const peopleSugs = allValues.filter(v=>v.toLowerCase().includes(input.toLowerCase())&&!values.includes(v)&&input.length>0);
+  const groupSugs = input.length>0 ? groupNames.filter(g=>g.toLowerCase().includes(input.toLowerCase())) : [];
+  const suggestions = [...peopleSugs, ...groupSugs.filter(g=>!peopleSugs.includes(g))];
   const allRelSugs=[...new Set([...RELATIONSHIP_SUGGESTIONS,...allRelationships])]; const relSugs=allRelSugs.filter(r=>r.toLowerCase().includes(relInput.toLowerCase())&&relInput.length>0);
 
   function commit(name, email, rel) {
@@ -802,12 +806,6 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
 
   function add(val) {
     const v = val.trim(); if (!v) return;
-    // Group expansion
-    if (groups[v]) {
-      const members = (groups[v].members||[]).filter(m=>!values.includes(m));
-      if (members.length>0) onChange([...values, ...members]);
-      setInput(""); setShowSugs(false); return;
-    }
     if (values.includes(v)) { setInput(""); return; }
     if (onNewPerson && !allValues.includes(v)) {
       setPendingName(v); setInput(""); setShowSugs(false); setStep("relationship");
@@ -852,21 +850,7 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
           React.createElement("button",{onClick:()=>add(input),style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"6px 11px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.85rem",color:"#8a7460"}},"+ Add")
         ),
     showSugs&&suggestions.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,right:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",maxHeight:"160px",overflowY:"auto"}},
-      suggestions.map(s=>{
-        const isGroup = !!groups[s];
-        const memberCount = isGroup ? (groups[s].members||[]).length : 0;
-        return React.createElement("div",{key:s,onMouseDown:()=>add(s),
-          style:{padding:"8px 12px",cursor:"pointer",fontSize:"0.9rem",color:"#2c2416",display:"flex",alignItems:"center",gap:"6px"},
-          onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
-          onMouseLeave:e=>e.currentTarget.style.background="transparent"},
-          isGroup
-            ? React.createElement(React.Fragment,null,
-                React.createElement("span",null,"👥 ",s),
-                React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic"}},memberCount+" people")
-              )
-            : React.createElement("span",null,icon," ",s)
-        );
-      })
+      suggestions.map(s=>React.createElement("div",{key:s,onMouseDown:()=>add(s),style:{padding:"8px 12px",cursor:"pointer",fontSize:"0.9rem",color:"#2c2416"},onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",onMouseLeave:e=>e.currentTarget.style.background="transparent"},icon," ",s))
     )
   );
 }
@@ -3682,8 +3666,18 @@ function AddEditForm({
       React.createElement("div",null,React.createElement("label",{style:S.label},"The Memory"),React.createElement("textarea",{value:form.content,onChange:e=>updateForm({content:e.target.value}),placeholder:"Write as much or as little as you remember\u2026",rows:6,style:{...S.input,resize:"vertical",lineHeight:"1.7"}})),
       React.createElement("div",null,React.createElement("label",{style:S.label},"Topic Tags"),React.createElement(TagPicker,{tags:form.tags,onToggle:tag=>updateForm({tags:form.tags.includes(tag)?form.tags.filter(t=>t!==tag):[...form.tags,tag]}),customTags,onAddCustom:addCustomTag,onRemoveCustom:removeCustomTag})),
       React.createElement("div",null,
-        React.createElement("label",{style:S.label},"People"),
-        React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:form.people||[],allValues:knownPeople,onChange:v=>updateForm({people:v}),placeholder:"Add a person or group\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean),groups:personGroups||{}})
+        React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"4px"}},
+          React.createElement("label",{style:{...S.label,margin:0}},"People"),
+          Object.keys(personGroups||{}).length>0&&React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap"}},
+            Object.entries(personGroups||{}).map(([gName,gData])=>
+              React.createElement("button",{key:gName,
+                onClick:()=>{const newPeople=[...new Set([...(form.people||[]),...(gData.members||[])])];updateForm({people:newPeople});},
+                style:{background:"rgba(100,110,140,0.08)",border:"1px solid rgba(100,110,140,0.25)",borderRadius:"20px",padding:"1px 10px",fontSize:"0.75rem",cursor:"pointer",color:"#4a5a7a",fontFamily:"'Crimson Text',serif",whiteSpace:"nowrap"}},
+                "+ ",gName)
+            )
+          )
+        ),
+        React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:form.people||[],allValues:knownPeople,onChange:v=>updateForm({people:v}),placeholder:"Add a person\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
       ),
       React.createElement("div",null,React.createElement("label",{style:S.label},"Organisations"),React.createElement(PeopleOrgField,{icon:"\ud83c\udfdb",values:form.orgs||[],allValues:knownOrgs,onChange:v=>updateForm({orgs:v}),placeholder:"Add an organisation\u2026"})),
       React.createElement("div",null,
