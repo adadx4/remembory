@@ -63,18 +63,18 @@ self.addEventListener("fetch", event => {
     event.respondWith(cacheFirst(event.request)); return;
   }
 
-  event.respondWith(networkFirst(event.request));
+  // All other requests — pass through without caching
 });
 
 async function cacheFirst(request) {
   const cached = await caches.match(request);
   if (cached) {
-    fetch(request).then(r => { if (r && r.ok) caches.open(SHELL_CACHE).then(c => c.put(request, r)); }).catch(()=>{});
+    fetch(request).then(r => { if (r.ok) caches.open(SHELL_CACHE).then(c => c.put(request, r)); }).catch(()=>{});
     return cached;
   }
   try {
     const response = await fetch(request);
-    if (response && response.ok) { const c = await caches.open(SHELL_CACHE); c.put(request, response.clone()); }
+    if (response.ok) { const c = await caches.open(SHELL_CACHE); c.put(request, response.clone()); }
     return response;
   } catch { return new Response("Offline — resource not cached yet.", { status: 503 }); }
 }
@@ -82,7 +82,7 @@ async function cacheFirst(request) {
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
-    if (response && response.ok) { const c = await caches.open(SHELL_CACHE); c.put(request, response.clone()); }
+    if (response.ok) { const c = await caches.open(SHELL_CACHE); c.put(request, response.clone()); }
     return response;
   } catch {
     const cached = await caches.match(request);
