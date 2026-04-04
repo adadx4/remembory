@@ -4678,7 +4678,7 @@ function handleEdit(m) {
       try {
         const conns = JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
         const preIdx = conns.findIndex(c=>c.email===senderEmail&&c.preConnected);
-        if (preIdx>=0) { conns[preIdx]={...conns[preIdx],preConnected:false,connectedAt:new Date().toISOString()}; localStorage.setItem("chronicle-connections",JSON.stringify(conns)); }
+        if (preIdx>=0) { conns[preIdx]={...conns[preIdx],preConnected:false,connectedAt:new Date().toISOString()}; localStorage.setItem("chronicle-connections",JSON.stringify(conns)); setLocalConnections([...conns]); }
       } catch(e) {}
     }
     // Show connection request if sender requested it and not suppressed
@@ -5993,6 +5993,7 @@ function handleEdit(m) {
                       if (!conns.find(c=>c.email===email)) {
                         conns.push({name, email, connectedAt: new Date().toISOString()});
                         localStorage.setItem("chronicle-connections", JSON.stringify(conns));
+                        setLocalConnections([...conns]);
                       }
                     }
                   }).catch(()=>{});
