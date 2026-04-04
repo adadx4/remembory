@@ -4752,6 +4752,12 @@ function handleEdit(m) {
     }
     setSyncStatus("syncing");
     try {
+      // Ensure readwrite permission (may be needed after page reload or with virtual drives)
+      const perm = await h.queryPermission({mode:"readwrite"});
+      if (perm !== "granted") {
+        const req = await h.requestPermission({mode:"readwrite"});
+        if (req !== "granted") { setSyncStatus("error: permission denied — please re-open the sync file"); setTimeout(()=>setSyncStatus(""),8000); return; }
+      }
       // 1. Read the sync file
       const file = await h.getFile();
       const text = await file.text();
