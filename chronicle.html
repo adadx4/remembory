@@ -1501,7 +1501,7 @@ function MemoryCard({m, onClick}) {
 
 // ── Main App ───────────────────────────────────────────────────
 
-function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, knownLocations, photo, onRename, onDelete, onSetRelationship, onSetNotes, onSetOrgs, onSetLocs, onSetPhoto, onViewMemories, allRelationships=[], connectionEntry, onSetConnection}) {
+function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, knownLocations, photo, onRename, onDelete, onSetRelationship, onSetNotes, onSetOrgs, onSetLocs, onSetPhoto, onViewMemories, allRelationships=[], connectionEntry, onSetConnection, email="", onSetEmail}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(name);
   const [editingRel, setEditingRel] = React.useState(false);
@@ -1516,6 +1516,9 @@ function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, kno
   const [editingLocs, setEditingLocs] = React.useState(false);
   const [locSearch, setLocSearch] = React.useState("");
   const locSugs = locSearch.length>0 ? (knownLocations||[]).filter(l=>l.toLowerCase().includes(locSearch.toLowerCase())&&!(locs||[]).includes(l)) : [];
+  const [editingEmail, setEditingEmail] = React.useState(false);
+  const [emailDraft, setEmailDraft] = React.useState(email||"");
+  function commitEmail() { if(onSetEmail) onSetEmail(name, emailDraft.trim()); setEditingEmail(false); }
 
   const [addingConn, setAddingConn] = React.useState(false);
   const [connEmail, setConnEmail] = React.useState(connectionEntry?.email||"");
@@ -1614,6 +1617,21 @@ function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, kno
             style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",
               fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px",textDecoration:"underline"}},
             relationship ? "edit relationship" : "+ add relationship"
+          ),
+      editingEmail
+        ? React.createElement("div",{style:{display:"inline-flex",gap:"6px",alignItems:"center"}},
+            React.createElement("input",{autoFocus:true,type:"email",value:emailDraft,
+              onChange:e=>setEmailDraft(e.target.value),
+              onKeyDown:e=>{if(e.key==="Enter")commitEmail();if(e.key==="Escape"){setEmailDraft(email||"");setEditingEmail(false);}},
+              onBlur:()=>setTimeout(commitEmail,150),
+              placeholder:"their@email.com",
+              style:{...S.input,padding:"4px 9px",fontSize:"0.84rem",width:"190px"}}),
+            React.createElement("button",{onClick:commitEmail,style:{...S.btn,padding:"4px 10px",fontSize:"0.82rem"}},"Save")
+          )
+        : React.createElement("button",{onClick:()=>{setEmailDraft(email||"");setEditingEmail(true);},
+            style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",
+              fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px",textDecoration:"underline"}},
+            email ? "✉ "+email : "+ add email"
           ),
       (orgs||[]).map(o=>React.createElement("span",{key:o,style:{display:"inline-flex",alignItems:"center",gap:"3px",fontSize:"0.78rem",color:"#5a4a30",background:"rgba(120,100,80,0.1)",border:"1px solid rgba(120,100,80,0.25)",borderRadius:"20px",padding:"1px 8px"}},
         "🏛 ",o,
@@ -2093,7 +2111,7 @@ function GroupsManager({personGroups, knownPeople, memories, onSetGroups, onView
   );
 }
 
-function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,peopleNotes,orgNotes,personOrgs,personLocations,entityPhotos,onSetEntityPhoto,localConnections,onSetConnection,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onSetPersonOrgs,onSetPersonLocations,onViewPerson,onAddPerson,onAddOrg}) {
+function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,peopleNotes,orgNotes,personOrgs,personLocations,entityPhotos,onSetEntityPhoto,localConnections,onSetConnection,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onSetPersonOrgs,onSetPersonLocations,onViewPerson,onAddPerson,onAddOrg,peopleEmails={},onSetEmail}) {
   const [search, setSearch] = React.useState("");
   const [filterRel, setFilterRel] = React.useState(null);
   const [filterOrg, setFilterOrg] = React.useState(null);
@@ -2184,6 +2202,7 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
         onSetRelationship,onSetNotes:onSetPersonNotes,onRename:onRenamePerson,onDelete:onDeletePerson,
         connectionEntry:(localConnections||[]).find(c=>c.name===name)||null,
         onSetConnection,
+        email:(peopleEmails||{})[name]||"",onSetEmail,
         onViewMemories:()=>onViewPerson(name)})),
       knownOrgs.length===0&&knownPeople.length===0&&!addingPerson&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No people recorded yet.")
     ),
@@ -6245,7 +6264,8 @@ function handleEdit(m) {
                 onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
                 onViewPerson:name=>setIndexFilter({type:"people",value:name}),
                 onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},
-                onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},})
+                onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},
+                peopleEmails,onSetEmail:(pName,em)=>persistSubject({peopleEmails:{...peopleEmails,[pName]:em}}),})
             : indexTab==="orgs"
             ? React.createElement(OrgsPanel,{knownOrgs,knownLocations,memories,orgNotes,orgLocations,orgPeriods,personOrgs,entityPhotos,onSetEntityPhoto:setEntityPhoto,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetOrgNotes:setOrgNotes,onSetOrgLocations:setOrgLocations,onSetOrgPeriods:setOrgPeriods,setIndexFilter,persistSubject})
             : indexTab==="locations"
@@ -6285,7 +6305,8 @@ function handleEdit(m) {
       })(),
 
       // ── PEOPLE & ORGS ──
-      view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,peopleNotes,orgNotes,entityPhotos,onSetEntityPhoto:setEntityPhoto,localConnections:localConnections,onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");},onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},}),
+      view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,peopleNotes,orgNotes,entityPhotos,onSetEntityPhoto:setEntityPhoto,localConnections:localConnections,onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");},onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},
+        peopleEmails,onSetEmail:(pName,em)=>persistSubject({peopleEmails:{...peopleEmails,[pName]:em}}),}),
 
       view==="sharing"&&React.createElement(SharingView,{
         memories, shareHistory, ownerName,
