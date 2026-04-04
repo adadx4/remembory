@@ -2654,12 +2654,12 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
 // ── Shared Chronicle generator ─────────────────────────────────
 
 // ── PerspectivesPanel ──────────────────────────────────────────
-function PerspectivesPanel({memory, onSave, peopleEmails, senderName}) {
+function PerspectivesPanel({memory, onSave, peopleEmails, senderName, ownerName=""}) {
   const perspectives = memory.perspectives || [];
   const [showAll, setShowAll] = useState(true);
   const [addingMine, setAddingMine] = useState(false);
   const [myDraft, setMyDraft] = useState("");
-  const [myName, setMyName] = useState("");
+  const [myName, setMyName] = useState(ownerName||"");
   const [makeDominant, setMakeDominant] = useState(true);
   const myPerspective = perspectives.find(p=>p.isOwn);
 
@@ -2820,7 +2820,10 @@ function PerspectivesPanel({memory, onSave, peopleEmails, senderName}) {
       addingMine && React.createElement("div", {style:{background:"rgba(122,158,138,0.06)",border:"1px solid rgba(122,158,138,0.3)",borderRadius:"4px",padding:"14px"}},
         React.createElement("div", {style:{marginBottom:"10px"}},
           React.createElement("label", {style:{...S.label,marginBottom:"4px"}}, "Your name"),
-          React.createElement("input", {value:myName,onChange:e=>setMyName(e.target.value),placeholder:"How should this be attributed?",style:{...S.input,padding:"6px 10px"}})
+          React.createElement("input", {value:myName,onChange:e=>setMyName(e.target.value),placeholder:"How should this be attributed?",style:{...S.input,padding:"6px 10px"}}),
+          !ownerName&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#a8885a",fontStyle:"italic",margin:"5px 0 0"}},
+            "Tip: set your name in Settings so it fills in automatically."
+          )
         ),
         React.createElement("div", {style:{marginBottom:"12px"}},
           React.createElement("label", {style:{...S.label,marginBottom:"4px"}}, "Your memory of this event"),
@@ -3832,7 +3835,8 @@ function DetailView({
       memory:m,
       onSave:handleSavePerspectives,
       peopleEmails,
-      senderName:m.sharedBy||null
+      senderName:m.sharedBy||null,
+      ownerName,
     }),
  
     // ── Action buttons ──
