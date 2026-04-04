@@ -3957,11 +3957,30 @@ function App() {
     // commitMemory will include this in its single batch save to avoid stale-closure stomping)
     let updatedKnownLocs = knownLocations;
     if (locationLabel) {
-      const locObj = { label: locationLabel, street: (form.locationStreet||"").trim(), town: (form.locationTown||"").trim(), state: (form.locationState||"").trim(), country: (form.locationCountry||"").trim() };
+      const fStreet = (form.locationStreet||"").trim();
+      const fTown   = (form.locationTown||"").trim();
+      const fState  = (form.locationState||"").trim();
+      const fCountry= (form.locationCountry||"").trim();
       const existingIdx = knownLocations.findIndex(l => (typeof l==='string'?l:l.label) === locationLabel);
-      updatedKnownLocs = existingIdx >= 0
-        ? knownLocations.map((l, i) => i === existingIdx ? {...l, ...locObj} : l)
-        : [...knownLocations, locObj].sort((a,b) => (typeof a==='string'?a:a.label).localeCompare(typeof b==='string'?b:b.label));
+      if (existingIdx >= 0) {
+        // Only overwrite an address field when the form has a non-empty value — this preserves
+        // existing address data when the user just changes the label without touching the address fields
+        updatedKnownLocs = knownLocations.map((l, i) => {
+          if (i !== existingIdx) return l;
+          const base = typeof l === 'string' ? {label:l, street:"", town:"", state:"", country:""} : l;
+          return {
+            ...base,
+            label: locationLabel,
+            ...(fStreet  ? {street:  fStreet}  : {}),
+            ...(fTown    ? {town:    fTown}    : {}),
+            ...(fState   ? {state:   fState}   : {}),
+            ...(fCountry ? {country: fCountry} : {}),
+          };
+        });
+      } else {
+        const locObj = {label: locationLabel, street: fStreet, town: fTown, state: fState, country: fCountry};
+        updatedKnownLocs = [...knownLocations, locObj].sort((a,b) => (typeof a==='string'?a:a.label).localeCompare(typeof b==='string'?b:b.label));
+      }
     }
 
     // If there's an end date, offer to create a second memory for it
