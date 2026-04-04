@@ -781,14 +781,17 @@ const RELATIONSHIP_SUGGESTIONS = [
   "Teacher","Tutor","Doctor","Therapist","Coach",
 ];
 
-function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPerson, onNewPersonRelationship, allRelationships=[]}) {
+function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPerson, onNewPersonRelationship, allRelationships=[], groups={}}) {
   const [input, setInput] = React.useState("");
   const [showSugs, setShowSugs] = React.useState(false);
   const [step, setStep] = React.useState(null); // null | "email" | "relationship"
   const [pendingName, setPendingName] = React.useState(null);
   const [relInput, setRelInput] = React.useState("");
   const [showRelSugs, setShowRelSugs] = React.useState(false);
-  const suggestions=allValues.filter(v=>v.toLowerCase().includes(input.toLowerCase())&&!values.includes(v)&&input.length>0);
+  const groupNames = Object.keys(groups);
+  const peopleSugs = allValues.filter(v=>v.toLowerCase().includes(input.toLowerCase())&&!values.includes(v)&&input.length>0);
+  const groupSugs = input.length>0 ? groupNames.filter(g=>g.toLowerCase().includes(input.toLowerCase())) : [];
+  const suggestions = [...peopleSugs, ...groupSugs.filter(g=>!peopleSugs.includes(g))];
   const allRelSugs=[...new Set([...RELATIONSHIP_SUGGESTIONS,...allRelationships])]; const relSugs=allRelSugs.filter(r=>r.toLowerCase().includes(relInput.toLowerCase())&&relInput.length>0);
 
   function commit(name, email, rel) {
