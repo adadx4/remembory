@@ -1474,7 +1474,7 @@ function RelationshipIndex({memories, peopleRelationships, onView, onRenameRelat
   );
 }
 
-function LocationsPanel({knownLocations,memories,locationNotes,locationCoords,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setIndexFilter,persistSubject}) {
+function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setIndexFilter,persistSubject}) {
   const [addingLoc, setAddingLoc] = React.useState(false);
   const [newLoc, setNewLoc] = React.useState("");
   function commitAdd(){
@@ -1482,7 +1482,8 @@ function LocationsPanel({knownLocations,memories,locationNotes,locationCoords,re
     if(!v)return;
     const existing = knownLocations.find(l => (typeof l === 'string' ? l === v : l.label === v));
     if(!existing){
-      persistSubject({knownLocations: [...knownLocations, v].sort((a,b) => {
+      const newLocObj = {label:v, street:"", town:"", state:"", country:""};
+      persistSubject({knownLocations: [...knownLocations, newLocObj].sort((a,b) => {
         const na = typeof a === 'string' ? a : a.label;
         const nb = typeof b === 'string' ? b : b.label;
         return na.localeCompare(nb);
@@ -1507,8 +1508,9 @@ function LocationsPanel({knownLocations,memories,locationNotes,locationCoords,re
     knownLocations.map(loc=>{
       const name = typeof loc === 'string' ? loc : loc.label;
       const count=memories.filter(m=>m.location===name||m.locations?.includes(name)).length;
+      const coords = (typeof loc==='object' ? loc.coords : null) || null;
       return React.createElement(LocationRow,{key:name,name,count,notes:locationNotes?.[name],
-        coords:locationCoords?.[name]||null,
+        coords,
         onRename:renameLocation,onDelete:deleteLocation,onSetNotes:setLocationNotes,
         onSetCoords:setLocationCoords,
         onView:()=>setIndexFilter({type:"locations",value:name})});
@@ -3619,11 +3621,20 @@ function App() {
   const customTags          = subject.customTags || [];
   const knownPeople         = subject.knownPeople || [];
   const knownOrgs           = subject.knownOrgs || [];
-  const knownLocations      = subject.knownLocations || [];
+  const locationNotes = subject.locationNotes || {};
+  // Migrate: absorb any coords stored in the legacy label-keyed dict into the location objects.
+  // After migration, coords live on knownLocations[i].coords so the label is free to change
+  // without breaking the geocode association.
+  const _legacyCoords = subject.locationCoords || {};
+  const knownLocations = (subject.knownLocations || []).map(l => {
+    const loc = typeof l === 'string' ? {label:l, street:"", town:"", state:"", country:""} : {...l};
+    if (!loc.coords && _legacyCoords[loc.label]) loc.coords = _legacyCoords[loc.label];
+    return loc;
+  });
+  // Derive the label-keyed dict from objects for MapView (and backward-compat export)
+  const locationCoords = Object.fromEntries(knownLocations.filter(l=>l.coords).map(l=>[l.label,l.coords]));
   const peopleEmails        = subject.peopleEmails || {};
   const peopleRelationships = subject.peopleRelationships || {};
-  const locationNotes = subject.locationNotes || {};
-  const locationCoords = subject.locationCoords || {};
   const peopleNotes         = subject.peopleNotes || {};
   const shareHistory          = subject.shareHistory || [];
   const legacyMessage         = subject.legacyMessage || "";
@@ -3846,7 +3857,10 @@ function App() {
   function setPersonEmail(name, email) { persistSubject({peopleEmails:{...peopleEmails, [name]: email}}); }
   function setPersonRelationship(name, rel) { persistSubject({peopleRelationships:{...peopleRelationships, [name]: rel}}); }
   function setLocationNotes(name, notes) { persistSubject({locationNotes:{...locationNotes, [name]: notes}}); }
-  function setLocationCoords(name, coords) { persistSubject({locationCoords:{...locationCoords, [name]: coords}}); }
+  function setLocationCoords(name, coords) {
+    const updated = knownLocations.map(l => l.label===name ? {...l, coords: coords||null} : l);
+    persistSubject({knownLocations: updated});
+  }
   function renameLocation(oldName, newName) {
     const n=newName.trim(); if(!n||n===oldName) return;
     const updMems=memories.map(m=>({...m,location:m.location===oldName?n:m.location,locations:(m.locations||[]).map(l=>l===oldName?n:l)}));
@@ -3865,8 +3879,8 @@ function App() {
       return na.localeCompare(nb);
     });
     const updNotes={...locationNotes}; if(updNotes[oldName]!==undefined){updNotes[n]=updNotes[oldName];delete updNotes[oldName];}
-    const updCoords={...locationCoords}; if(updCoords[oldName]!==undefined){updCoords[n]=updCoords[oldName];delete updCoords[oldName];}
-    persistSubject({memories:updMems,knownLocations:updKnown,locationNotes:updNotes,locationCoords:updCoords});
+    // Coords are embedded in the location object and travel with it automatically on rename
+    persistSubject({memories:updMems,knownLocations:updKnown,locationNotes:updNotes});
   }
   function deleteLocation(name) {
     const updMems=memories.map(m=>({...m,location:m.location===name?"":m.location,locations:(m.locations||[]).filter(l=>l!==name)}));
@@ -3938,15 +3952,18 @@ function App() {
 
     const primaryId = editingId || (Date.now().toString()+Math.random().toString(36).slice(2));
     const primary = {...formWithLoc, id:primaryId};
-    // Update knownLocations with structured address data
+
+    // Compute updated knownLocations with structured address data (no separate persistSubject call —
+    // commitMemory will include this in its single batch save to avoid stale-closure stomping)
+    let updatedKnownLocs = knownLocations;
     if (locationLabel) {
       const locObj = { label: locationLabel, street: (form.locationStreet||"").trim(), town: (form.locationTown||"").trim(), state: (form.locationState||"").trim(), country: (form.locationCountry||"").trim() };
-      const existingIdx = knownLocations.findIndex(l => l.label === locationLabel);
-      const updatedLocs = existingIdx >= 0
+      const existingIdx = knownLocations.findIndex(l => (typeof l==='string'?l:l.label) === locationLabel);
+      updatedKnownLocs = existingIdx >= 0
         ? knownLocations.map((l, i) => i === existingIdx ? {...l, ...locObj} : l)
-        : [...knownLocations, locObj].sort((a,b) => a.label.localeCompare(b.label));
-      persistSubject({knownLocations: updatedLocs});
+        : [...knownLocations, locObj].sort((a,b) => (typeof a==='string'?a:a.label).localeCompare(typeof b==='string'?b:b.label));
     }
+
     // If there's an end date, offer to create a second memory for it
     if ((form.endFuzzy || form.endOngoing) && !editingId) {
       const secondary = {
@@ -3961,19 +3978,28 @@ function App() {
         mediaUrls: [],
         endFuzzy: null, endYear: null, endMonth: 1, endDay: 1, endSeason: "Early", endOngoing: false,
       };
-      setPendingEndMemory({primary, secondary});
+      setPendingEndMemory({primary, secondary, updatedKnownLocs});
       return;
     }
 
-    commitMemory(primary, null);
+    commitMemory(primary, null, updatedKnownLocs);
   }
 
-  function commitMemory(primary, secondary) {
-    // Batch everything into one persistSubject call to avoid stale-closure stomping
+  function commitMemory(primary, secondary, updatedKnownLocs) {
+    // All location/people/org state is merged here in one persistSubject call to avoid
+    // stale-closure stomping when multiple state updates would otherwise race each other.
     const allFormLocs = [primary.location,...(primary.locations||[])].filter(Boolean);
-    const newPeople    = [...new Set([...knownPeople,  ...(primary.people||[]), ...(secondary?.people||[])])].sort();
-    const newOrgs      = [...new Set([...knownOrgs,    ...(primary.orgs||[]),   ...(secondary?.orgs||[])])].sort();
-    const newLocs      = [...new Set([...knownLocations,...allFormLocs])].sort();
+    const newPeople = [...new Set([...knownPeople, ...(primary.people||[]), ...(secondary?.people||[])])].sort();
+    const newOrgs   = [...new Set([...knownOrgs,   ...(primary.orgs||[]),   ...(secondary?.orgs||[])])].sort();
+    // Merge any form locations not yet in the list, preserving existing location objects
+    const baseLocs = updatedKnownLocs || knownLocations;
+    const existingLabels = new Set(baseLocs.map(l => typeof l==='string' ? l : l.label));
+    const newLocs = [
+      ...baseLocs,
+      ...allFormLocs
+        .filter(label => !existingLabels.has(label))
+        .map(label => ({label, street:"", town:"", state:"", country:""}))
+    ].sort((a,b) => (typeof a==='string'?a:a.label).localeCompare(typeof b==='string'?b:b.label));
 
     if (editingId) {
       const updated = memories.map(m=>m.id===editingId?primary:m).sort((a,b)=>sortKey(a)-sortKey(b));
@@ -5474,7 +5500,7 @@ function handleEdit(m) {
               autoFocus:true,
               value:secondary.title,
               onChange:e=>setPendingEndMemory(p=>({...p,secondary:{...p.secondary,title:e.target.value}})),
-              onKeyDown:e=>{ if(e.key==="Enter") { commitMemory(primary,secondary); } },
+              onKeyDown:e=>{ if(e.key==="Enter") { commitMemory(primary,secondary,pendingEndMemory.updatedKnownLocs); } },
               style:{...S.input,fontSize:"1rem"}
             }),
             React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",marginTop:"5px"}},
@@ -5482,8 +5508,8 @@ function handleEdit(m) {
             )
           ),
           React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap"}},
-            React.createElement("button",{onClick:()=>commitMemory(primary,secondary),style:{...S.btn,flex:1}},"Save both"),
-            React.createElement("button",{onClick:()=>commitMemory(primary,null),style:{...S.btnOutline,flex:1}},"Just the one entry"),
+            React.createElement("button",{onClick:()=>commitMemory(primary,secondary,pendingEndMemory.updatedKnownLocs),style:{...S.btn,flex:1}},"Save both"),
+            React.createElement("button",{onClick:()=>commitMemory(primary,null,pendingEndMemory.updatedKnownLocs),style:{...S.btnOutline,flex:1}},"Just the one entry"),
             React.createElement("button",{onClick:()=>setPendingEndMemory(null),style:{...S.btnOutline,color:"#c4858a",borderColor:"#e0c8c8"}},"Cancel")
           )
         )
@@ -5585,7 +5611,16 @@ function handleEdit(m) {
         React.createElement(MapView,{
           memories,
           locationCoords,
-          onSaveCoords: (allCoords) => persistSubject({locationCoords:allCoords}),
+          onSaveCoords: (allCoords) => {
+            // allCoords = {[label]: {lat,lng,manual}} from auto-geocoding; merge into location objects
+            const updated = knownLocations.map(l => {
+              const label = typeof l==='string' ? l : l.label;
+              const c = allCoords[label];
+              if (!c) return l;
+              return typeof l==='string' ? {label:l, street:"", town:"", state:"", country:"", coords:c} : {...l, coords:c};
+            });
+            persistSubject({knownLocations: updated});
+          },
           onSelectLocation: loc => {
             setIndexFilter({type:"locations",value:loc});
             setIndexTab("locations");
@@ -5667,7 +5702,7 @@ function handleEdit(m) {
                 onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},
                 onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},})
             : indexTab==="locations"
-            ? React.createElement(LocationsPanel,{knownLocations,memories,locationNotes,locationCoords,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setIndexFilter,persistSubject})
+            ? React.createElement(LocationsPanel,{knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setIndexFilter,persistSubject})
             : indexTab==="relationships"
             ? React.createElement(RelationshipIndex,{memories,peopleRelationships,
                 onView:(rel,people)=>setIndexFilter({type:"relationships",value:rel,people}),onRenameRelationship:renameRelationship})
