@@ -434,10 +434,10 @@ function seedSubject(s) {
 // legacy alias used by importBackup
 function seedData(data) { return data; }
 
-const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], ownerName:"", ownerEmail:"" };
+const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], orgLocations:{}, orgPeriods:{}, ownerName:"", ownerEmail:"" };
 
 function emptySubject(id, name, isSelf=false) {
-  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
+  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
 }
 
 // Migrate flat data → subjects structure
@@ -1604,25 +1604,47 @@ function LocationRow({name, count, notes, coords, street, town, state, country, 
   );
 }
 
-function OrgRow({name, count, notes, connectedPeople, onRename, onDelete, onSetNotes}) {
+function OrgRow({name, count, notes, connectedPeople, locs, knownLocations, periods, onRename, onDelete, onSetNotes, onSetLocs, onSetPeriods, onView}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(name);
   const [showNotes, setShowNotes] = React.useState(false);
   const [notesDraft, setNotesDraft] = React.useState(notes||"");
+  const [editingLocs, setEditingLocs] = React.useState(false);
+  const [locSearch, setLocSearch] = React.useState("");
+  const allLocLabels = (knownLocations||[]).map(l => typeof l === 'string' ? l : l.label);
+  const locSugs = locSearch.length > 0 ? allLocLabels.filter(l => l.toLowerCase().includes(locSearch.toLowerCase()) && !(locs||[]).includes(l)) : [];
+  const [showPeriods, setShowPeriods] = React.useState(false);
+  const [addingPeriod, setAddingPeriod] = React.useState(false);
+  const [pStart, setPStart] = React.useState("");
+  const [pEnd, setPEnd] = React.useState("");
+  const [pLabel, setPLabel] = React.useState("");
   function commitRename() { if(draft.trim()&&draft.trim()!==name) onRename(name,draft.trim()); setRenaming(false); }
   function commitNotes() { onSetNotes(name, notesDraft); }
+  function addPeriod() {
+    if (!pStart.trim()) return;
+    const newPeriod = {id:Date.now().toString()+Math.random().toString(36).slice(2), start:pStart.trim(), end:pEnd.trim(), label:pLabel.trim()};
+    onSetPeriods(name, [...(periods||[]), newPeriod]);
+    setPStart(""); setPEnd(""); setPLabel(""); setAddingPeriod(false);
+  }
+  function removePeriod(id) { onSetPeriods(name, (periods||[]).filter(p=>p.id!==id)); }
+  function formatPeriod(p) { return (p.start||"?") + (p.end ? "–"+p.end : "–") + (p.label ? " · "+p.label : ""); }
   return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"12px 0"}},
     React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
       renaming
         ? React.createElement("input",{autoFocus:true,value:draft,onChange:e=>setDraft(e.target.value),
             onKeyDown:e=>{if(e.key==="Enter")commitRename();if(e.key==="Escape"){setDraft(name);setRenaming(false);}},
             onBlur:commitRename,style:{...S.input,padding:"5px 9px",fontSize:"1rem",flex:1,minWidth:"140px"}})
-        : React.createElement("span",{style:{flex:1,fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208"}},name),
+        : onView
+          ? React.createElement("button",{onClick:onView,style:{flex:1,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",padding:0,textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"3px"}},name)
+          : React.createElement("span",{style:{flex:1,fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208"}},name),
       React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},
         count," ",count===1?"memory":"memories"),
-      React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px"}},
+      React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px",flexWrap:"wrap"}},
         !renaming&&React.createElement("button",{onClick:()=>{setDraft(name);setRenaming(true);},
           style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem"}},"Rename"),
+        React.createElement("button",{onClick:()=>setShowPeriods(s=>!s),
+          style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:(periods||[]).length>0?"#4a6a9a":"#8a7460",borderColor:(periods||[]).length>0?"#8ab0d8":"#c8b89a"}},
+          showPeriods?"Hide periods":((periods||[]).length>0?"✓ Periods":"+ Periods")),
         React.createElement("button",{onClick:()=>setShowNotes(s=>!s),
           style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:notes?"#4a7a5a":"#8a7460",borderColor:notes?"#7a9e8a":"#c8b89a"}},
           showNotes ? "Hide notes" : (notes ? "✓ Notes" : "+ Notes")),
@@ -1634,17 +1656,109 @@ function OrgRow({name, count, notes, connectedPeople, onRename, onDelete, onSetN
       React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic"}},"People: "),
       (connectedPeople||[]).map(p=>React.createElement("span",{key:p,style:{fontSize:"0.78rem",color:"#4a5a7a",background:"rgba(100,110,140,0.1)",border:"1px solid rgba(100,110,140,0.2)",borderRadius:"20px",padding:"1px 8px"}},p))
     ),
-    showNotes && React.createElement("div",{style:{marginTop:"8px"}},
-      React.createElement("textarea",{
-        value:notesDraft,
-        onChange:e=>setNotesDraft(e.target.value),
-        onBlur:commitNotes,
-        placeholder:"Notes about this organisation…",
-        rows:3,
-        style:{...S.input,width:"100%",resize:"vertical",fontSize:"0.88rem",fontFamily:"'Crimson Text',Georgia,serif",lineHeight:1.6}
-      }),
+    React.createElement("div",{style:{marginTop:"6px",paddingLeft:"2px",display:"flex",flexWrap:"wrap",gap:"5px",alignItems:"center"}},
+      (locs||[]).map(l=>React.createElement("span",{key:l,style:{display:"inline-flex",alignItems:"center",gap:"3px",fontSize:"0.78rem",color:"#3a5a4a",background:"rgba(80,140,100,0.1)",border:"1px solid rgba(80,140,100,0.25)",borderRadius:"20px",padding:"1px 8px"}},
+        "📍 ",l,
+        React.createElement("button",{onClick:()=>onSetLocs(name,(locs||[]).filter(x=>x!==l)),style:{background:"none",border:"none",cursor:"pointer",color:"#8a7460",fontSize:"0.7rem",padding:"0 0 0 2px",lineHeight:1}},"×")
+      )),
+      editingLocs
+        ? React.createElement("div",{style:{position:"relative",display:"inline-flex",gap:"6px",alignItems:"center"}},
+            React.createElement("input",{autoFocus:true,value:locSearch,onChange:e=>setLocSearch(e.target.value),
+              onKeyDown:e=>{if(e.key==="Escape"){setEditingLocs(false);setLocSearch("");}},
+              onBlur:()=>setTimeout(()=>{setEditingLocs(false);setLocSearch("");},200),
+              placeholder:"Type location…",style:{...S.input,padding:"3px 8px",fontSize:"0.8rem",width:"140px"}}),
+            locSugs.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,minWidth:"160px",background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)"}},
+              locSugs.map(l=>React.createElement("div",{key:l,onMouseDown:()=>{onSetLocs(name,[...(locs||[]),l]);setLocSearch("");setEditingLocs(false);},
+                style:{padding:"6px 12px",cursor:"pointer",fontSize:"0.86rem",color:"#2c2416"},
+                onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+                onMouseLeave:e=>e.currentTarget.style.background="transparent"},l))
+            )
+          )
+        : React.createElement("button",{onClick:()=>setEditingLocs(true),
+            style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px",textDecoration:"underline"}},
+            "+ link location")
+    ),
+    showPeriods&&React.createElement("div",{style:{marginTop:"8px",background:"rgba(74,106,154,0.04)",border:"1px solid rgba(74,106,154,0.12)",borderRadius:"3px",padding:"10px 14px"}},
+      (periods||[]).length>0&&React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"5px",marginBottom:"8px"}},
+        (periods||[]).map(p=>React.createElement("div",{key:p.id,style:{display:"flex",alignItems:"center",gap:"8px"}},
+          React.createElement("span",{style:{fontSize:"0.84rem",color:"#2c3a5a",fontFamily:"'Crimson Text',serif",flex:1}},formatPeriod(p)),
+          React.createElement("button",{onClick:()=>removePeriod(p.id),style:{background:"none",border:"none",cursor:"pointer",color:"#c4858a",fontSize:"0.76rem",padding:"0 2px",textDecoration:"underline",fontFamily:"'Crimson Text',serif"}},"remove")
+        ))
+      ),
+      addingPeriod
+        ? React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"6px"}},
+            React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap"}},
+              React.createElement("input",{value:pStart,onChange:e=>setPStart(e.target.value),
+                onKeyDown:e=>{if(e.key==="Enter")addPeriod();if(e.key==="Escape"){setAddingPeriod(false);setPStart("");setPEnd("");setPLabel("");}},
+                placeholder:"Start (e.g. 2010)",autoFocus:true,
+                style:{...S.input,padding:"4px 8px",fontSize:"0.84rem",flex:1,minWidth:"100px"}}),
+              React.createElement("input",{value:pEnd,onChange:e=>setPEnd(e.target.value),
+                onKeyDown:e=>{if(e.key==="Enter")addPeriod();},
+                placeholder:"End (blank if ongoing)",
+                style:{...S.input,padding:"4px 8px",fontSize:"0.84rem",flex:1,minWidth:"110px"}}),
+              React.createElement("input",{value:pLabel,onChange:e=>setPLabel(e.target.value),
+                onKeyDown:e=>{if(e.key==="Enter")addPeriod();},
+                placeholder:"Role / description (optional)",
+                style:{...S.input,padding:"4px 8px",fontSize:"0.84rem",flex:2,minWidth:"150px"}})
+            ),
+            React.createElement("div",{style:{display:"flex",gap:"6px"}},
+              React.createElement("button",{onClick:addPeriod,disabled:!pStart.trim(),style:{...S.btn,padding:"5px 12px",fontSize:"0.84rem",opacity:pStart.trim()?1:0.4}},"Add"),
+              React.createElement("button",{onClick:()=>{setAddingPeriod(false);setPStart("");setPEnd("");setPLabel("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.84rem"}},"Cancel")
+            )
+          )
+        : React.createElement("button",{onClick:()=>setAddingPeriod(true),style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add period")
+    ),
+    showNotes&&React.createElement("div",{style:{marginTop:"8px"}},
+      React.createElement("textarea",{value:notesDraft,onChange:e=>setNotesDraft(e.target.value),onBlur:commitNotes,
+        placeholder:"Notes about this organisation…",rows:3,
+        style:{...S.input,width:"100%",resize:"vertical",fontSize:"0.88rem",fontFamily:"'Crimson Text',Georgia,serif",lineHeight:1.6}}),
       React.createElement("p",{style:{fontSize:"0.75rem",color:"#7a6a58",fontStyle:"italic",marginTop:"3px"}},"Saved automatically when you click away")
     )
+  );
+}
+
+function OrgsPanel({knownOrgs,knownLocations,memories,orgNotes,orgLocations,orgPeriods,personOrgs,onRenameOrg,onDeleteOrg,onSetOrgNotes,onSetOrgLocations,onSetOrgPeriods,setIndexFilter,persistSubject}) {
+  const [search, setSearch] = React.useState("");
+  const [adding, setAdding] = React.useState(false);
+  const [newName, setNewName] = React.useState("");
+  const q = search.trim().toLowerCase();
+  const filtered = q ? knownOrgs.filter(n=>n.toLowerCase().includes(q)) : knownOrgs;
+  const orgCount = name => memories.filter(m=>m.orgs?.includes(name)).length;
+  function commitAdd() {
+    const v=newName.trim(); if(!v||knownOrgs.includes(v)) return;
+    persistSubject({knownOrgs:[...knownOrgs,v].sort()});
+    setNewName(""); setAdding(false);
+  }
+  return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
+    React.createElement("div",{style:{position:"relative",marginBottom:"12px"}},
+      React.createElement("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Search organisations…",style:{...S.input,paddingLeft:"32px",fontSize:"0.92rem"}}),
+      React.createElement("span",{style:{position:"absolute",left:"10px",top:"50%",transform:"translateY(-50%)",color:"#7a6a58",fontSize:"0.9rem",pointerEvents:"none"}},"🔍"),
+      search&&React.createElement("button",{onClick:()=>setSearch(""),style:{position:"absolute",right:"8px",top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"1rem",lineHeight:1}},"×")
+    ),
+    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px"}},
+      React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},
+        filtered.length+" "+(filtered.length===1?"organisation":"organisations")),
+      !adding&&React.createElement("button",{onClick:()=>{setNewName("");setAdding(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add org")
+    ),
+    adding&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"12px"}},
+      React.createElement("input",{autoFocus:true,value:newName,onChange:e=>setNewName(e.target.value),
+        onKeyDown:e=>{if(e.key==="Enter")commitAdd();if(e.key==="Escape"){setAdding(false);setNewName("");}},
+        placeholder:"Organisation name…",style:{...S.input,padding:"5px 9px",fontSize:"0.92rem",flex:1}}),
+      React.createElement("button",{onClick:commitAdd,style:{...S.btn,padding:"5px 12px",fontSize:"0.86rem"}},"Add"),
+      React.createElement("button",{onClick:()=>{setAdding(false);setNewName("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.86rem"}},"Cancel")
+    ),
+    knownOrgs.length===0&&!adding&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No organisations recorded yet."),
+    q&&filtered.length===0&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No results for \u201c"+search+"\u201d"),
+    filtered.map(name=>{
+      const cp=Object.entries(personOrgs||{}).filter(([,os])=>(os||[]).includes(name)).map(([p])=>p);
+      return React.createElement(OrgRow,{key:name,name,count:orgCount(name),
+        notes:orgNotes?.[name],connectedPeople:cp,
+        locs:orgLocations?.[name]||[],knownLocations,
+        periods:orgPeriods?.[name]||[],
+        onRename:onRenameOrg,onDelete:onDeleteOrg,onSetNotes:onSetOrgNotes,
+        onSetLocs:onSetOrgLocations,onSetPeriods:onSetOrgPeriods,
+        onView:()=>setIndexFilter({type:"orgs",value:name})});
+    })
   );
 }
 
@@ -2915,7 +3029,7 @@ function SettingsView({
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#8a3030",margin:"0 0 8px"}},"Reset"),
         React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px"}},"Permanently deletes all memories and cannot be undone. Download a backup first if you want to keep a copy."),
         React.createElement("button",{
-          onClick:()=>{ if(window.confirm("Delete all "+memories.length+" memories? This cannot be undone.\n\nDownload a backup first.")) { persistSubject({memories:[],knownPeople:[],knownOrgs:[],knownLocations:[],customTags:[],peopleEmails:{},peopleRelationships:{},peopleNotes:{},orgNotes:{},locationNotes:{},locationCoords:{},personOrgs:{},personLocations:{},personGroups:{},shareHistory:[],lastBackup:null,lastImport:null}); setView("life"); }},
+          onClick:()=>{ if(window.confirm("Delete all "+memories.length+" memories? This cannot be undone.\n\nDownload a backup first.")) { persistSubject({memories:[],knownPeople:[],knownOrgs:[],knownLocations:[],customTags:[],peopleEmails:{},peopleRelationships:{},peopleNotes:{},orgNotes:{},orgLocations:{},orgPeriods:{},locationNotes:{},locationCoords:{},personOrgs:{},personLocations:{},personGroups:{},shareHistory:[],lastBackup:null,lastImport:null}); setView("life"); }},
           style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}
         },"\ud83d\uddd1 Clear all memories")
       ),
@@ -3640,6 +3754,8 @@ function App() {
   const shareHistory          = subject.shareHistory || [];
   const legacyMessage         = subject.legacyMessage || "";
   const orgNotes            = subject.orgNotes || {};
+  const orgLocations        = subject.orgLocations || {};
+  const orgPeriods          = subject.orgPeriods || {};
   const personOrgs          = subject.personOrgs || {};
   const personLocations     = subject.personLocations || {};
   const personGroups        = subject.personGroups || {};
@@ -3787,7 +3903,7 @@ function App() {
   // persist: legacy-compatible — detects if patch is subject-level or top-level
   function persist(patch) {
     // If patch contains subject-level keys, route to persistSubject
-    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","locationCoords","personOrgs","personLocations","personGroups"]);
+    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","locationCoords","orgLocations","orgPeriods","orgNotes","personOrgs","personLocations","personGroups"]);
     const isSubjectPatch = Object.keys(patch).some(k => subjectKeys.has(k));
     if (isSubjectPatch) {
       // strip any top-level only keys before passing to persistSubject
@@ -3847,13 +3963,19 @@ function App() {
     const n=newName.trim(); if(!n||n===oldName) return;
     const updMems=memories.map(m=>({...m,orgs:m.orgs?.map(o=>o===oldName?n:o)||[]}));
     const updKnown=[...new Set([...knownOrgs.filter(o=>o!==oldName),n])].sort();
-    persistSubject({memories:updMems,knownOrgs:updKnown});
+    const updOrgLocs={...orgLocations}; if(updOrgLocs[oldName]!==undefined){updOrgLocs[n]=updOrgLocs[oldName];delete updOrgLocs[oldName];}
+    const updOrgPeriods={...orgPeriods}; if(updOrgPeriods[oldName]!==undefined){updOrgPeriods[n]=updOrgPeriods[oldName];delete updOrgPeriods[oldName];}
+    persistSubject({memories:updMems,knownOrgs:updKnown,orgLocations:updOrgLocs,orgPeriods:updOrgPeriods});
   }
   function deleteOrg(name) {
     const updMems=memories.map(m=>({...m,orgs:m.orgs?.filter(o=>o!==name)||[]}));
     const updKnown=knownOrgs.filter(o=>o!==name);
-    persistSubject({memories:updMems,knownOrgs:updKnown});
+    const updOrgLocs={...orgLocations}; delete updOrgLocs[name];
+    const updOrgPeriods={...orgPeriods}; delete updOrgPeriods[name];
+    persistSubject({memories:updMems,knownOrgs:updKnown,orgLocations:updOrgLocs,orgPeriods:updOrgPeriods});
   }
+  function setOrgLocations(orgName, locs) { persistSubject({orgLocations:{...orgLocations, [orgName]: locs}}); }
+  function setOrgPeriods(orgName, periods) { persistSubject({orgPeriods:{...orgPeriods, [orgName]: periods}}); }
   function registerPeople(names) { const merged=[...new Set([...knownPeople,...names])].sort(); persistSubject({knownPeople:merged}); }
   function setPersonEmail(name, email) { persistSubject({peopleEmails:{...peopleEmails, [name]: email}}); }
   function setPersonRelationship(name, rel) { persistSubject({peopleRelationships:{...peopleRelationships, [name]: rel}}); }
@@ -4299,6 +4421,8 @@ function handleEdit(m) {
         const mergedRelationships = {...(remote.peopleRelationships||{}), ...(local.peopleRelationships||{})};
         const mergedPeopleNotes = {...(remote.peopleNotes||{}), ...(local.peopleNotes||{})};
         const mergedOrgNotes = {...(remote.orgNotes||{}), ...(local.orgNotes||{})};
+        const mergedOrgLocations = {...(remote.orgLocations||{}), ...(local.orgLocations||{})};
+        const mergedOrgPeriods = {...(remote.orgPeriods||{}), ...(local.orgPeriods||{})};
         const mergedLocNotes = {...(remote.locationNotes||{}), ...(local.locationNotes||{})};
         const mergedLocCoords = {...(remote.locationCoords||{}), ...(local.locationCoords||{})};
         const mergedPersonOrgs = {...(remote.personOrgs||{}), ...(local.personOrgs||{})};
@@ -4309,7 +4433,8 @@ function handleEdit(m) {
           memories: finalMems, knownPeople: mergedPeople, knownOrgs: mergedOrgs,
           knownLocations: mergedLocs, customTags: mergedTags,
           peopleRelationships: mergedRelationships, peopleNotes: mergedPeopleNotes,
-          orgNotes: mergedOrgNotes, locationNotes: mergedLocNotes,
+          orgNotes: mergedOrgNotes, orgLocations: mergedOrgLocations, orgPeriods: mergedOrgPeriods,
+          locationNotes: mergedLocNotes,
           locationCoords: mergedLocCoords, personOrgs: mergedPersonOrgs,
           personLocations: mergedPersonLocs, personGroups: mergedPersonGroups,
         };
@@ -4367,7 +4492,7 @@ function handleEdit(m) {
       }));
       return {...m, mediaUrls: urls};
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, // Top-level profile & settings fields
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, orgLocations, orgPeriods, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, // Top-level profile & settings fields
     wantPublicProfile:data.wantPublicProfile||false, profileAbout:data.profileAbout||"", profileImageUrl:data.profileImageUrl||"", allowFollowers:data.allowFollowers!==false, profilePrivacy:data.profilePrivacy||"open", profileDisplayName:data.profileDisplayName||"", carerMode:data.carerMode||false, carerName:data.carerName||"", carerEmail:data.carerEmail||"", suppressConnectRequests:data.suppressConnectRequests||[]}, null, 2);
   }
 
@@ -5020,13 +5145,15 @@ function handleEdit(m) {
       if (senderName && senderEmail) updatedPeopleEmails[senderName] = senderEmail;
       const mergedRelationships = {...(d.peopleRelationships||{}), ...(data.peopleRelationships||{})};
       const mergedPeopleNotes={...(d.peopleNotes||{}),...peopleNotes}; const mergedOrgNotes={...(d.orgNotes||{}),...orgNotes};
+      const mergedOrgLocations={...(d.orgLocations||{}), ...(data.orgLocations||{})};
+      const mergedOrgPeriods={...(d.orgPeriods||{}), ...(data.orgPeriods||{})};
       const mergedLocationNotes={...(d.locationNotes||{}), ...(data.locationNotes||{})};
       const mergedLocationCoords={...(d.locationCoords||{}), ...(data.locationCoords||{})};
       const mergedPersonOrgs={...(d.personOrgs||{}), ...(data.personOrgs||{})};
       const mergedPersonLocations={...(d.personLocations||{}), ...(data.personLocations||{})};
       const mergedPersonGroups={...(d.personGroups||{}), ...(data.personGroups||{})};
       // Use functional setData to avoid stale closure — importBackup runs inside async FileReader callback
-      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,locationNotes:mergedLocationNotes,locationCoords:mergedLocationCoords,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,lastImport:new Date().toISOString()};
+      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,orgLocations:mergedOrgLocations,orgPeriods:mergedOrgPeriods,locationNotes:mergedLocationNotes,locationCoords:mergedLocationCoords,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,lastImport:new Date().toISOString()};
       setData(prev => {
         const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
         const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
@@ -5718,13 +5845,7 @@ function handleEdit(m) {
                 onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},
                 onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},})
             : indexTab==="orgs"
-            ? React.createElement(PeopleOrgsManager,{knownPeople:[],knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,
-                onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,
-                onRenamePerson:renamePerson,onDeletePerson:deletePerson,
-                onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
-                onViewPerson:name=>setIndexFilter({type:"orgs",value:name}),
-                onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},
-                onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},})
+            ? React.createElement(OrgsPanel,{knownOrgs,knownLocations,memories,orgNotes,orgLocations,orgPeriods,personOrgs,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetOrgNotes:setOrgNotes,onSetOrgLocations:setOrgLocations,onSetOrgPeriods:setOrgPeriods,setIndexFilter,persistSubject})
             : indexTab==="locations"
             ? React.createElement(LocationsPanel,{knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setLocationAddress,setIndexFilter,persistSubject})
             : indexTab==="relationships"
