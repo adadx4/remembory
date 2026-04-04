@@ -3379,6 +3379,127 @@ function SettingsView({
   );
 }
 
+// ── SharingView ───────────────────────────────────────────────
+function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShareCodeInput, shareCodeStatus, importFromCode, setView, setSelected}) {
+  const [tab, setTab] = React.useState("received");
+
+  const received = memories.filter(m => m.sharedBy);
+  const sent = shareHistory || [];
+  const sentMemoryCount = new Set(sent.flatMap(h => h.memIds || [])).size;
+  const sentPeopleCount = new Set(sent.flatMap(h => h.people || [])).size;
+
+  // Group received by sender
+  const bySender = {};
+  received.forEach(m => {
+    const s = m.sharedBy || "Unknown";
+    if (!bySender[s]) bySender[s] = [];
+    bySender[s].push(m);
+  });
+
+  // Group sent by recipient person
+  const byPerson = {};
+  sent.forEach(h => {
+    (h.people || []).forEach(p => {
+      if (!byPerson[p]) byPerson[p] = [];
+      byPerson[p].push(h);
+    });
+  });
+
+  const cardStyle = {background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"16px 20px",marginBottom:"14px"};
+  const tabActive = {padding:"8px 20px",border:"none",background:"transparent",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",marginBottom:"-2px",borderBottom:"2px solid #2c2416",color:"#1a1208",fontWeight:600};
+  const tabInactive = {...tabActive,borderBottom:"2px solid transparent",color:"#8a7460",fontWeight:400};
+
+  return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"720px"}},
+    React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 16px",color:"#1a1208"}},"Sharing"),
+
+    // Stats row
+    React.createElement("div",{style:{display:"flex",gap:"28px",marginBottom:"24px",flexWrap:"wrap"}},
+      React.createElement("div",{style:{textAlign:"center"}},
+        React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:"#1a1208"}},received.length),
+        React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em"}},"Received")
+      ),
+      React.createElement("div",{style:{textAlign:"center"}},
+        React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:"#1a1208"}},sentMemoryCount),
+        React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em"}},"Sent")
+      ),
+      React.createElement("div",{style:{textAlign:"center"}},
+        React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:"#1a1208"}},sentPeopleCount),
+        React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em"}},"People shared with")
+      )
+    ),
+
+    // Tab bar
+    React.createElement("div",{style:{display:"flex",gap:"0",marginBottom:"24px",borderBottom:"2px solid #e0d4be"}},
+      [["received","Received"],["sent","Sent"],["codes","Receive a Share"]].map(([t,label])=>
+        React.createElement("button",{key:t,onClick:()=>setTab(t),style:tab===t?tabActive:tabInactive},label)
+      )
+    ),
+
+    // RECEIVED tab
+    tab==="received"&&(
+      received.length===0
+        ? React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic"}},"No memories have been shared with you yet.")
+        : React.createElement("div",null,
+            Object.entries(bySender).map(([sender,mems])=>
+              React.createElement("div",{key:sender,style:cardStyle},
+                React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"10px"}},
+                  React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",margin:0}},sender),
+                  React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},mems.length+" "+(mems.length===1?"memory":"memories"))
+                ),
+                mems.map(m=>
+                  React.createElement("div",{key:m.id,style:{display:"flex",alignItems:"baseline",gap:"8px",padding:"5px 0",borderTop:"1px solid #ede4d4"}},
+                    React.createElement("button",{onClick:()=>{setSelected(m.id);setView("detail");},
+                      style:{background:"none",border:"none",padding:0,fontFamily:"'Crimson Text',Georgia,serif",fontSize:"0.95rem",color:"#2c2416",cursor:"pointer",textAlign:"left",flex:1}},m.title),
+                    m.sharedAt&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#b0a090",whiteSpace:"nowrap"}},new Date(m.sharedAt).toLocaleDateString())
+                  )
+                )
+              )
+            )
+          )
+    ),
+
+    // SENT tab
+    tab==="sent"&&(
+      sent.length===0
+        ? React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic"}},"You haven\u2019t shared any memories yet.")
+        : React.createElement("div",null,
+            Object.entries(byPerson).map(([person,events])=>{
+              const allMemIds = [...new Set(events.flatMap(e => e.memIds||[]))];
+              const sharedMems = memories.filter(m => allMemIds.includes(m.id));
+              const latestDate = events.map(e=>e.date).filter(Boolean).sort().pop();
+              return React.createElement("div",{key:person,style:cardStyle},
+                React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"10px"}},
+                  React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",margin:0}},person),
+                  latestDate&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},"Last shared "+new Date(latestDate).toLocaleDateString())
+                ),
+                sharedMems.length>0
+                  ? sharedMems.map(m=>
+                      React.createElement("div",{key:m.id,style:{display:"flex",alignItems:"baseline",gap:"8px",padding:"5px 0",borderTop:"1px solid #ede4d4"}},
+                        React.createElement("button",{onClick:()=>{setSelected(m.id);setView("detail");},
+                          style:{background:"none",border:"none",padding:0,fontFamily:"'Crimson Text',Georgia,serif",fontSize:"0.95rem",color:"#2c2416",cursor:"pointer",textAlign:"left",flex:1}},m.title)
+                      )
+                    )
+                  : React.createElement("p",{style:{fontSize:"0.84rem",color:"#b0a090",margin:0,fontStyle:"italic"}},"Shared "+allMemIds.length+" "+(allMemIds.length===1?"memory":"memories"))
+              );
+            })
+          )
+    ),
+
+    // RECEIVE A SHARE tab
+    tab==="codes"&&React.createElement("div",null,
+      React.createElement("div",{style:cardStyle},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Receive shared memories"),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 12px",lineHeight:1.6}},"Enter a share code from someone\u2019s message or the bridge page."),
+        React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"8px"}},
+          React.createElement("input",{type:"text",value:shareCodeInput,onChange:e=>setShareCodeInput(e.target.value.trim()),onKeyDown:e=>e.key==="Enter"&&importFromCode(),placeholder:"e.g. a1b2c3d4",style:{...S.input,flex:1,fontFamily:"monospace",fontSize:"1rem",letterSpacing:"0.05em"}}),
+          React.createElement("button",{onClick:importFromCode,disabled:!shareCodeInput.trim()||shareCodeStatus==="Fetching\u2026",style:{...S.btn,padding:"9px 18px",whiteSpace:"nowrap",opacity:shareCodeInput.trim()?1:0.4}},shareCodeStatus==="Fetching\u2026"?"Fetching\u2026":"Import")
+        ),
+        shareCodeStatus&&React.createElement("p",{style:{fontSize:"0.84rem",color:shareCodeStatus.startsWith("\u2713")?"#4a7a5a":"#c4858a",fontStyle:"italic"}},shareCodeStatus)
+      )
+    )
+  );
+}
+
 // ════════════════════════════════════════════════════════════════
 // EXTRACTED COMPONENT: ImportView
 // ════════════════════════════════════════════════════════════════
@@ -5571,10 +5692,11 @@ function handleEdit(m) {
     if (view==="legacy") return "Legacy View";
     if (view==="print") return "Print / Export";
     if (view==="index") return indexFilter ? `${indexFilter.value}` : "Index";
+    if (view==="sharing") return "Sharing";
     return null;
   }
 
-  const showBack=["add","edit","detail","decade","year","timeline","import","people","index","map","print","prompt","settings","legacy","public-profile"].includes(view);
+  const showBack=["add","edit","detail","decade","year","timeline","import","people","index","map","print","prompt","settings","legacy","public-profile","sharing"].includes(view);
   const showAdd=!["add","edit","print"].includes(view);
   const breadcrumb=bc();
 
@@ -5967,6 +6089,7 @@ function handleEdit(m) {
             textDecoration:"none",display:"inline-flex",alignItems:"center"}
         },"Explore ↗"),
         !isMobile&&view!=="prompt"&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("prompt"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"✦ Prompt"),
+        !isMobile&&!["add","edit"].includes(view)&&(shareHistory?.length>0||memories.some(m=>m.sharedBy))&&React.createElement("button",{onClick:()=>setView("sharing"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem",background:view==="sharing"?"#2c2416":"transparent",color:view==="sharing"?"#f5f0e8":undefined,borderColor:view==="sharing"?"#2c2416":undefined}},"⇌ Sharing"),
         !isMobile&&React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",title:"Subscribe to Chronicle",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#7a6040",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#7a6040";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
         !isMobile&&React.createElement("button",{onClick:()=>setView("settings"),
           style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem",position:"relative"}},
@@ -5992,6 +6115,7 @@ function handleEdit(m) {
         ["timeline","≡","List"],
         ["index","☰","Index"],
         ["map","🗺","Map"],
+        ...(shareHistory?.length>0||memories.some(m=>m.sharedBy)?[["sharing","⇌","Sharing"]]:[]),
         ["settings","⚙","Settings"],
       ].map(([v,icon,label])=>React.createElement("button",{key:v,onClick:()=>{ setIndexFilter(null); setView(v); },style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:view===v?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:view===v?"2px solid #2c2416":"2px solid transparent"}},
         React.createElement("span",{style:{fontSize:"1.1rem",lineHeight:1}},icon),
@@ -6138,6 +6262,12 @@ function handleEdit(m) {
 
       // ── PEOPLE & ORGS ──
       view==="people"&&React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,personOrgs,personLocations,peopleNotes,orgNotes,entityPhotos,onSetEntityPhoto:setEntityPhoto,localConnections:localConnections,onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,onRenamePerson:renamePerson,onDeletePerson:deletePerson,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,onViewPerson:name=>{setIndexFilter({type:"people",value:name});setView("index");},onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},}),
+
+      view==="sharing"&&React.createElement(SharingView,{
+        memories, shareHistory, ownerName,
+        shareCodeInput, setShareCodeInput, shareCodeStatus, importFromCode,
+        setView, setSelected,
+      }),
 
       view==="settings"&&React.createElement(SettingsView,{
         subject, subjects, ownerName, ownerEmail, carerEmail,
