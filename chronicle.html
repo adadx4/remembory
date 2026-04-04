@@ -6212,11 +6212,11 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
             React.createElement("div",{style:{flex:1,borderLeft:`3px solid ${empty?"#e0d4be":"#c8a87a"}`,paddingLeft:"14px"}},
               empty
                 ? React.createElement("div",{style:{height:"34px",display:"flex",alignItems:"center"}},React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},"no memories recorded"))
-                : React.createElement("div",{onClick:()=>{setZoomYear(yr);setView("year");},style:{cursor:"pointer",paddingTop:"6px",paddingBottom:"8px"}},
-                    React.createElement("div",{style:{display:"flex",gap:"5px",marginBottom:"5px",flexWrap:"wrap"}},
-                      yMems.map(m=>React.createElement("span",{key:m.id,title:m.title+((m.visibility==="public")?" (public)":(m.visibility==="subscriber")?" (subscribers)":(m.visibility==="connected"||m.visibility==="tagged")?" ("+m.visibility+")":""),onClick:e=>{e.stopPropagation();setSelected(m.id);setView("detail");},style:{width:"9px",height:"9px",borderRadius:"50%",background:m.tags[0]?TAG_COLORS[m.tags[0]]:"#c8b89a",outline:(m.visibility==="public")?"2px solid rgba(74,122,90,0.7)":(m.visibility==="subscriber")?"2px solid rgba(168,136,90,0.7)":(m.visibility==="connected"||m.visibility==="tagged")?"2px solid rgba(100,120,160,0.7)":"none",outlineOffset:"1px",display:"inline-block",cursor:"pointer"}}))
-                    ),
-                    React.createElement("p",{style:{margin:0,fontSize:"0.86rem",color:"#6a5c48",fontStyle:"italic"}},yMems[0].title,(yMems.length>1?` +${yMems.length-1} more`:""))
+                : React.createElement("div",{style:{paddingTop:"6px",paddingBottom:"8px"}},
+                    yMems.map(m=>React.createElement("div",{key:m.id,style:{display:"flex",alignItems:"baseline",gap:"7px",marginBottom:"3px"}},
+                      React.createElement("span",{style:{width:"9px",height:"9px",borderRadius:"50%",background:m.tags[0]?TAG_COLORS[m.tags[0]]:"#c8b89a",flexShrink:0,display:"inline-block",marginTop:"3px"}}),
+                      React.createElement("button",{onClick:()=>{setSelected(m.id);setView("detail");},style:{background:"none",border:"none",cursor:"pointer",padding:0,textAlign:"left",fontFamily:"'Crimson Text',Georgia,serif",fontSize:"0.9rem",color:"#2c2416",lineHeight:1.4,textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px"}},m.title)
+                    ))
                   )
             )
           );
