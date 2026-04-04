@@ -2539,7 +2539,6 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
 
   function handleGetLink() {
     if (!senderName.trim()) { alert("Please enter your name first."); return; }
-    if (personalMsg.trim().length < 20) { setMsgError("Please write at least a sentence so they know why you’re sharing this."); return; }
     setMsgError("");
     if (onRecordShare && selectedPeople.length) onRecordShare(selectedPeople, selectedMemIds);
     setStep("link");
@@ -2559,7 +2558,7 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
   },"Share");
 
   const toShare = allMems.filter(m=>selectedMemIds.has(m.id));
-  const canShare = senderName.trim() && selectedMemIds.size > 0 && personalMsg.trim().length >= 20;
+  const canShare = senderName.trim() && selectedMemIds.size > 0;
 
   return React.createElement("div",{style:{width:"100%",marginTop:"4px",border:"1px solid #7a9e8a",borderRadius:"4px",background:"rgba(122,158,138,0.05)",padding:"16px",animation:"fadeIn 0.2s ease"}},
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}},
@@ -2639,15 +2638,12 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
         React.createElement("label",{style:{...S.label,marginBottom:"6px",display:"block"}},"Personal note"),
         React.createElement("textarea",{
           value:personalMsg,
-          onChange:e=>{setPersonalMsg(e.target.value);if(msgError&&e.target.value.trim().length>=20)setMsgError("");},
-          placeholder:"Why are you sharing this? What does it mean to you?",
+          onChange:e=>setPersonalMsg(e.target.value),
+          placeholder:"Add a personal note (optional) — why you\u2019re sharing, what it means to you\u2026",
           rows:3,
           style:{...S.input,resize:"vertical",marginTop:"4px",fontFamily:"'Crimson Text',Georgia,serif",fontSize:"0.95rem",lineHeight:1.6}
         }),
-        msgError && React.createElement("p",{style:{fontSize:"0.82rem",color:"#a04848",marginTop:"4px"}},msgError),
-        personalMsg.trim().length > 0 && personalMsg.trim().length < 20 && !msgError && React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",marginTop:"4px",fontStyle:"italic"}},
-          (20 - personalMsg.trim().length) + " more characters needed"
-        )
+        React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",marginTop:"4px",fontStyle:"italic"}},"Optional")
       ),
 
       selectedPeople.some(p=>(localConnections||[]).some(c=>c.name===p))&&React.createElement("div",{
@@ -4637,7 +4633,6 @@ function handleEdit(m) {
       setPendingShareWantConnect(true);
       setShareCodeStatus("");
       setShareCodeInput("");
-      setShowSettings(false);
     } catch(e) {
       setShareCodeStatus("Error fetching — check your connection.");
     }
@@ -4747,8 +4742,12 @@ function handleEdit(m) {
   }
 
   async function doSync(handle) {
-    const h = handle || syncFileHandle;
-    if (!h) return;
+    let h = handle || syncFileHandle;
+    if (!h) {
+      // Handle lost after page reload — re-prompt then sync
+      await chooseSyncFile();
+      return;
+    }
     setSyncStatus("syncing");
     try {
       // 1. Read the sync file
