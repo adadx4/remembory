@@ -4698,7 +4698,8 @@ function handleEdit(m) {
     try {
       const [handle] = await window.showOpenFilePicker({
         types: [{ description: "Chronicle sync file", accept: { "application/json": [".json"] } }],
-        multiple: false
+        multiple: false,
+        mode: "readwrite",
       });
       setSyncFileHandle(handle);
       const info = { name: handle.name, lastSync: null };
@@ -4818,7 +4819,10 @@ function handleEdit(m) {
         }, null, 2);
       }
 
-      // 4. Write merged result back to sync file
+      // 4. Write merged result back to sync file (ensure write permission)
+      if ((await h.queryPermission({mode:"readwrite"})) !== "granted") {
+        await h.requestPermission({mode:"readwrite"});
+      }
       const writable = await h.createWritable();
       await writable.write(mergedJson);
       await writable.close();
