@@ -4603,7 +4603,7 @@ function handleEdit(m) {
         ];
         const existingPeople = m.people || [];
         const people = senderName && !existingPeople.includes(senderName) ? [...existingPeople, senderName] : existingPeople;
-        return {...m, content:"", perspectives, sharedBy:senderName, sharedByEmail:senderEmail2, sharedAt:d.sharedAt, people};
+        return {...m, content:"", perspectives, sharedBy:senderName, sharedByEmail:senderEmail2, sharedAt:d.sharedAt, people, visibility:"private"};
       });
       const toAdd = incomingMems.filter(m=>!existingIds.has(m.id));
       const merged = memories.map(m=>{
@@ -4648,7 +4648,7 @@ function handleEdit(m) {
       ];
       const existingPeople = m.people || [];
       const people = senderName && !existingPeople.includes(senderName) ? [...existingPeople, senderName] : existingPeople;
-      return {...m, content:"", perspectives, sharedBy:senderName, sharedByEmail:senderEmail, sharedAt:d.sharedAt, people};
+      return {...m, content:"", perspectives, sharedBy:senderName, sharedByEmail:senderEmail, sharedAt:d.sharedAt, people, visibility:"private"};
     });
     const toAdd = incomingMems.filter(m=>!existingIds.has(m.id));
     const merged = memories.map(m=>{
@@ -5484,7 +5484,7 @@ function handleEdit(m) {
         // Add sender to people on this memory
         const existingPeople = m.people || [];
         const people = senderName && !existingPeople.includes(senderName) ? [...existingPeople, senderName] : existingPeople;
-        return { ...m, content: "", perspectives, sharedBy: senderName, sharedAt: d.sharedAt, people };
+        return { ...m, content: "", perspectives, sharedBy: senderName, sharedAt: d.sharedAt, people, visibility: "private" };
       });
 
       // Merge: if a memory with same id exists, merge perspectives into it; otherwise add new
