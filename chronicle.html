@@ -1474,7 +1474,7 @@ function RelationshipIndex({memories, peopleRelationships, onView, onRenameRelat
   );
 }
 
-function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setIndexFilter,persistSubject}) {
+function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setLocationAddress,setIndexFilter,persistSubject}) {
   const [addingLoc, setAddingLoc] = React.useState(false);
   const [newLoc, setNewLoc] = React.useState("");
   function commitAdd(){
@@ -1506,19 +1506,23 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
     ),
     knownLocations.length===0&&!addingLoc&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No locations recorded yet."),
     knownLocations.map(loc=>{
-      const name = typeof loc === 'string' ? loc : loc.label;
-      const count=memories.filter(m=>m.location===name||m.locations?.includes(name)).length;
-      const coords = (typeof loc==='object' ? loc.coords : null) || null;
+      const name    = typeof loc === 'string' ? loc : loc.label;
+      const count   = memories.filter(m=>m.location===name||m.locations?.includes(name)).length;
+      const coords  = (typeof loc==='object' ? loc.coords : null) || null;
+      const street  = (typeof loc==='object' ? loc.street  : "") || "";
+      const town    = (typeof loc==='object' ? loc.town    : "") || "";
+      const state   = (typeof loc==='object' ? loc.state   : "") || "";
+      const country = (typeof loc==='object' ? loc.country : "") || "";
       return React.createElement(LocationRow,{key:name,name,count,notes:locationNotes?.[name],
-        coords,
+        coords, street, town, state, country,
         onRename:renameLocation,onDelete:deleteLocation,onSetNotes:setLocationNotes,
-        onSetCoords:setLocationCoords,
+        onSetCoords:setLocationCoords,onSetAddress:setLocationAddress,
         onView:()=>setIndexFilter({type:"locations",value:name})});
     })
   );
 }
 
-function LocationRow({name, count, notes, coords, onRename, onDelete, onSetNotes, onSetCoords, onView}) {
+function LocationRow({name, count, notes, coords, street, town, state, country, onRename, onDelete, onSetNotes, onSetCoords, onSetAddress, onView}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(name);
   const [showNotes, setShowNotes] = React.useState(false);
@@ -1526,19 +1530,16 @@ function LocationRow({name, count, notes, coords, onRename, onDelete, onSetNotes
   const [editingCoords, setEditingCoords] = React.useState(false);
   const [coordDraft, setCoordDraft] = React.useState(coords ? coords.lat.toFixed(6)+","+coords.lng.toFixed(6) : "");
   const hasCoords = coords && coords.lat != null && coords.lng != null;
-  const nameParts = name.split(",").map(s=>s.trim());
-  // Parse based on part count:
-  // 1 part: treat as street/place (user will add town/country)
-  // 2 parts: Town, Country
-  // 3 parts: Town, State, Country
-  // 4+ parts: Street, Town, State, Country
-  const np = nameParts;
   const [editingStructured, setEditingStructured] = React.useState(false);
-  const [sStreet, setSStreet] = React.useState(np.length>=4?np[0]:np.length===1?np[0]:"");
-  const [sTown,   setStown]   = React.useState(np.length>=4?np[1]:np.length>=2?np[0]:"");
-  const [sState,  setSstate]  = React.useState(np.length>=4?np[2]:np.length===3?np[1]:"");
-  const [sCountry,setSCountry]= React.useState(np.length>=2?np[np.length-1]:"");
-  function commitStructured(){const parts=[sStreet,sTown,sState,sCountry].filter(v=>v.trim());const newName=parts.join(", ");if(newName&&newName!==name)onRename(name,newName);setEditingStructured(false);}
+  // Format panel initialises from the stored address fields, not from the name string
+  const [sStreet, setSStreet] = React.useState(street||"");
+  const [sTown,   setStown]   = React.useState(town||"");
+  const [sState,  setSstate]  = React.useState(state||"");
+  const [sCountry,setSCountry]= React.useState(country||"");
+  function commitStructured() {
+    onSetAddress(name, {street:sStreet.trim(), town:sTown.trim(), state:sState.trim(), country:sCountry.trim()});
+    setEditingStructured(false);
+  }
 
   function commitRename() { if(draft.trim()&&draft.trim()!==name) onRename(name,draft.trim()); setRenaming(false); }
   function commitNotes() { onSetNotes(name, notesDraft); }
@@ -3861,6 +3862,10 @@ function App() {
     const updated = knownLocations.map(l => l.label===name ? {...l, coords: coords||null} : l);
     persistSubject({knownLocations: updated});
   }
+  function setLocationAddress(name, {street, town, state, country}) {
+    const updated = knownLocations.map(l => l.label===name ? {...l, street, town, state, country} : l);
+    persistSubject({knownLocations: updated});
+  }
   function renameLocation(oldName, newName) {
     const n=newName.trim(); if(!n||n===oldName) return;
     const updMems=memories.map(m=>({...m,location:m.location===oldName?n:m.location,locations:(m.locations||[]).map(l=>l===oldName?n:l)}));
@@ -5721,7 +5726,7 @@ function handleEdit(m) {
                 onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},
                 onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},})
             : indexTab==="locations"
-            ? React.createElement(LocationsPanel,{knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setIndexFilter,persistSubject})
+            ? React.createElement(LocationsPanel,{knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setLocationAddress,setIndexFilter,persistSubject})
             : indexTab==="relationships"
             ? React.createElement(RelationshipIndex,{memories,peopleRelationships,
                 onView:(rel,people)=>setIndexFilter({type:"relationships",value:rel,people}),onRenameRelationship:renameRelationship})
