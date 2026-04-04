@@ -923,7 +923,10 @@ const DECADE_PROMPTS = [
   dec => `There's a gap around the ${dec}s — anything from that time worth preserving?`,
 ];
 
-function buildPrompt(memories, knownPeople, knownOrgs, knownLocations, seen=new Set()) {
+function buildPrompt(memories, knownPeople, knownOrgs, knownLocations, seen=new Set(), extras={}) {
+  // extras: { peopleRelationships, orgLocations, personOrgs }
+  const { peopleRelationships={}, orgLocations={}, personOrgs={} } = extras;
+
   // Score people, places, orgs by memory count (fewer = more interesting to fill in)
   const memCount = arr => arr.map(x => ({
     x, n: memories.filter(m =>
@@ -932,9 +935,43 @@ function buildPrompt(memories, knownPeople, knownOrgs, knownLocations, seen=new 
     ).length
   })).sort((a,b) => a.n - b.n);
 
+  const locLabels = knownLocations.map(l=>typeof l==='string'?l:l.label);
   const people = memCount(knownPeople).filter(({n})=>n<10).sort((a,b)=>a.n-b.n);
   const orgs   = memCount(knownOrgs).filter(({n})=>n<8).sort((a,b)=>a.n-b.n);
-  const locs   = memCount(knownLocations).filter(({n})=>n<8).sort((a,b)=>a.n-b.n);
+  const locs   = memCount(locLabels).filter(({n})=>n<8).sort((a,b)=>a.n-b.n);
+
+  // ── Completion prompts: incomplete index data ──────────────────
+  const completionPool = [];
+
+  // People without a relationship set
+  knownPeople.filter(p=>!peopleRelationships[p]).forEach(p=>{
+    completionPool.push({ type:"person", subtype:"set-relationship", entity:p, count:memories.filter(m=>(m.people||[]).includes(p)).length,
+      text:`What is ${p} to you? Adding a relationship helps you find and filter memories.`,
+      action:`Add a memory with ${p}` });
+  });
+
+  // Locations without geocodes
+  knownLocations.filter(l=>{const loc=typeof l==='object'?l:null; return !loc||!loc.coords;}).forEach(l=>{
+    const label=typeof l==='string'?l:l.label;
+    completionPool.push({ type:"place", subtype:"set-coords", entity:label, count:memories.filter(m=>m.location===label||(m.locations||[]).includes(label)).length,
+      text:`${label} has no map coordinates yet — it won\u2019t appear on your map. Do you know roughly where it is?`,
+      action:`Add a memory at ${label}` });
+  });
+
+  // Orgs without any linked people
+  knownOrgs.filter(o=>!Object.values(personOrgs).some(os=>(os||[]).includes(o))).forEach(o=>{
+    completionPool.push({ type:"org", subtype:"set-org-people", entity:o, count:memories.filter(m=>(m.orgs||[]).includes(o)).length,
+      text:`${o} has no people linked to it. Who were the key people in your time there?`,
+      action:`Add a memory about ${o}` });
+  });
+
+  // Orgs without any linked locations
+  knownOrgs.filter(o=>!(orgLocations[o]||[]).length).forEach(o=>{
+    completionPool.push({ type:"org", subtype:"set-org-location", entity:o, count:memories.filter(m=>(m.orgs||[]).includes(o)).length,
+      text:`Where was ${o} based? Linking a location helps connect it to your map and other memories.`,
+      action:`Add a memory about ${o}` });
+  });
+
   // Zero-memory entities get top slots in pool
   const zeroPool = [
     ...people.filter(({n})=>n===0).map(({x})=>({ type:"person",entity:x,count:0,text:`You\u2019ve recorded ${x} but haven\u2019t linked any memories yet. What\u2019s the first thing that comes to mind?`,action:`Add a memory with ${x}` })),
@@ -958,8 +995,10 @@ function buildPrompt(memories, knownPeople, knownOrgs, knownLocations, seen=new 
   // Build pool of possible prompts
   const pool = [];
 
-  // Zero-memory entities always go first if not seen
-  zeroPool.forEach(p=>{ if(!seen.has(p.entity+"||"+p.text)) pool.unshift(p); });
+  // Completion prompts (incomplete data) go first if not seen
+  completionPool.forEach(p=>{ if(!seen.has(p.entity+"||"+p.text)) pool.push(p); });
+  // Zero-memory entities go next if not seen
+  zeroPool.forEach(p=>{ if(!seen.has(p.entity+"||"+p.text)) pool.push(p); });
   people.filter(({n})=>n>0).slice(0,8).forEach(({x,n})=>{
     const fns = PERSON_PROMPTS;
     const fn = fns[Math.floor(Math.random()*fns.length)];
@@ -993,11 +1032,35 @@ const TYPE_ICON = { person:"👤", place:"📍", org:"🏛", tag:"🏷", decade:
 const TYPE_COLOR = { person:"rgba(100,120,160,0.1)", place:"rgba(122,158,138,0.1)", org:"rgba(160,140,100,0.1)", tag:"rgba(196,170,130,0.1)", decade:"rgba(140,130,160,0.1)" };
 const TYPE_BORDER = { person:"rgba(100,120,160,0.3)", place:"rgba(122,158,138,0.3)", org:"rgba(160,140,100,0.3)", tag:"rgba(196,170,130,0.3)", decade:"rgba(140,130,160,0.3)" };
 
-function PrompterView({memories, knownPeople, knownOrgs, knownLocations, onAddWithContext}) {
+function PrompterView({memories, knownPeople, knownOrgs, knownLocations, peopleRelationships, orgLocations, personOrgs, onAddWithContext, onSetRelationship, onSetCoords, onSetOrgLocations, onSetOrgPeople}) {
+  const extras = { peopleRelationships, orgLocations, personOrgs };
   const [seen, setSeen] = React.useState(()=>new Set());
-  const [prompt, setPrompt] = React.useState(()=>buildPrompt(memories,knownPeople,knownOrgs,knownLocations,new Set()));
+  const [prompt, setPrompt] = React.useState(()=>buildPrompt(memories,knownPeople,knownOrgs,knownLocations,new Set(),extras));
   const [history, setHistory] = React.useState([]);
   const [dismissed, setDismissed] = React.useState(0);
+  // Inline action state
+  const [relDraft, setRelDraft] = React.useState("");
+  const [relSaved, setRelSaved] = React.useState(false);
+  const [coordDraft, setCoordDraft] = React.useState("");
+  const [coordSaved, setCoordSaved] = React.useState(false);
+  const [orgLocSearch, setOrgLocSearch] = React.useState("");
+  const [orgLocSaved, setOrgLocSaved] = React.useState(false);
+  const [orgPeopleSearch, setOrgPeopleSearch] = React.useState("");
+  const [orgPeopleAdded, setOrgPeopleAdded] = React.useState([]);
+  const allLocLabels = knownLocations.map(l=>typeof l==='string'?l:l.label);
+  const allRelSugs = [...new Set([...RELATIONSHIP_SUGGESTIONS,...Object.values(peopleRelationships).filter(Boolean)])];
+  const [showRelSugs, setShowRelSugs] = React.useState(false);
+  const relSugs = relDraft.length>0 ? allRelSugs.filter(r=>r.toLowerCase().includes(relDraft.toLowerCase())) : [];
+  const locSugs = orgLocSearch.length>0 ? allLocLabels.filter(l=>l.toLowerCase().includes(orgLocSearch.toLowerCase())) : [];
+  const peopleSugs = orgPeopleSearch.length>0 ? knownPeople.filter(p=>p.toLowerCase().includes(orgPeopleSearch.toLowerCase())&&!orgPeopleAdded.includes(p)) : [];
+
+  function resetInline() {
+    setRelDraft(""); setRelSaved(false);
+    setCoordDraft(""); setCoordSaved(false);
+    setOrgLocSearch(""); setOrgLocSaved(false);
+    setOrgPeopleSearch(""); setOrgPeopleAdded([]);
+    setShowRelSugs(false);
+  }
 
   function next() {
     const nextSeen = new Set(seen);
@@ -1006,13 +1069,121 @@ function PrompterView({memories, knownPeople, knownOrgs, knownLocations, onAddWi
       setSeen(nextSeen);
       setHistory(h=>[prompt,...h].slice(0,10));
     }
-    const p = buildPrompt(memories,knownPeople,knownOrgs,knownLocations,nextSeen);
+    resetInline();
+    const p = buildPrompt(memories,knownPeople,knownOrgs,knownLocations,nextSeen,extras);
     setPrompt(p);
     setDismissed(d=>d+1);
   }
 
-  function respond() {
-    onAddWithContext(prompt);
+  function respond() { onAddWithContext(prompt); }
+
+  function saveRelationship() {
+    if (!relDraft.trim()) return;
+    onSetRelationship(prompt.entity, relDraft.trim());
+    setRelSaved(true);
+  }
+
+  function saveCoords() {
+    const v = coordDraft.trim();
+    const parts = v.split(/[,\s]+/).map(Number).filter(n=>!isNaN(n));
+    if (parts.length===2 && parts[0]>=-90 && parts[0]<=90 && parts[1]>=-180 && parts[1]<=180) {
+      onSetCoords(prompt.entity, {lat:parts[0], lng:parts[1], manual:true});
+      setCoordSaved(true);
+    } else {
+      alert("Enter coordinates as: lat, lng — e.g. 51.5074, -0.1278");
+    }
+  }
+
+  function saveOrgLocation(label) {
+    const current = orgLocations[prompt.entity]||[];
+    if (!current.includes(label)) onSetOrgLocations(prompt.entity, [...current, label]);
+    setOrgLocSearch(""); setOrgLocSaved(true);
+  }
+
+  function saveOrgPerson(person) {
+    onSetOrgPeople(person, prompt.entity);
+    setOrgPeopleAdded(a=>[...a, person]);
+    setOrgPeopleSearch("");
+  }
+
+  // Inline action widget
+  function renderInlineAction(p) {
+    if (!p.subtype) return null;
+    const boxStyle = {marginTop:"18px",paddingTop:"16px",borderTop:"1px solid rgba(0,0,0,0.08)"};
+    if (p.subtype==="set-relationship") {
+      if (relSaved) return React.createElement("div",{style:boxStyle},
+        React.createElement("p",{style:{fontSize:"0.84rem",color:"#4a7a5a",margin:0}},"✓ Saved — "+relDraft));
+      return React.createElement("div",{style:{...boxStyle,position:"relative"}},
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5c48",marginBottom:"7px",fontWeight:600}},"Set relationship"),
+        React.createElement("div",{style:{display:"flex",gap:"6px"}},
+          React.createElement("input",{value:relDraft,onChange:e=>{setRelDraft(e.target.value);setShowRelSugs(true);},
+            onKeyDown:e=>{if(e.key==="Enter")saveRelationship();if(e.key==="Escape")setShowRelSugs(false);},
+            onBlur:()=>setTimeout(()=>setShowRelSugs(false),150),
+            placeholder:"e.g. Friend, Sister, Colleague…",
+            style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",flex:1}}),
+          React.createElement("button",{onClick:saveRelationship,disabled:!relDraft.trim(),style:{...S.btn,padding:"6px 14px",opacity:relDraft.trim()?1:0.4}},"Save")
+        ),
+        showRelSugs&&relSugs.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,right:"70px",background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",maxHeight:"140px",overflowY:"auto"}},
+          relSugs.map(r=>React.createElement("div",{key:r,onMouseDown:()=>{setRelDraft(r);setShowRelSugs(false);},
+            style:{padding:"6px 12px",cursor:"pointer",fontSize:"0.86rem",color:"#2c2416"},
+            onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+            onMouseLeave:e=>e.currentTarget.style.background="transparent"},r))
+        )
+      );
+    }
+    if (p.subtype==="set-coords") {
+      if (coordSaved) return React.createElement("div",{style:boxStyle},
+        React.createElement("p",{style:{fontSize:"0.84rem",color:"#4a7a5a",margin:0}},"✓ Coordinates saved — location will now appear on your map"));
+      return React.createElement("div",{style:boxStyle},
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5c48",marginBottom:"4px",fontWeight:600}},"Set coordinates"),
+        React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",marginBottom:"7px"}},"Paste from Google Maps: right-click a location → copy coordinates"),
+        React.createElement("div",{style:{display:"flex",gap:"6px"}},
+          React.createElement("input",{value:coordDraft,onChange:e=>setCoordDraft(e.target.value),
+            onKeyDown:e=>{if(e.key==="Enter")saveCoords();},
+            placeholder:"lat, lng — e.g. 51.5074, -0.1278",
+            style:{...S.input,padding:"6px 10px",fontSize:"0.86rem",flex:1,fontFamily:"monospace"}}),
+          React.createElement("button",{onClick:saveCoords,disabled:!coordDraft.trim(),style:{...S.btn,padding:"6px 14px",opacity:coordDraft.trim()?1:0.4}},"Save")
+        )
+      );
+    }
+    if (p.subtype==="set-org-location") {
+      return React.createElement("div",{style:{...boxStyle,position:"relative"}},
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5c48",marginBottom:"7px",fontWeight:600}},"Link a location"),
+        orgLocSaved&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"6px"}},"✓ Location linked"),
+        React.createElement("div",{style:{display:"flex",gap:"6px"}}),
+        React.createElement("input",{value:orgLocSearch,onChange:e=>setOrgLocSearch(e.target.value),
+          onKeyDown:e=>{if(e.key==="Escape")setOrgLocSearch("");},
+          onBlur:()=>setTimeout(()=>setOrgLocSearch(""),200),
+          placeholder:"Type a location name…",
+          style:{...S.input,padding:"6px 10px",fontSize:"0.88rem"}}),
+        locSugs.length>0&&React.createElement("div",{style:{background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",marginTop:"2px"}},
+          locSugs.map(l=>React.createElement("div",{key:l,onMouseDown:()=>saveOrgLocation(l),
+            style:{padding:"6px 12px",cursor:"pointer",fontSize:"0.86rem",color:"#2c2416"},
+            onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+            onMouseLeave:e=>e.currentTarget.style.background="transparent"},"📍 ",l))
+        )
+      );
+    }
+    if (p.subtype==="set-org-people") {
+      return React.createElement("div",{style:{...boxStyle,position:"relative"}},
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5c48",marginBottom:"7px",fontWeight:600}},"Link people"),
+        orgPeopleAdded.length>0&&React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"4px",marginBottom:"7px"}},
+          orgPeopleAdded.map(p=>React.createElement("span",{key:p,style:{fontSize:"0.78rem",color:"#4a5a7a",background:"rgba(100,110,140,0.1)",border:"1px solid rgba(100,110,140,0.2)",borderRadius:"20px",padding:"1px 8px"}},"👤 ",p))
+        ),
+        React.createElement("input",{value:orgPeopleSearch,onChange:e=>setOrgPeopleSearch(e.target.value),
+          onKeyDown:e=>{if(e.key==="Escape")setOrgPeopleSearch("");},
+          onBlur:()=>setTimeout(()=>setOrgPeopleSearch(""),200),
+          placeholder:"Search people…",
+          style:{...S.input,padding:"6px 10px",fontSize:"0.88rem"}}),
+        peopleSugs.length>0&&React.createElement("div",{style:{background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",marginTop:"2px"}},
+          peopleSugs.map(p=>React.createElement("div",{key:p,onMouseDown:()=>saveOrgPerson(p),
+            style:{padding:"6px 12px",cursor:"pointer",fontSize:"0.86rem",color:"#2c2416"},
+            onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+            onMouseLeave:e=>e.currentTarget.style.background="transparent"},"👤 ",p))
+        )
+      );
+    }
+    return null;
   }
 
   if (!memories.length) return React.createElement("div",{style:{textAlign:"center",padding:"60px 20px"}},
@@ -1039,17 +1210,19 @@ function PrompterView({memories, knownPeople, knownOrgs, knownLocations, onAddWi
             color:"#8a7060",fontWeight:600}},
             prompt.type==="decade" ? `${prompt.entity}s` : prompt.entity),
           prompt.count>0&&React.createElement("span",{style:{fontSize:"0.76rem",color:"#7a6a58",fontStyle:"italic"}},
-            `· ${prompt.count} ${prompt.count===1?"memory":"memories"}`)
+            `· ${prompt.count} ${prompt.count===1?"memory":"memories"}`),
+          prompt.subtype&&React.createElement("span",{style:{fontSize:"0.7rem",color:"#8a7460",background:"rgba(200,184,154,0.3)",borderRadius:"20px",padding:"1px 8px",fontStyle:"italic"}},"complete info")
         ),
         React.createElement("p",{style:{
           fontFamily:"'Playfair Display',serif",fontSize:"1.3rem",fontStyle:"italic",
           lineHeight:1.55,color:"#1a1208",margin:"0 0 24px"
         }}, prompt.text),
-        React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap"}},
+        renderInlineAction(prompt),
+        React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap",marginTop:"20px"}},
           React.createElement("button",{onClick:respond,style:{
             background:"#2c2416",color:"#f5f0e8",border:"none",padding:"10px 22px",
             borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"1rem"
-          }},"✍ Write this memory"),
+          }},"✍ "+prompt.action),
           React.createElement("button",{onClick:next,style:{
             background:"transparent",border:"1px solid #c8b89a",color:"#6a5c48",
             padding:"10px 18px",borderRadius:"2px",cursor:"pointer",
@@ -1076,7 +1249,7 @@ function PrompterView({memories, knownPeople, knownOrgs, knownLocations, onAddWi
     ) : React.createElement("div",{style:{textAlign:"center",padding:"40px 20px"}},
       React.createElement("p",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",fontStyle:"italic",color:"#8a7460",marginBottom:"16px"}},
         "You've worked through everything for now — come back as you add more memories."),
-      React.createElement("button",{onClick:()=>{setDismissed(0);setHistory([]);setSeen(new Set()); setPrompt(buildPrompt(memories,knownPeople,knownOrgs,knownLocations,new Set()));},
+      React.createElement("button",{onClick:()=>{setDismissed(0);setHistory([]);setSeen(new Set()); setPrompt(buildPrompt(memories,knownPeople,knownOrgs,knownLocations,new Set(),extras));},
         style:{background:"transparent",border:"1px solid #c8b89a",color:"#6a5c48",padding:"9px 18px",borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.95rem"}},
         "Start again")
     )
@@ -6216,6 +6389,14 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
       // ── PROMPTER ──
       view==="prompt"&&React.createElement(PrompterView,{
         memories, knownPeople:knownPeople.filter(p=>p!==ownerName), knownOrgs, knownLocations,
+        peopleRelationships, orgLocations, personOrgs,
+        onSetRelationship: setPersonRelationship,
+        onSetCoords: setLocationCoords,
+        onSetOrgLocations: setOrgLocations,
+        onSetOrgPeople: (personName, orgName) => {
+          const current = personOrgs[personName]||[];
+          if (!current.includes(orgName)) setPersonOrgs(personName, [...current, orgName]);
+        },
         onAddWithContext: (prompt) => {
           const pre = newForm();
           // Pre-fill people/orgs/locations based on what the prompt is about
