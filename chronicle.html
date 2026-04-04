@@ -4145,7 +4145,12 @@ function App() {
   const profileImageUrl      = data.profileImageUrl || "";
   const profilePrivacy       = data.profilePrivacy || "open"; // open | subscribers | connected | private
 
-  const [view, setView] = useState("life");
+  const [view, _setView] = useState("life");
+  const viewHistoryRef = React.useRef([]);
+  function setView(v) {
+    viewHistoryRef.current = [...viewHistoryRef.current.slice(-49), view];
+    _setView(v);
+  }
   const [selected, setSelected] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [zoomDecade, setZoomDecade] = useState(null);
@@ -5711,12 +5716,15 @@ function handleEdit(m) {
 
   // ── Navigation ───────────────────────────────────────────────
   function goBack() {
-    if (view==="detail") { zoomYear?setView("year"):zoomDecade?setView("decade"):setView("life"); }
-    else if (view==="year") setView("decade");
-    else if (view==="decade") setView("life");
-    else if (view==="edit") setView("detail");
-    else if (view==="index" && indexFilter) setIndexFilter(null);
-    else setView("life");
+    if (view==="index" && indexFilter) { setIndexFilter(null); return; }
+    const hist = viewHistoryRef.current;
+    if (hist.length > 0) {
+      const prev = hist[hist.length - 1];
+      viewHistoryRef.current = hist.slice(0, -1);
+      _setView(prev);
+    } else {
+      _setView("life");
+    }
   }
 
   function bc() {
