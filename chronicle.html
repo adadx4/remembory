@@ -4075,6 +4075,7 @@ function App() {
   const [pendingShare, setPendingShare] = useState(null);
   const [pendingConnectRequest, setPendingConnectRequest] = useState(null); // {name, email}
   const [pendingShareSelected, setPendingShareSelected] = useState(new Set());
+  const [pendingShareWantConnect, setPendingShareWantConnect] = useState(true);
   const [inAppShareCode, setInAppShareCode] = useState(null);
   const [inAppBrowser, setInAppBrowser] = useState(null);
   const [pendingEndMemory, setPendingEndMemory] = useState(null);
@@ -4631,46 +4632,12 @@ function handleEdit(m) {
         }));
         return {...m, mediaUrls};
       }));
-      const d = {...dRaw, memories: restoredMems};
-      const isShared = !!d.sharedBy;
-      const senderName = d.sharedBy || null;
-      // Compute existingIds early so incomingMems.map can skip content-wrapping for already-owned memories
-      const existingIds = new Set(memories.map(m=>m.id));
-      const senderEmail2 = d.sharedByEmail || '';
-      const incomingMems = d.memories.map(m => {
-        if (!isShared || !m.content || existingIds.has(m.id)) return m; // skip content-wrap if we already own this memory
-        const existingPerspectives = m.perspectives || [];
-        const alreadyHasSender = existingPerspectives.some(p=>p.author===senderName);
-        const perspectives = alreadyHasSender ? existingPerspectives : [
-          ...existingPerspectives,
-          { author:senderName, content:m.content, addedAt:d.sharedAt||new Date().toISOString(), isOwn:false }
-        ];
-        const existingPeople = m.people || [];
-        const people = senderName && !existingPeople.includes(senderName) ? [...existingPeople, senderName] : existingPeople;
-        return {...m, content:"", perspectives, sharedBy:senderName, sharedByEmail:senderEmail2, sharedAt:d.sharedAt, people, visibility:"private"};
-      });
-      const toAdd = incomingMems.filter(m=>!existingIds.has(m.id));
-      const merged = memories.map(m=>{
-        const incoming = incomingMems.find(im=>im.id===m.id);
-        if (!incoming) return m;
-        const existing = m.perspectives||[];
-        const newP = (incoming.perspectives||[]).filter(p=>!existing.some(e=>e.author===p.author));
-        return {...m, perspectives:[...existing,...newP], sharedBy:incoming.sharedBy||m.sharedBy};
-      });
-      const finalMems = [...merged,...toAdd].sort((a,b)=>sortKey(a)-sortKey(b));
-      const backupPeople = d.knownPeople||[...new Set(d.memories.flatMap(m=>m.people||[]))];
-      const backupOrgs = d.knownOrgs||[...new Set(d.memories.flatMap(m=>m.orgs||[]))];
-      const updatedEmails2 = {...(peopleEmails||{})};
-      if (senderName && senderEmail2) updatedEmails2[senderName] = senderEmail2;
-      persistSubject({memories:finalMems,
-        knownPeople:[...new Set([...knownPeople,...backupPeople])].sort(),
-        knownOrgs:[...new Set([...knownOrgs,...backupOrgs])].sort(),
-        peopleEmails:updatedEmails2
-      });
-      setShareCodeStatus(`✓ Imported ${d.memories.length} ${d.memories.length===1?"memory":"memories"} from ${senderName||"shared link"}.`);
+      setPendingShare({...dRaw, memories: restoredMems});
+      setPendingShareSelected(new Set(restoredMems.map(m=>m.id)));
+      setPendingShareWantConnect(true);
+      setShareCodeStatus("");
       setShareCodeInput("");
       setShowSettings(false);
-      setView("life");
     } catch(e) {
       setShareCodeStatus("Error fetching — check your connection.");
     }
@@ -4720,10 +4687,6 @@ function handleEdit(m) {
         const preIdx = conns.findIndex(c=>c.email===senderEmail&&c.preConnected);
         if (preIdx>=0) { conns[preIdx]={...conns[preIdx],preConnected:false,connectedAt:new Date().toISOString()}; localStorage.setItem("chronicle-connections",JSON.stringify(conns)); setLocalConnections([...conns]); }
       } catch(e) {}
-    }
-    // Show connection request if sender requested it and not suppressed
-    if (d.requestConnect && senderEmail && !suppressConnectRequests.includes(senderEmail)) {
-      setPendingConnectRequest({ name: senderName, email: senderEmail });
     }
     // Navigate to the first imported memory
     if (toAdd.length > 0) { setSelected(toAdd[0].id); setView("detail"); }
@@ -5978,8 +5941,16 @@ function handleEdit(m) {
               )
             ),
 
-            React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"18px"}},
+            React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"16px"}},
               "You can add your own perspective to any saved memory afterwards."
+            ),
+
+            // Connection offer
+            pendingShare.sharedBy && senderEmail && React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"10px",padding:"12px 14px",background:"rgba(74,122,90,0.07)",border:"1px solid rgba(74,122,90,0.25)",borderRadius:"3px",marginBottom:"16px",cursor:"pointer"}},
+              React.createElement("input",{type:"checkbox",checked:pendingShareWantConnect,onChange:e=>setPendingShareWantConnect(e.target.checked),style:{flexShrink:0,width:"16px",height:"16px"}}),
+              React.createElement("span",{style:{fontSize:"0.88rem",color:"#3a5a3a",lineHeight:1.4}},
+                `Add ${pendingShare.sharedBy} as a connection — you\u2019ll each be notified of shared places and times`
+              )
             ),
 
             React.createElement("div",{style:{display:"flex",gap:"10px"}},
@@ -5987,6 +5958,7 @@ function handleEdit(m) {
                 onClick:()=>{
                   const filtered={...pendingShare,memories:pendingShare.memories.filter(m=>pendingShareSelected.has(m.id))};
                   if(filtered.memories.length>0) acceptShare(filtered);
+                  if(pendingShareWantConnect && senderEmail && pendingShare.sharedBy) setPendingConnectRequest({name:pendingShare.sharedBy,email:senderEmail});
                   setPendingShare(null);
                 },
                 disabled:pendingShareSelected.size===0,
