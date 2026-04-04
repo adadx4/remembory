@@ -1250,8 +1250,8 @@
     const email = document.getElementById('email-input').value;
     fetch('https://buttondown.email/api/emails/embed-subscribe/remembory', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ email }).toString()
     })
     .then(res => {
       if (!res.ok) throw new Error();
