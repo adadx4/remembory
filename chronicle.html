@@ -3316,9 +3316,10 @@ function SettingsView({
               ),
               React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
                 React.createElement("button",{onClick:()=>doSync(),disabled:syncStatus==="syncing",style:{...S.btn,flex:1,opacity:syncStatus==="syncing"?0.6:1}},
-                  syncStatus==="syncing"?"Syncing\u2026":syncStatus==="done"?"Synced":syncStatus==="error"?"Sync failed":"Sync now"),
+                  syncStatus==="syncing"?"Syncing\u2026":syncStatus==="done"?"Synced":syncStatus.startsWith("error")?"Retry sync":"Sync now"),
                 React.createElement("button",{onClick:clearSyncFile,style:{...S.btnOutline,padding:"9px 14px",fontSize:"0.84rem"}},"Disconnect")
-              )
+              ),
+              syncStatus.startsWith("error")&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#c4858a",marginTop:"6px",wordBreak:"break-all"}},syncStatus)
             )
           : React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
               React.createElement("button",{onClick:createSyncFile,style:{...S.btn,flex:1}},"Create sync file"),
@@ -4835,8 +4836,8 @@ function handleEdit(m) {
       setTimeout(() => setSyncStatus(""), 3000);
     } catch(e) {
       console.error("doSync:", e);
-      setSyncStatus("error");
-      setTimeout(() => setSyncStatus(""), 4000);
+      setSyncStatus("error: " + (e?.message || e));
+      setTimeout(() => setSyncStatus(""), 8000);
     }
   }
 
