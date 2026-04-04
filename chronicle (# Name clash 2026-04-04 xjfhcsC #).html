@@ -1503,7 +1503,7 @@ function RelationshipIndex({memories, peopleRelationships, onView, onRenameRelat
   );
 }
 
-function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setLocationAddress,entityPhotos,onSetEntityPhoto,setIndexFilter,persistSubject}) {
+function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setLocationAddress,setIndexFilter,persistSubject}) {
   const [addingLoc, setAddingLoc] = React.useState(false);
   const [newLoc, setNewLoc] = React.useState("");
   function commitAdd(){
@@ -1544,7 +1544,6 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
       const country = (typeof loc==='object' ? loc.country : "") || "";
       return React.createElement(LocationRow,{key:name,name,count,notes:locationNotes?.[name],
         coords, street, town, state, country,
-        photo:(entityPhotos||{})["location:"+name]||null,onSetPhoto:onSetEntityPhoto,
         onRename:renameLocation,onDelete:deleteLocation,onSetNotes:setLocationNotes,
         onSetCoords:setLocationCoords,onSetAddress:setLocationAddress,
         onView:()=>setIndexFilter({type:"locations",value:name})});
@@ -1552,7 +1551,7 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
   );
 }
 
-function LocationRow({name, count, notes, coords, street, town, state, country, photo, onSetPhoto, onRename, onDelete, onSetNotes, onSetCoords, onSetAddress, onView}) {
+function LocationRow({name, count, notes, coords, street, town, state, country, onRename, onDelete, onSetNotes, onSetCoords, onSetAddress, onView}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(name);
   const [showNotes, setShowNotes] = React.useState(false);
@@ -1585,9 +1584,7 @@ function LocationRow({name, count, notes, coords, street, town, state, country, 
     }
   }
 
-  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"12px 0",display:"flex",gap:"12px",alignItems:"flex-start"}},
-    React.createElement(EntityPhotoUpload,{photo,size:48,onSet:med=>onSetPhoto("location:"+name,med),onClear:()=>onSetPhoto("location:"+name,null)}),
-    React.createElement("div",{style:{flex:1,minWidth:0}},
+  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"12px 0"}},
     React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
       renaming
         ? React.createElement("input",{autoFocus:true,value:draft,onChange:e=>setDraft(e.target.value),
@@ -1633,7 +1630,6 @@ function LocationRow({name, count, notes, coords, street, town, state, country, 
       React.createElement("textarea",{value:notesDraft,onChange:e=>setNotesDraft(e.target.value),onBlur:commitNotes,placeholder:"Notes about this location…",rows:3,style:{...S.input,width:"100%",resize:"vertical",fontSize:"0.88rem",fontFamily:"'Crimson Text',Georgia,serif",lineHeight:1.6}}),
       React.createElement("p",{style:{fontSize:"0.75rem",color:"#7a6a58",fontStyle:"italic",marginTop:"3px"}},"Saved automatically when you click away")
     )
-    ) // close inner content div
   );
 }
 
