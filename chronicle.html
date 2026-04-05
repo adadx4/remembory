@@ -3634,7 +3634,7 @@ function ImportView({
   gedContext, setGedContext, gedContextSel, setGedContextSel,
   handleGedFile, handleGedPick, commitGedImport,
   // Shared data
-  knownPeople, peopleEmails, peopleRelationships, persistSubject,
+  knownPeople, knownLocations, peopleEmails, peopleRelationships, persistSubject,
 }) {
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
     React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Import"),
@@ -3669,7 +3669,7 @@ function ImportView({
           React.createElement("div",{style:{flex:1,display:"grid",gap:"8px"}},
             React.createElement("div",null,React.createElement("label",{style:S.label},"Title"),React.createElement("input",{value:item.title,onChange:e=>updatePhoto(item.id,{title:e.target.value}),style:{...S.input,padding:"7px 10px"}})),
             React.createElement(DateFields,{form:item,setForm:u=>updatePhoto(item.id,u)}),
-            React.createElement("div",null,React.createElement("label",{style:S.label},"Location"),React.createElement("input",{value:item.location,onChange:e=>updatePhoto(item.id,{location:e.target.value}),placeholder:"optional",style:{...S.input,padding:"7px 10px"}})),
+            React.createElement("div",null,React.createElement("label",{style:S.label},"Location"),React.createElement(LocationAutocomplete,{value:item.location||"",onChange:v=>updatePhoto(item.id,{location:v}),knownLocations,placeholder:"optional"})),
             React.createElement("div",null,React.createElement("label",{style:S.label},"Tags"),React.createElement(TagPicker,{tags:item.tags,onToggle:tag=>updatePhoto(item.id,{tags:item.tags.includes(tag)?item.tags.filter(t=>t!==tag):[...item.tags,tag]})})),
             React.createElement("div",null,
               React.createElement("label",{style:S.label},"People"),
@@ -6714,7 +6714,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         gedSearch, setGedSearch, gedContext, setGedContext,
         gedContextSel, setGedContextSel,
         handleGedFile, handleGedPick, commitGedImport,
-        knownPeople, peopleEmails, peopleRelationships, persistSubject,
+        knownPeople, knownLocations, peopleEmails, peopleRelationships, persistSubject,
       }),
                         
       // ── LIFE VIEW ──
