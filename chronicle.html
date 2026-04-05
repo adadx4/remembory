@@ -4228,6 +4228,15 @@ function App() {
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [backupNagDismissed, setBackupNagDismissed] = useState(false);
   const [licenceKey, setLicenceKey] = useState(()=>{try{return localStorage.getItem("chronicle-licence-key")||"";}catch(e){return "";}});
+  // socialKey is a stable identity for social/Explore features — uses licence key if set, otherwise a persistent UUID
+  const socialKey = React.useMemo(()=>{
+    if(licenceKey) return licenceKey;
+    try{
+      let k=localStorage.getItem("chronicle-social-key");
+      if(!k){k=crypto.randomUUID();localStorage.setItem("chronicle-social-key",k);}
+      return k;
+    }catch(e){return "";}
+  },[licenceKey]);
   const [licenceStatus, setLicenceStatus] = useState(null);
   // Dev override: localStorage.setItem("chronicle-dev-mode","1") in console to bypass subscription
   const isDevMode = (()=>{try{return localStorage.getItem("chronicle-dev-mode")==="1";}catch(e){return false;}})();
@@ -4290,7 +4299,7 @@ function App() {
         .filter(p => p.locations.length > 0);
       const res = await fetch(WORKER_URL + "/profile/publish", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-LS-Key": licenceKey },
+        headers: { "Content-Type": "application/json", "X-LS-Key": socialKey },
         body: JSON.stringify({ ownerName: ownerName||carerName, displayName: profileDisplayName||ownerName||carerName, ownerEmail: ownerEmail||carerEmail, about: profileAbout||"", imageUrl: profileImageUrl||"", allowFollowers: allowFollowers!==false, profilePrivacy: profilePrivacy||"open", memories: publicMems, peopleEmails, presenceIndex, connectionEmails: (localConnections||[]).map(c=>c.email).filter(Boolean) })
       });
       const data = await res.json();
@@ -4308,7 +4317,7 @@ function App() {
     try {
       const res = await fetch(WORKER_URL + "/profile/unpublish", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-LS-Key": licenceKey },
+        headers: { "Content-Type": "application/json", "X-LS-Key": socialKey },
         body: JSON.stringify({ identifier: profileState.identifier })
       });
       if (!res.ok) throw new Error("Server error");
@@ -6081,10 +6090,10 @@ function handleEdit(m) {
             React.createElement("button",{
               onClick:()=>{
                 const myEmail = ownerEmail || carerEmail;
-                if (myEmail && pendingConnectRequest.email && licenceKey) {
+                if (myEmail && pendingConnectRequest.email && socialKey) {
                   fetch(WORKER_URL+"/connect",{
                     method:"POST",
-                    headers:{"Content-Type":"application/json","X-LS-Key":licenceKey},
+                    headers:{"Content-Type":"application/json","X-LS-Key":socialKey},
                     body:JSON.stringify({myEmail,theirEmail:pendingConnectRequest.email})
                   }).then(()=>{
                     // Store connection locally for People index filter
@@ -6227,7 +6236,7 @@ function handleEdit(m) {
           href:(()=>{
             const base="https://social.remembory.net/";
             const params=[];
-            if(licenceKey) params.push("key="+encodeURIComponent(licenceKey));
+            if(socialKey) params.push("key="+encodeURIComponent(socialKey));
             if(profileState?.identifier) params.push("id="+profileState.identifier);
             return params.length?base+"?"+params.join("&"):base;
           })(),
@@ -6436,7 +6445,7 @@ function handleEdit(m) {
       view==="public-profile"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"640px"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 8px",color:"#1a1208"}},"Public Profile"),
         profileState?.url&&React.createElement("div",{style:{marginBottom:"12px"}},
-          React.createElement("a",{href:profileState.url+(licenceKey?"?key="+encodeURIComponent(licenceKey)+(ownerEmail||carerEmail?"&email="+encodeURIComponent(ownerEmail||carerEmail):""):""),
+          React.createElement("a",{href:profileState.url+(socialKey?"?key="+encodeURIComponent(socialKey)+(ownerEmail||carerEmail?"&email="+encodeURIComponent(ownerEmail||carerEmail):""):""),
             target:"_blank",rel:"noopener",
             style:{fontFamily:"'Crimson Text',serif",fontSize:"0.9rem",color:"#a8885a",textDecoration:"none",
               borderBottom:"1px solid rgba(168,136,90,0.3)",paddingBottom:"1px"}},
@@ -6611,7 +6620,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
             ? React.createElement("div",null,
                 React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"4px"}},
                   "✓ Live at ",
-                  React.createElement("a",{href:profileState.url+(licenceKey?"?key="+encodeURIComponent(licenceKey)+(ownerEmail||carerEmail?"&email="+encodeURIComponent(ownerEmail||carerEmail):""):""),target:"_blank",rel:"noopener",style:{color:"#a8885a"}},profileState.url)
+                  React.createElement("a",{href:profileState.url+(socialKey?"?key="+encodeURIComponent(socialKey)+(ownerEmail||carerEmail?"&email="+encodeURIComponent(ownerEmail||carerEmail):""):""),target:"_blank",rel:"noopener",style:{color:"#a8885a"}},profileState.url)
                 ),
                 profileState.lastPublished&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},
                   "Last published: "+new Date(profileState.lastPublished).toLocaleDateString()
