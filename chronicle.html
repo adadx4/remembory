@@ -62,11 +62,14 @@ function clearLicenceCache() {
   try { localStorage.removeItem(LS_CACHE_KEY); } catch(e) {}
 }
 
-// Licence validation stub — subscriptions not yet live
+const PROMO_CODES = ["REMEMBER2025","FAMILY2025","FRIEND2025"];
 async function validateLicenceKey(key) {
   if (!key) return null;
-  // When subscriptions launch, validation will happen here
-  return { valid: true, tier: "subscriber", expiresAt: null };
+  const clean = key.trim();
+  if (!clean) return null;
+  if (PROMO_CODES.includes(clean.toUpperCase())) return {valid:true, tier:"subscriber", expiresAt:null, promo:true};
+  // Subscription checkout not yet live
+  return {valid:false, reason:"not_available"};
 }
 const TAG_COLORS = {
   childhood:"#e8a87c", family:"#c9b89a", travel:"#7a9e9f", education:"#8b9dc3",
@@ -3263,15 +3266,53 @@ function SettingsView({
               persistTop({wantPublicProfile:e.target.checked});
               if (!e.target.checked && profileState) unpublishProfile();
             },
-            style:{marginTop:"3px",flexShrink:0}}),
+            disabled:!isSubscriber,
+            style:{marginTop:"3px",flexShrink:0,cursor:isSubscriber?"pointer":"not-allowed"}}),
           React.createElement("div",null,
             React.createElement("label",{htmlFor:"want-public",
-              style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",cursor:"pointer",display:"block",marginBottom:"4px"}},
+              style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",cursor:isSubscriber?"pointer":"default",display:"block",marginBottom:"4px"}},
               "Enable public profile"),
             React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,margin:0}},
-              "Enables visibility controls on memories and your public profile page.")
+              isSubscriber ? "Enables visibility controls on memories and your public profile page."
+                : React.createElement(React.Fragment,null,"Requires a subscription. ",
+                    React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{color:"#a8885a"}},"Support us \u2192")))
           )
         )
+      ),
+
+      // ── Subscription ──
+      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+        React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},"\u2728 Subscription"),
+          isSubscriber&&React.createElement("span",{style:{fontSize:"0.72rem",background:"#4a7a5a",color:"#fff",padding:"2px 9px",borderRadius:"20px",letterSpacing:"0.04em"}},"ACTIVE")
+        ),
+        isSubscriber
+          ? React.createElement("div",null,
+              React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"6px"}},licenceStatus?.promo?"\u2713 Subscriber (promo)":"\u2713 Subscriber"),
+              React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"Sharing and Genealogy Mode are enabled."),
+              React.createElement("button",{onClick:()=>saveLicenceKey(""),style:{...S.btnOutline,fontSize:"0.82rem",padding:"5px 12px",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove key")
+            )
+          : React.createElement("div",null,
+              React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,marginBottom:"12px"}},
+                "A subscription unlocks sharing memories with others, Genealogy Mode, and public timelines. The core app is always free \u2014 no account ever required."),
+              licenceStatus&&!licenceStatus.valid&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#c4858a",marginBottom:"8px",fontStyle:"italic"}},
+                licenceStatus.reason==="expired"?"Your licence key has expired \u2014 renew at remembory.net.":
+                licenceStatus.reason==="invalid"?"That key doesn\u2019t look right \u2014 check for typos.":"Couldn\u2019t validate that key."),
+              React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"10px"}},
+                React.createElement("input",{value:licenceKey,
+                  onChange:e=>saveLicenceKey(e.target.value),
+                  onKeyDown:e=>{if(e.key==="Enter")saveLicenceKey(e.target.value);},
+                  id:"licence-key-input",
+                  placeholder:"Paste your promo or licence key\u2026",
+                  style:{...S.input,flex:1,fontSize:"0.88rem",fontFamily:"monospace",letterSpacing:"0.05em"}}),
+                React.createElement("button",{
+                  onClick:()=>{ const el=document.getElementById("licence-key-input"); saveLicenceKey(el?el.value:licenceKey); },
+                  style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem"}
+                },"Apply")
+              ),
+              React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic"}},"Subscriptions coming soon \u2014 ",
+                React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{color:"#a8885a"}},"support us on Ko-fi \u2192"))
+            )
       ),
 
       // ── Password / lock ──
@@ -3298,6 +3339,11 @@ function SettingsView({
         },"\ud83d\uddd1 Clear all memories")
       ),
 
+      !isSubscriber&&React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
+        "Unlock sharing & genealogy mode \u2014 ",
+        React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"\u2728 support us on Ko-fi"),
+        "."
+      ),
       React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
         "Chronicle \u2022 build 2026-04-03 UTC"
       )
@@ -3603,7 +3649,16 @@ function ImportView({
     ),
 
     // ══════════════ GEDCOM TAB ══════════════
-    importTab==="gedcom"&&React.createElement("div",null,
+    importTab==="gedcom"&&(!isSubscriber
+      ? React.createElement("div",{style:{textAlign:"center",padding:"48px 24px",border:"1px solid #d4c4a8",borderRadius:"6px",background:"rgba(255,252,245,0.5)"}},
+          React.createElement("div",{style:{fontSize:"2.5rem",marginBottom:"12px",opacity:0.5}},"\ud83c\udf33"),
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",fontStyle:"italic",color:"#1a1208",marginBottom:"10px"}},"Genealogy Mode"),
+          React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,maxWidth:"380px",margin:"0 auto 16px"}},
+            "GEDCOM import is a subscriber feature. Import a family tree, flesh out your ancestors\u2019 lives, and connect genealogy research to narrative."),
+          React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{...S.btn,display:"inline-block",padding:"10px 24px",textDecoration:"none",fontSize:"0.9rem"}},
+            "Support us on Ko-fi \u2192")
+        )
+      : React.createElement("div",null,
       // No file loaded yet
       !gedPersons&&React.createElement("div",null,
         React.createElement("div",{
@@ -3762,7 +3817,7 @@ function ImportView({
           "Import "+gedPicked.fullName+" \u2192 "+(gedPreview.mems.length+gedContextSel.size)+" "+((gedPreview.mems.length+gedContextSel.size)===1?"memory":"memories")
         )
       )
-    ),
+    )),
 
     // ══════════════ EMAIL TAB ══════════════
     importTab==="email"&&React.createElement("div",null,
@@ -4175,8 +4230,8 @@ function App() {
   const [licenceKey, setLicenceKey] = useState(()=>{try{return localStorage.getItem("chronicle-licence-key")||"";}catch(e){return "";}});
   const [licenceStatus, setLicenceStatus] = useState(null);
   // Dev override: localStorage.setItem("chronicle-dev-mode","1") in console to bypass subscription
-  // Subscriptions not yet live — all features available to everyone
-  const isSubscriber = true;
+  const isDevMode = (()=>{try{return localStorage.getItem("chronicle-dev-mode")==="1";}catch(e){return false;}})();
+  const isSubscriber = isDevMode || licenceStatus?.valid===true;
   React.useEffect(()=>{
     if(licenceKey){validateLicenceKey(licenceKey).then(s=>{
       setLicenceStatus(s);
@@ -6181,6 +6236,7 @@ function handleEdit(m) {
             textDecoration:"none",display:"inline-flex",alignItems:"center"}
         },"Explore ↗"),
         !isMobile&&view!=="prompt"&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("prompt"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"✦ Prompt"),
+        !isMobile&&React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",title:"Support Remembory",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#7a6040",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#7a6040";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
         !isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("sharing"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem",background:view==="sharing"?"#2c2416":"transparent",color:view==="sharing"?"#f5f0e8":undefined,borderColor:view==="sharing"?"#2c2416":undefined}},"⇌ Sharing"),
         !isMobile&&React.createElement("button",{onClick:()=>setView("settings"),
           style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem",position:"relative"}},
