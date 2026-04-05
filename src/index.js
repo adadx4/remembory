@@ -352,7 +352,7 @@ function makeCard(entry) {
   (m.tags || []).slice(0,3).forEach(function(t) { chips += '<span class="chip">' + esc(t) + '</span>'; });
 
   var avatarInner = p.imageUrl
-    ? '<img src="' + esc(p.imageUrl) + '" alt="" onerror="this.style.display=\'none\'">'
+    ? '<img src="' + esc(p.imageUrl) + '" alt="" onerror="this.style.display=&apos;none&apos;">'
     : esc((p.displayName || '?')[0]);
 
   var excerpt = (m.content || '').replace(/<[^>]*>/g, '').slice(0, 220);
@@ -622,7 +622,7 @@ function profilePage(profile, visibleMems, isOwner) {
 <main>
   ${isOwner ? `<div class="owner-banner">&#128100; You are viewing your own published chronicle. All visibility levels are shown.</div>` : ""}
   <div class="profile-header">
-    <div class="big-avatar">${profile.imageUrl ? `<img src="${esc(profile.imageUrl)}" alt="" onerror="this.style.display='none'">` : esc((profile.displayName || "?")[0])}</div>
+    <div class="big-avatar">${profile.imageUrl ? `<img src="${esc(profile.imageUrl)}" alt="" onerror="this.style.display=&apos;none&apos;">` : esc((profile.displayName || "?")[0])}</div>
     <div class="profile-info">
       <h2>${esc(profile.displayName)}</h2>
       ${profile.about ? `<p>${esc(profile.about)}</p>` : ""}
