@@ -4354,7 +4354,7 @@ function App() {
       const res = await fetch(WORKER_URL + "/profile/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-LS-Key": licenceKey },
-        body: JSON.stringify({ ownerName: ownerName||carerName, displayName: profileDisplayName||ownerName||carerName, ownerEmail: ownerEmail||carerEmail, about: profileAbout||"", imageUrl: profileImageUrl||"", allowFollowers: allowFollowers!==false, profilePrivacy: profilePrivacy||"open", memories: publicMems, peopleEmails, presenceIndex })
+        body: JSON.stringify({ ownerName: ownerName||carerName, displayName: profileDisplayName||ownerName||carerName, ownerEmail: ownerEmail||carerEmail, about: profileAbout||"", imageUrl: profileImageUrl||"", allowFollowers: allowFollowers!==false, profilePrivacy: profilePrivacy||"open", memories: publicMems, peopleEmails, presenceIndex, connectionEmails: (localConnections||[]).map(c=>c.email).filter(Boolean) })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Server error");
