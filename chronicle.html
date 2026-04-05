@@ -2423,7 +2423,7 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
   const [copied, setCopied] = useState(false);
   const [includeIntro, setIncludeIntro] = useState(true);
   const [copiedMsg, setCopiedMsg] = useState(false);
-  const CHRONICLE_INTRO = "I\u2019ve shared some memories with you using Chronicle \u2014 a free, private memory keeper by Remembory (https://remembory.net).\n\nPlease open the link below in a web browser (Safari, Chrome, Firefox, etc). Opening from within a messaging app may not work correctly:\n";
+  const CHRONICLE_INTRO = "I\u2019ve shared some memories with you using Chronicle \u2014 a free, private memory journal at remembory.net.\n\nChronicle lets you collect the story of a life: memories, photos, places, and the people in them. Everything is stored privately on your own device \u2014 nothing is uploaded to a server unless you choose to share it.\n\nWhen you open the link below, you\u2019ll be able to review the memories I\u2019ve shared, choose which ones to save, and add them to your own Chronicle \u2014 where you can add your own perspective, fill in your side of the story, and start building your own timeline.\n\nIt\u2019s free to use. No account or sign-up needed to get started.\n\n\u26a0 Please open the link in a browser (Safari, Chrome, Firefox) \u2014 opening from inside a messaging app may not work correctly:\n";
   function buildMessage() { return includeIntro ? CHRONICLE_INTRO + shareUrl : shareUrl; }
   function copyMessage() {
     navigator.clipboard.writeText(buildMessage()).then(()=>{ setCopiedMsg(true); setTimeout(()=>setCopiedMsg(false),2500); });
