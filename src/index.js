@@ -564,8 +564,21 @@ window.addEventListener('DOMContentLoaded', init);
 </html>`;
 }
 
+// ── Location display helper ───────────────────────────────────────────────────
+function locationDisplay(m) {
+  const privacy = m.locationPrivacy || "town";
+  if (privacy === "exact") {
+    return [m.locationStreet, m.locationTown, m.locationState, m.locationCountry].filter(Boolean).join(", ") || m.location || "";
+  }
+  if (privacy === "country") {
+    return m.locationCountry || m.locationState || m.location || "";
+  }
+  // "town" — default
+  return [m.locationTown, m.locationCountry].filter(Boolean).join(", ") || m.locationCountry || m.locationState || m.location || "";
+}
+
 // ── Individual profile page ───────────────────────────────────────────────────
-function profilePage(profile, visibleMems) {
+function profilePage(profile, visibleMems, isOwner) {
   var mems = visibleMems || [];
   return `<!DOCTYPE html>
 <html lang="en">
@@ -594,6 +607,11 @@ function profilePage(profile, visibleMems) {
     .chip { font-size: 0.76rem; padding: 2px 8px; background: rgba(200,168,122,0.15); border: 1px solid rgba(200,168,122,0.35); border-radius: 10px; color: #5a4020; }
     .memory-card p { font-size: 0.92rem; color: #4a3820; line-height: 1.7; white-space: pre-wrap; }
     .no-mems { text-align: center; padding: 40px; color: #8a7460; font-style: italic; }
+    .vis-badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 10px; font-family: Arial, sans-serif; letter-spacing: 0.04em; float: right; margin-left: 8px; }
+    .vis-public { background: rgba(74,122,90,0.12); color: #2d6b3a; border: 1px solid rgba(74,122,90,0.3); }
+    .vis-connected { background: rgba(100,120,160,0.12); color: #3a4a7a; border: 1px solid rgba(100,120,160,0.3); }
+    .vis-subscriber { background: rgba(168,136,90,0.12); color: #7a5a20; border: 1px solid rgba(168,136,90,0.3); }
+    .owner-banner { background: rgba(74,122,90,0.08); border: 1px solid rgba(74,122,90,0.25); border-radius: 4px; padding: 10px 14px; margin-bottom: 20px; font-size: 0.84rem; color: #3a5a3a; }
   </style>
 </head>
 <body>
@@ -602,6 +620,7 @@ function profilePage(profile, visibleMems) {
   <h1>${esc(profile.displayName)}'s Chronicle</h1>
 </header>
 <main>
+  ${isOwner ? `<div class="owner-banner">&#128100; You are viewing your own published chronicle. All visibility levels are shown.</div>` : ""}
   <div class="profile-header">
     <div class="big-avatar">${profile.imageUrl ? `<img src="${esc(profile.imageUrl)}" alt="" onerror="this.style.display='none'">` : esc((profile.displayName || "?")[0])}</div>
     <div class="profile-info">
@@ -610,16 +629,23 @@ function profilePage(profile, visibleMems) {
       <div class="meta">${mems.length} ${mems.length === 1 ? "memory" : "memories"} · Published ${profile.publishedAt ? new Date(profile.publishedAt).toLocaleDateString() : ""}</div>
     </div>
   </div>
-  ${mems.length ? mems.map(m => `
+  ${mems.length ? mems.map(m => {
+    const vis = m.visibility || "public";
+    const visBadgeClass = vis === "connected" ? "vis-connected" : vis === "subscriber" ? "vis-subscriber" : "vis-public";
+    const visLabel = vis === "connected" ? "Connected" : vis === "subscriber" ? "Subscribers" : "Public";
+    const locStr = locationDisplay(m);
+    return `
   <div class="memory-card">
+    <span class="vis-badge ${visBadgeClass}">${visLabel}</span>
     ${m.title ? `<h3>${esc(m.title)}</h3>` : ""}
     <div class="chips">
       ${m.year ? `<span class="chip">${esc(String(m.year))}</span>` : ""}
-      ${m.location ? `<span class="chip">&#128205; ${esc(m.location)}</span>` : ""}
+      ${locStr ? `<span class="chip">&#128205; ${esc(locStr)}</span>` : ""}
       ${(m.tags||[]).map(t => `<span class="chip">${esc(t)}</span>`).join("")}
     </div>
     ${m.content ? `<p>${esc(m.content)}</p>` : ""}
-  </div>`).join("") : `<p class="no-mems">No memories visible to you in this chronicle.</p>`}
+  </div>`;
+  }).join("") : `<p class="no-mems">No memories visible to you in this chronicle.</p>`}
 </main>
 </body>
 </html>`;
@@ -653,10 +679,14 @@ export default {
       if (!raw) return new Response("<html><body><p>Profile not found or has been removed.</p><a href='/explore'>Back to Explore</a></body></html>", { status: 404, headers: { "Content-Type": "text/html" } });
       const profile = JSON.parse(raw);
       const viewerKey = getViewerKey(request, url);
-      const viewerEmailHash = viewerKey ? await sha256hex(viewerKey.trim().toUpperCase()) : "";
-      const vEmail = viewerEmailHash ? await getViewerEmailHash(env, viewerEmailHash) : "";
-      const visibleMems = (profile.memories || []).filter(m => canViewMemory(m, vEmail, profile.connectionEmailHashes || []));
-      return new Response(profilePage(profile, visibleMems), {
+      const viewerKeyHash = viewerKey ? await sha256hex(viewerKey.trim().toUpperCase()) : "";
+      const viewerIdentifier = viewerKeyHash ? await env.SHARES.get("keymap:" + viewerKeyHash) : "";
+      const isOwner = !!(viewerIdentifier && viewerIdentifier === identifier);
+      const vEmailHash = (!isOwner && viewerKeyHash) ? await getViewerEmailHash(env, viewerKeyHash) : "";
+      const visibleMems = isOwner
+        ? (profile.memories || [])
+        : (profile.memories || []).filter(m => canViewMemory(m, vEmailHash, profile.connectionEmailHashes || []));
+      return new Response(profilePage(profile, visibleMems, isOwner), {
         headers: { "Content-Type": "text/html;charset=UTF-8", "Cache-Control": "no-store" },
       });
     }
