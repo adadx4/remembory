@@ -2423,7 +2423,7 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
   const [copied, setCopied] = useState(false);
   const [includeIntro, setIncludeIntro] = useState(true);
   const [copiedMsg, setCopiedMsg] = useState(false);
-  const CHRONICLE_INTRO = "I\u2019ve shared some memories with you using Chronicle \u2014 a free, private memory keeper at remembory.net.\n\nPlease open the link below in Safari or Chrome (not inside a messaging app) so it works correctly:\n";
+  const CHRONICLE_INTRO = "I\u2019ve shared some memories with you using Chronicle \u2014 a free, private memory keeper by Remembory (https://remembory.net).\n\nPlease open the link below in a web browser (Safari, Chrome, Firefox, etc). Opening from within a messaging app may not work correctly:\n";
   function buildMessage() { return includeIntro ? CHRONICLE_INTRO + shareUrl : shareUrl; }
   function copyMessage() {
     navigator.clipboard.writeText(buildMessage()).then(()=>{ setCopiedMsg(true); setTimeout(()=>setCopiedMsg(false),2500); });
