@@ -3167,7 +3167,7 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
   const [status, setStatus] = React.useState(""); // "", "pushing", "pulling", "done", "error:..."
 
   async function keyHash(licKey) {
-    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(licKey));
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(licKey.trim().toUpperCase()));
     return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
   }
 
