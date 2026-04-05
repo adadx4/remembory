@@ -3154,6 +3154,92 @@ function isInAppBrowser() {
   return null;
 }
  
+function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
+  const [passphrase, setPassphrase] = React.useState("");
+  const [showPass, setShowPass] = React.useState(false);
+  const [status, setStatus] = React.useState(""); // "", "pushing", "pulling", "done", "error:..."
+
+  async function keyHash(licKey) {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(licKey));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+  }
+
+  async function push() {
+    if (!passphrase.trim()) { setStatus("error:Enter a sync passphrase first."); return; }
+    if (!licenceKey) { setStatus("error:A licence key is required for cloud sync."); return; }
+    setStatus("pushing");
+    try {
+      const json = await buildBackupJson();
+      const encrypted = await encryptData(passphrase, json);
+      const hash = await keyHash(licenceKey);
+      const res = await fetch(WORKER_URL + "/sync/push", {
+        method: "POST",
+        headers: {"Content-Type":"application/json","X-Chronicle-Client":"1"},
+        body: JSON.stringify({keyHash: hash, ...encrypted}),
+      });
+      if (!res.ok) { const e=await res.json().catch(()=>({})); setStatus("error:"+(e.error||res.status)); return; }
+      setStatus("done");
+      setTimeout(()=>setStatus(""),3000);
+    } catch(e) { setStatus("error:"+e.message); }
+  }
+
+  async function pull() {
+    if (!passphrase.trim()) { setStatus("error:Enter your sync passphrase first."); return; }
+    if (!licenceKey) { setStatus("error:A licence key is required for cloud sync."); return; }
+    setStatus("pulling");
+    try {
+      const hash = await keyHash(licenceKey);
+      const res = await fetch(WORKER_URL + "/sync/pull/" + hash, {headers:{"X-Chronicle-Client":"1"}});
+      if (res.status === 404) { setStatus("error:No sync data found. Push from your other device first."); return; }
+      if (!res.ok) { const e=await res.json().catch(()=>({})); setStatus("error:"+(e.error||res.status)); return; }
+      const stored = await res.json();
+      const plain = await decryptData(passphrase, stored);
+      if (!plain) { setStatus("error:Wrong passphrase — could not decrypt."); return; }
+      const fakeEvt = {target:{files:[new File([plain],"chronicle-sync.json",{type:"application/json"})]}};
+      importBackup(fakeEvt);
+      setStatus("done");
+      setTimeout(()=>setStatus(""),3000);
+    } catch(e) { setStatus("error:"+e.message); }
+  }
+
+  const isErr = status.startsWith("error:");
+  const errMsg = isErr ? status.slice(6) : "";
+
+  return React.createElement("div",null,
+    React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 4px",lineHeight:1.6}},
+      "Your memories are encrypted with your passphrase before leaving your device. We never see them in readable form."),
+    React.createElement("p",{style:{fontSize:"0.78rem",color:"#a8885a",fontStyle:"italic",margin:"0 0 12px"}},
+      "Use the same passphrase on all your devices."),
+    React.createElement("div",{style:{position:"relative",marginBottom:"12px"}},
+      React.createElement("input",{
+        type:showPass?"text":"password",
+        value:passphrase,
+        onChange:e=>setPassphrase(e.target.value),
+        placeholder:"Sync passphrase",
+        style:{...S.input,paddingRight:"60px"}
+      }),
+      React.createElement("button",{
+        onClick:()=>setShowPass(s=>!s),
+        style:{position:"absolute",right:"8px",top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem"}
+      },showPass?"Hide":"Show")
+    ),
+    React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"8px"}},
+      React.createElement("button",{
+        onClick:push,
+        disabled:status==="pushing"||status==="pulling",
+        style:{...S.btn,flex:1,opacity:(status==="pushing"||status==="pulling")?0.6:1}
+      },status==="pushing"?"Pushing\u2026":"Push to cloud"),
+      React.createElement("button",{
+        onClick:pull,
+        disabled:status==="pushing"||status==="pulling",
+        style:{...S.btnOutline,flex:1,opacity:(status==="pushing"||status==="pulling")?0.6:1}
+      },status==="pulling"?"Pulling\u2026":"Pull from cloud")
+    ),
+    status==="done"&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontStyle:"italic"}},"✓ Done"),
+    isErr&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#c4858a",marginTop:"4px"}},errMsg)
+  );
+}
+
 // ════════════════════════════════════════════════════════════════
 // EXTRACTED COMPONENT: SettingsView
 // ════════════════════════════════════════════════════════════════
@@ -3305,54 +3391,28 @@ function SettingsView({
 
       // ── Cloud Sync ──
       React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Cloud Sync"),
-        !isMobile
-          ? React.createElement(React.Fragment,null,
-              React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.6}},
-                "Keep Chronicle in sync across devices using a file in your cloud storage folder (iCloud Drive, Dropbox, Google Drive, OneDrive etc.)."),
-              syncInfo
-                ? React.createElement("div",null,
-                    React.createElement("div",{style:{background:"rgba(74,122,90,0.08)",border:"1px solid rgba(74,122,90,0.2)",borderRadius:"3px",padding:"10px 14px",marginBottom:"12px",fontSize:"0.84rem"}},
-                      React.createElement("div",{style:{color:"#1a1208",fontWeight:600,marginBottom:"2px"}},syncInfo.name),
-                      React.createElement("div",{style:{color:"#8a7460"}}, syncInfo.lastSync ? "Last synced: "+new Date(syncInfo.lastSync).toLocaleString() : "Not yet synced")
-                    ),
-                    React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
-                      React.createElement("button",{onClick:()=>doSync(),disabled:syncStatus==="syncing",style:{...S.btn,flex:1,opacity:syncStatus==="syncing"?0.6:1}},
-                        syncStatus==="syncing"?"Syncing\u2026":syncStatus==="done"?"Synced":syncStatus.startsWith("error")?"Retry sync":"Sync now"),
-                      React.createElement("button",{onClick:clearSyncFile,style:{...S.btnOutline,padding:"9px 14px",fontSize:"0.84rem"}},"Disconnect")
-                    ),
-                    syncStatus.startsWith("error")&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#c4858a",marginTop:"6px",wordBreak:"break-all"}},syncStatus)
-                  )
-                : React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
-                    React.createElement("button",{onClick:createSyncFile,style:{...S.btn,flex:1}},"Create sync file"),
-                    React.createElement("button",{onClick:chooseSyncFile,style:{...S.btnOutline,flex:1,padding:"9px 14px",fontSize:"0.84rem"}},"Open existing sync file")
-                  )
-            )
-          : React.createElement(React.Fragment,null,
-              React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 12px",lineHeight:1.6}},
-                "On mobile, sync manually via your cloud storage app (Proton Drive, iCloud, Dropbox etc.):"),
-              React.createElement("ol",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.8,margin:"0 0 14px",paddingLeft:"18px"}},
-                React.createElement("li",null,"Export the sync file below and save it to your cloud folder."),
-                React.createElement("li",null,"On your other device, export too, then import the file from the other device to merge.")
-              ),
-              React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
-                React.createElement("button",{
-                  onClick:async()=>{
-                    const json=await buildBackupJson();
-                    const blob=new Blob([json],{type:"application/json"});
-                    const a=document.createElement("a");
-                    a.href=URL.createObjectURL(blob);
-                    a.download="chronicle-sync.json";
-                    a.click();
-                  },
-                  style:{...S.btn,flex:1}
-                },"Export sync file"),
-                React.createElement("label",{style:{...S.btnOutline,flex:1,padding:"9px 14px",fontSize:"0.84rem",cursor:"pointer",textAlign:"center"}},
-                  "Import sync file",
-                  React.createElement("input",{type:"file",accept:".json",style:{display:"none"},onChange:importBackup})
-                )
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 12px"}},"Cloud Sync"),
+        React.createElement(CloudSyncPanel,{buildBackupJson,importBackup,licenceKey}),
+        !isMobile&&React.createElement("div",{style:{marginTop:"16px",paddingTop:"16px",borderTop:"1px solid #ede4d4"}},
+          React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",margin:"0 0 8px",fontStyle:"italic"}},"Or sync via a local cloud storage folder (desktop only):"),
+          syncInfo
+            ? React.createElement("div",null,
+                React.createElement("div",{style:{background:"rgba(74,122,90,0.08)",border:"1px solid rgba(74,122,90,0.2)",borderRadius:"3px",padding:"8px 12px",marginBottom:"8px",fontSize:"0.82rem"}},
+                  React.createElement("span",{style:{color:"#1a1208",fontWeight:600}},syncInfo.name),
+                  React.createElement("span",{style:{color:"#8a7460",marginLeft:"8px"}},syncInfo.lastSync?"Last synced: "+new Date(syncInfo.lastSync).toLocaleString():"Not yet synced")
+                ),
+                React.createElement("div",{style:{display:"flex",gap:"8px"}},
+                  React.createElement("button",{onClick:()=>doSync(),disabled:syncStatus==="syncing",style:{...S.btn,flex:1,fontSize:"0.84rem",opacity:syncStatus==="syncing"?0.6:1}},
+                    syncStatus==="syncing"?"Syncing\u2026":syncStatus==="done"?"Synced":syncStatus.startsWith("error")?"Retry":"Sync now"),
+                  React.createElement("button",{onClick:clearSyncFile,style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.82rem"}},"Disconnect")
+                ),
+                syncStatus.startsWith("error")&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#c4858a",marginTop:"4px",wordBreak:"break-all"}},syncStatus)
               )
-            )
+            : React.createElement("div",{style:{display:"flex",gap:"8px"}},
+                React.createElement("button",{onClick:createSyncFile,style:{...S.btn,flex:1,fontSize:"0.84rem"}},"Create sync file"),
+                React.createElement("button",{onClick:chooseSyncFile,style:{...S.btnOutline,flex:1,padding:"7px 12px",fontSize:"0.82rem"}},"Open existing")
+              )
+        )
       ),
 
       // ── Backup ──
