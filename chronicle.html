@@ -3476,6 +3476,17 @@ function SettingsView({
             React.createElement("input",{type:"file",accept:".json",style:{display:"none"},onChange:importBackup})
           )
         )
+      ),
+      // ── Import Photos (mobile only) ──
+      isMobile&&React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 6px"}},"Import Photos"),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.5}},
+          "Add memories from your photo library. Chronicle can read dates and locations from photo metadata."
+        ),
+        React.createElement("button",{
+          onClick:()=>setView("import"),
+          style:{...S.btn,padding:"10px 16px",fontSize:"0.88rem"}
+        },"↑ Import from photos")
       )
     ), // end backup tab
 
@@ -6314,7 +6325,6 @@ function handleEdit(m) {
         ["index","☰","Index"],
         ["map","🗺","Map"],
         ["sharing","⇌","Sharing"],
-        ["import","↑","Import"],
         ["settings","⚙","Settings"],
       ].map(([v,icon,label])=>React.createElement("button",{key:v,onClick:()=>{ setIndexFilter(null); setView(v); },style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:view===v?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:view===v?"2px solid #2c2416":"2px solid transparent"}},
         React.createElement("span",{style:{fontSize:"1.1rem",lineHeight:1}},icon),
