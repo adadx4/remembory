@@ -318,7 +318,14 @@ async function resolveMediaUrl(med) {
 // ── Crypto helpers ────────────────────────────────────────────
 const CRYPTO_KEY = "chronicle-crypto";  // stores {salt, iv, ciphertext, check} — all base64
 
-function b64(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function b64(buf) {
+  const bytes = new Uint8Array(buf);
+  let str = "";
+  for (let i = 0; i < bytes.length; i += 8192) {
+    str += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  return btoa(str);
+}
 function unb64(s) { return Uint8Array.from(atob(s), c=>c.charCodeAt(0)); }
 
 async function deriveKey(password, salt) {
