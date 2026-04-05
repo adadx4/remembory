@@ -373,10 +373,10 @@ function makeCard(entry) {
     (chips ? '<div class="chips">' + chips + '</div>' : '') +
     (excerpt ? '<p class="excerpt">' + esc(excerpt) + '</p>' : '') +
     '<div class="card-footer">' +
-      '<button class="react-btn' + (alreadyReacted ? ' reacted' : '') + '" id="react-' + esc(memKey.replace(':','-')) + '" onclick="doReact(\'' + esc(p.identifier) + '\',\'' + esc(m.id) + '\',this)">' +
+      '<button class="react-btn' + (alreadyReacted ? ' reacted' : '') + '" id="react-' + esc(memKey.replace(':','-')) + '" onclick="doReact(&apos;' + esc(p.identifier) + '&apos;,&apos;' + esc(m.id) + '&apos;,this)">' +
         (alreadyReacted ? '&#10084;' : '&#9825;') + ' <span class="react-count">' + reactions + '</span>' +
       '</button>' +
-      '<a class="profile-link" href="' + API + '/p/' + esc(p.identifier) + '?key=' + encodeURIComponent(viewerKey) + '">' + esc(p.displayName) + '\'s chronicle \u2192</a>' +
+      '<a class="profile-link" href="' + API + '/p/' + esc(p.identifier) + '?key=' + encodeURIComponent(viewerKey) + '">' + esc(p.displayName) + '&apos;s chronicle \u2192</a>' +
     '</div>';
   return div;
 }
@@ -446,7 +446,7 @@ function renderInterestTab() {
 function renderInterestFormHTML() {
   var locVal = (interests.locations || []).join(', ');
   var tagChips = (interests.tags || []).map(function(t) {
-    return '<span class="tag-chip">' + esc(t) + '<button onclick="removeTag(\'' + esc(t) + '\')" title="Remove">&times;</button></span>';
+    return '<span class="tag-chip">' + esc(t) + '<button onclick="removeTag(&apos;' + esc(t) + '&apos;)" title="Remove">&times;</button></span>';
   }).join('');
 
   return '<div class="interest-form">' +
@@ -462,7 +462,7 @@ function renderInterestFormHTML() {
     '</div>' +
     '<label class="field-label">Tags &amp; themes</label>' +
     '<div class="tags-input-row">' +
-      '<input type="text" id="int-tag-input" placeholder="wartime, emigration, music\u2026" onkeydown="if(event.key===\'Enter\'){addTag();event.preventDefault();}">' +
+      '<input type="text" id="int-tag-input" placeholder="wartime, emigration, music\u2026" onkeydown="if(event.key===&apos;Enter&apos;){addTag();event.preventDefault();}">' +
       '<button onclick="addTag()">Add</button>' +
     '</div>' +
     '<div class="tag-chips" id="tag-chips">' + tagChips + '</div>' +
@@ -494,7 +494,7 @@ function refreshTagChips() {
   var el = document.getElementById('tag-chips');
   if (!el) return;
   el.innerHTML = (interests.tags || []).map(function(t) {
-    return '<span class="tag-chip">' + esc(t) + '<button onclick="removeTag(\'' + esc(t) + '\')" title="Remove">&times;</button></span>';
+    return '<span class="tag-chip">' + esc(t) + '<button onclick="removeTag(&apos;' + esc(t) + '&apos;)" title="Remove">&times;</button></span>';
   }).join('');
 }
 
