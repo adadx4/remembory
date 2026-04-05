@@ -3168,7 +3168,7 @@ function SettingsView({
   importBackup, shareCodeInput, setShareCodeInput,
   shareCodeStatus, importFromCode,
   saveBackupBusy, setSaveBackupBusy,
-  syncInfo, syncStatus, chooseSyncFile, createSyncFile, doSync, clearSyncFile, buildBackupJson,
+  syncInfo, syncStatus, chooseSyncFile, createSyncFile, doSync, clearSyncFile, buildBackupJson, isMobile,
   unpublishProfile,
 }) {
 
@@ -3306,7 +3306,7 @@ function SettingsView({
       // ── Cloud Sync ──
       React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Cloud Sync"),
-        window.showOpenFilePicker
+        !isMobile
           ? React.createElement(React.Fragment,null,
               React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.6}},
                 "Keep Chronicle in sync across devices using a file in your cloud storage folder (iCloud Drive, Dropbox, Google Drive, OneDrive etc.)."),
@@ -6343,7 +6343,7 @@ function handleEdit(m) {
         importBackup, shareCodeInput, setShareCodeInput,
         shareCodeStatus, importFromCode,
         saveBackupBusy, setSaveBackupBusy,
-        syncInfo, syncStatus, chooseSyncFile, createSyncFile, doSync, clearSyncFile, buildBackupJson,
+        syncInfo, syncStatus, chooseSyncFile, createSyncFile, doSync, clearSyncFile, buildBackupJson, isMobile,
       }),
 
 
