@@ -4233,7 +4233,13 @@ function App() {
     if(licenceKey) return licenceKey;
     try{
       let k=localStorage.getItem("chronicle-social-key");
-      if(!k){k=crypto.randomUUID();localStorage.setItem("chronicle-social-key",k);}
+      if(!k){
+        const uuid = typeof crypto.randomUUID==="function"
+          ? crypto.randomUUID()
+          : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==="x"?r:(r&0x3|0x8)).toString(16);});
+        k=uuid;
+        localStorage.setItem("chronicle-social-key",k);
+      }
       return k;
     }catch(e){return "";}
   },[licenceKey]);
@@ -4244,20 +4250,6 @@ function App() {
   React.useEffect(()=>{
     if(licenceKey){validateLicenceKey(licenceKey).then(s=>{
       setLicenceStatus(s);
-      // Fetch mention notifications if we have an email
-      const email = s?.email || ownerEmail || carerEmail;
-      if(s?.valid && email){
-        fetch(WORKER_URL+"/mentions/"+encodeURIComponent(email))
-          .then(r=>r.ok?r.json():null)
-          .then(d=>{
-            if (!d) return;
-            const mentions = (d.mentions||[]).map(n=>({...n, type:"mention"}));
-            const placeMatches = (d.placeMatches||[]).map(n=>({...n, type:"place-match"}));
-            const all = [...mentions, ...placeMatches];
-            if (all.length) setNotifications(all);
-          })
-          .catch(()=>{});
-      }
     });}
     else{setLicenceStatus(null);}
   },[licenceKey]);
