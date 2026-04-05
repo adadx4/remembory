@@ -136,14 +136,24 @@ function explorePage() {
     .logo span { font-weight: 400; font-style: italic; font-size: 1rem; color: #8a7460; margin-left: 6px; }
     .key-status { font-size: 0.78rem; color: #8a7460; font-style: italic; }
     .key-status.active { color: #4a7a5a; }
-    nav.tabs { display: flex; border-bottom: 2px solid #e0d4be; background: #faf7f2; overflow-x: auto; }
-    nav.tabs button { flex: 1; min-width: 90px; padding: 12px 8px 10px; border: none; background: transparent; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 0.95rem; color: #8a7460; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; transition: color 0.15s; }
+    nav.tabs { display: flex; border-bottom: 2px solid #e0d4be; background: #faf7f2; }
+    nav.tabs button { flex: 1; padding: 12px 8px 10px; border: none; background: transparent; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 0.95rem; color: #8a7460; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.15s; }
     nav.tabs button.active { color: #1a1208; border-bottom-color: #2c2416; font-weight: 600; }
     nav.tabs button:hover:not(.active) { color: #4a3820; }
-    main { max-width: 680px; margin: 0 auto; padding: 24px 16px 60px; }
-    .feed-header { margin-bottom: 20px; }
-    .feed-header h2 { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-style: italic; color: #1a1208; margin-bottom: 4px; }
-    .feed-header p { font-size: 0.88rem; color: #8a7460; line-height: 1.5; }
+    main { max-width: 680px; margin: 0 auto; padding: 20px 16px 60px; }
+    /* Browse controls */
+    .browse-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+    .sort-group { display: flex; gap: 0; border: 1px solid #c8b89a; border-radius: 20px; overflow: hidden; }
+    .sort-btn { padding: 5px 16px; border: none; background: transparent; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 0.88rem; color: #8a7460; transition: all 0.15s; }
+    .sort-btn.active { background: #2c2416; color: #f5f0e8; }
+    .sort-btn:not(.active):hover { background: rgba(44,36,22,0.06); }
+    .period-group { display: flex; gap: 0; border: 1px solid #c8b89a; border-radius: 20px; overflow: hidden; }
+    .period-btn { padding: 5px 14px; border: none; background: transparent; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 0.88rem; color: #8a7460; transition: all 0.15s; }
+    .period-btn.active { background: #2c2416; color: #f5f0e8; }
+    .period-btn:not(.active):hover { background: rgba(44,36,22,0.06); }
+    .connected-filter { display: flex; align-items: center; gap: 6px; font-size: 0.88rem; color: #6a5840; cursor: pointer; margin-left: auto; }
+    .connected-filter input { cursor: pointer; accent-color: #2c2416; width: 15px; height: 15px; }
+    /* Cards */
     .card { background: #fffcf5; border: 1px solid #d4c4a8; border-radius: 4px; padding: 20px; margin-bottom: 16px; transition: box-shadow 0.15s; }
     .card:hover { box-shadow: 0 4px 20px rgba(44,36,22,0.1); }
     .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
@@ -152,7 +162,7 @@ function explorePage() {
     .card-byline { flex: 1; min-width: 0; }
     .card-byline strong { display: block; font-size: 0.95rem; color: #1a1208; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .card-byline span { font-size: 0.78rem; color: #8a7460; font-style: italic; }
-    .vis-badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 10px; font-family: Arial, sans-serif; letter-spacing: 0.04em; }
+    .vis-badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 10px; font-family: Arial, sans-serif; letter-spacing: 0.04em; flex-shrink: 0; }
     .vis-public { background: rgba(74,122,90,0.12); color: #2d6b3a; border: 1px solid rgba(74,122,90,0.3); }
     .vis-connected { background: rgba(100,120,160,0.12); color: #3a4a7a; border: 1px solid rgba(100,120,160,0.3); }
     .vis-subscriber { background: rgba(168,136,90,0.12); color: #7a5a20; border: 1px solid rgba(168,136,90,0.3); }
@@ -163,35 +173,35 @@ function explorePage() {
     .card-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid #ede4d4; }
     .react-btn { background: transparent; border: 1px solid #d4c4a8; border-radius: 20px; padding: 4px 12px; cursor: pointer; font-size: 0.88rem; color: #8a7460; font-family: 'Crimson Text', serif; transition: all 0.15s; display: flex; align-items: center; gap: 5px; }
     .react-btn:hover, .react-btn.reacted { background: rgba(200,100,100,0.08); border-color: rgba(200,100,100,0.3); color: #a04040; }
-    .profile-link { font-size: 0.78rem; color: #a8885a; text-decoration: underline; cursor: pointer; }
+    .profile-link { font-size: 0.78rem; color: #a8885a; text-decoration: underline; }
     .loading { color: #8a7460; font-style: italic; padding: 40px 0; text-align: center; }
     .empty { text-align: center; padding: 60px 20px; color: #8a7460; }
     .empty h3 { font-family: 'Playfair Display', serif; font-style: italic; margin-bottom: 8px; font-size: 1.2rem; color: #4a3820; }
     .empty p { font-size: 0.9rem; line-height: 1.6; }
-    .period-toggle { display: flex; gap: 6px; margin-bottom: 20px; }
-    .period-btn { padding: 5px 14px; border: 1px solid #c8b89a; border-radius: 20px; background: transparent; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 0.88rem; color: #8a7460; }
-    .period-btn.active { background: #2c2416; color: #f5f0e8; border-color: #2c2416; }
-    /* Interest tab */
+    /* Interests tab */
     .interest-form { background: #fffcf5; border: 1px solid #d4c4a8; border-radius: 4px; padding: 20px; margin-bottom: 24px; }
     .interest-form h3 { font-family: 'Playfair Display', serif; font-style: italic; font-size: 1.1rem; margin-bottom: 4px; color: #1a1208; }
-    .interest-form p { font-size: 0.84rem; color: #8a7460; margin-bottom: 16px; line-height: 1.5; }
-    label.field-label { display: block; font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase; color: #6a5840; margin-bottom: 5px; margin-top: 14px; font-family: Arial, sans-serif; }
-    input[type=text], input[type=number] { width: 100%; padding: 8px 10px; border: 1px solid #c8b89a; border-radius: 3px; font-family: 'Crimson Text', serif; font-size: 0.95rem; background: #faf7f2; color: #1a1208; }
-    input[type=text]:focus, input[type=number]:focus { outline: none; border-color: #a8885a; }
+    .interest-form p { font-size: 0.84rem; color: #8a7460; margin-bottom: 14px; line-height: 1.5; }
+    .field-section { margin-top: 14px; }
+    label.field-label { display: block; font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase; color: #6a5840; margin-bottom: 6px; font-family: Arial, sans-serif; }
+    .chip-group { display: flex; flex-wrap: wrap; gap: 5px; }
+    .int-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; padding: 3px 10px; background: rgba(200,168,122,0.15); border: 1px solid rgba(200,168,122,0.35); border-radius: 10px; color: #5a4020; }
+    .int-chip button { background: none; border: none; cursor: pointer; color: #a8885a; font-size: 0.9rem; padding: 0 0 0 2px; line-height: 1; }
+    .int-chip button:hover { color: #c04040; }
+    .add-chip-row { display: flex; gap: 6px; margin-top: 8px; }
+    .add-chip-row input { flex: 1; padding: 7px 10px; border: 1px solid #c8b89a; border-radius: 3px; font-family: 'Crimson Text', serif; font-size: 0.92rem; background: #faf7f2; color: #1a1208; }
+    .add-chip-row input:focus { outline: none; border-color: #a8885a; }
+    .add-chip-row button { padding: 7px 14px; background: #2c2416; color: #f5f0e8; border: none; border-radius: 3px; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 0.9rem; white-space: nowrap; }
     .year-row { display: flex; gap: 8px; align-items: center; }
     .year-row span { color: #8a7460; font-size: 0.88rem; }
-    .year-row input { flex: 1; }
-    .tags-input-row { display: flex; gap: 6px; }
-    .tags-input-row input { flex: 1; }
-    .tags-input-row button { padding: 8px 12px; background: #2c2416; color: #f5f0e8; border: none; border-radius: 3px; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 0.9rem; }
-    .tag-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
-    .tag-chip { display: flex; align-items: center; gap: 4px; font-size: 0.78rem; padding: 2px 8px; background: rgba(200,168,122,0.15); border: 1px solid rgba(200,168,122,0.35); border-radius: 10px; color: #5a4020; }
-    .tag-chip button { background: none; border: none; cursor: pointer; color: #8a7460; font-size: 0.9rem; padding: 0; line-height: 1; }
-    .save-btn { margin-top: 16px; padding: 10px 20px; background: #2c2416; color: #f5f0e8; border: none; border-radius: 3px; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 1rem; }
+    .year-row input { flex: 1; padding: 7px 10px; border: 1px solid #c8b89a; border-radius: 3px; font-family: 'Crimson Text', serif; font-size: 0.92rem; background: #faf7f2; color: #1a1208; }
+    .year-row input:focus { outline: none; border-color: #a8885a; }
+    .save-btn { margin-top: 18px; padding: 10px 20px; background: #2c2416; color: #f5f0e8; border: none; border-radius: 3px; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 1rem; }
     .save-btn:disabled { opacity: 0.5; }
     .save-msg { font-size: 0.82rem; margin-top: 8px; font-style: italic; }
     .save-msg.ok { color: #4a7a5a; }
     .save-msg.err { color: #c4858a; }
+    .results-heading { font-family: 'Playfair Display', serif; font-style: italic; font-size: 1.1rem; color: #1a1208; margin-bottom: 14px; }
     /* No-key banner */
     .no-key-banner { background: #fff8ec; border: 1px solid #e8d4a0; border-radius: 4px; padding: 14px 16px; margin-bottom: 20px; font-size: 0.88rem; color: #5a4820; line-height: 1.6; }
     .no-key-banner strong { display: block; margin-bottom: 4px; }
@@ -202,137 +212,139 @@ function explorePage() {
   <div class="logo">Chronicle <span>Explore</span></div>
   <div class="key-status" id="key-status">Not signed in</div>
 </header>
-<nav class="tabs" id="tabs">
-  <button onclick="switchTab('latest')" id="tab-latest">Latest</button>
-  <button onclick="switchTab('popular')" id="tab-popular">Popular</button>
-  <button onclick="switchTab('connected')" id="tab-connected">Connected</button>
+<nav class="tabs">
+  <button onclick="switchTab('browse')" id="tab-browse" class="active">Browse</button>
   <button onclick="switchTab('interests')" id="tab-interests">Interests</button>
 </nav>
-<main>
-  <div id="feed-header" class="feed-header"></div>
-  <div id="period-toggle" style="display:none" class="period-toggle">
-    <button class="period-btn active" id="period-7d" onclick="setPeriod('7d')">Last 7 days</button>
-    <button class="period-btn" id="period-24h" onclick="setPeriod('24h')">Last 24 hours</button>
-  </div>
-  <div id="feed"></div>
+<main id="main-content">
 </main>
 
 <script>
 var API = 'https://social.remembory.net';
 var viewerKey = '';
-var activeTab = 'latest';
-var popularPeriod = '7d';
-var interests = { locations: [], yearFrom: '', yearTo: '', tags: [] };
+var viewerId = '';
+var activeTab = 'browse';
+var browseSort = 'latest';
+var browsePeriod = '7d';
+var browseConnected = false;
+var interests = { locations: [], yearFrom: null, yearTo: null, tags: [] };
 var reactedMemories = {};
+var ownProfileDefaults = null; // populated from /profile/:id
 
 function getParam(name) {
   return new URLSearchParams(location.search).get(name) || '';
 }
-
 function lsGet(k) { try { return localStorage.getItem(k); } catch(e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch(e) {} }
 
-function init() {
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function init() {
   var keyFromUrl = getParam('key');
+  var idFromUrl = getParam('id');
   if (keyFromUrl) { lsSet('chronicle-explore-key', keyFromUrl); viewerKey = keyFromUrl; }
   else { viewerKey = lsGet('chronicle-explore-key') || ''; }
-
-  var tabFromUrl = getParam('tab');
+  if (idFromUrl) { lsSet('chronicle-explore-id', idFromUrl); viewerId = idFromUrl; }
+  else { viewerId = lsGet('chronicle-explore-id') || ''; }
 
   var reacted = lsGet('chronicle-explore-reacted');
   if (reacted) { try { reactedMemories = JSON.parse(reacted); } catch(e) {} }
 
   updateKeyStatus();
-  loadInterestPrefs().then(function() {
-    switchTab(tabFromUrl || 'latest');
-  });
+
+  // Load stored interest prefs and own profile defaults in parallel
+  await Promise.all([loadInterestPrefs(), loadOwnProfileDefaults()]);
+
+  var tabFromUrl = getParam('tab');
+  switchTab(tabFromUrl || 'browse');
 }
 
 function updateKeyStatus() {
   var el = document.getElementById('key-status');
-  if (viewerKey) {
-    el.textContent = 'Signed in via Chronicle';
-    el.className = 'key-status active';
-  } else {
-    el.textContent = 'Not signed in';
-    el.className = 'key-status';
-  }
+  if (viewerKey) { el.textContent = 'Signed in via Chronicle'; el.className = 'key-status active'; }
+  else { el.textContent = 'Not signed in'; el.className = 'key-status'; }
 }
 
 function switchTab(tab) {
   activeTab = tab;
-  ['latest','popular','connected','interests'].forEach(function(t) {
-    var btn = document.getElementById('tab-' + t);
-    if (btn) btn.className = t === tab ? 'active' : '';
-  });
-  document.getElementById('period-toggle').style.display = tab === 'popular' ? 'flex' : 'none';
-  loadTab();
+  document.getElementById('tab-browse').className = tab === 'browse' ? 'active' : '';
+  document.getElementById('tab-interests').className = tab === 'interests' ? 'active' : '';
+  if (tab === 'browse') renderBrowseTab();
+  else renderInterestTab();
+}
+
+// ── Browse tab ────────────────────────────────────────────────────────────────
+function renderBrowseTab() {
+  var main = document.getElementById('main-content');
+  main.innerHTML =
+    '<div class="browse-controls">' +
+      '<div class="sort-group">' +
+        '<button class="sort-btn' + (browseSort==='latest'?' active':'') + '" onclick="setSort(&apos;latest&apos;)">Latest</button>' +
+        '<button class="sort-btn' + (browseSort==='popular'?' active':'') + '" onclick="setSort(&apos;popular&apos;)">Popular</button>' +
+      '</div>' +
+      '<div class="period-group" id="period-group" style="' + (browseSort==='popular'?'':'display:none') + '">' +
+        '<button class="period-btn' + (browsePeriod==='7d'?' active':'') + '" onclick="setPeriod(&apos;7d&apos;)">7 days</button>' +
+        '<button class="period-btn' + (browsePeriod==='24h'?' active':'') + '" onclick="setPeriod(&apos;24h&apos;)">24 hours</button>' +
+      '</div>' +
+      '<label class="connected-filter">' +
+        '<input type="checkbox" id="connected-cb"' + (browseConnected?' checked':'') + ' onchange="setConnected(this.checked)"> My connections only' +
+      '</label>' +
+    '</div>' +
+    '<div id="browse-feed"><p class="loading">Loading\u2026</p></div>';
+  loadBrowseFeed();
+}
+
+function setSort(sort) {
+  browseSort = sort;
+  var pg = document.getElementById('period-group');
+  if (pg) pg.style.display = sort === 'popular' ? '' : 'none';
+  var btns = document.querySelectorAll('.sort-btn');
+  btns.forEach(function(b) { b.className = 'sort-btn' + (b.textContent.toLowerCase() === sort ? ' active' : ''); });
+  loadBrowseFeed();
 }
 
 function setPeriod(period) {
-  popularPeriod = period;
-  document.getElementById('period-7d').className = 'period-btn' + (period === '7d' ? ' active' : '');
-  document.getElementById('period-24h').className = 'period-btn' + (period === '24h' ? ' active' : '');
-  loadTab();
+  browsePeriod = period;
+  var btns = document.querySelectorAll('.period-btn');
+  btns.forEach(function(b) { b.className = 'period-btn' + (b.textContent.trim() === (period==='7d'?'7 days':'24 hours') ? ' active' : ''); });
+  loadBrowseFeed();
 }
 
-function setFeedHeader(title, subtitle) {
-  document.getElementById('feed-header').innerHTML =
-    '<h2>' + esc(title) + '</h2>' + (subtitle ? '<p>' + esc(subtitle) + '</p>' : '');
+function setConnected(checked) {
+  browseConnected = checked;
+  loadBrowseFeed();
 }
 
-async function loadTab() {
-  if (activeTab === 'interests') { renderInterestTab(); return; }
-  var feed = document.getElementById('feed');
-  feed.innerHTML = '<p class="loading">Loading\u2026</p>';
+async function loadBrowseFeed() {
+  var feedEl = document.getElementById('browse-feed');
+  if (!feedEl) return;
+  feedEl.innerHTML = '<p class="loading">Loading\u2026</p>';
   try {
-    var data;
-    if (activeTab === 'latest') {
-      setFeedHeader('Latest', 'Recently updated chronicles from the community.');
-      data = await apiFetch('/explore/latest?key=' + encodeURIComponent(viewerKey));
-      renderCards(data.entries || []);
-    } else if (activeTab === 'popular') {
-      setFeedHeader('Popular', 'Memories that resonated most recently.');
-      data = await apiFetch('/explore/popular?key=' + encodeURIComponent(viewerKey) + '&period=' + popularPeriod);
-      renderCards(data.entries || []);
-    } else if (activeTab === 'connected') {
-      setFeedHeader('Connected', 'Memories from people in your connections.');
-      if (!viewerKey) {
-        feed.innerHTML = noKeyBanner('The Connected tab shows memories from people you know in Chronicle. Open Chronicle and use Explore from there to sign in.');
-        return;
-      }
-      data = await apiFetch('/explore/connected?key=' + encodeURIComponent(viewerKey));
-      renderCards(data.entries || []);
+    var qs = '/explore/feed?sort=' + browseSort + '&period=' + browsePeriod + '&key=' + encodeURIComponent(viewerKey);
+    if (browseConnected) qs += '&connected=1';
+    var data = await apiFetch(qs);
+    var entries = data.entries || [];
+    if (!entries.length) {
+      var emptyMsg = browseConnected
+        ? 'No memories from your connections yet. Make sure you have published your own profile and your connections have published theirs.'
+        : 'No memories published yet. Be the first \u2014 publish your chronicle in the Chronicle app.';
+      feedEl.innerHTML = '<div class="empty"><h3>Nothing here yet</h3><p>' + esc(emptyMsg) + '</p></div>';
+    } else {
+      feedEl.innerHTML = '';
+      entries.forEach(function(entry) { feedEl.appendChild(makeCard(entry)); });
     }
   } catch(e) {
-    feed.innerHTML = '<p class="loading" style="color:#c4858a">Could not load feed: ' + esc(e.message) + '</p>';
+    feedEl.innerHTML = '<p class="loading" style="color:#c4858a">Could not load feed: ' + esc(e.message) + '</p>';
   }
 }
 
+// ── Shared card rendering ─────────────────────────────────────────────────────
 async function apiFetch(path) {
   var r = await fetch(API + path);
   if (!r.ok) throw new Error('Server error ' + r.status);
   return r.json();
-}
-
-function noKeyBanner(msg) {
-  return '<div class="no-key-banner"><strong>Sign in with Chronicle</strong>' + esc(msg) + '</div>';
-}
-
-function renderCards(entries) {
-  var feed = document.getElementById('feed');
-  if (!entries.length) {
-    feed.innerHTML = '<div class="empty"><h3>Nothing here yet</h3><p>Be the first — publish your chronicle in the Chronicle app.</p></div>';
-    return;
-  }
-  feed.innerHTML = '';
-  entries.forEach(function(entry) {
-    feed.appendChild(makeCard(entry));
-  });
-}
-
-function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function makeCard(entry) {
@@ -341,40 +353,32 @@ function makeCard(entry) {
   var reactions = entry.reactions || 0;
   var memKey = p.identifier + ':' + m.id;
   var alreadyReacted = !!reactedMemories[memKey];
-
   var vis = m.visibility || 'public';
   var visBadgeClass = vis === 'connected' ? 'vis-connected' : vis === 'subscriber' ? 'vis-subscriber' : 'vis-public';
   var visLabel = vis === 'connected' ? 'Connected' : vis === 'subscriber' ? 'Subscribers' : 'Public';
-
   var chips = '';
   if (m.year) chips += '<span class="chip">' + esc(String(m.year)) + '</span>';
   if (m.location) chips += '<span class="chip">&#128205; ' + esc(m.location) + '</span>';
   (m.tags || []).slice(0,3).forEach(function(t) { chips += '<span class="chip">' + esc(t) + '</span>'; });
-
   var avatarInner = p.imageUrl
     ? '<img src="' + esc(p.imageUrl) + '" alt="" onerror="this.style.display=&apos;none&apos;">'
     : esc((p.displayName || '?')[0]);
-
   var excerpt = (m.content || '').replace(/<[^>]*>/g, '').slice(0, 220);
   if ((m.content || '').length > 220) excerpt += '\u2026';
-
   var div = document.createElement('div');
   div.className = 'card';
   div.innerHTML =
     '<div class="card-header">' +
       '<div class="avatar">' + avatarInner + '</div>' +
-      '<div class="card-byline">' +
-        '<strong>' + esc(p.displayName) + '</strong>' +
-        '<span>' + esc(memDateLabel(m)) + '</span>' +
-      '</div>' +
+      '<div class="card-byline"><strong>' + esc(p.displayName) + '</strong><span>' + esc(memDateLabel(m)) + '</span></div>' +
       '<span class="vis-badge ' + visBadgeClass + '">' + visLabel + '</span>' +
     '</div>' +
     (m.title ? '<div class="memory-title">' + esc(m.title) + '</div>' : '') +
     (chips ? '<div class="chips">' + chips + '</div>' : '') +
-    (excerpt ? '<p class="excerpt">' + esc(excerpt) + '</p>' : '') +
+    (excerpt ? '<p class="excerpt">' + excerpt + '</p>' : '') +
     '<div class="card-footer">' +
-      '<button class="react-btn' + (alreadyReacted ? ' reacted' : '') + '" id="react-' + esc(memKey.replace(':','-')) + '" onclick="doReact(&apos;' + esc(p.identifier) + '&apos;,&apos;' + esc(m.id) + '&apos;,this)">' +
-        (alreadyReacted ? '&#10084;' : '&#9825;') + ' <span class="react-count">' + reactions + '</span>' +
+      '<button class="react-btn' + (alreadyReacted?' reacted':'') + '" onclick="doReact(&apos;' + esc(p.identifier) + '&apos;,&apos;' + esc(m.id) + '&apos;,this)">' +
+        (alreadyReacted?'&#10084;':'&#9825;') + ' <span class="react-count">' + reactions + '</span>' +
       '</button>' +
       '<a class="profile-link" href="' + API + '/p/' + esc(p.identifier) + '?key=' + encodeURIComponent(viewerKey) + '">' + esc(p.displayName) + '&apos;s chronicle \u2192</a>' +
     '</div>';
@@ -383,7 +387,6 @@ function makeCard(entry) {
 
 function memDateLabel(m) {
   if (!m.year) return '';
-  if (m.fuzzy === 'year') return String(m.year);
   if (m.month) return new Date(m.year, m.month - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
   return String(m.year);
 }
@@ -413,134 +416,182 @@ async function doReact(identifier, memId, btn) {
   } catch(e) { /* silent */ }
 }
 
-// ── Interest tab ─────────────────────────────────────────────────────────────
+// ── Interests tab ─────────────────────────────────────────────────────────────
 async function loadInterestPrefs() {
   if (!viewerKey) return;
   try {
     var r = await fetch(API + '/interest/get?key=' + encodeURIComponent(viewerKey));
     if (r.ok) {
       var d = await r.json();
-      interests = d || interests;
+      if (d && (d.locations || d.tags || d.yearFrom || d.yearTo)) interests = d;
+    }
+  } catch(e) {}
+}
+
+async function loadOwnProfileDefaults() {
+  if (!viewerKey || !viewerId) return;
+  try {
+    var r = await fetch(API + '/profile/' + encodeURIComponent(viewerId) + '?key=' + encodeURIComponent(viewerKey));
+    if (!r.ok) return;
+    var profile = await r.json();
+    var mems = profile.memories || [];
+    var locs = [], tags = [], years = [];
+    mems.forEach(function(m) {
+      // Location: prefer town+country, fall back to location label
+      var loc = '';
+      if (m.locationTown && m.locationCountry) loc = m.locationTown + ', ' + m.locationCountry;
+      else if (m.locationTown) loc = m.locationTown;
+      else if (m.locationCountry) loc = m.locationCountry;
+      else if (m.location) loc = m.location;
+      if (loc && !locs.includes(loc)) locs.push(loc);
+      if (m.year && !years.includes(m.year)) years.push(m.year);
+      (m.tags || []).forEach(function(t) { if (t && !tags.includes(t)) tags.push(t); });
+    });
+    ownProfileDefaults = { locations: locs, years: years, tags: tags };
+    // Populate interests with defaults only if nothing was previously saved
+    if (!interests.locations.length && !interests.tags.length && !interests.yearFrom && !interests.yearTo) {
+      interests.locations = locs.slice();
+      interests.tags = tags.slice();
+      if (years.length) { interests.yearFrom = Math.min.apply(null, years); interests.yearTo = Math.max.apply(null, years); }
     }
   } catch(e) {}
 }
 
 function renderInterestTab() {
-  setFeedHeader('Interests', 'Declare your interests to find relevant memories.');
-  var feed = document.getElementById('feed');
-
-  if (!viewerKey) {
-    feed.innerHTML = noKeyBanner('Save your interests and find memories that match what matters to you. Open Chronicle and use Explore from there to sign in.') +
-      renderInterestFormHTML();
-    bindInterestForm();
-    return;
-  }
-
-  feed.innerHTML = renderInterestFormHTML();
-  bindInterestForm();
-
-  // Also show matching results below the form
-  loadInterestResults();
-}
-
-function renderInterestFormHTML() {
-  var locVal = (interests.locations || []).join(', ');
+  var main = document.getElementById('main-content');
+  var locChips = (interests.locations || []).map(function(l) {
+    return '<span class="int-chip">' + esc(l) + '<button onclick="removeInterestLoc(' + JSON.stringify(l).replace(/"/g,'&quot;') + ')" title="Remove">&times;</button></span>';
+  }).join('');
   var tagChips = (interests.tags || []).map(function(t) {
-    return '<span class="tag-chip">' + esc(t) + '<button onclick="removeTag(&apos;' + esc(t) + '&apos;)" title="Remove">&times;</button></span>';
+    return '<span class="int-chip">' + esc(t) + '<button onclick="removeInterestTag(' + JSON.stringify(t).replace(/"/g,'&quot;') + ')" title="Remove">&times;</button></span>';
   }).join('');
 
-  return '<div class="interest-form">' +
-    '<h3>Your interests</h3>' +
-    '<p>Chronicle will find memories that match these interests across all published chronicles.</p>' +
-    '<label class="field-label">Locations</label>' +
-    '<input type="text" id="int-locations" value="' + esc(locVal) + '" placeholder="Edinburgh, Scotland, Nova Scotia\u2026">' +
-    '<label class="field-label">Time period</label>' +
-    '<div class="year-row">' +
-      '<input type="number" id="int-year-from" value="' + esc(String(interests.yearFrom || '')) + '" placeholder="From year" min="1700" max="2100">' +
-      '<span>to</span>' +
-      '<input type="number" id="int-year-to" value="' + esc(String(interests.yearTo || '')) + '" placeholder="To year" min="1700" max="2100">' +
+  main.innerHTML =
+    '<div class="interest-form">' +
+      '<h3>Your interests</h3>' +
+      '<p>Find memories from other chronicles that match the places, periods, and themes that matter to you. Defaults are drawn from your own memories.</p>' +
+      '<div class="field-section">' +
+        '<label class="field-label">Locations</label>' +
+        '<div class="chip-group" id="loc-chips">' + (locChips || '<span style="font-size:0.82rem;color:#8a7460;font-style:italic">None yet</span>') + '</div>' +
+        '<div class="add-chip-row">' +
+          '<input type="text" id="loc-input" placeholder="Add a place\u2026" onkeydown="if(event.key===&apos;Enter&apos;){addInterestLoc();event.preventDefault();}">' +
+          '<button onclick="addInterestLoc()">Add</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="field-section">' +
+        '<label class="field-label">Time period</label>' +
+        '<div class="year-row">' +
+          '<input type="number" id="int-year-from" value="' + esc(String(interests.yearFrom || '')) + '" placeholder="From year" min="1700" max="2100">' +
+          '<span>to</span>' +
+          '<input type="number" id="int-year-to" value="' + esc(String(interests.yearTo || '')) + '" placeholder="To year" min="1700" max="2100">' +
+        '</div>' +
+      '</div>' +
+      '<div class="field-section">' +
+        '<label class="field-label">Tags &amp; themes</label>' +
+        '<div class="chip-group" id="tag-chips">' + (tagChips || '<span style="font-size:0.82rem;color:#8a7460;font-style:italic">None yet</span>') + '</div>' +
+        '<div class="add-chip-row">' +
+          '<input type="text" id="tag-input" placeholder="Add a tag or theme\u2026" onkeydown="if(event.key===&apos;Enter&apos;){addInterestTag();event.preventDefault();}">' +
+          '<button onclick="addInterestTag()">Add</button>' +
+        '</div>' +
+      '</div>' +
+      '<button class="save-btn" onclick="saveAndSearch()" id="save-int-btn">Find matching memories</button>' +
+      '<div class="save-msg" id="save-int-msg"></div>' +
     '</div>' +
-    '<label class="field-label">Tags &amp; themes</label>' +
-    '<div class="tags-input-row">' +
-      '<input type="text" id="int-tag-input" placeholder="wartime, emigration, music\u2026" onkeydown="if(event.key===&apos;Enter&apos;){addTag();event.preventDefault();}">' +
-      '<button onclick="addTag()">Add</button>' +
-    '</div>' +
-    '<div class="tag-chips" id="tag-chips">' + tagChips + '</div>' +
-    '<button class="save-btn" onclick="saveInterests()" id="save-int-btn">Save &amp; find matches</button>' +
-    '<div class="save-msg" id="save-int-msg"></div>' +
-  '</div>';
-}
+    '<div id="interest-results"></div>';
 
-function bindInterestForm() {}
-
-function addTag() {
-  var input = document.getElementById('int-tag-input');
-  var val = (input.value || '').trim().toLowerCase();
-  if (!val) return;
-  if (!interests.tags) interests.tags = [];
-  if (!interests.tags.includes(val)) {
-    interests.tags.push(val);
-    refreshTagChips();
+  // Auto-run search if we have defaults
+  if (interests.locations.length || interests.tags.length || interests.yearFrom || interests.yearTo) {
+    loadInterestResults();
   }
-  input.value = '';
 }
 
-function removeTag(tag) {
-  interests.tags = (interests.tags || []).filter(function(t) { return t !== tag; });
-  refreshTagChips();
+function refreshLocChips() {
+  var el = document.getElementById('loc-chips');
+  if (!el) return;
+  el.innerHTML = (interests.locations || []).map(function(l) {
+    return '<span class="int-chip">' + esc(l) + '<button onclick="removeInterestLoc(' + JSON.stringify(l).replace(/"/g,'&quot;') + ')" title="Remove">&times;</button></span>';
+  }).join('') || '<span style="font-size:0.82rem;color:#8a7460;font-style:italic">None yet</span>';
 }
 
 function refreshTagChips() {
   var el = document.getElementById('tag-chips');
   if (!el) return;
   el.innerHTML = (interests.tags || []).map(function(t) {
-    return '<span class="tag-chip">' + esc(t) + '<button onclick="removeTag(&apos;' + esc(t) + '&apos;)" title="Remove">&times;</button></span>';
-  }).join('');
+    return '<span class="int-chip">' + esc(t) + '<button onclick="removeInterestTag(' + JSON.stringify(t).replace(/"/g,'&quot;') + ')" title="Remove">&times;</button></span>';
+  }).join('') || '<span style="font-size:0.82rem;color:#8a7460;font-style:italic">None yet</span>';
 }
 
-async function saveInterests() {
-  var locRaw = (document.getElementById('int-locations') || {}).value || '';
-  var locs = locRaw.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+function addInterestLoc() {
+  var input = document.getElementById('loc-input');
+  var val = (input.value || '').trim();
+  if (!val) return;
+  if (!interests.locations) interests.locations = [];
+  if (!interests.locations.includes(val)) { interests.locations.push(val); refreshLocChips(); }
+  input.value = '';
+}
+
+function removeInterestLoc(loc) {
+  interests.locations = (interests.locations || []).filter(function(l) { return l !== loc; });
+  refreshLocChips();
+}
+
+function addInterestTag() {
+  var input = document.getElementById('tag-input');
+  var val = (input.value || '').trim().toLowerCase();
+  if (!val) return;
+  if (!interests.tags) interests.tags = [];
+  if (!interests.tags.includes(val)) { interests.tags.push(val); refreshTagChips(); }
+  input.value = '';
+}
+
+function removeInterestTag(tag) {
+  interests.tags = (interests.tags || []).filter(function(t) { return t !== tag; });
+  refreshTagChips();
+}
+
+async function saveAndSearch() {
   var yfEl = document.getElementById('int-year-from');
   var ytEl = document.getElementById('int-year-to');
-  interests.locations = locs;
   interests.yearFrom = yfEl && yfEl.value ? parseInt(yfEl.value) : null;
   interests.yearTo = ytEl && ytEl.value ? parseInt(ytEl.value) : null;
 
   var btn = document.getElementById('save-int-btn');
   var msg = document.getElementById('save-int-msg');
   if (btn) btn.disabled = true;
-  try {
-    var r = await fetch(API + '/interest/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: viewerKey, interests: interests })
-    });
-    if (!r.ok) throw new Error('Server error');
-    if (msg) { msg.textContent = '\u2713 Saved'; msg.className = 'save-msg ok'; }
-    loadInterestResults();
-  } catch(e) {
-    if (msg) { msg.textContent = 'Could not save: ' + esc(e.message); msg.className = 'save-msg err'; }
+
+  // Save prefs if signed in
+  if (viewerKey) {
+    try {
+      var r = await fetch(API + '/interest/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: viewerKey, interests: interests })
+      });
+      if (!r.ok) throw new Error('Server error');
+      if (msg) { msg.textContent = '\u2713 Saved'; msg.className = 'save-msg ok'; }
+    } catch(e) {
+      if (msg) { msg.textContent = 'Could not save: ' + esc(e.message); msg.className = 'save-msg err'; }
+    }
   }
+
+  await loadInterestResults();
   if (btn) btn.disabled = false;
 }
 
 async function loadInterestResults() {
+  var resultsDiv = document.getElementById('interest-results');
+  if (!resultsDiv) return;
+  resultsDiv.innerHTML = '<p class="loading">Finding matches\u2026</p>';
+
   var qs = '/explore/interest?key=' + encodeURIComponent(viewerKey);
   if (interests.locations && interests.locations.length) qs += '&locations=' + encodeURIComponent(interests.locations.join(','));
-  if (interests.yearFrom) qs += '&yearFrom=' + interests.yearFrom;
-  if (interests.yearTo) qs += '&yearTo=' + interests.yearTo;
+  var yfEl = document.getElementById('int-year-from');
+  var ytEl = document.getElementById('int-year-to');
+  var yf = (yfEl && yfEl.value) ? parseInt(yfEl.value) : interests.yearFrom;
+  var yt = (ytEl && ytEl.value) ? parseInt(ytEl.value) : interests.yearTo;
+  if (yf) qs += '&yearFrom=' + yf;
+  if (yt) qs += '&yearTo=' + yt;
   if (interests.tags && interests.tags.length) qs += '&tags=' + encodeURIComponent(interests.tags.join(','));
-
-  var feed = document.getElementById('feed');
-  var existing = feed.querySelector('.interest-form');
-  var resultsDiv = document.getElementById('interest-results');
-  if (!resultsDiv) {
-    resultsDiv = document.createElement('div');
-    resultsDiv.id = 'interest-results';
-    feed.appendChild(resultsDiv);
-  }
-  resultsDiv.innerHTML = '<p class="loading">Finding matches\u2026</p>';
 
   try {
     var data = await apiFetch(qs);
@@ -548,7 +599,7 @@ async function loadInterestResults() {
     if (!entries.length) {
       resultsDiv.innerHTML = '<div class="empty"><h3>No matches yet</h3><p>Refine your interests above, or wait for more chronicles to be published.</p></div>';
     } else {
-      resultsDiv.innerHTML = '<div class="feed-header" style="margin-bottom:16px"><h2 style="font-size:1.1rem">Matching memories (' + entries.length + ')</h2></div>';
+      resultsDiv.innerHTML = '<p class="results-heading">Matching memories (' + entries.length + ')</p>';
       var frag = document.createDocumentFragment();
       entries.forEach(function(entry) { frag.appendChild(makeCard(entry)); });
       resultsDiv.appendChild(frag);
@@ -794,59 +845,43 @@ export default {
       return json(pub);
     }
 
-    // GET /explore/latest
-    if (request.method === "GET" && path === "/explore/latest") {
+    // GET /explore/feed?sort=latest|popular&period=7d|24h&connected=1
+    if (request.method === "GET" && path === "/explore/feed") {
       const viewerKey = getViewerKey(request, url);
-      const viewerEmailHash = viewerKey ? await sha256hex(viewerKey.trim().toUpperCase()) : "";
-      const vEmailHash = viewerEmailHash ? await getViewerEmailHash(env, viewerEmailHash) : "";
-      const list = await getProfilesList(env);
-      const open = list.filter(p => p.profilePrivacy !== "disabled");
-      const cursor = parseInt(url.searchParams.get("cursor") || "0");
-      const page = open.slice(cursor, cursor + 20);
-      const entries = await buildEntries(env, page, vEmailHash, null);
-      return json({ entries, nextCursor: cursor + page.length < open.length ? cursor + page.length : null });
-    }
-
-    // GET /explore/popular?period=7d|24h
-    if (request.method === "GET" && path === "/explore/popular") {
-      const viewerKey = getViewerKey(request, url);
-      const viewerEmailHash = viewerKey ? await sha256hex(viewerKey.trim().toUpperCase()) : "";
-      const vEmailHash = viewerEmailHash ? await getViewerEmailHash(env, viewerEmailHash) : "";
+      const viewerKeyHash = viewerKey ? await sha256hex(viewerKey.trim().toUpperCase()) : "";
+      const vEmailHash = viewerKeyHash ? await getViewerEmailHash(env, viewerKeyHash) : "";
+      const sort = url.searchParams.get("sort") || "latest";
       const period = url.searchParams.get("period") || "7d";
-      const cutoff = Date.now() - (period === "24h" ? 86400000 : 7 * 86400000);
-      const list = await getProfilesList(env);
-      const open = list.filter(p => p.profilePrivacy !== "disabled");
-      // Fetch reaction totals for each profile in open list (batch — up to 20)
-      const sample = open.slice(0, 40);
-      const withReactions = await Promise.all(sample.map(async p => {
-        const rawRx = await env.SHARES.get("reactions:totals:" + p.identifier);
-        const totals = rawRx ? JSON.parse(rawRx) : {};
-        const recentTotal = Object.values(totals).reduce((s, v) => {
-          return s + (v.lastReactedAt && new Date(v.lastReactedAt).getTime() > cutoff ? v.count : 0);
-        }, 0);
-        return { ...p, recentTotal };
-      }));
-      withReactions.sort((a, b) => b.recentTotal - a.recentTotal);
-      const entries = await buildEntries(env, withReactions.slice(0, 20), vEmailHash, "most-reacted");
-      return json({ entries });
-    }
+      const connectedOnly = url.searchParams.get("connected") === "1";
+      const cutoff = sort === "popular" ? Date.now() - (period === "24h" ? 86400000 : 7 * 86400000) : 0;
 
-    // GET /explore/connected
-    if (request.method === "GET" && path === "/explore/connected") {
-      const viewerKey = getViewerKey(request, url);
-      if (!viewerKey) return json({ entries: [] });
-      const viewerKeyHash = await sha256hex(viewerKey.trim().toUpperCase());
-      const vEmailHash = await getViewerEmailHash(env, viewerKeyHash);
-      if (!vEmailHash) return json({ entries: [], hint: "Publish your profile first to see connected memories." });
-      const viewerIdentifier = await env.SHARES.get("keymap:" + viewerKeyHash) || "";
       const list = await getProfilesList(env);
-      // A profile is "connected" to viewer if viewer's emailHash is in their connectionEmailHashes
-      const connected = list.filter(p =>
-        p.profilePrivacy !== "disabled" &&
-        p.identifier !== viewerIdentifier &&
-        (p.connectionEmailHashes || []).includes(vEmailHash)
-      );
-      const entries = await buildEntries(env, connected, vEmailHash, null);
+      let profiles = list.filter(p => p.profilePrivacy !== "disabled");
+
+      if (connectedOnly) {
+        if (!vEmailHash) return json({ entries: [], hint: "Publish your profile to use the Connected filter." });
+        const viewerIdentifier = viewerKeyHash ? await env.SHARES.get("keymap:" + viewerKeyHash) || "" : "";
+        profiles = profiles.filter(p =>
+          p.identifier !== viewerIdentifier &&
+          (p.connectionEmailHashes || []).includes(vEmailHash)
+        );
+      }
+
+      let entries = await buildEntries(env, profiles.slice(0, 50), vEmailHash, sort, cutoff);
+
+      if (sort === "popular") {
+        entries.sort((a, b) => b._sortScore - a._sortScore);
+      } else {
+        // latest: sort by profile updatedAt desc, then memory year desc within same profile
+        entries.sort((a, b) => {
+          const dateDiff = b._profileUpdatedAt.localeCompare(a._profileUpdatedAt);
+          if (dateDiff !== 0) return dateDiff;
+          return (b.memory.year || 0) - (a.memory.year || 0);
+        });
+      }
+
+      // Strip internal sort fields
+      entries = entries.slice(0, 100).map(({ _sortScore, _profileUpdatedAt, ...e }) => e);
       return json({ entries });
     }
 
@@ -1104,9 +1139,9 @@ async function getViewerEmailHash(env, viewerKeyHash) {
   return profile.ownerEmailHash || "";
 }
 
-// Build feed entries: [{profile (compact), memory, reactions}]
-// Picks one representative memory per profile (most recent with public visibility)
-async function buildEntries(env, profileCompacts, viewerEmailHash, sortHint) {
+// Build feed entries: all visible memories across profiles
+// sort: "latest" (by profile updatedAt then memory year desc) | "popular" (by reactions in period)
+async function buildEntries(env, profileCompacts, viewerEmailHash, sort, cutoff) {
   const entries = [];
   for (const compact of profileCompacts) {
     const raw = await env.SHARES.get("profile:" + compact.identifier);
@@ -1117,33 +1152,33 @@ async function buildEntries(env, profileCompacts, viewerEmailHash, sortHint) {
     );
     if (!visibleMems.length) continue;
 
-    // Sort visible memories: if sortHint is "most-reacted", we need reaction counts
-    let sorted = [...visibleMems].sort((a, b) => {
-      const ay = a.year || 0, by2 = b.year || 0;
-      return by2 - ay;
-    });
+    const profileMeta = {
+      identifier: compact.identifier,
+      displayName: compact.displayName,
+      about: compact.about,
+      imageUrl: compact.imageUrl,
+    };
 
-    if (sortHint === "most-reacted") {
-      // Fetch reaction totals for this profile
-      const rawTotals = await env.SHARES.get("reactions:totals:" + compact.identifier);
-      const totals = rawTotals ? JSON.parse(rawTotals) : {};
-      sorted = sorted.sort((a, b) => ((totals[b.id]?.count || 0) - (totals[a.id]?.count || 0)));
+    const rawTotals = sort === "popular" ? await env.SHARES.get("reactions:totals:" + compact.identifier) : null;
+    const totals = rawTotals ? JSON.parse(rawTotals) : {};
+
+    for (const memory of visibleMems) {
+      const reactionCount = sort === "popular"
+        ? (totals[memory.id]?.count || 0)
+        : 0;
+      const recentReactions = sort === "popular" && cutoff
+        ? (totals[memory.id]?.lastReactedAt && new Date(totals[memory.id].lastReactedAt).getTime() > cutoff ? reactionCount : 0)
+        : reactionCount;
+      // For latest, use stored total reactions for display even though sort is by date
+      const displayReactions = totals[memory.id]?.count || 0;
+      entries.push({
+        profile: profileMeta,
+        memory,
+        reactions: displayReactions,
+        _sortScore: sort === "popular" ? recentReactions : (memory.year || 0),
+        _profileUpdatedAt: compact.updatedAt || "",
+      });
     }
-
-    const memory = sorted[0];
-    const rxRaw = await env.SHARES.get("reactions:" + compact.identifier + ":" + memory.id);
-    const reactions = rxRaw ? parseInt(rxRaw) : 0;
-
-    entries.push({
-      profile: {
-        identifier: compact.identifier,
-        displayName: compact.displayName,
-        about: compact.about,
-        imageUrl: compact.imageUrl,
-      },
-      memory,
-      reactions,
-    });
   }
   return entries;
 }
