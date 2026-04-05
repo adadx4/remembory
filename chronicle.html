@@ -2257,7 +2257,13 @@ async function geocode(name, cache) {
 }
 
 // ── MapView component ──────────────────────────────────────────
-function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords }) {
+function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords, knownLocations }) {
+  // Build a map from label → structured address for better geocoding
+  const knownLocMap = React.useMemo(() => {
+    const m = {};
+    (knownLocations||[]).forEach(l => { if (l && l.label) m[l.label] = l; });
+    return m;
+  }, [knownLocations]);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const [status, setStatus] = useState(""); // loading message
@@ -2318,7 +2324,19 @@ function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords }) {
       for (const loc of uniqueLocations) {
         // Rate limit: 1 req/sec for Nominatim
         if (!cache[loc]) await new Promise(r => setTimeout(r, 1100));
-        const coords = await geocode(loc, cache);
+        // Build a geocode query from structured address fields if available, fallback to label
+        let geocodeQuery = loc;
+        const kl = knownLocMap[loc];
+        if (kl) {
+          const parts = [kl.street, kl.town, kl.state, kl.country].filter(Boolean);
+          if (parts.length > 0) geocodeQuery = parts.join(", ");
+        }
+        // Use a separate cache key for the query so label→coords association stays correct
+        let coords = cache[loc];
+        if (!coords) {
+          coords = await geocode(geocodeQuery, cache);
+          if (coords) cache[loc] = coords; // store under label key
+        }
         if (!coords || !mapInstanceRef.current) continue;
 
         const mems = locationMemories[loc];
@@ -3983,9 +4001,15 @@ function AddEditForm({
   customTags, addCustomTag, removeCustomTag,
   wantPublicProfile, persistSubject,
   setForm, newForm, setEditingId, setView,
+  isCarerMode, ownerName, carerName,
 }) {
+  const addTitle = isCarerMode && ownerName ? `Record a Memory for ${ownerName}` : "Record a Memory";
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
-    React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.6rem",fontStyle:"italic",marginBottom:form._promptHint?"10px":"20px",color:"#1a1208"}},view==="edit"?"Edit Memory":"Record a Memory"),
+    React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.6rem",fontStyle:"italic",marginBottom:(form._promptHint||isCarerMode)?"10px":"20px",color:"#1a1208"}},view==="edit"?"Edit Memory":addTitle),
+    isCarerMode&&ownerName&&view==="add"&&React.createElement("div",{style:{background:"rgba(74,122,90,0.07)",border:"1px solid rgba(74,122,90,0.2)",borderRadius:"3px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.84rem",color:"#3a5a3a",lineHeight:1.6}},
+      `You're adding this to ${ownerName}'s chronicle.`,
+      carerName&&React.createElement("span",null,` Your name (${carerName}) will be recorded as the contributor.`)
+    ),
     form._promptHint&&React.createElement("div",{style:{
       background:"rgba(196,170,130,0.12)",border:"1px solid rgba(196,170,130,0.35)",
       borderRadius:"3px",padding:"10px 14px",marginBottom:"20px",
@@ -4150,7 +4174,7 @@ function AddEditForm({
         )
       ),
       React.createElement("div",{style:{display:"flex",gap:"10px",paddingTop:"4px"}},
-        React.createElement("button",{onClick:handleSubmit,style:S.btn},view==="edit"?"Save Changes":"Save to Chronicle"),
+        React.createElement("button",{onClick:handleSubmit,style:S.btn},view==="edit"?"Save Changes":isCarerMode&&ownerName?`Save to ${ownerName}'s Chronicle`:"Save to Chronicle"),
         React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView(view==="edit"?"detail":"life"); },style:S.btnOutline},"Cancel")
       )
     )
@@ -4171,6 +4195,7 @@ function App() {
   const [inAppShareCode, setInAppShareCode] = useState(null);
   const [inAppBrowser, setInAppBrowser] = useState(null);
   const [pendingEndMemory, setPendingEndMemory] = useState(null);
+  const [pendingAttribution, setPendingAttribution] = useState(null); // {memId} — post-save attribution prompt in carer mode
   const [showSubjectMgr, setShowSubjectMgr] = useState(false);
 
   // Detect ?share=code — block in-app browsers to avoid consuming the link
@@ -4231,6 +4256,7 @@ function App() {
   const carerName           = data.carerName || "";
   const carerEmail          = data.carerEmail || "";
   const carerMode           = data.carerMode || false;
+  const isCarerMode         = carerMode || !subject.isSelf;
   const suppressConnectRequests = data.suppressConnectRequests || [];
   const wantPublicProfile    = data.wantPublicProfile || false;
   const profileAbout         = data.profileAbout || "";
@@ -4649,7 +4675,9 @@ function App() {
       const toAdd = secondary ? [primary, secondary] : [primary];
       const updated = [...memories,...toAdd].sort((a,b)=>sortKey(a)-sortKey(b));
       persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs});
-      setForm(newForm()); setView("life");
+      setForm(newForm());
+      if (isCarerMode && carerName) { setPendingAttribution({memId: primary.id}); }
+      else setView("life");
     }
     setPendingEndMemory(null);
   }
@@ -5800,7 +5828,7 @@ function handleEdit(m) {
     if (view==="year") return `${zoomDecade}s › ${zoomYear}`;
     if (view==="detail") { const m=memories.find(x=>x.id===selected); return zoomYear?`${zoomDecade}s › ${zoomYear} › ${m?.title}`:zoomDecade?`${zoomDecade}s › ${m?.title}`:m?.title; }
     if (view==="timeline") return "All memories";
-    if (view==="add") return "Add memory";
+    if (view==="add") return isCarerMode&&ownerName ? `Add memory for ${ownerName}` : "Add memory";
     if (view==="edit") return "Edit memory";
     if (view==="import") return "Import";
     if (view==="prompt") return "Prompter";
@@ -5903,12 +5931,18 @@ function handleEdit(m) {
         React.createElement("span",{style:{fontSize:"0.88rem",color:"#6a5c48",marginLeft:"10px"}},"Add your name in Settings, and remember to back up regularly \u2014 your memories live in this browser and could be lost if you clear your browser data.")
       ),
       React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0}},
-        React.createElement("button",{
-          onClick:()=>{setView("settings");setOnboardingDismissed(true);},
-          style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem"}},"Open Settings"),
-        React.createElement("button",{
-          onClick:()=>setOnboardingDismissed(true),
-          style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1rem",padding:"4px 8px"}},"\u00d7")
+        React.createElement("button",{onClick:()=>{setView("settings");setOnboardingDismissed(true);},style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem"}},"Open Settings"),
+        React.createElement("button",{onClick:()=>setOnboardingDismissed(true),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1rem",padding:"4px 8px"}},"\u00d7")
+      )
+    ),
+    !onboardingDismissed && ownerName && isCarerMode && !carerName && React.createElement("div",{style:{background:"rgba(74,122,90,0.08)",borderBottom:"1px solid rgba(74,122,90,0.25)",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
+      React.createElement("div",null,
+        React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#2a4a32",fontWeight:600}},`Recording for ${ownerName}`),
+        React.createElement("span",{style:{fontSize:"0.88rem",color:"#4a6a52",marginLeft:"10px"}},"Add your name in Settings so your contributions are attributed correctly.")
+      ),
+      React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0}},
+        React.createElement("button",{onClick:()=>{setView("settings");setOnboardingDismissed(true);},style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem",background:"#4a7a5a"}},"Add your name"),
+        React.createElement("button",{onClick:()=>setOnboardingDismissed(true),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1rem",padding:"4px 8px"}},"\u00d7")
       )
     ),
 
@@ -6140,6 +6174,42 @@ function handleEdit(m) {
       )
     ),
 
+    // ── ATTRIBUTION MODAL (carer mode) ──
+    pendingAttribution&&React.createElement("div",{style:{position:"fixed",inset:0,background:"rgba(44,36,22,0.55)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}},
+      React.createElement("div",{style:{background:"#faf7f2",borderRadius:"4px",padding:"28px",maxWidth:"440px",width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,0.25)",border:"1px solid #c8b89a"}},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.3rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"How was this memory recalled?"),
+        React.createElement("p",{style:{fontSize:"0.88rem",color:"#8a7460",marginBottom:"20px",lineHeight:1.6}},
+          "This helps Chronicle record the source of each memory faithfully."
+        ),
+        ...[
+          ["self","📖",`${ownerName||"They"} remembered it themselves`,"This came from the subject's own recollection."],
+          ["carer","✍️",`${carerName||"You"} remembered it`,"You witnessed or recall this directly."],
+          ["told","💬","Told by someone else","A third party recounted this memory."],
+        ].map(([val,icon,label,hint])=>
+          React.createElement("button",{
+            key:val,
+            onClick:()=>{
+              const memId = pendingAttribution.memId;
+              setMemories(prev=>prev.map(m=>m.id===memId?{...m,recalledBy:val}:m));
+              setPendingAttribution(null);
+              setView("life");
+            },
+            style:{display:"flex",alignItems:"flex-start",gap:"12px",width:"100%",background:"#fffcf5",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"14px 16px",marginBottom:"10px",cursor:"pointer",textAlign:"left",fontFamily:"'Crimson Text',serif"}
+          },
+            React.createElement("span",{style:{fontSize:"1.3rem",flexShrink:0}},icon),
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:"1rem",color:"#1a1208",fontWeight:600,lineHeight:1.3}},label),
+              React.createElement("div",{style:{fontSize:"0.8rem",color:"#8a7460",marginTop:"2px",lineHeight:1.4}},hint)
+            )
+          )
+        ),
+        React.createElement("button",{
+          onClick:()=>{ setPendingAttribution(null); setView("life"); },
+          style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",textDecoration:"underline",padding:"4px 0",display:"block",margin:"0 auto"}
+        },"Skip for now")
+      )
+    ),
+
     // ── END DATE SECOND MEMORY MODAL ──
     pendingEndMemory&&(()=>{
       const { primary, secondary } = pendingEndMemory;
@@ -6179,8 +6249,9 @@ function handleEdit(m) {
           title:"Switch person",
           style:{display:"flex",alignItems:"center",gap:"5px",background:"rgba(200,168,122,0.12)",border:"1px solid rgba(200,168,122,0.4)",borderRadius:"20px",padding:"3px 10px 3px 8px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.82rem",color:"#6a4a28",whiteSpace:"nowrap",maxWidth:isMobile?"120px":"180px",overflow:"hidden",flexShrink:0}
         },
-          React.createElement("span",{style:{fontSize:"0.8rem",flexShrink:0}},subject.isSelf?"👤":"🧑"),
-          React.createElement("span",{style:{overflow:"hidden",textOverflow:"ellipsis"}},subject.name),
+          React.createElement("span",{style:{fontSize:"0.8rem",flexShrink:0}},isCarerMode?"🫂":subject.isSelf?"👤":"🧑"),
+          isCarerMode&&React.createElement("span",{style:{fontSize:"0.68rem",color:"#7a5a20",opacity:0.8,flexShrink:0}},carerName?"recording for":"for"),
+          React.createElement("span",{style:{overflow:"hidden",textOverflow:"ellipsis",fontWeight:isCarerMode?600:400}},subject.name),
           subjects.length>1&&React.createElement("span",{style:{opacity:0.5,fontSize:"0.7rem",flexShrink:0,marginLeft:"2px"}},"▾")
         ),
         !isMobile&&breadcrumb&&React.createElement(React.Fragment,null,
@@ -6263,11 +6334,12 @@ function handleEdit(m) {
       view==="map"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Map"),
         React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"18px",fontSize:"0.92rem"}},
-          `${[...new Set(memories.flatMap(m=>[m.location,...(m.locations||[])].filter(Boolean)))].length} locations across your memories — click a pin to explore`
+          `${[...new Set(memories.flatMap(m=>[m.location,...(m.locations||[])].filter(Boolean)))].length} locations across ${isCarerMode&&ownerName?`${ownerName}'s memories`:"your memories"} — click a pin to explore`
         ),
         React.createElement(MapView,{
           memories,
           locationCoords,
+          knownLocations,
           onSaveCoords: (allCoords) => {
             // allCoords = {[label]: {lat,lng,manual}} from auto-geocoding; merge into location objects
             const updated = knownLocations.map(l => {
@@ -6719,11 +6791,11 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
                         
       // ── LIFE VIEW ──
       view==="life"&&React.createElement("div",{style:{animation:"fadeIn 0.35s ease"}},
-        React.createElement("p",{style:{fontStyle:"italic",color:"#8a7460",marginBottom:"22px",fontSize:"0.95rem"}},memories.length===0?"Your story begins here.":`${memories.length} ${memories.length===1?"memory":"memories"} across ${allDecades.length} ${allDecades.length===1?"decade":"decades"}`),
+        React.createElement("p",{style:{fontStyle:"italic",color:"#8a7460",marginBottom:"22px",fontSize:"0.95rem"}},memories.length===0?(isCarerMode&&ownerName?`${ownerName}'s story begins here.`:"Your story begins here."):`${memories.length} ${memories.length===1?"memory":"memories"} across ${allDecades.length} ${allDecades.length===1?"decade":"decades"}`),
         memories.length===0&&React.createElement("div",{style:{textAlign:"center",padding:"60px 20px",color:"#8a7460"}},
           React.createElement("div",{style:{fontSize:"3rem",marginBottom:"12px",opacity:0.3}},"◎"),
-          React.createElement("p",{style:{fontFamily:"'Playfair Display',serif",fontStyle:"italic",fontSize:"1.2rem",margin:"0 0 8px"}},"Your chronicle is empty."),
-          React.createElement("p",{style:{fontSize:"0.95rem",margin:0}},"Press + Add to record your first memory.")
+          React.createElement("p",{style:{fontFamily:"'Playfair Display',serif",fontStyle:"italic",fontSize:"1.2rem",margin:"0 0 8px"}},isCarerMode&&ownerName?`${ownerName}'s chronicle is empty.`:"Your chronicle is empty."),
+          React.createElement("p",{style:{fontSize:"0.95rem",margin:0}},isCarerMode&&ownerName?`Press + Add to record a memory for ${ownerName}.`:"Press + Add to record your first memory.")
         ),
         React.createElement("div",{style:{display:"grid",gridTemplateColumns:isMobile?"repeat(auto-fill, minmax(140px, 1fr))":"repeat(auto-fill, minmax(190px, 1fr))",gap:isMobile?"10px":"14px"}},
           (()=>{
@@ -6849,6 +6921,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         customTags, addCustomTag, removeCustomTag,
         wantPublicProfile, persistSubject,
         setForm, newForm, setEditingId, setView,
+        isCarerMode, ownerName, carerName,
       }),
 
     )
