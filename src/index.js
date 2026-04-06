@@ -1061,7 +1061,27 @@ export default {
       }
 
       const viewerIdentifier2 = viewerKeyHash ? await env.SHARES.get("keymap:" + viewerKeyHash) || "" : "";
-      const entries = await buildEntries(env, finalMatched.slice(0, 30), vEmailHash, viewerIdentifier2, null);
+      const allEntries = await buildEntries(env, finalMatched.slice(0, 30), vEmailHash, viewerIdentifier2, null);
+
+      // Filter to only memories that actually match the interest criteria
+      const entries = allEntries.filter(e => {
+        const m = e.memory;
+        // Location match: check all location fields
+        const locMatch = !locations.length || (() => {
+          const memLocs = [m.locationTown, m.locationCountry, m.locationState, m.location]
+            .filter(Boolean).map(l => l.toLowerCase());
+          return memLocs.some(ml => locations.some(il => ml.includes(il)));
+        })();
+        // Year match
+        const yearMatch = (!yearFrom && !yearTo) || !!(
+          m.year && (yearFrom && yearTo ? m.year >= yearFrom && m.year <= yearTo :
+                     yearFrom ? m.year >= yearFrom : m.year <= yearTo)
+        );
+        // Tag match
+        const tagMatch = !tags.length ||
+          (m.tags || []).some(t => tags.some(it => t.toLowerCase().includes(it)));
+        return locMatch && yearMatch && tagMatch;
+      });
       return json({ entries });
     }
 
