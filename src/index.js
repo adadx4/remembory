@@ -1292,15 +1292,16 @@ async function getViewerEmailHash(env, viewerKeyHash) {
 
 // Build feed entries: all visible memories across profiles
 // sort: "latest" (by profile updatedAt then memory year desc) | "popular" (by reactions in period)
-async function buildEntries(env, profileCompacts, viewerEmailHash, sort, cutoff) {
+async function buildEntries(env, profileCompacts, viewerEmailHash, viewerIdentifier, sort, cutoff) {
   const entries = [];
   for (const compact of profileCompacts) {
     const raw = await env.SHARES.get("profile:" + compact.identifier);
     if (!raw) continue;
     const profile = JSON.parse(raw);
-    const visibleMems = (profile.memories || []).filter(m =>
-      canViewMemory(m, viewerEmailHash, profile.connectionEmailHashes || [])
-    );
+    const isOwner = !!(viewerIdentifier && viewerIdentifier === compact.identifier);
+    const visibleMems = isOwner
+      ? (profile.memories || []).filter(m => (m.visibility || "private") !== "private")
+      : (profile.memories || []).filter(m => canViewMemory(m, viewerEmailHash, profile.connectionEmailHashes || []));
     if (!visibleMems.length) continue;
 
     const profileMeta = {
