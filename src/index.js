@@ -235,7 +235,7 @@ function explorePage() {
 </header>
 <nav class="tabs">
   <button onclick="switchTab('browse')" id="tab-browse" class="active">Browse</button>
-  <button onclick="switchTab('interests')" id="tab-interests">Interests</button>
+  <button onclick="switchTab('interests')" id="tab-interests">Find</button>
 </nav>
 <div class="layout">
   <aside class="sidebar-left">
