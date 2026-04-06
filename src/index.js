@@ -558,6 +558,15 @@ window.addEventListener('DOMContentLoaded', init);
 </html>`;
 }
 
+// ── Location display helper ───────────────────────────────────────────────────
+function locationDisplay(m, detail) {
+  if (detail === "country") {
+    return m.locationCountry || m.locationState || m.location || "";
+  }
+  // "town" — default
+  return [m.locationTown, m.locationCountry].filter(Boolean).join(", ") || m.locationCountry || m.locationState || m.location || "";
+}
+
 // ── Individual profile page ───────────────────────────────────────────────────
 function profilePage(profile, visibleMems, isOwner, viewerKey, viewerIdentifier, connectionLevel) {
   const mems = visibleMems || [];
@@ -956,19 +965,20 @@ export default {
       const connectedOnly = url.searchParams.get("connected") === "1";
       const cutoff = sort === "popular" ? Date.now() - (period === "24h" ? 86400000 : 7 * 86400000) : 0;
 
+      const viewerIdentifier = viewerKeyHash ? await env.SHARES.get("keymap:" + viewerKeyHash) || "" : "";
+
       const list = await getProfilesList(env);
       let profiles = list.filter(p => p.profilePrivacy !== "disabled");
 
       if (connectedOnly) {
         if (!vEmailHash) return json({ entries: [], hint: "Publish your profile to use the Connected filter." });
-        const viewerIdentifier = viewerKeyHash ? await env.SHARES.get("keymap:" + viewerKeyHash) || "" : "";
         profiles = profiles.filter(p =>
           p.identifier === viewerIdentifier ||
           (p.connectionEmailHashes || []).includes(vEmailHash)
         );
       }
 
-      let entries = await buildEntries(env, profiles.slice(0, 50), vEmailHash, sort, cutoff);
+      let entries = await buildEntries(env, profiles.slice(0, 50), vEmailHash, viewerIdentifier, sort, cutoff);
 
       if (sort === "popular") {
         entries.sort((a, b) => b._sortScore - a._sortScore);
@@ -1050,7 +1060,8 @@ export default {
         finalMatched = finalMatched.filter(Boolean);
       }
 
-      const entries = await buildEntries(env, finalMatched.slice(0, 30), vEmailHash, null);
+      const viewerIdentifier2 = viewerKeyHash ? await env.SHARES.get("keymap:" + viewerKeyHash) || "" : "";
+      const entries = await buildEntries(env, finalMatched.slice(0, 30), vEmailHash, viewerIdentifier2, null);
       return json({ entries });
     }
 
