@@ -29,15 +29,47 @@ function esc(s) {
 
 // ── Visibility check ──────────────────────────────────────────────────────────
 // Returns true if a viewer (identified by their emailHash) can see this memory
-function canViewMemory(memory, viewerEmailHash, profileConnectionEmailHashes) {
+function canViewMemory(memory, viewerEmailHash, profileConnectionEmailHashes, isSubscriber) {
   const v = memory.visibility;
   if (!v || v === "private") return false;
   if (v === "public") return true;
-  if (v === "subscriber") return !!viewerEmailHash; // any keyed user counts as subscriber
+  if (v === "subscriber") return !!(isSubscriber || viewerEmailHash);
   if (v === "connected" || v === "tagged") {
     return !!(viewerEmailHash && profileConnectionEmailHashes && profileConnectionEmailHashes.includes(viewerEmailHash));
   }
   return false;
+}
+
+// Returns true if the viewer holds an active license OR has a published profile (legacy subscriber)
+async function checkSubscriber(env, viewerKeyHash, viewerEmailHash) {
+  if (viewerEmailHash) return true; // legacy: has published profile
+  if (!viewerKeyHash) return false;
+  const raw = await env.SHARES.get("license:" + viewerKeyHash);
+  if (!raw) return false;
+  const lic = JSON.parse(raw);
+  return lic.status === "active";
+}
+
+function generateLicenseKey() {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+  return `REM-${hex.slice(0,4)}-${hex.slice(4,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}`;
+}
+
+async function verifyStripeSignature(bodyText, sigHeader, secret) {
+  const parts = Object.fromEntries(sigHeader.split(",").map(p => p.split("=")));
+  const ts = parts.t, v1 = parts.v1;
+  if (!ts || !v1) return false;
+  if (Math.abs(Date.now() / 1000 - parseInt(ts)) > 300) return false;
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${ts}.${bodyText}`));
+  const expected = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+  if (expected.length !== v1.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ v1.charCodeAt(i);
+  return diff === 0;
 }
 
 // ── Bridge page (share links) ─────────────────────────────────────────────────
@@ -830,9 +862,10 @@ export default {
       const viewerIdentifier = viewerKeyHash ? await env.SHARES.get("keymap:" + viewerKeyHash) : "";
       const isOwner = !!(viewerIdentifier && viewerIdentifier === identifier);
       const vEmailHash = (!isOwner && viewerKeyHash) ? await getViewerEmailHash(env, viewerKeyHash) : "";
+      const isSub = !isOwner ? await checkSubscriber(env, viewerKeyHash, vEmailHash) : false;
       const visibleMems = isOwner
         ? (profile.memories || [])
-        : (profile.memories || []).filter(m => canViewMemory(m, vEmailHash, profile.connectionEmailHashes || []));
+        : (profile.memories || []).filter(m => canViewMemory(m, vEmailHash, profile.connectionEmailHashes || [], isSub));
       const connectionLevel = isOwner ? "owner" : (vEmailHash && (profile.connectionEmailHashes || []).includes(vEmailHash)) ? "connected" : "public";
       return new Response(profilePage(profile, visibleMems, isOwner, viewerKey, viewerIdentifier || "", connectionLevel), {
         headers: { "Content-Type": "text/html;charset=UTF-8", "Cache-Control": "no-store" },
@@ -948,7 +981,8 @@ export default {
       const pub = { ...profile };
       if (!isOwner) {
         const vEmailHash = viewerKeyHash ? await getViewerEmailHash(env, viewerKeyHash) : "";
-        pub.memories = (profile.memories || []).filter(m => canViewMemory(m, vEmailHash, profile.connectionEmailHashes || []));
+        const isSub = await checkSubscriber(env, viewerKeyHash, vEmailHash);
+        pub.memories = (profile.memories || []).filter(m => canViewMemory(m, vEmailHash, profile.connectionEmailHashes || [], isSub));
       }
       pub.isOwner = isOwner;
       delete pub.connectionEmailHashes; // don't expose
@@ -960,6 +994,7 @@ export default {
       const viewerKey = getViewerKey(request, url);
       const viewerKeyHash = viewerKey ? await sha256hex(viewerKey.trim().toUpperCase()) : "";
       const vEmailHash = viewerKeyHash ? await getViewerEmailHash(env, viewerKeyHash) : "";
+      const isSub = await checkSubscriber(env, viewerKeyHash, vEmailHash);
       const sort = url.searchParams.get("sort") || "latest";
       const period = url.searchParams.get("period") || "7d";
       const connectedOnly = url.searchParams.get("connected") === "1";
@@ -978,7 +1013,7 @@ export default {
         );
       }
 
-      let entries = await buildEntries(env, profiles.slice(0, 50), vEmailHash, viewerIdentifier, sort, cutoff);
+      let entries = await buildEntries(env, profiles.slice(0, 50), vEmailHash, viewerIdentifier, isSub, sort, cutoff);
 
       if (sort === "popular") {
         entries.sort((a, b) => b._sortScore - a._sortScore);
@@ -1001,6 +1036,7 @@ export default {
       const viewerKey = getViewerKey(request, url);
       const viewerKeyHash = viewerKey ? await sha256hex(viewerKey.trim().toUpperCase()) : "";
       const vEmailHash = viewerKeyHash ? await getViewerEmailHash(env, viewerKeyHash) : "";
+      const isSub2 = await checkSubscriber(env, viewerKeyHash, vEmailHash);
 
       // Interests from query params (freshest) or stored prefs
       let locations = (url.searchParams.get("locations") || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
@@ -1061,7 +1097,7 @@ export default {
       }
 
       const viewerIdentifier2 = viewerKeyHash ? await env.SHARES.get("keymap:" + viewerKeyHash) || "" : "";
-      const allEntries = await buildEntries(env, finalMatched.slice(0, 30), vEmailHash, viewerIdentifier2, null);
+      const allEntries = await buildEntries(env, finalMatched.slice(0, 30), vEmailHash, viewerIdentifier2, isSub2, null);
 
       // Filter to only memories that actually match the interest criteria
       const entries = allEntries.filter(e => {
@@ -1277,6 +1313,168 @@ export default {
       return json({ subscribers: subscribers.filter(Boolean), total: subscribers.length });
     }
 
+    // ── Stripe ────────────────────────────────────────────────────────────────
+
+    // POST /stripe/webhook
+    if (request.method === "POST" && path === "/stripe/webhook") {
+      const sig = request.headers.get("stripe-signature") || "";
+      const bodyText = await request.text();
+      const secret = env.STRIPE_WEBHOOK_SECRET || "";
+      if (!secret) return new Response("Webhook secret not configured", { status: 500 });
+      if (!await verifyStripeSignature(bodyText, sig, secret)) {
+        return new Response("Invalid signature", { status: 400 });
+      }
+      const event = JSON.parse(bodyText);
+
+      if (event.type === "checkout.session.completed") {
+        const session = event.data.object;
+        const email = (session.customer_details?.email || "").toLowerCase();
+        const customerId = session.customer || "";
+        const subscriptionId = session.subscription || "";
+        const licenseKey = generateLicenseKey();
+        const keyHash = await sha256hex(licenseKey.trim().toUpperCase());
+        const now = new Date().toISOString();
+        const record = { licenseKey, keyHash, email, customerId, subscriptionId, status: "active", createdAt: now, renewedAt: now };
+        await env.SHARES.put("license:" + keyHash, JSON.stringify(record));
+        // Index by customerId and subscriptionId for webhook lookups
+        await env.SHARES.put("license_by_customer:" + customerId, keyHash);
+        if (subscriptionId) await env.SHARES.put("license_by_sub:" + subscriptionId, keyHash);
+        // Store pending key for success page retrieval (expires after 10 min)
+        await env.SHARES.put("license_pending:" + session.id, licenseKey, { expirationTtl: 600 });
+      }
+
+      if (event.type === "customer.subscription.deleted") {
+        const sub = event.data.object;
+        const keyHash = await env.SHARES.get("license_by_sub:" + sub.id);
+        if (keyHash) {
+          const raw = await env.SHARES.get("license:" + keyHash);
+          if (raw) {
+            const rec = JSON.parse(raw);
+            rec.status = "cancelled";
+            rec.cancelledAt = new Date().toISOString();
+            await env.SHARES.put("license:" + keyHash, JSON.stringify(rec));
+          }
+        }
+      }
+
+      if (event.type === "invoice.payment_failed") {
+        const inv = event.data.object;
+        const subId = inv.subscription || "";
+        if (subId) {
+          const keyHash = await env.SHARES.get("license_by_sub:" + subId);
+          if (keyHash) {
+            const raw = await env.SHARES.get("license:" + keyHash);
+            if (raw) {
+              const rec = JSON.parse(raw);
+              rec.status = "suspended";
+              rec.suspendedAt = new Date().toISOString();
+              await env.SHARES.put("license:" + keyHash, JSON.stringify(rec));
+            }
+          }
+        }
+      }
+
+      if (event.type === "invoice.paid") {
+        const inv = event.data.object;
+        const subId = inv.subscription || "";
+        if (subId) {
+          const keyHash = await env.SHARES.get("license_by_sub:" + subId);
+          if (keyHash) {
+            const raw = await env.SHARES.get("license:" + keyHash);
+            if (raw) {
+              const rec = JSON.parse(raw);
+              rec.status = "active";
+              rec.renewedAt = new Date().toISOString();
+              await env.SHARES.put("license:" + keyHash, JSON.stringify(rec));
+            }
+          }
+        }
+      }
+
+      return new Response("OK", { status: 200 });
+    }
+
+    // GET /stripe/success?session_id=…
+    if (request.method === "GET" && path === "/stripe/success") {
+      const sessionId = url.searchParams.get("session_id") || "";
+      if (!sessionId) return new Response("Missing session_id", { status: 400 });
+      const licenseKey = sessionId ? await env.SHARES.get("license_pending:" + sessionId) : null;
+      const found = !!licenseKey;
+      return new Response(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Remembory — Thank you!</title>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Crimson Text', Georgia, serif; background: #f7f2ea; color: #2c2416; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: #fffcf5; border: 1px solid #d4c4a8; border-radius: 6px; padding: 40px 36px; max-width: 480px; width: 100%; text-align: center; }
+    h1 { font-family: 'Playfair Display', serif; font-size: 1.8rem; font-style: italic; color: #1a1208; margin-bottom: 12px; }
+    .subtitle { color: #6a5840; font-size: 1rem; line-height: 1.6; margin-bottom: 28px; }
+    .key-box { background: #f0e8d8; border: 1px solid #c8b89a; border-radius: 4px; padding: 14px 18px; font-family: monospace; font-size: 1.15rem; letter-spacing: 0.06em; color: #1a1208; margin-bottom: 10px; word-break: break-all; }
+    .copy-btn { background: #2c2416; color: #f5f0e8; border: none; border-radius: 3px; padding: 8px 20px; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 0.95rem; margin-bottom: 24px; transition: opacity 0.15s; }
+    .copy-btn:hover { opacity: 0.85; }
+    .instructions { font-size: 0.88rem; color: #6a5840; line-height: 1.7; text-align: left; background: rgba(200,168,122,0.08); border: 1px solid rgba(200,168,122,0.25); border-radius: 4px; padding: 14px 16px; }
+    .instructions strong { color: #2c2416; }
+    .warn { font-size: 0.82rem; color: #a85a2a; font-style: italic; margin-top: 16px; }
+    a { color: #a8885a; }
+  </style>
+</head>
+<body>
+<div class="card">
+  ${found ? `
+  <h1>Welcome to Remembory</h1>
+  <p class="subtitle">Your subscription is active. Here is your license key — save it somewhere safe.</p>
+  <div class="key-box" id="lk">${esc(licenseKey)}</div>
+  <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('lk').textContent).then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy key',1500)})">Copy key</button>
+  <div class="instructions">
+    <strong>How to use your key:</strong><br>
+    Open <a href="https://remembory.net/chronicle.html">Chronicle</a> and paste this key into the licence key field in Settings. It unlocks Subscriber-level content across all Chronicles and lets others mark you as a subscriber contact.
+  </div>
+  <p class="warn">This page will not show your key again. Please save it now.</p>
+  ` : `
+  <h1>Something went wrong</h1>
+  <p class="subtitle">We could not retrieve your license key. This link may have expired (valid for 10 minutes after purchase).<br><br>Please <a href="mailto:hello@remembory.net">contact us</a> with your order confirmation and we'll issue your key manually.</p>
+  `}
+</div>
+</body>
+</html>`, { headers: { "Content-Type": "text/html;charset=UTF-8", "Cache-Control": "no-store" } });
+    }
+
+    // GET /license/check?key=…
+    if (request.method === "GET" && path === "/license/check") {
+      const key = getViewerKey(request, url);
+      if (!key) return json({ valid: false });
+      const keyHash = await sha256hex(key.trim().toUpperCase());
+      const raw = await env.SHARES.get("license:" + keyHash);
+      if (!raw) return json({ valid: false });
+      const rec = JSON.parse(raw);
+      return json({ valid: rec.status === "active", status: rec.status, renewedAt: rec.renewedAt });
+    }
+
+    // POST /license/generate  (admin — manual key issuance)
+    if (request.method === "POST" && path === "/license/generate") {
+      const secret = request.headers.get("X-Admin-Secret") || "";
+      if (!secret || secret !== (env.ADMIN_SECRET || "")) return json({ error: "Forbidden" }, 403);
+      const body = await request.json().catch(() => ({}));
+      const licenseKey = generateLicenseKey();
+      const keyHash = await sha256hex(licenseKey.trim().toUpperCase());
+      const now = new Date().toISOString();
+      const record = {
+        licenseKey, keyHash,
+        email: (body.email || "").toLowerCase(),
+        customerId: body.customerId || "",
+        subscriptionId: body.subscriptionId || "",
+        status: "active",
+        createdAt: now, renewedAt: now,
+        note: body.note || "manually issued",
+      };
+      await env.SHARES.put("license:" + keyHash, JSON.stringify(record));
+      return json({ ok: true, licenseKey });
+    }
+
     // Health check
     if (path === "/health") return json({ ok: true });
 
@@ -1312,7 +1510,7 @@ async function getViewerEmailHash(env, viewerKeyHash) {
 
 // Build feed entries: all visible memories across profiles
 // sort: "latest" (by profile updatedAt then memory year desc) | "popular" (by reactions in period)
-async function buildEntries(env, profileCompacts, viewerEmailHash, viewerIdentifier, sort, cutoff) {
+async function buildEntries(env, profileCompacts, viewerEmailHash, viewerIdentifier, isSubscriber, sort, cutoff) {
   const entries = [];
   for (const compact of profileCompacts) {
     const raw = await env.SHARES.get("profile:" + compact.identifier);
@@ -1321,7 +1519,7 @@ async function buildEntries(env, profileCompacts, viewerEmailHash, viewerIdentif
     const isOwner = !!(viewerIdentifier && viewerIdentifier === compact.identifier);
     const visibleMems = isOwner
       ? (profile.memories || []).filter(m => (m.visibility || "private") !== "private")
-      : (profile.memories || []).filter(m => canViewMemory(m, viewerEmailHash, profile.connectionEmailHashes || []));
+      : (profile.memories || []).filter(m => canViewMemory(m, viewerEmailHash, profile.connectionEmailHashes || [], isSubscriber));
     if (!visibleMems.length) continue;
 
     const profileMeta = {
