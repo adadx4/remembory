@@ -4259,7 +4259,18 @@ function App() {
   const [view, _setView] = useState("life");
   const viewHistoryRef = React.useRef([]);
   function setView(v) {
-    viewHistoryRef.current = [...viewHistoryRef.current.slice(-49), view];
+    const EDIT_VIEWS = ["add", "edit"];
+    if (EDIT_VIEWS.includes(view)) {
+      // Leaving an edit/add screen: don't record it in back-history.
+      // If we're returning to the exact view we came from, also pop that entry
+      // so Back skips past it to the view before the edit chain started.
+      const hist = viewHistoryRef.current;
+      if (hist.length > 0 && hist[hist.length - 1] === v) {
+        viewHistoryRef.current = hist.slice(0, -1);
+      }
+    } else {
+      viewHistoryRef.current = [...viewHistoryRef.current.slice(-49), view];
+    }
     _setView(v);
   }
   const [selected, setSelected] = useState(null);
@@ -6825,7 +6836,34 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
               React.createElement("div",{style:{display:"flex",gap:"3px",flexWrap:"wrap"}},yearsInDec(dec).map(yr=>React.createElement("span",{key:yr,style:{fontSize:"0.68rem",padding:"1px 5px",borderRadius:"2px",background:"#e8dfd0",color:"#8a7460"}},yr)))
             );
           });})()
-        )
+        ),
+        memories.length>=3&&(()=>{
+          function barChart(title,items,getColor,onClickItem){
+            const max=Math.max(1,...items.map(([,c])=>c));
+            return React.createElement("div",{style:{background:"rgba(255,252,245,0.85)",border:"1px solid #e0d4be",borderRadius:"4px",padding:"14px"}},
+              React.createElement("h4",{style:{margin:"0 0 11px",fontFamily:"'Playfair Display',serif",fontSize:"0.8rem",color:"#8a7460",fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase"}},title),
+              items.length===0
+                ?React.createElement("p",{style:{fontSize:"0.8rem",color:"#8a7460",fontStyle:"italic",margin:0}},"None recorded yet")
+                :items.map(([name,count])=>React.createElement("div",{key:name,onClick:()=>onClickItem(name),style:{marginBottom:"7px",cursor:"pointer"},onMouseEnter:e=>e.currentTarget.style.opacity="0.65",onMouseLeave:e=>e.currentTarget.style.opacity="1"},
+                    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"2px"}},
+                      React.createElement("span",{style:{fontSize:"0.8rem",color:"#2c2416",fontFamily:"'Crimson Text',serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"80%"}},name),
+                      React.createElement("span",{style:{fontSize:"0.72rem",color:"#8a7460",flexShrink:0}},count)
+                    ),
+                    React.createElement("div",{style:{height:"5px",borderRadius:"3px",background:"#e8dfd0"}},
+                      React.createElement("div",{style:{height:"100%",borderRadius:"3px",width:Math.round((count/max)*100)+"%",background:getColor(name)}})
+                    )
+                  ))
+            );
+          }
+          const tagItems=Object.entries(memories.reduce((a,m)=>{(m.tags||[]).forEach(t=>{a[t]=(a[t]||0)+1;});return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,8);
+          const locItems=Object.entries(memories.filter(m=>m.location).reduce((a,m)=>{a[m.location]=(a[m.location]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,8);
+          const peopleItems=Object.entries(memories.reduce((a,m)=>{(m.people||[]).forEach(p=>{a[p]=(a[p]||0)+1;});return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,8);
+          return React.createElement("div",{style:{marginTop:"22px",display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:"12px"}},
+            barChart("Tags",tagItems,n=>TAG_COLORS[n]||"#c8a87a",n=>{setIndexFilter({type:"tags",value:n});setView("index");}),
+            barChart("Locations",locItems,()=>"#a89a7a",n=>{setIndexFilter({type:"locations",value:n});setView("index");}),
+            barChart("People",peopleItems,()=>"#8a9a7a",n=>{setIndexFilter({type:"people",value:n});setView("index");})
+          );
+        })()
       ),
 
       // ── DECADE VIEW ──
