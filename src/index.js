@@ -1858,13 +1858,13 @@ async function renderOverview() {
     var cancelled = allLicenses.filter(function(l){return l.status==='cancelled';}).length;
     el.innerHTML =
       '<div class="stat-grid">'+
-        '<div class="stat-card"><div class="num">'+active+'</div><div class="label">Active subscribers</div></div>'+
-        '<div class="stat-card"><div class="num" style="'+(suspended?'color:#c4858a':'')+'">'+suspended+'</div><div class="label">Suspended</div></div>'+
-        '<div class="stat-card"><div class="num" style="'+(cancelled?'color:#a08080':'')+'">'+cancelled+'</div><div class="label">Cancelled</div></div>'+
+        '<div class="stat-card"><div class="num">'+active+'</div><div class="label">Subscribers</div></div>'+
         '<div class="stat-card"><div class="num">'+allMailing.length+'</div><div class="label">Mailing list</div></div>'+
-        '<div class="stat-card"><div class="num">'+allProfiles.length+'</div><div class="label">Published chronicles</div></div>'+
+        '<div class="stat-card"><div class="num">'+allProfiles.length+'</div><div class="label">Public profiles</div></div>'+
         '<div class="stat-card"><div class="num">'+(stats.publicMems||0)+'</div><div class="label">Public memories</div></div>'+
-        '<div class="stat-card"><div class="num">'+(stats.subscriberMems||0)+'&thinsp;<span style="font-size:1rem;color:#8a7460">+</span>&thinsp;'+(stats.connectedMems||0)+'&thinsp;<span style="font-size:1rem;color:#8a7460">+</span>&thinsp;'+(stats.taggedMems||0)+'</div><div class="label">Sub / Connected / Tagged</div></div>'+
+        '<div class="stat-card"><div class="num">'+(stats.subscriberMems||0)+'</div><div class="label">Subscriber memories</div></div>'+
+        '<div class="stat-card"><div class="num">'+(stats.connectedMems||0)+'</div><div class="label">Connected memories</div></div>'+
+        '<div class="stat-card"><div class="num">'+(stats.taggedMems||0)+'</div><div class="label">Tagged memories</div></div>'+
       '</div>'+
       '<div class="card"><div class="card-title">Recent subscriptions</div>'+licenseTable(allLicenses.slice().sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'');}).slice(0,10))+'</div>';
   } catch(e) { el.innerHTML = '<p class="loading" style="color:#c4858a">Failed to load: '+esc(e.message)+'</p>'; }
