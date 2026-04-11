@@ -1714,7 +1714,7 @@ function adminPage() {
     .tab.active { color: #1a1208; border-bottom-color: #2c2416; font-weight: 600; }
     .tab:hover:not(.active) { color: #4a3820; }
     .content { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
-    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 28px; }
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 200px); gap: 14px; margin-bottom: 28px; justify-content: center; }
     .stat-card { background: #fffcf5; border: 1px solid #d4c4a8; border-radius: 4px; padding: 18px 20px; }
     .stat-card .num { font-family: 'Playfair Display', serif; font-size: 2rem; color: #1a1208; font-style: italic; }
     .stat-card .label { font-size: 0.8rem; color: #8a7460; text-transform: uppercase; letter-spacing: 0.05em; font-family: Arial, sans-serif; margin-top: 2px; }
@@ -1859,14 +1859,12 @@ async function renderOverview() {
     el.innerHTML =
       '<div class="stat-grid">'+
         '<div class="stat-card"><div class="num">'+active+'</div><div class="label">Active subscribers</div></div>'+
+        '<div class="stat-card"><div class="num" style="'+(suspended?'color:#c4858a':'')+'">'+suspended+'</div><div class="label">Suspended</div></div>'+
+        '<div class="stat-card"><div class="num" style="'+(cancelled?'color:#a08080':'')+'">'+cancelled+'</div><div class="label">Cancelled</div></div>'+
+        '<div class="stat-card"><div class="num">'+allMailing.length+'</div><div class="label">Mailing list</div></div>'+
         '<div class="stat-card"><div class="num">'+allProfiles.length+'</div><div class="label">Published chronicles</div></div>'+
         '<div class="stat-card"><div class="num">'+(stats.publicMems||0)+'</div><div class="label">Public memories</div></div>'+
-        '<div class="stat-card"><div class="num">'+(stats.subscriberMems||0)+'</div><div class="label">Subscriber memories</div></div>'+
-        '<div class="stat-card"><div class="num">'+(stats.connectedMems||0)+'</div><div class="label">Connected memories</div></div>'+
-        '<div class="stat-card"><div class="num">'+(stats.taggedMems||0)+'</div><div class="label">Tagged memories</div></div>'+
-        '<div class="stat-card"><div class="num">'+allMailing.length+'</div><div class="label">Mailing list</div></div>'+
-        (suspended?'<div class="stat-card"><div class="num" style="color:#c4858a">'+suspended+'</div><div class="label">Suspended</div></div>':'')+
-        (cancelled?'<div class="stat-card"><div class="num" style="color:#a08080">'+cancelled+'</div><div class="label">Cancelled</div></div>':'')+
+        '<div class="stat-card"><div class="num">'+(stats.subscriberMems||0)+'&thinsp;<span style="font-size:1rem;color:#8a7460">+</span>&thinsp;'+(stats.connectedMems||0)+'&thinsp;<span style="font-size:1rem;color:#8a7460">+</span>&thinsp;'+(stats.taggedMems||0)+'</div><div class="label">Sub / Connected / Tagged</div></div>'+
       '</div>'+
       '<div class="card"><div class="card-title">Recent subscriptions</div>'+licenseTable(allLicenses.slice().sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'');}).slice(0,10))+'</div>';
   } catch(e) { el.innerHTML = '<p class="loading" style="color:#c4858a">Failed to load: '+esc(e.message)+'</p>'; }
@@ -2007,11 +2005,11 @@ function renderProfileTable(el, filter) {
     '<div class="card">'+
       '<div class="card-title">Published chronicles ('+profiles.length+')</div>'+
       '<div class="search-bar"><input id="prof-search" placeholder="Search name or identifier…"></div>'+
-      '<table><thead><tr><th>Name</th><th>Identifier</th><th>Memories</th><th>Published</th><th>Privacy</th><th>Actions</th></tr></thead><tbody>'+
+      '<table><thead><tr><th>Name</th><th>Email</th><th>Memories</th><th>Published</th><th>Privacy</th><th>Actions</th></tr></thead><tbody>'+
       profiles.map(function(p){
         return '<tr>'+
           '<td><a href="'+API+'/p/'+esc(p.identifier)+'" target="_blank" style="color:#a8885a;text-decoration:underline">'+esc(p.displayName||'—')+'</a></td>'+
-          '<td><span class="key-mono">'+esc(p.identifier||'—')+'</span></td>'+
+          '<td>'+esc(p.email||'—')+'</td>'+
           '<td>'+(p.memCount||0)+'</td>'+
           '<td>'+fmt(p.publishedAt||p.updatedAt)+'</td>'+
           '<td>'+esc(p.profilePrivacy||'open')+'</td>'+
