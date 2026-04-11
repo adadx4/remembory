@@ -2392,15 +2392,21 @@ function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords, kno
 }
 
 // ── ShareViaLink ───────────────────────────────────────────────
-function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) {
+function ShareViaLink({memories, senderName, senderEmail, personalMsg, deliverToEmails, onDone}) {
   const [status, setStatus] = useState("idle");
   const [shareUrl, setShareUrl] = useState("");
+  const [shareCode, setShareCode] = useState("");
   const [shareErr, setShareErr] = useState("");
   const [copied, setCopied] = useState(false);
-  const [includeIntro, setIncludeIntro] = useState(true);
+  const [msgMode, setMsgMode] = useState("full"); // "full" | "link" | "code"
   const [copiedMsg, setCopiedMsg] = useState(false);
   const CHRONICLE_INTRO = "I\u2019ve shared some memories with you using Chronicle \u2014 a free, private memory journal at remembory.net.\n\nChronicle lets you collect the story of a life: memories, photos, places, and the people in them. Everything is stored privately on your own device \u2014 nothing is uploaded to a server unless you choose to share it.\n\nWhen you open the link below, you\u2019ll be able to review the memories I\u2019ve shared, choose which ones to save, and add them to your own Chronicle \u2014 where you can add your own perspective, fill in your side of the story, and start building your own timeline.\n\nIt\u2019s free to use. No account or sign-up needed to get started.\n\n\u26a0 Please open the link in a browser (Safari, Chrome, Firefox) \u2014 opening from inside a messaging app may not work correctly:\n";
-  function buildMessage() { return includeIntro ? CHRONICLE_INTRO + shareUrl : shareUrl; }
+  const CODE_INSTRUCTIONS = "To add these memories to your Chronicle, open remembory.net/chronicle.html in your browser, go to the Sharing page, and enter this code:";
+  function buildMessage() {
+    if (msgMode === "full") return CHRONICLE_INTRO + shareUrl + (shareCode ? "\n\nAlready have Chronicle? Use the share code instead: " + shareCode : "");
+    if (msgMode === "code") return CODE_INSTRUCTIONS + "\n\n" + shareCode;
+    return shareUrl;
+  }
   function copyMessage() {
     navigator.clipboard.writeText(buildMessage()).then(()=>{ setCopiedMsg(true); setTimeout(()=>setCopiedMsg(false),2500); });
   }
@@ -2453,7 +2459,18 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
       if (!res.ok) throw new Error("Server error " + res.status);
       const data = await res.json();
       setShareUrl(data.url);
+      setShareCode(data.code || "");
       setStatus("done");
+      // Deliver directly to connected recipients who have an email on file
+      if (data.code && deliverToEmails && deliverToEmails.length > 0) {
+        deliverToEmails.forEach(email => {
+          fetch(WORKER_URL + "/share/deliver", {
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({shareId:data.code,toEmail:email,fromName:senderName.trim(),fromEmail:senderEmail||""})
+          }).catch(()=>{});
+        });
+      }
     } catch(e) {
       setStatus("error");
       setShareErr(e.message || String(e));
@@ -2476,16 +2493,27 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
 
 
   if (status==="done") return React.createElement("div",null,
-    React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontWeight:600,marginBottom:"12px"}},"✓ Link ready — copy and send the message below:"),
-    React.createElement("label",{style:{display:"flex",alignItems:"flex-start",gap:"8px",marginBottom:"10px",cursor:"pointer"}},
-      React.createElement("input",{type:"checkbox",checked:includeIntro,onChange:e=>setIncludeIntro(e.target.checked),style:{marginTop:"3px",flexShrink:0}}),
-      React.createElement("span",{style:{fontSize:"0.82rem",color:"#6a5c48",lineHeight:1.5}},"Include a brief explanation of Chronicle (good for first-time recipients)")
+    React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontWeight:600,marginBottom:"12px"}},"✓ Ready — choose what to send:"),
+    React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"6px",marginBottom:"12px"}},
+      [
+        ["full","Include introductory message","good for first-time recipients"],
+        ["link","Link only","just the share URL"],
+        ["code","Share code only","for recipients who already have Chronicle"],
+      ].map(([val,label,hint])=>
+        React.createElement("label",{key:val,style:{display:"flex",alignItems:"flex-start",gap:"8px",cursor:"pointer",padding:"6px 10px",borderRadius:"3px",background:msgMode===val?"rgba(122,158,138,0.1)":"transparent",border:msgMode===val?"1px solid rgba(122,158,138,0.4)":"1px solid transparent"}},
+          React.createElement("input",{type:"radio",name:"msgMode",value:val,checked:msgMode===val,onChange:()=>setMsgMode(val),style:{marginTop:"3px",flexShrink:0}}),
+          React.createElement("div",null,
+            React.createElement("div",{style:{fontSize:"0.88rem",color:"#2c2416",lineHeight:1.4}},label),
+            React.createElement("div",{style:{fontSize:"0.75rem",color:"#8a7460"}},hint)
+          )
+        )
+      )
     ),
     React.createElement("textarea",{
       readOnly:true,
       value:buildMessage(),
       onClick:e=>e.target.select(),
-      rows: includeIntro ? 6 : 2,
+      rows: msgMode==="full" ? 8 : 3,
       style:{...S.input,width:"100%",fontSize:"0.82rem",color:"#2c2416",lineHeight:1.6,resize:"none",boxSizing:"border-box",fontFamily:"inherit",whiteSpace:"pre-wrap",marginBottom:"10px"}
     }),
     React.createElement("button",{onClick:copyMessage,style:{...S.btn,width:"100%",marginBottom:"8px",fontSize:"0.88rem"}},
@@ -2666,6 +2694,7 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
       senderName:senderName,
       senderEmail:effectiveEmail,
       personalMsg:personalMsg,
+      deliverToEmails:selectedPeople.map(p=>(peopleEmails||{})[p]).filter(Boolean),
       onDone:handleClose
     })
   );
@@ -3506,8 +3535,20 @@ function SettingsView({
 }
 
 // ── SharingView ───────────────────────────────────────────────
-function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShareCodeInput, shareCodeStatus, importFromCode, setView, setSelected}) {
+function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShareCodeInput, shareCodeStatus, importFromCode, setView, setSelected, ownerEmail, onOpenShare}) {
   const [tab, setTab] = React.useState("received");
+  const [pendingDeliveries, setPendingDeliveries] = React.useState([]);
+
+  React.useEffect(() => {
+    if (!ownerEmail) return;
+    fetch(WORKER_URL + "/my/deliveries/fetch", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:ownerEmail})
+    }).then(r=>r.ok?r.json():{deliveries:[]})
+      .then(d=>{ if(d.deliveries&&d.deliveries.length) setPendingDeliveries(d.deliveries); })
+      .catch(()=>{});
+  }, [ownerEmail]);
 
   const received = memories.filter(m => m.sharedBy);
   const sent = shareHistory || [];
@@ -3562,10 +3603,29 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
     ),
 
     // RECEIVED tab
-    tab==="received"&&(
-      received.length===0
+    tab==="received"&&React.createElement("div",null,
+      // Pending direct deliveries
+      pendingDeliveries.length>0&&React.createElement("div",null,
+        React.createElement("p",{style:{fontSize:"0.78rem",color:"#4a7a5a",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"10px"}},"Waiting to review"),
+        pendingDeliveries.map((d,i)=>
+          React.createElement("div",{key:i,style:{...cardStyle,borderColor:"#7a9e8a",background:"rgba(122,158,138,0.07)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px"}},
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208"}},d.sharedBy||"Someone"),
+              React.createElement("div",{style:{fontSize:"0.82rem",color:"#8a7460",marginTop:"2px"}},(d.memories||[]).length+" "+(d.memories&&d.memories.length===1?"memory":"memories")+" shared with you directly")
+            ),
+            React.createElement("button",{
+              onClick:()=>{
+                if(onOpenShare) onOpenShare(d);
+                setPendingDeliveries(prev=>prev.filter((_,j)=>j!==i));
+              },
+              style:{...S.btn,padding:"8px 18px",whiteSpace:"nowrap",fontSize:"0.88rem"}
+            },"Review")
+          )
+        )
+      ),
+      received.length===0&&pendingDeliveries.length===0
         ? React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic"}},"No memories have been shared with you yet.")
-        : React.createElement("div",null,
+        : received.length>0&&React.createElement("div",null,
             Object.entries(bySender).map(([sender,mems])=>
               React.createElement("div",{key:sender,style:cardStyle},
                 React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"10px"}},
@@ -6542,6 +6602,12 @@ function handleEdit(m) {
         memories, shareHistory, ownerName,
         shareCodeInput, setShareCodeInput, shareCodeStatus, importFromCode,
         setView, setSelected,
+        ownerEmail,
+        onOpenShare:(shareData)=>{
+          setPendingShare(shareData);
+          setPendingShareSelected(new Set((shareData.memories||[]).map(m=>m.id)));
+          setPendingShareWantConnect(true);
+        },
       }),
 
       view==="settings"&&React.createElement(SettingsView,{

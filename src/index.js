@@ -1251,6 +1251,51 @@ export default {
       }
     }
 
+    // POST /share/deliver — push a share directly to a recipient's delivery queue
+    if (request.method === "POST" && path === "/share/deliver") {
+      try {
+        const body = await request.json();
+        const { shareId, toEmail, fromName, fromEmail } = body;
+        if (!shareId || !toEmail) return json({ error: "Missing shareId or toEmail" }, 400);
+        const emailHash = await sha256hex(toEmail.trim().toLowerCase());
+        const existing = await env.SHARES.get("deliveries:" + emailHash);
+        const arr = existing ? JSON.parse(existing) : [];
+        // Avoid duplicates
+        if (!arr.find(d => d.shareId === shareId)) {
+          arr.push({ shareId, fromName: fromName || "", fromEmail: fromEmail || "", sentAt: new Date().toISOString() });
+        }
+        await env.SHARES.put("deliveries:" + emailHash, JSON.stringify(arr), { expirationTtl: 60 * 60 * 24 * 365 });
+        return json({ ok: true });
+      } catch (e) {
+        return json({ error: "Server error: " + e.message }, 500);
+      }
+    }
+
+    // POST /my/deliveries/fetch — retrieve and clear pending deliveries for an email address
+    if (request.method === "POST" && path === "/my/deliveries/fetch") {
+      try {
+        const body = await request.json();
+        const email = (body.email || "").trim().toLowerCase();
+        if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
+        const emailHash = await sha256hex(email);
+        const raw = await env.SHARES.get("deliveries:" + emailHash);
+        if (!raw) return json({ deliveries: [] });
+        const arr = JSON.parse(raw);
+        // Fetch full share payloads
+        const full = await Promise.all(arr.map(async d => {
+          const shareRaw = await env.SHARES.get(d.shareId);
+          if (!shareRaw) return null;
+          const share = JSON.parse(shareRaw);
+          return { ...share, _shareId: d.shareId, _deliveredAt: d.sentAt };
+        }));
+        // Clear the queue after fetching
+        await env.SHARES.delete("deliveries:" + emailHash);
+        return json({ deliveries: full.filter(Boolean) });
+      } catch (e) {
+        return json({ error: "Server error: " + e.message }, 500);
+      }
+    }
+
     // GET /s/:code
     if (request.method === "GET" && path.startsWith("/s/")) {
       const code = path.slice(3);
