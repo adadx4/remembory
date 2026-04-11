@@ -68,21 +68,26 @@ async function validateLicenceKey(key) {
   const clean = key.trim();
   if (!clean) return null;
   if (PROMO_CODES.includes(clean.toUpperCase())) return {valid:true, tier:"subscriber", expiresAt:null, promo:true};
-  // Check cached result first (valid for 24h)
   const cached = loadLicenceCache();
-  if (cached && cached.key === clean && cached.checked && (Date.now() - cached.checked < 86400000)) {
-    return {valid: cached.status === "active", status: cached.status, renewedAt: cached.renewedAt};
+  // If we have a valid cached result for this key, use it immediately —
+  // then recheck in the background so the cache stays fresh for next time.
+  if (cached && cached.key === clean && cached.status === "active") {
+    // Background refresh — don't await, never blocks the user
+    fetch("https://social.remembory.net/license/check?key=" + encodeURIComponent(clean))
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) saveLicenceCache({key: clean, checked: Date.now(), status: d.status, renewedAt: d.renewedAt}); })
+      .catch(() => {});
+    return {valid: true, tier: "subscriber", status: cached.status, renewedAt: cached.renewedAt};
   }
+  // No valid cache — must go online to activate
   try {
     const r = await fetch("https://social.remembory.net/license/check?key=" + encodeURIComponent(clean));
     if (!r.ok) throw new Error("server");
     const d = await r.json();
     saveLicenceCache({key: clean, checked: Date.now(), status: d.status, renewedAt: d.renewedAt});
     if (d.valid) return {valid: true, tier: "subscriber", status: d.status, renewedAt: d.renewedAt};
-    return {valid: false, reason: d.status === "cancelled" ? "expired" : d.status === "suspended" ? "expired" : "invalid"};
+    return {valid: false, reason: d.status === "cancelled" || d.status === "suspended" ? "expired" : "invalid"};
   } catch(e) {
-    // Offline — fall back to cache if present
-    if (cached && cached.key === clean && cached.status === "active") return {valid: true, tier: "subscriber", offline: true};
     return {valid: false, reason: "unavailable"};
   }
 }
