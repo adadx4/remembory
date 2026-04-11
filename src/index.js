@@ -932,6 +932,7 @@ export default {
         await env.SHARES.put("profile:" + identifier, JSON.stringify(profile), {
           expirationTtl: 60 * 60 * 24 * 365 * 2,
         });
+        if (body.ownerEmail) await env.SHARES.put("profile_email:" + identifier, body.ownerEmail.trim().toLowerCase());
 
         // Update compact profiles index
         await updateProfilesIndex(env, {
@@ -1407,7 +1408,12 @@ export default {
     if (request.method === "GET" && path === "/stripe/success") {
       const sessionId = url.searchParams.get("session_id") || "";
       if (!sessionId) return new Response("Missing session_id", { status: 400 });
-      const licenseKey = sessionId ? await env.SHARES.get("license_pending:" + sessionId) : null;
+      const pendingRaw = sessionId ? await env.SHARES.get("license_pending:" + sessionId) : null;
+      let licenseKey = null, customerEmail = "";
+      if (pendingRaw) {
+        try { const p = JSON.parse(pendingRaw); licenseKey = p.key; customerEmail = p.email || ""; }
+        catch(e) { licenseKey = pendingRaw; } // backwards compat with old plain-string format
+      }
       const found = !!licenseKey;
       return new Response(`<!DOCTYPE html>
 <html lang="en">
@@ -1428,6 +1434,11 @@ export default {
     .instructions { font-size: 0.88rem; color: #6a5840; line-height: 1.7; text-align: left; background: rgba(200,168,122,0.08); border: 1px solid rgba(200,168,122,0.25); border-radius: 4px; padding: 14px 16px; }
     .instructions strong { color: #2c2416; }
     .warn { font-size: 0.82rem; color: #a85a2a; font-style: italic; margin-top: 16px; }
+    .mailing-opt { display: flex; align-items: flex-start; gap: 8px; margin-top: 16px; text-align: left; font-size: 0.86rem; color: #6a5840; line-height: 1.5; }
+    .mailing-opt input { margin-top: 3px; flex-shrink: 0; accent-color: #2c2416; width: 15px; height: 15px; cursor: pointer; }
+    .mailing-opt label { cursor: pointer; }
+    .mailing-msg { font-size: 0.8rem; font-style: italic; margin-top: 6px; }
+    .mailing-msg.ok { color: #4a7a5a; }
     a { color: #a8885a; }
   </style>
 </head>
@@ -1443,6 +1454,32 @@ export default {
     Open <a href="https://remembory.net/chronicle.html">Chronicle</a> and paste this key into the licence key field in Settings. It unlocks Subscriber-level content across all Chronicles and lets others mark you as a subscriber contact.
   </div>
   <p class="warn">This page will not show your key again. Please save it now.</p>
+  <div class="mailing-opt">
+    <input type="checkbox" id="mailing-cb" checked>
+    <label for="mailing-cb">Keep me updated with Remembory news and new features.</label>
+  </div>
+  <div class="mailing-msg" id="mailing-msg"></div>
+  <script>
+  (function() {
+    var email = ${JSON.stringify(customerEmail)};
+    var cb = document.getElementById('mailing-cb');
+    var msg = document.getElementById('mailing-msg');
+    // Auto-subscribe if checkbox still checked after 2s (gives user time to uncheck)
+    var timer = setTimeout(function() { if (cb.checked && email) subscribe(); }, 2000);
+    cb.addEventListener('change', function() {
+      if (!this.checked) { clearTimeout(timer); msg.textContent = ''; }
+    });
+    function subscribe() {
+      if (!email) return;
+      fetch('https://social.remembory.net/mailing/subscribe', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({email: email})
+      }).then(function(r) {
+        if (r.ok) { msg.textContent = '\\u2713 Subscribed to updates.'; msg.className = 'mailing-msg ok'; }
+      }).catch(function(){});
+    }
+  })();
+  </script>
   ` : `
   <h1>Something went wrong</h1>
   <p class="subtitle">We could not retrieve your license key. This link may have expired (valid for 10 minutes after purchase).<br><br>Please <a href="mailto:hello@remembory.net">contact us</a> with your order confirmation and we'll issue your key manually.</p>
@@ -1617,7 +1654,11 @@ export default {
       const secret = request.headers.get("X-Admin-Secret") || "";
       if (!secret || secret !== (env.ADMIN_SECRET || "")) return json({ error: "Forbidden" }, 403);
       const list = await getProfilesList(env);
-      return json({ profiles: list, total: list.length });
+      const withEmails = await Promise.all(list.map(async p => {
+        const email = await env.SHARES.get("profile_email:" + p.identifier);
+        return { ...p, email: email || "" };
+      }));
+      return json({ profiles: withEmails, total: withEmails.length });
     }
 
     // POST /admin/profile/remove — remove a profile from public index
@@ -1822,6 +1863,7 @@ async function renderOverview() {
         '<div class="stat-card"><div class="num">'+(stats.publicMems||0)+'</div><div class="label">Public memories</div></div>'+
         '<div class="stat-card"><div class="num">'+(stats.subscriberMems||0)+'</div><div class="label">Subscriber memories</div></div>'+
         '<div class="stat-card"><div class="num">'+(stats.connectedMems||0)+'</div><div class="label">Connected memories</div></div>'+
+        '<div class="stat-card"><div class="num">'+(stats.taggedMems||0)+'</div><div class="label">Tagged memories</div></div>'+
         '<div class="stat-card"><div class="num">'+allMailing.length+'</div><div class="label">Mailing list</div></div>'+
         (suspended?'<div class="stat-card"><div class="num" style="color:#c4858a">'+suspended+'</div><div class="label">Suspended</div></div>':'')+
         (cancelled?'<div class="stat-card"><div class="num" style="color:#a08080">'+cancelled+'</div><div class="label">Cancelled</div></div>':'')+
