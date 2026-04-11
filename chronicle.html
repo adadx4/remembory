@@ -3317,7 +3317,7 @@ function SettingsView({
             React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,margin:0}},
               isSubscriber ? "Enables visibility controls on memories and your public profile page."
                 : React.createElement(React.Fragment,null,"Requires a subscription. ",
-                    React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{color:"#a8885a"}},"Support us \u2192")))
+                    React.createElement("a",{href:"https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02",target:"_blank",rel:"noopener",style:{color:"#a8885a"}},"Subscribe \u2192")))
           )
         )
       ),
@@ -3385,7 +3385,7 @@ function SettingsView({
 
       !isSubscriber&&React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
         "Unlock sharing & genealogy mode \u2014 ",
-        React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"\u2728 support us on Ko-fi"),
+        React.createElement("a",{href:"https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"\u2728 subscribe"),
         "."
       ),
       React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
@@ -3699,8 +3699,8 @@ function ImportView({
           React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",fontStyle:"italic",color:"#1a1208",marginBottom:"10px"}},"Genealogy Mode"),
           React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,maxWidth:"380px",margin:"0 auto 16px"}},
             "GEDCOM import is a subscriber feature. Import a family tree, flesh out your ancestors\u2019 lives, and connect genealogy research to narrative."),
-          React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{...S.btn,display:"inline-block",padding:"10px 24px",textDecoration:"none",fontSize:"0.9rem"}},
-            "Support us on Ko-fi \u2192")
+          React.createElement("a",{href:"https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02",target:"_blank",rel:"noopener",style:{...S.btn,display:"inline-block",padding:"10px 24px",textDecoration:"none",fontSize:"0.9rem"}},
+            "Subscribe to unlock \u2192")
         )
       : React.createElement("div",null,
       // No file loaded yet
@@ -4283,6 +4283,12 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [backupNagDismissed, setBackupNagDismissed] = useState(false);
+  const [subscribeNagDismissed, setSubscribeNagDismissed] = useState(false);
+  const subscribeNagPermanent = React.useMemo(()=>{ try{return localStorage.getItem("chronicle-subscribe-nag-off")==="1";}catch(e){return false;} },[]);
+  function dismissSubscribeNag(permanent) {
+    setSubscribeNagDismissed(true);
+    if (permanent) { try{localStorage.setItem("chronicle-subscribe-nag-off","1");}catch(e){} }
+  }
   const [licenceKey, setLicenceKey] = useState(()=>{try{return localStorage.getItem("chronicle-licence-key")||"";}catch(e){return "";}});
   // socialKey is a stable identity for social/Explore features — uses licence key if set, otherwise a persistent UUID
   const socialKey = React.useMemo(()=>{
@@ -5939,6 +5945,17 @@ function handleEdit(m) {
       );
     })()),
 
+    (!isSubscriber&&!subscribeNagDismissed&&!subscribeNagPermanent&&ownerName)&&React.createElement("div",{style:{background:"rgba(168,136,90,0.1)",borderBottom:"1px solid rgba(168,136,90,0.3)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
+      React.createElement("p",{style:{margin:0,fontSize:"0.85rem",color:"#5a4020",lineHeight:1.4}},
+        "\u2728 Enjoying Chronicle? A subscription unlocks sharing, social features, and genealogy mode — and helps keep the project going."
+      ),
+      React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0,alignItems:"center"}},
+        React.createElement("a",{href:"https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02",target:"_blank",rel:"noopener",style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem",textDecoration:"none",display:"inline-block"}},"Subscribe \u2192"),
+        React.createElement("button",{onClick:()=>dismissSubscribeNag(false),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.8rem",padding:"4px 8px",fontFamily:"'Crimson Text',serif",whiteSpace:"nowrap"}},"Not now"),
+        React.createElement("button",{onClick:()=>dismissSubscribeNag(true),style:{background:"transparent",border:"none",color:"#b0a080",cursor:"pointer",fontSize:"0.75rem",padding:"4px 6px"}},"Don\u2019t show again")
+      )
+    ),
+
     !onboardingDismissed && !ownerName && React.createElement("div",{style:{background:"rgba(200,168,122,0.12)",borderBottom:"1px solid rgba(200,168,122,0.4)",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
       React.createElement("div",null,
         React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#4a3820",fontWeight:600}},"👋 Welcome to Chronicle"),
@@ -6302,7 +6319,7 @@ function handleEdit(m) {
             textDecoration:"none",display:"inline-flex",alignItems:"center"}
         },"Explore ↗"),
         !isMobile&&view!=="prompt"&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("prompt"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem"}},"✦ Prompt"),
-        !isMobile&&React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",title:"Support Remembory",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid transparent",borderRadius:"2px",color:"#7a6040",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#d4c4a8";},onMouseLeave:e=>{e.currentTarget.style.color="#7a6040";e.currentTarget.style.borderColor="transparent";}},"☕ Support"),
+        !isMobile&&!isSubscriber&&React.createElement("a",{href:"https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02",target:"_blank",rel:"noopener",style:{display:"flex",alignItems:"center",gap:"4px",padding:"7px 10px",border:"1px solid rgba(168,136,90,0.35)",borderRadius:"2px",color:"#a8885a",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",transition:"color 0.2s,border-color 0.2s"},onMouseEnter:e=>{e.currentTarget.style.color="#8a6a3a";e.currentTarget.style.borderColor="#c8a87a";},onMouseLeave:e=>{e.currentTarget.style.color="#a8885a";e.currentTarget.style.borderColor="rgba(168,136,90,0.35);";}},"✨ Subscribe"),
         !isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>setView("sharing"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem",background:view==="sharing"?"#2c2416":"transparent",color:view==="sharing"?"#f5f0e8":undefined,borderColor:view==="sharing"?"#2c2416":undefined}},"⇌ Sharing"),
         !isMobile&&React.createElement("button",{onClick:()=>setView("settings"),
           style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem",position:"relative"}},
