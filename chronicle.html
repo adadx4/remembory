@@ -47,9 +47,9 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 const TAGS = ["childhood","family","travel","education","work","love","health","milestone","home","friendship","adventure","loss"];
 const WORKER_URL = "https://social.remembory.net";
 
-// ── Licence key validation (Lemon Squeezy) ────────────────────
-// Keys are issued by Lemon Squeezy. We validate against their API on first use,
-// then cache the result in localStorage for offline use.
+// ── Licence key validation ─────────────────────────────────────
+// Keys are issued by Remembory (Stripe subscription or manual).
+// Validated against the social worker. Cached in localStorage for offline use.
 const LS_CACHE_KEY = "chronicle-licence-cache";
 
 function loadLicenceCache() {
@@ -68,8 +68,23 @@ async function validateLicenceKey(key) {
   const clean = key.trim();
   if (!clean) return null;
   if (PROMO_CODES.includes(clean.toUpperCase())) return {valid:true, tier:"subscriber", expiresAt:null, promo:true};
-  // Subscription checkout not yet live
-  return {valid:false, reason:"not_available"};
+  // Check cached result first (valid for 24h)
+  const cached = loadLicenceCache();
+  if (cached && cached.key === clean && cached.checked && (Date.now() - cached.checked < 86400000)) {
+    return {valid: cached.status === "active", status: cached.status, renewedAt: cached.renewedAt};
+  }
+  try {
+    const r = await fetch("https://social.remembory.net/license/check?key=" + encodeURIComponent(clean));
+    if (!r.ok) throw new Error("server");
+    const d = await r.json();
+    saveLicenceCache({key: clean, checked: Date.now(), status: d.status, renewedAt: d.renewedAt});
+    if (d.valid) return {valid: true, tier: "subscriber", status: d.status, renewedAt: d.renewedAt};
+    return {valid: false, reason: d.status === "cancelled" ? "expired" : d.status === "suspended" ? "expired" : "invalid"};
+  } catch(e) {
+    // Offline — fall back to cache if present
+    if (cached && cached.key === clean && cached.status === "active") return {valid: true, tier: "subscriber", offline: true};
+    return {valid: false, reason: "unavailable"};
+  }
 }
 const TAG_COLORS = {
   childhood:"#e8a87c", family:"#c9b89a", travel:"#7a9e9f", education:"#8b9dc3",
@@ -3303,15 +3318,15 @@ function SettingsView({
                   onChange:e=>saveLicenceKey(e.target.value),
                   onKeyDown:e=>{if(e.key==="Enter")saveLicenceKey(e.target.value);},
                   id:"licence-key-input",
-                  placeholder:"Paste your promo or licence key\u2026",
+                  placeholder:"Paste your licence key (REM-XXXX-…) or promo code\u2026",
                   style:{...S.input,flex:1,fontSize:"0.88rem",fontFamily:"monospace",letterSpacing:"0.05em"}}),
                 React.createElement("button",{
                   onClick:()=>{ const el=document.getElementById("licence-key-input"); saveLicenceKey(el?el.value:licenceKey); },
                   style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem"}
                 },"Apply")
               ),
-              React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic"}},"Subscriptions coming soon \u2014 ",
-                React.createElement("a",{href:"https://ko-fi.com/remembory",target:"_blank",rel:"noopener",style:{color:"#a8885a"}},"support us on Ko-fi \u2192"))
+              React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic"}},
+                React.createElement("a",{href:"https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02",target:"_blank",rel:"noopener",style:{color:"#a8885a"}},"Subscribe \u2014 $20 AUD / year \u2192"))
             )
       ),
 
