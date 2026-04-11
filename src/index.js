@@ -599,12 +599,20 @@ window.addEventListener('DOMContentLoaded', init);
 }
 
 // ── Location display helper ───────────────────────────────────────────────────
+// detail: "full"|"town"|"state"|"country", or undefined to use m.locationPrivacy
 function locationDisplay(m, detail) {
-  if (detail === "country") {
-    return m.locationCountry || m.locationState || m.location || "";
+  const priv = detail !== undefined ? detail : (m.locationPrivacy || "town");
+  if (priv === "full") {
+    return m.location || [m.locationTown, m.locationState, m.locationCountry].filter(Boolean).join(", ") || "";
+  }
+  if (priv === "state") {
+    return [m.locationState, m.locationCountry].filter(Boolean).join(", ") || m.locationCountry || "";
+  }
+  if (priv === "country") {
+    return m.locationCountry || m.locationState || "";
   }
   // "town" — default
-  return [m.locationTown, m.locationCountry].filter(Boolean).join(", ") || m.locationCountry || m.locationState || m.location || "";
+  return [m.locationTown, m.locationCountry].filter(Boolean).join(", ") || m.locationCountry || m.locationState || "";
 }
 
 // ── Individual profile page ───────────────────────────────────────────────────
@@ -719,7 +727,7 @@ function profilePage(profile, visibleMems, isOwner, viewerKey, viewerIdentifier,
       const vis = m.visibility || "public";
       const visBadgeClass = vis === "connected" ? "vis-connected" : vis === "subscriber" ? "vis-subscriber" : "vis-public";
       const visLabel = vis === "connected" ? "Connected" : vis === "subscriber" ? "Subscribers" : "Public";
-      const locStr = locationDisplay(m);
+      const locStr = locationDisplay(m, isOwner ? "full" : undefined);
       return `<div class="memory-card">
       <span class="vis-badge ${visBadgeClass}">${visLabel}</span>
       ${m.title ? `<h3>${esc(m.title)}</h3>` : ""}

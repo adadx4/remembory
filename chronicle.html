@@ -4266,6 +4266,7 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [zoomDecade, setZoomDecade] = useState(null);
   const [zoomYear, setZoomYear] = useState(null);
+  const [scrollToDecade, setScrollToDecade] = useState(null);
   const [form, setForm] = useState(newForm());
   const [filter, setFilter] = useState({tag:null,search:"",sharing:null});
   const [showSettings, setShowSettings] = useState(false);
@@ -5803,6 +5804,15 @@ function handleEdit(m) {
   const filtByDec={};
   filtered.forEach(m=>{ const d=Math.floor(m.year/10)*10; if(!filtByDec[d]) filtByDec[d]=[]; filtByDec[d].push(m); });
 
+  // Scroll to a decade section in the list view after navigation from Life view
+  React.useEffect(() => {
+    if (view === "timeline" && scrollToDecade !== null) {
+      const el = document.getElementById("dec-" + scrollToDecade);
+      if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); }
+      setScrollToDecade(null);
+    }
+  }, [view, scrollToDecade]);
+
   // ── Navigation ───────────────────────────────────────────────
   function goBack() {
     if (view==="index" && indexFilter) { setIndexFilter(null); return; }
@@ -6801,7 +6811,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
             const tagCounts={}; mems.forEach(m=>m.tags.forEach(t=>{tagCounts[t]=(tagCounts[t]||0)+1;}));
             const topTags=Object.entries(tagCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
             const perYear=Array.from({length:10},(_,i)=>memories.filter(m=>m.year===dec+i).length);
-            return React.createElement("div",{key:dec,onClick:()=>{setZoomDecade(dec);setZoomYear(null);setView("decade");},style:{cursor:"pointer",background:"rgba(255,252,245,0.85)",border:"1px solid #e0d4be",borderRadius:"4px",padding:"16px 14px",transition:"all 0.2s"},
+            return React.createElement("div",{key:dec,onClick:()=>{setScrollToDecade(dec);setView("timeline");},style:{cursor:"pointer",background:"rgba(255,252,245,0.85)",border:"1px solid #e0d4be",borderRadius:"4px",padding:"16px 14px",transition:"all 0.2s"},
               onMouseEnter:e=>{e.currentTarget.style.borderColor="#c8b89a";e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.07)";},
               onMouseLeave:e=>{e.currentTarget.style.borderColor="#e0d4be";e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="none";}},
               React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"12px"}},
@@ -6890,14 +6900,16 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
             style:{background:"transparent",border:"none",color:"#c4858a",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px"}},
             "clear")
         ),
-        Object.keys(filtByDec).sort().map(dec=>React.createElement("div",{key:dec,style:{marginBottom:"36px"}},
-          React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"12px",marginBottom:"14px"}},
+        Object.keys(filtByDec).sort().map(dec=>React.createElement("div",{key:dec,id:"dec-"+dec,style:{marginBottom:"28px"}},
+          React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"12px",marginBottom:"10px"}},
             React.createElement("h3",{onClick:()=>{setZoomDecade(+dec);setZoomYear(null);setView("decade");},style:{margin:0,fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#8a7460",fontWeight:700,letterSpacing:"0.1em",cursor:"pointer"},onMouseEnter:e=>e.target.style.color="#1a1208",onMouseLeave:e=>e.target.style.color="#8a7460"},`${dec}s ↗`),
             React.createElement("div",{style:{flex:1,height:"1px",background:"linear-gradient(to right, #c8b89a, transparent)"}})
           ),
-          React.createElement("div",{style:{position:"relative",paddingLeft:"22px"}},
-            React.createElement("div",{style:{position:"absolute",left:"7px",top:0,bottom:0,width:"1px",background:"linear-gradient(to bottom, #c8b89a, transparent)"}}),
-            filtByDec[dec].map(m=>React.createElement(MemoryCard,{key:m.id,m,onClick:id=>{setSelected(id);setView("detail");}}))
+          React.createElement("div",{style:{paddingLeft:"14px",borderLeft:"3px solid #c8a87a"}},
+            filtByDec[dec].map(m=>React.createElement("div",{key:m.id,style:{display:"flex",alignItems:"baseline",gap:"7px",marginBottom:"3px"}},
+              React.createElement("span",{style:{width:"9px",height:"9px",borderRadius:"50%",background:m.tags[0]?TAG_COLORS[m.tags[0]]:"#c8b89a",flexShrink:0,display:"inline-block",marginTop:"3px"}}),
+              React.createElement("button",{onClick:()=>{setSelected(m.id);setView("detail");},style:{background:"none",border:"none",cursor:"pointer",padding:0,textAlign:"left",fontFamily:"'Crimson Text',Georgia,serif",fontSize:"0.9rem",color:"#2c2416",lineHeight:1.4,textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px"}},m.title)
+            ))
           )
         ))
       ),
