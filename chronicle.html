@@ -2413,10 +2413,27 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
     setStatus("loading");
     try {
       // Strip the sender's own subject name from people arrays before sharing
-      // so the recipient doesn't see "My Chronicle" or similar as a tagged person
-      const sanitisedMemories = memories.map(m => ({
-        ...m,
-        people: (m.people||[]).filter(p => p !== senderName.trim())
+      // so the recipient doesn't see "My Chronicle" or similar as a tagged person.
+      // Also resolve any mediaId blob references to embedded data: URLs so the
+      // recipient receives the actual photo data, not just a local IDB key.
+      const sanitisedMemories = await Promise.all(memories.map(async m => {
+        const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async med => {
+          if (med.mediaId) {
+            try {
+              const blob = await idbGet(med.mediaId);
+              if (blob) {
+                return await new Promise(resolve => {
+                  const reader = new FileReader();
+                  reader.onload = () => resolve({ url: reader.result, name: med.name, mediaId: med.mediaId });
+                  reader.onerror = () => resolve(med); // fallback to bare ref
+                  reader.readAsDataURL(blob);
+                });
+              }
+            } catch(e) { /* blob not found, fall through */ }
+          }
+          return med;
+        }));
+        return { ...m, people: (m.people||[]).filter(p => p !== senderName.trim()), mediaUrls };
       }));
       const payload = {
         sharedBy: senderName.trim(),
@@ -2425,10 +2442,15 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, onDone}) 
         requestConnect: true,
         memories: sanitisedMemories
       };
+      const bodyStr = JSON.stringify(payload);
+      // KV values are capped at 25 MB; warn if photos push us close
+      if (bodyStr.length > 20 * 1024 * 1024) {
+        throw new Error("Share package is too large (>20 MB). Try sharing fewer memories or remove large photos.");
+      }
       const res = await fetch(WORKER_URL + "/share", {
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(payload)
+        body:bodyStr
       });
       if (!res.ok) throw new Error("Server error " + res.status);
       const data = await res.json();
