@@ -422,6 +422,7 @@ async function renderBrowseRightSidebar() {
       '<div class="rs-title">Subscribe</div>'+
       '<p style="font-size:0.78rem;color:#6a5840;line-height:1.5;margin-bottom:8px">Unlock subscriber-level memories across all Chronicles.</p>'+
       '<a class="rs-donate" href="https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02" target="_blank" rel="noopener">&#10024; Subscribe &mdash; $20 AUD / year</a>'+
+      '<p style="font-size:0.74rem;text-align:center;margin-top:8px"><a href="https://social.remembory.net/license/recover" target="_blank" style="color:#a8885a">Lost your key?</a></p>'+
     '</div>'+
     '<div class="rs-section"><a class="rs-donate" href="https://ko-fi.com/remembory" target="_blank" rel="noopener">\u2615 Support on Ko-fi</a></div>';
   rs.innerHTML = '<div class="rs-section"><p class="loading" style="font-size:0.8rem;padding:4px 0">Loading\u2026</p></div>'+supportHtml;
@@ -1346,6 +1347,7 @@ export default {
         // Index by customerId and subscriptionId for webhook lookups
         await env.SHARES.put("license_by_customer:" + customerId, keyHash);
         if (subscriptionId) await env.SHARES.put("license_by_sub:" + subscriptionId, keyHash);
+        if (email) await env.SHARES.put("license_by_email:" + email, keyHash);
         // Store pending key for success page retrieval (expires after 10 min)
         await env.SHARES.put("license_pending:" + session.id, licenseKey, { expirationTtl: 600 });
       }
@@ -1479,7 +1481,155 @@ export default {
         note: body.note || "manually issued",
       };
       await env.SHARES.put("license:" + keyHash, JSON.stringify(record));
+      if (record.email) await env.SHARES.put("license_by_email:" + record.email, keyHash);
       return json({ ok: true, licenseKey });
+    }
+
+    // GET /license/recover — self-service key recovery page (or admin lookup)
+    if (request.method === "GET" && path === "/license/recover") {
+      const email = (url.searchParams.get("email") || "").trim().toLowerCase();
+      const adminSecret = url.searchParams.get("secret") || request.headers.get("X-Admin-Secret") || "";
+      const isAdmin = !!(adminSecret && adminSecret === (env.ADMIN_SECRET || ""));
+
+      let result = null;
+      if (email) {
+        const keyHash = await env.SHARES.get("license_by_email:" + email);
+        if (keyHash) {
+          const raw = await env.SHARES.get("license:" + keyHash);
+          if (raw) result = JSON.parse(raw);
+        }
+      }
+
+      // Admin JSON response
+      if (isAdmin && email) {
+        if (!result) return json({ found: false });
+        return json({ found: true, licenseKey: result.licenseKey, status: result.status, createdAt: result.createdAt, renewedAt: result.renewedAt });
+      }
+
+      // HTML recovery page
+      const found = !!(result && result.status === "active");
+      const cancelled = !!(result && result.status !== "active");
+      return new Response(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Remembory — Recover licence key</title>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Crimson Text', Georgia, serif; background: #f7f2ea; color: #2c2416; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: #fffcf5; border: 1px solid #d4c4a8; border-radius: 6px; padding: 40px 36px; max-width: 460px; width: 100%; }
+    h1 { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-style: italic; color: #1a1208; margin-bottom: 10px; }
+    .subtitle { color: #6a5840; font-size: 0.95rem; line-height: 1.6; margin-bottom: 24px; }
+    form { display: flex; flex-direction: column; gap: 10px; }
+    input { padding: 10px 13px; border: 1px solid #c8b89a; border-radius: 3px; font-family: 'Crimson Text', serif; font-size: 1rem; background: #faf7f2; color: #1a1208; }
+    input:focus { outline: none; border-color: #a8885a; }
+    button { padding: 10px; background: #2c2416; color: #f5f0e8; border: none; border-radius: 3px; font-family: 'Crimson Text', serif; font-size: 1rem; cursor: pointer; transition: opacity 0.15s; }
+    button:hover { opacity: 0.85; }
+    .key-box { background: #f0e8d8; border: 1px solid #c8b89a; border-radius: 4px; padding: 14px 18px; font-family: monospace; font-size: 1.1rem; letter-spacing: 0.06em; color: #1a1208; word-break: break-all; margin-bottom: 10px; }
+    .copy-btn { background: #2c2416; color: #f5f0e8; border: none; border-radius: 3px; padding: 8px 20px; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 0.95rem; transition: opacity 0.15s; }
+    .copy-btn:hover { opacity: 0.85; }
+    .msg { font-size: 0.88rem; line-height: 1.6; padding: 12px 14px; border-radius: 3px; margin-top: 4px; }
+    .msg.warn { background: rgba(196,133,138,0.1); border: 1px solid rgba(196,133,138,0.3); color: #8a3030; }
+    .msg.info { background: rgba(74,122,90,0.08); border: 1px solid rgba(74,122,90,0.25); color: #3a5a3a; }
+    a { color: #a8885a; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Recover your key</h1>
+  ${!email ? `
+  <p class="subtitle">Enter the email address you used to subscribe and we'll show your licence key.</p>
+  <form method="GET" action="/license/recover">
+    <input type="email" name="email" placeholder="your@email.com" required autofocus>
+    <button type="submit">Look up my key</button>
+  </form>
+  ` : found ? `
+  <p class="subtitle">Active licence key for <strong>${esc(email)}</strong>:</p>
+  <div class="key-box" id="lk">${esc(result.licenseKey)}</div>
+  <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('lk').textContent).then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy key',1500)})">Copy key</button>
+  <p style="font-size:0.82rem;color:#8a7460;margin-top:12px;font-style:italic">Paste this into Chronicle &rarr; Settings &rarr; Subscription.</p>
+  ` : cancelled ? `
+  <div class="msg warn">Your subscription for <strong>${esc(email)}</strong> is no longer active (${esc(result.status)}). <a href="https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02">Resubscribe &rarr;</a></div>
+  ` : `
+  <div class="msg warn">No active subscription found for <strong>${esc(email)}</strong>. Check for typos, or <a href="mailto:hello@remembory.net">contact us</a> if you think this is an error.</div>
+  <form method="GET" action="/license/recover" style="margin-top:16px">
+    <input type="email" name="email" value="${esc(email)}" required>
+    <button type="submit">Try again</button>
+  </form>
+  `}
+</div>
+</body>
+</html>`, { headers: { "Content-Type": "text/html;charset=UTF-8", "Cache-Control": "no-store" } });
+    }
+
+    // ── Admin ─────────────────────────────────────────────────────────────────
+
+    // GET /admin — dashboard HTML
+    if (request.method === "GET" && path === "/admin") {
+      return new Response(adminPage(), { headers: { "Content-Type": "text/html;charset=UTF-8", "Cache-Control": "no-store" } });
+    }
+
+    // GET /admin/licenses — list all licenses
+    if (request.method === "GET" && path === "/admin/licenses") {
+      const secret = request.headers.get("X-Admin-Secret") || "";
+      if (!secret || secret !== (env.ADMIN_SECRET || "")) return json({ error: "Forbidden" }, 403);
+      const list = await env.SHARES.list({ prefix: "license:" });
+      const records = await Promise.all(list.keys.map(async k => {
+        const raw = await env.SHARES.get(k.name);
+        return raw ? JSON.parse(raw) : null;
+      }));
+      return json({ licenses: records.filter(Boolean) });
+    }
+
+    // POST /admin/license/revoke
+    if (request.method === "POST" && path === "/admin/license/revoke") {
+      const secret = request.headers.get("X-Admin-Secret") || "";
+      if (!secret || secret !== (env.ADMIN_SECRET || "")) return json({ error: "Forbidden" }, 403);
+      const { keyHash } = await request.json().catch(() => ({}));
+      if (!keyHash) return json({ error: "Missing keyHash" }, 400);
+      const raw = await env.SHARES.get("license:" + keyHash);
+      if (!raw) return json({ error: "Not found" }, 404);
+      const rec = JSON.parse(raw);
+      rec.status = "cancelled"; rec.cancelledAt = new Date().toISOString();
+      await env.SHARES.put("license:" + keyHash, JSON.stringify(rec));
+      return json({ ok: true });
+    }
+
+    // POST /admin/license/reinstate
+    if (request.method === "POST" && path === "/admin/license/reinstate") {
+      const secret = request.headers.get("X-Admin-Secret") || "";
+      if (!secret || secret !== (env.ADMIN_SECRET || "")) return json({ error: "Forbidden" }, 403);
+      const { keyHash } = await request.json().catch(() => ({}));
+      if (!keyHash) return json({ error: "Missing keyHash" }, 400);
+      const raw = await env.SHARES.get("license:" + keyHash);
+      if (!raw) return json({ error: "Not found" }, 404);
+      const rec = JSON.parse(raw);
+      rec.status = "active"; rec.renewedAt = new Date().toISOString();
+      delete rec.cancelledAt; delete rec.suspendedAt;
+      await env.SHARES.put("license:" + keyHash, JSON.stringify(rec));
+      return json({ ok: true });
+    }
+
+    // GET /admin/profiles — full profiles index
+    if (request.method === "GET" && path === "/admin/profiles") {
+      const secret = request.headers.get("X-Admin-Secret") || "";
+      if (!secret || secret !== (env.ADMIN_SECRET || "")) return json({ error: "Forbidden" }, 403);
+      const list = await getProfilesList(env);
+      return json({ profiles: list, total: list.length });
+    }
+
+    // POST /admin/profile/remove — remove a profile from public index
+    if (request.method === "POST" && path === "/admin/profile/remove") {
+      const secret = request.headers.get("X-Admin-Secret") || "";
+      if (!secret || secret !== (env.ADMIN_SECRET || "")) return json({ error: "Forbidden" }, 403);
+      const { identifier } = await request.json().catch(() => ({}));
+      if (!identifier) return json({ error: "Missing identifier" }, 400);
+      const list = await getProfilesList(env);
+      const filtered = list.filter(p => p.identifier !== identifier);
+      await env.SHARES.put("profiles:list", JSON.stringify(filtered));
+      return json({ ok: true, removed: list.length - filtered.length });
     }
 
     // Health check
@@ -1488,6 +1638,379 @@ export default {
     return json({ error: "Not found" }, 404);
   },
 };
+
+// ── Admin dashboard ───────────────────────────────────────────────────────────
+function adminPage() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Remembory Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Crimson Text', Georgia, serif; background: #f7f2ea; color: #2c2416; min-height: 100vh; }
+    a { color: inherit; text-decoration: none; }
+    header { background: #1a1208; color: #f5f0e8; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-family: 'Playfair Display', serif; font-size: 1.2rem; font-style: italic; }
+    header .signed-in { font-size: 0.8rem; color: #a8a090; }
+    .login-wrap { display: flex; align-items: center; justify-content: center; min-height: 80vh; }
+    .login-card { background: #fffcf5; border: 1px solid #d4c4a8; border-radius: 6px; padding: 36px; width: 320px; }
+    .login-card h2 { font-family: 'Playfair Display', serif; font-style: italic; margin-bottom: 16px; font-size: 1.4rem; color: #1a1208; }
+    .login-card input { width: 100%; padding: 10px 12px; border: 1px solid #c8b89a; border-radius: 3px; font-family: 'Crimson Text', serif; font-size: 1rem; background: #faf7f2; color: #1a1208; margin-bottom: 10px; }
+    .login-card input:focus { outline: none; border-color: #a8885a; }
+    .btn { padding: 9px 18px; background: #2c2416; color: #f5f0e8; border: none; border-radius: 3px; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 0.95rem; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn-sm { padding: 4px 10px; font-size: 0.82rem; }
+    .btn-danger { background: #8a3030; }
+    .btn-success { background: #3a6a4a; }
+    .btn-outline { background: transparent; border: 1px solid #c8b89a; color: #5a4020; }
+    .btn-outline:hover { background: rgba(44,36,22,0.06); opacity: 1; }
+    .tabs { display: flex; border-bottom: 2px solid #e0d4be; background: #faf7f2; padding: 0 24px; }
+    .tab { padding: 11px 20px 9px; border: none; background: transparent; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 0.95rem; color: #8a7460; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.15s; }
+    .tab.active { color: #1a1208; border-bottom-color: #2c2416; font-weight: 600; }
+    .tab:hover:not(.active) { color: #4a3820; }
+    .content { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 28px; }
+    .stat-card { background: #fffcf5; border: 1px solid #d4c4a8; border-radius: 4px; padding: 18px 20px; }
+    .stat-card .num { font-family: 'Playfair Display', serif; font-size: 2rem; color: #1a1208; font-style: italic; }
+    .stat-card .label { font-size: 0.8rem; color: #8a7460; text-transform: uppercase; letter-spacing: 0.05em; font-family: Arial, sans-serif; margin-top: 2px; }
+    .card { background: #fffcf5; border: 1px solid #d4c4a8; border-radius: 4px; padding: 20px; margin-bottom: 18px; }
+    .card-title { font-family: 'Playfair Display', serif; font-style: italic; font-size: 1.1rem; color: #1a1208; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #8a7460; font-family: Arial, sans-serif; padding: 6px 10px; border-bottom: 2px solid #e0d4be; }
+    td { padding: 9px 10px; border-bottom: 1px solid #f0e8d8; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(200,168,122,0.04); }
+    .badge { display: inline-block; font-size: 0.68rem; padding: 2px 7px; border-radius: 10px; font-family: Arial, sans-serif; letter-spacing: 0.04em; }
+    .badge-active { background: rgba(74,122,90,0.12); color: #2d6b3a; border: 1px solid rgba(74,122,90,0.3); }
+    .badge-cancelled { background: rgba(196,133,138,0.12); color: #8a3030; border: 1px solid rgba(196,133,138,0.3); }
+    .badge-suspended { background: rgba(168,136,90,0.12); color: #7a5a20; border: 1px solid rgba(168,136,90,0.3); }
+    .key-mono { font-family: monospace; font-size: 0.82rem; color: #5a4020; letter-spacing: 0.04em; }
+    .form-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .form-row input { flex: 1; padding: 8px 12px; border: 1px solid #c8b89a; border-radius: 3px; font-family: 'Crimson Text', serif; font-size: 0.95rem; background: #faf7f2; color: #1a1208; }
+    .form-row input:focus { outline: none; border-color: #a8885a; }
+    .msg { font-size: 0.84rem; padding: 8px 12px; border-radius: 3px; margin-top: 6px; }
+    .msg.ok { background: rgba(74,122,90,0.1); color: #2d6b3a; border: 1px solid rgba(74,122,90,0.25); }
+    .msg.err { background: rgba(196,133,138,0.1); color: #8a3030; border: 1px solid rgba(196,133,138,0.3); }
+    .loading { color: #8a7460; font-style: italic; padding: 20px 0; text-align: center; }
+    .search-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+    .search-bar input { flex: 1; padding: 8px 12px; border: 1px solid #c8b89a; border-radius: 3px; font-family: 'Crimson Text', serif; font-size: 0.95rem; background: #faf7f2; color: #1a1208; }
+    .search-bar input:focus { outline: none; border-color: #a8885a; }
+    .copy-link { font-size: 0.74rem; color: #a8885a; cursor: pointer; text-decoration: underline; margin-left: 6px; }
+    #app { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- Login -->
+<div class="login-wrap" id="login">
+  <div class="login-card">
+    <h2>Admin Login</h2>
+    <input type="password" id="secret-input" placeholder="Admin secret…" onkeydown="if(event.key==='Enter')doLogin()">
+    <div id="login-err" style="font-size:0.82rem;color:#8a3030;margin-bottom:8px;display:none">Incorrect secret.</div>
+    <button class="btn" style="width:100%" onclick="doLogin()">Sign in</button>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="app">
+  <header>
+    <h1>Remembory Admin</h1>
+    <div class="signed-in" id="signed-in-label"></div>
+  </header>
+  <nav class="tabs">
+    <button class="tab active" onclick="switchTab('overview')" id="tab-overview">Overview</button>
+    <button class="tab" onclick="switchTab('licenses')" id="tab-licenses">Subscriptions</button>
+    <button class="tab" onclick="switchTab('generate')" id="tab-generate">Issue Key</button>
+    <button class="tab" onclick="switchTab('profiles')" id="tab-profiles">Profiles</button>
+    <button class="tab" onclick="switchTab('mailing')" id="tab-mailing">Mailing List</button>
+  </nav>
+  <div class="content" id="tab-content"></div>
+</div>
+
+<script>
+var API = 'https://social.remembory.net';
+var secret = '';
+var activeTab = 'overview';
+var allLicenses = [], allProfiles = [], allMailing = [];
+
+function ss(k,v) { try { sessionStorage.setItem(k,v); } catch(e) {} }
+function sg(k) { try { return sessionStorage.getItem(k)||''; } catch(e) { return ''; } }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmt(iso) { return iso ? new Date(iso).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : '—'; }
+function copyText(t,el) { navigator.clipboard.writeText(t).then(()=>{ var old=el.textContent; el.textContent='Copied!'; setTimeout(()=>el.textContent=old,1500); }).catch(()=>{}); }
+
+async function api(method, path, body) {
+  var opts = { method, headers: { 'X-Admin-Secret': secret } };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  var r = await fetch(API + path, opts);
+  if (r.status === 403) { logout(); throw new Error('Forbidden'); }
+  return r.json();
+}
+
+async function doLogin() {
+  var inp = document.getElementById('secret-input');
+  var s = (inp.value||'').trim();
+  if (!s) return;
+  // Verify by hitting a protected endpoint
+  try {
+    var r = await fetch(API + '/admin/licenses', { headers: { 'X-Admin-Secret': s } });
+    if (r.status === 403) { document.getElementById('login-err').style.display=''; return; }
+    var data = await r.json();
+    secret = s; ss('admin-secret', s);
+    allLicenses = data.licenses || [];
+    showApp();
+  } catch(e) { document.getElementById('login-err').style.display=''; }
+}
+
+function logout() { secret=''; ss('admin-secret',''); document.getElementById('app').style.display='none'; document.getElementById('login').style.display='flex'; }
+
+function showApp() {
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('signed-in-label').textContent = 'Signed in';
+  switchTab('overview');
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(function(b){ b.className='tab'+(b.id==='tab-'+tab?' active':''); });
+  if (tab==='overview') renderOverview();
+  else if (tab==='licenses') renderLicenses();
+  else if (tab==='generate') renderGenerate();
+  else if (tab==='profiles') renderProfiles();
+  else if (tab==='mailing') renderMailing();
+}
+
+// ── Overview ─────────────────────────────────────────────────────────────────
+async function renderOverview() {
+  var el = document.getElementById('tab-content');
+  el.innerHTML = '<p class="loading">Loading…</p>';
+  try {
+    var [ldata, pdata, mdata, stats] = await Promise.all([
+      api('GET','/admin/licenses'),
+      api('GET','/admin/profiles'),
+      fetch(API+'/mailing/list?secret='+encodeURIComponent(secret)).then(r=>r.json()),
+      fetch(API+'/explore/stats').then(r=>r.json())
+    ]);
+    allLicenses = ldata.licenses || [];
+    allProfiles = pdata.profiles || [];
+    allMailing = mdata.subscribers || [];
+    var active = allLicenses.filter(function(l){return l.status==='active';}).length;
+    var suspended = allLicenses.filter(function(l){return l.status==='suspended';}).length;
+    var cancelled = allLicenses.filter(function(l){return l.status==='cancelled';}).length;
+    el.innerHTML =
+      '<div class="stat-grid">'+
+        '<div class="stat-card"><div class="num">'+active+'</div><div class="label">Active subscribers</div></div>'+
+        '<div class="stat-card"><div class="num">'+allProfiles.length+'</div><div class="label">Published chronicles</div></div>'+
+        '<div class="stat-card"><div class="num">'+(stats.publicMems||0)+'</div><div class="label">Public memories</div></div>'+
+        '<div class="stat-card"><div class="num">'+(stats.subscriberMems||0)+'</div><div class="label">Subscriber memories</div></div>'+
+        '<div class="stat-card"><div class="num">'+(stats.connectedMems||0)+'</div><div class="label">Connected memories</div></div>'+
+        '<div class="stat-card"><div class="num">'+allMailing.length+'</div><div class="label">Mailing list</div></div>'+
+        (suspended?'<div class="stat-card"><div class="num" style="color:#c4858a">'+suspended+'</div><div class="label">Suspended</div></div>':'')+
+        (cancelled?'<div class="stat-card"><div class="num" style="color:#a08080">'+cancelled+'</div><div class="label">Cancelled</div></div>':'')+
+      '</div>'+
+      '<div class="card"><div class="card-title">Recent subscriptions</div>'+licenseTable(allLicenses.slice().sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'');}).slice(0,10))+'</div>';
+  } catch(e) { el.innerHTML = '<p class="loading" style="color:#c4858a">Failed to load: '+esc(e.message)+'</p>'; }
+}
+
+// ── Licenses ─────────────────────────────────────────────────────────────────
+async function renderLicenses() {
+  var el = document.getElementById('tab-content');
+  if (!allLicenses.length) {
+    el.innerHTML = '<p class="loading">Loading…</p>';
+    var data = await api('GET','/admin/licenses');
+    allLicenses = data.licenses || [];
+  }
+  renderLicenseTable(el, '');
+}
+
+function renderLicenseTable(el, filter) {
+  var licenses = filter
+    ? allLicenses.filter(function(l){ var f=filter.toLowerCase(); return (l.email||'').includes(f)||(l.licenseKey||'').toLowerCase().includes(f)||(l.status||'').includes(f); })
+    : allLicenses.slice();
+  licenses.sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'');});
+  el.innerHTML =
+    '<div class="card">'+
+      '<div class="card-title">All subscriptions ('+licenses.length+')<button class="btn btn-sm btn-outline" onclick="refreshLicenses()" style="margin-left:8px">Refresh</button></div>'+
+      '<div class="search-bar"><input id="lic-search" placeholder="Search email, key or status…" oninput="renderLicenseTable(document.getElementById(\'tab-content\'),this.value)" value="'+esc(filter)+'"></div>'+
+      licenseTable(licenses)+
+    '</div>';
+}
+
+function licenseTable(licenses) {
+  if (!licenses.length) return '<p style="color:#8a7460;font-style:italic;padding:10px 0">None found.</p>';
+  return '<table><thead><tr><th>Email</th><th>Key</th><th>Status</th><th>Created</th><th>Renewed</th><th>Actions</th></tr></thead><tbody>'+
+    licenses.map(function(l){
+      var bc = l.status==='active'?'badge-active':l.status==='suspended'?'badge-suspended':'badge-cancelled';
+      return '<tr>'+
+        '<td>'+esc(l.email||'—')+'</td>'+
+        '<td><span class="key-mono">'+esc(l.licenseKey||'—')+'</span>'+
+          (l.licenseKey?'<span class="copy-link" onclick="copyText(\''+esc(l.licenseKey)+'\',this)">copy</span>':'')+
+        '</td>'+
+        '<td><span class="badge '+bc+'">'+esc(l.status)+'</span>'+
+          (l.note?' <span style="font-size:0.74rem;color:#a8a090;font-style:italic">'+esc(l.note)+'</span>':'')+
+        '</td>'+
+        '<td>'+fmt(l.createdAt)+'</td>'+
+        '<td>'+fmt(l.renewedAt)+'</td>'+
+        '<td style="white-space:nowrap">'+
+          (l.status==='active'
+            ? '<button class="btn btn-sm btn-danger" onclick="revokeKey(\''+esc(l.keyHash)+'\',this)">Revoke</button>'
+            : '<button class="btn btn-sm btn-success" onclick="reinstateKey(\''+esc(l.keyHash)+'\',this)">Reinstate</button>')+
+        '</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table>';
+}
+
+async function refreshLicenses() {
+  var data = await api('GET','/admin/licenses');
+  allLicenses = data.licenses || [];
+  var el = document.getElementById('tab-content');
+  var filter = document.getElementById('lic-search');
+  renderLicenseTable(el, filter?filter.value:'');
+}
+
+async function revokeKey(keyHash, btn) {
+  if (!confirm('Revoke this licence? The subscriber will lose access on next key check.')) return;
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    await api('POST','/admin/license/revoke',{keyHash});
+    var rec = allLicenses.find(function(l){return l.keyHash===keyHash;});
+    if (rec) rec.status = 'cancelled';
+    var el = document.getElementById('tab-content'); var filter = document.getElementById('lic-search');
+    renderLicenseTable(el, filter?filter.value:'');
+  } catch(e) { btn.disabled=false; btn.textContent='Revoke'; alert('Failed: '+e.message); }
+}
+
+async function reinstateKey(keyHash, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    await api('POST','/admin/license/reinstate',{keyHash});
+    var rec = allLicenses.find(function(l){return l.keyHash===keyHash;});
+    if (rec) { rec.status = 'active'; rec.renewedAt = new Date().toISOString(); }
+    var el = document.getElementById('tab-content'); var filter = document.getElementById('lic-search');
+    renderLicenseTable(el, filter?filter.value:'');
+  } catch(e) { btn.disabled=false; btn.textContent='Reinstate'; alert('Failed: '+e.message); }
+}
+
+// ── Generate ──────────────────────────────────────────────────────────────────
+function renderGenerate() {
+  document.getElementById('tab-content').innerHTML =
+    '<div class="card" style="max-width:480px">'+
+      '<div class="card-title">Issue a free licence key</div>'+
+      '<div class="form-row"><input id="gen-email" type="email" placeholder="Recipient email (optional)…"></div>'+
+      '<div class="form-row"><input id="gen-note" type="text" placeholder="Note, e.g. "complimentary" or "beta tester"…"></div>'+
+      '<button class="btn" onclick="generateKey()">Generate key</button>'+
+      '<div id="gen-result"></div>'+
+    '</div>';
+}
+
+async function generateKey() {
+  var email = (document.getElementById('gen-email').value||'').trim();
+  var note = (document.getElementById('gen-note').value||'').trim()||'manually issued';
+  var res = document.getElementById('gen-result');
+  res.innerHTML = '<p style="color:#8a7460;font-style:italic;margin-top:10px">Generating…</p>';
+  try {
+    var data = await api('POST','/license/generate',{email,note});
+    res.innerHTML = '<div class="msg ok" style="margin-top:10px">Key issued: <span class="key-mono">'+esc(data.licenseKey)+'</span> <span class="copy-link" onclick="copyText(\''+esc(data.licenseKey)+'\',this)">copy</span></div>';
+    allLicenses = []; // invalidate cache so next visit to Subscriptions tab refreshes
+  } catch(e) { res.innerHTML = '<div class="msg err" style="margin-top:10px">Failed: '+esc(e.message)+'</div>'; }
+}
+
+// ── Profiles ──────────────────────────────────────────────────────────────────
+async function renderProfiles() {
+  var el = document.getElementById('tab-content');
+  el.innerHTML = '<p class="loading">Loading…</p>';
+  try {
+    var data = await api('GET','/admin/profiles');
+    allProfiles = data.profiles || [];
+    renderProfileTable(el, '');
+  } catch(e) { el.innerHTML = '<p class="loading" style="color:#c4858a">Failed: '+esc(e.message)+'</p>'; }
+}
+
+function renderProfileTable(el, filter) {
+  var profiles = filter
+    ? allProfiles.filter(function(p){ var f=filter.toLowerCase(); return (p.displayName||'').toLowerCase().includes(f)||(p.identifier||'').toLowerCase().includes(f); })
+    : allProfiles.slice();
+  el.innerHTML =
+    '<div class="card">'+
+      '<div class="card-title">Published chronicles ('+profiles.length+')</div>'+
+      '<div class="search-bar"><input placeholder="Search name or identifier…" oninput="renderProfileTable(document.getElementById(\'tab-content\'),this.value)"></div>'+
+      '<table><thead><tr><th>Name</th><th>Identifier</th><th>Memories</th><th>Published</th><th>Privacy</th><th>Actions</th></tr></thead><tbody>'+
+      profiles.map(function(p){
+        return '<tr>'+
+          '<td><a href="'+API+'/p/'+esc(p.identifier)+'" target="_blank" style="color:#a8885a;text-decoration:underline">'+esc(p.displayName||'—')+'</a></td>'+
+          '<td><span class="key-mono">'+esc(p.identifier||'—')+'</span></td>'+
+          '<td>'+(p.memCount||0)+'</td>'+
+          '<td>'+fmt(p.publishedAt||p.updatedAt)+'</td>'+
+          '<td>'+esc(p.profilePrivacy||'open')+'</td>'+
+          '<td><button class="btn btn-sm btn-danger" onclick="removeProfile(\''+esc(p.identifier)+'\',this)">Remove</button></td>'+
+        '</tr>';
+      }).join('')+
+      '</tbody></table>'+
+    '</div>';
+}
+
+async function removeProfile(identifier, btn) {
+  if (!confirm('Remove "'+identifier+'" from the public index? The data is NOT deleted — they can republish.')) return;
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    await api('POST','/admin/profile/remove',{identifier});
+    allProfiles = allProfiles.filter(function(p){return p.identifier!==identifier;});
+    renderProfileTable(document.getElementById('tab-content'),'');
+  } catch(e) { btn.disabled=false; btn.textContent='Remove'; alert('Failed: '+e.message); }
+}
+
+// ── Mailing list ──────────────────────────────────────────────────────────────
+async function renderMailing() {
+  var el = document.getElementById('tab-content');
+  el.innerHTML = '<p class="loading">Loading…</p>';
+  try {
+    var data = await fetch(API+'/mailing/list?secret='+encodeURIComponent(secret)).then(function(r){return r.json();});
+    allMailing = data.subscribers || [];
+    el.innerHTML =
+      '<div class="card">'+
+        '<div class="card-title">Mailing list ('+allMailing.length+')'+
+          '<button class="btn btn-sm btn-outline" onclick="exportMailing()" style="margin-left:8px">Export CSV</button>'+
+        '</div>'+
+        '<table><thead><tr><th>Email</th><th>Subscribed</th></tr></thead><tbody>'+
+        allMailing.sort(function(a,b){return (b.subscribedAt||'').localeCompare(a.subscribedAt||'');}).map(function(s){
+          return '<tr><td>'+esc(s.email)+'</td><td>'+fmt(s.subscribedAt)+'</td></tr>';
+        }).join('')+
+        '</tbody></table>'+
+      '</div>';
+  } catch(e) { el.innerHTML = '<p class="loading" style="color:#c4858a">Failed: '+esc(e.message)+'</p>'; }
+}
+
+function exportMailing() {
+  var csv = 'email,subscribed_at\\n' + allMailing.map(function(s){return s.email+','+s.subscribedAt;}).join('\\n');
+  var a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download = 'mailing-list-'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(function() {
+  var s = sg('admin-secret');
+  if (s) {
+    secret = s;
+    // Verify it's still valid
+    fetch(API+'/admin/licenses', { headers: { 'X-Admin-Secret': s } }).then(function(r) {
+      if (r.status===403) { logout(); return; }
+      return r.json().then(function(data) {
+        allLicenses = data.licenses || [];
+        showApp();
+      });
+    }).catch(function(){ showApp(); }); // network error — show app optimistically
+  }
+})();
+</script>
+</body>
+</html>`;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
