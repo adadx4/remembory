@@ -6900,18 +6900,29 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
             style:{background:"transparent",border:"none",color:"#c4858a",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px"}},
             "clear")
         ),
-        Object.keys(filtByDec).sort().map(dec=>React.createElement("div",{key:dec,id:"dec-"+dec,style:{marginBottom:"28px"}},
-          React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"12px",marginBottom:"10px"}},
-            React.createElement("h3",{onClick:()=>{setZoomDecade(+dec);setZoomYear(null);setView("decade");},style:{margin:0,fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#8a7460",fontWeight:700,letterSpacing:"0.1em",cursor:"pointer"},onMouseEnter:e=>e.target.style.color="#1a1208",onMouseLeave:e=>e.target.style.color="#8a7460"},`${dec}s ↗`),
-            React.createElement("div",{style:{flex:1,height:"1px",background:"linear-gradient(to right, #c8b89a, transparent)"}})
-          ),
-          React.createElement("div",{style:{paddingLeft:"14px",borderLeft:"3px solid #c8a87a"}},
-            filtByDec[dec].map(m=>React.createElement("div",{key:m.id,style:{display:"flex",alignItems:"baseline",gap:"7px",marginBottom:"3px"}},
-              React.createElement("span",{style:{width:"9px",height:"9px",borderRadius:"50%",background:m.tags[0]?TAG_COLORS[m.tags[0]]:"#c8b89a",flexShrink:0,display:"inline-block",marginTop:"3px"}}),
-              React.createElement("button",{onClick:()=>{setSelected(m.id);setView("detail");},style:{background:"none",border:"none",cursor:"pointer",padding:0,textAlign:"left",fontFamily:"'Crimson Text',Georgia,serif",fontSize:"0.9rem",color:"#2c2416",lineHeight:1.4,textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px"}},m.title)
-            ))
-          )
-        ))
+        Object.keys(filtByDec).sort().map(dec=>{
+          const byYear={};
+          filtByDec[dec].forEach(m=>{const yr=m.year||0;if(!byYear[yr])byYear[yr]=[];byYear[yr].push(m);});
+          return React.createElement("div",{key:dec,id:"dec-"+dec,style:{marginBottom:"28px"}},
+            React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"12px",marginBottom:"10px"}},
+              React.createElement("h3",{onClick:()=>{setZoomDecade(+dec);setZoomYear(null);setView("decade");},style:{margin:0,fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#8a7460",fontWeight:700,letterSpacing:"0.1em",cursor:"pointer"},onMouseEnter:e=>e.currentTarget.style.color="#1a1208",onMouseLeave:e=>e.currentTarget.style.color="#8a7460"},
+                dec,React.createElement("span",{style:{fontSize:"0.55em",letterSpacing:0,verticalAlign:"baseline"}},"s")," ↗"),
+              React.createElement("div",{style:{flex:1,height:"1px",background:"linear-gradient(to right, #c8b89a, transparent)"}})
+            ),
+            React.createElement("div",{style:{paddingLeft:"14px",borderLeft:"3px solid #c8a87a"}},
+              Object.keys(byYear).sort((a,b)=>+a-+b).map(yr=>React.createElement("div",{key:yr,style:{marginBottom:"10px"}},
+                +yr>0&&React.createElement("div",{onClick:()=>{setZoomDecade(+dec);setZoomYear(+yr);setView("year");},style:{display:"inline-flex",alignItems:"baseline",gap:"5px",marginBottom:"4px",cursor:"pointer"},onMouseEnter:e=>e.currentTarget.style.opacity="0.6",onMouseLeave:e=>e.currentTarget.style.opacity="1"},
+                  React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.82rem",fontWeight:700,color:"#5a4a38",letterSpacing:"0.04em"}},yr),
+                  React.createElement("span",{style:{fontSize:"0.7rem",color:"#8a7460",fontStyle:"italic"}},byYear[yr].length===1?"1 memory":byYear[yr].length+" memories")
+                ),
+                byYear[yr].map(m=>React.createElement("div",{key:m.id,style:{display:"flex",alignItems:"baseline",gap:"7px",marginBottom:"3px"}},
+                  React.createElement("span",{style:{width:"9px",height:"9px",borderRadius:"50%",background:m.tags[0]?TAG_COLORS[m.tags[0]]:"#c8b89a",flexShrink:0,display:"inline-block",marginTop:"3px"}}),
+                  React.createElement("button",{onClick:()=>{setSelected(m.id);setView("detail");},style:{background:"none",border:"none",cursor:"pointer",padding:0,textAlign:"left",fontFamily:"'Crimson Text',Georgia,serif",fontSize:"0.9rem",color:"#2c2416",lineHeight:1.4,textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px"}},m.title)
+                ))
+              ))
+            )
+          );
+        })
       ),
 
       view==="detail"&&selected&&React.createElement(DetailView,{
