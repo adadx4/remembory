@@ -1711,7 +1711,7 @@ function adminPage() {
     <h2>Admin Login</h2>
     <input type="password" id="secret-input" placeholder="Admin secret…" onkeydown="if(event.key==='Enter')doLogin()">
     <div id="login-err" style="font-size:0.82rem;color:#8a3030;margin-bottom:8px;display:none">Incorrect secret.</div>
-    <button class="btn" style="width:100%" onclick="doLogin()">Sign in</button>
+    <button class="btn" id="login-btn" style="width:100%" onclick="doLogin()">Sign in</button>
   </div>
 </div>
 
@@ -1753,17 +1753,30 @@ async function api(method, path, body) {
 
 async function doLogin() {
   var inp = document.getElementById('secret-input');
+  var btn = document.getElementById('login-btn');
+  var err = document.getElementById('login-err');
   var s = (inp.value||'').trim();
   if (!s) return;
-  // Verify by hitting a protected endpoint
+  btn.disabled = true; btn.textContent = 'Signing in\u2026';
+  err.style.display = 'none';
   try {
     var r = await fetch(API + '/admin/licenses', { headers: { 'X-Admin-Secret': s } });
-    if (r.status === 403) { document.getElementById('login-err').style.display=''; return; }
+    if (r.status === 403) {
+      err.textContent = 'Incorrect secret.';
+      err.style.display = '';
+      btn.disabled = false; btn.textContent = 'Sign in';
+      return;
+    }
+    if (!r.ok) throw new Error('Server error ' + r.status);
     var data = await r.json();
     secret = s; ss('admin-secret', s);
     allLicenses = data.licenses || [];
     showApp();
-  } catch(e) { document.getElementById('login-err').style.display=''; }
+  } catch(e) {
+    err.textContent = 'Could not connect: ' + e.message;
+    err.style.display = '';
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
 }
 
 function logout() { secret=''; ss('admin-secret',''); document.getElementById('app').style.display='none'; document.getElementById('login').style.display='flex'; }
