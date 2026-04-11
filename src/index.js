@@ -1849,9 +1849,20 @@ function renderLicenseTable(el, filter) {
   el.innerHTML =
     '<div class="card">'+
       '<div class="card-title">All subscriptions ('+licenses.length+')<button class="btn btn-sm btn-outline" onclick="refreshLicenses()" style="margin-left:8px">Refresh</button></div>'+
-      '<div class="search-bar"><input id="lic-search" placeholder="Search email, key or status…" oninput="renderLicenseTable(document.getElementById(\'tab-content\'),this.value)" value="'+esc(filter)+'"></div>'+
+      '<div class="search-bar"><input id="lic-search" placeholder="Search email, key or status…" value="'+esc(filter)+'"></div>'+
       licenseTable(licenses)+
     '</div>';
+  var s = document.getElementById('lic-search');
+  if (s) s.addEventListener('input', function(){ renderLicenseTable(document.getElementById('tab-content'), this.value); });
+  el.addEventListener('click', function(e) {
+    var copyEl = e.target.closest('[data-copy]');
+    if (copyEl) { copyText(copyEl.getAttribute('data-copy'), copyEl); return; }
+    var actionEl = e.target.closest('[data-action]');
+    if (!actionEl) return;
+    var action = actionEl.getAttribute('data-action'), key = actionEl.getAttribute('data-key');
+    if (action === 'revoke') revokeKey(key, actionEl);
+    else if (action === 'reinstate') reinstateKey(key, actionEl);
+  });
 }
 
 function licenseTable(licenses) {
@@ -1862,7 +1873,7 @@ function licenseTable(licenses) {
       return '<tr>'+
         '<td>'+esc(l.email||'—')+'</td>'+
         '<td><span class="key-mono">'+esc(l.licenseKey||'—')+'</span>'+
-          (l.licenseKey?'<span class="copy-link" onclick="copyText(\''+esc(l.licenseKey)+'\',this)">copy</span>':'')+
+          (l.licenseKey?'<span class="copy-link" data-copy="'+esc(l.licenseKey)+'">copy</span>':'')+
         '</td>'+
         '<td><span class="badge '+bc+'">'+esc(l.status)+'</span>'+
           (l.note?' <span style="font-size:0.74rem;color:#a8a090;font-style:italic">'+esc(l.note)+'</span>':'')+
@@ -1871,8 +1882,8 @@ function licenseTable(licenses) {
         '<td>'+fmt(l.renewedAt)+'</td>'+
         '<td style="white-space:nowrap">'+
           (l.status==='active'
-            ? '<button class="btn btn-sm btn-danger" onclick="revokeKey(\''+esc(l.keyHash)+'\',this)">Revoke</button>'
-            : '<button class="btn btn-sm btn-success" onclick="reinstateKey(\''+esc(l.keyHash)+'\',this)">Reinstate</button>')+
+            ? '<button class="btn btn-sm btn-danger" data-action="revoke" data-key="'+esc(l.keyHash)+'">Revoke</button>'
+            : '<button class="btn btn-sm btn-success" data-action="reinstate" data-key="'+esc(l.keyHash)+'">Reinstate</button>')+
         '</td>'+
       '</tr>';
     }).join('')+
@@ -1929,7 +1940,8 @@ async function generateKey() {
   res.innerHTML = '<p style="color:#8a7460;font-style:italic;margin-top:10px">Generating…</p>';
   try {
     var data = await api('POST','/license/generate',{email,note});
-    res.innerHTML = '<div class="msg ok" style="margin-top:10px">Key issued: <span class="key-mono">'+esc(data.licenseKey)+'</span> <span class="copy-link" onclick="copyText(\''+esc(data.licenseKey)+'\',this)">copy</span></div>';
+    res.innerHTML = '<div class="msg ok" style="margin-top:10px">Key issued: <span class="key-mono">'+esc(data.licenseKey)+'</span> <span class="copy-link" data-copy="'+esc(data.licenseKey)+'">copy</span></div>';
+    var c = res.querySelector('[data-copy]'); if (c) c.addEventListener('click', function(){ copyText(this.getAttribute('data-copy'),this); });
     allLicenses = []; // invalidate cache so next visit to Subscriptions tab refreshes
   } catch(e) { res.innerHTML = '<div class="msg err" style="margin-top:10px">Failed: '+esc(e.message)+'</div>'; }
 }
@@ -1952,7 +1964,7 @@ function renderProfileTable(el, filter) {
   el.innerHTML =
     '<div class="card">'+
       '<div class="card-title">Published chronicles ('+profiles.length+')</div>'+
-      '<div class="search-bar"><input placeholder="Search name or identifier…" oninput="renderProfileTable(document.getElementById(\'tab-content\'),this.value)"></div>'+
+      '<div class="search-bar"><input id="prof-search" placeholder="Search name or identifier…"></div>'+
       '<table><thead><tr><th>Name</th><th>Identifier</th><th>Memories</th><th>Published</th><th>Privacy</th><th>Actions</th></tr></thead><tbody>'+
       profiles.map(function(p){
         return '<tr>'+
@@ -1961,11 +1973,17 @@ function renderProfileTable(el, filter) {
           '<td>'+(p.memCount||0)+'</td>'+
           '<td>'+fmt(p.publishedAt||p.updatedAt)+'</td>'+
           '<td>'+esc(p.profilePrivacy||'open')+'</td>'+
-          '<td><button class="btn btn-sm btn-danger" onclick="removeProfile(\''+esc(p.identifier)+'\',this)">Remove</button></td>'+
+          '<td><button class="btn btn-sm btn-danger" data-remove="'+esc(p.identifier)+'">Remove</button></td>'+
         '</tr>';
       }).join('')+
       '</tbody></table>'+
     '</div>';
+  var ps = document.getElementById('prof-search');
+  if (ps) ps.addEventListener('input', function(){ renderProfileTable(document.getElementById('tab-content'), this.value); });
+  el.addEventListener('click', function(e) {
+    var rm = e.target.closest('[data-remove]');
+    if (rm) removeProfile(rm.getAttribute('data-remove'), rm);
+  });
 }
 
 async function removeProfile(identifier, btn) {
