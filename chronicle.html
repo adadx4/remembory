@@ -6959,6 +6959,89 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
             );
           });})()
         ),
+
+        // ── RESIDENCE TIMELINE ──
+        (()=>{
+          const currentYear = new Date().getFullYear();
+          const homeMs = memories
+            .filter(m => m.year && m.location && (m.tags||[]).includes("home"))
+            .sort((a,b) => a.year!==b.year ? a.year-b.year : (a.month||0)-(b.month||0));
+          if (homeMs.length === 0) return null;
+          // Build periods — collapse consecutive same-location entries
+          const residences = [];
+          homeMs.forEach((m,i) => {
+            const last = residences[residences.length-1];
+            const nextYear = homeMs[i+1] ? homeMs[i+1].year : currentYear;
+            if (last && last.location === m.location) {
+              last.endYear = nextYear;
+              last.isCurrent = !homeMs[i+1];
+            } else {
+              residences.push({location:m.location, startYear:m.year, endYear:nextYear, isCurrent:!homeMs[i+1], memId:m.id});
+            }
+          });
+          const minYear = residences[0].startYear;
+          const span = Math.max(1, currentYear - minYear);
+          // Assign a distinct colour per unique location
+          const palette = ["#a87e6b","#7a9e9f","#8b9dc3","#89b08a","#c4a962","#9b8ea8","#c4858a","#b5936b"];
+          const locColor = {};
+          residences.forEach(r => { if(!locColor[r.location]) locColor[r.location] = palette[Object.keys(locColor).length % palette.length]; });
+          // Decade tick marks, always include start and current year
+          const ticks = [];
+          const fd = Math.ceil((minYear+1)/10)*10;
+          for(let y=fd; y<currentYear; y+=10) ticks.push(y);
+          return React.createElement("div",{style:{marginTop:"22px",background:"rgba(255,252,245,0.85)",border:"1px solid #e0d4be",borderRadius:"4px",padding:"16px 14px"}},
+            React.createElement("h4",{style:{margin:"0 0 14px",fontFamily:"'Playfair Display',serif",fontSize:"0.8rem",color:"#8a7460",fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase"}},"Residences"),
+            // Segmented bar
+            React.createElement("div",{style:{position:"relative"}},
+              React.createElement("div",{style:{display:"flex",height:"30px",borderRadius:"3px",overflow:"hidden",width:"100%"}},
+                residences.map((r,i) => {
+                  const w = Math.max(0.5, (r.endYear-r.startYear)/span*100).toFixed(2)+"%";
+                  return React.createElement("div",{key:i,
+                    title:`${r.location}: ${r.startYear}–${r.isCurrent?"present":r.endYear}`,
+                    style:{width:w,background:locColor[r.location],display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0,cursor:"pointer"},
+                    onClick:()=>{setIndexFilter({type:"locations",value:r.location});setView("index");}
+                  },
+                    React.createElement("span",{style:{fontSize:"0.68rem",fontWeight:600,color:"#fff",textShadow:"0 1px 2px rgba(0,0,0,0.45)",padding:"0 4px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}},
+                      (r.endYear-r.startYear)/span > 0.09 ? r.location : ""
+                    )
+                  );
+                })
+              ),
+              // Year ruler
+              React.createElement("div",{style:{position:"relative",height:"18px",marginTop:"3px",fontSize:"0.64rem",color:"#8a7460"}},
+                React.createElement("span",{style:{position:"absolute",left:0}},minYear),
+                ticks.map(yr=>React.createElement("span",{key:yr,style:{position:"absolute",left:((yr-minYear)/span*100).toFixed(2)+"%",transform:"translateX(-50%)"}},yr)),
+                React.createElement("span",{style:{position:"absolute",right:0}},currentYear)
+              )
+            ),
+            // Detail list
+            React.createElement("div",{style:{marginTop:"14px",display:"flex",flexDirection:"column",gap:"7px"}},
+              residences.map((r,i)=>{
+                const dur = r.isCurrent ? currentYear-r.startYear : r.endYear-r.startYear;
+                const barW = Math.max(1, (r.endYear-r.startYear)/span*100).toFixed(1)+"%";
+                return React.createElement("div",{key:i,style:{display:"grid",gridTemplateColumns:"10px 1fr auto",gap:"8px",alignItems:"center"}},
+                  React.createElement("div",{style:{width:"10px",height:"10px",borderRadius:"2px",background:locColor[r.location]}}),
+                  React.createElement("div",null,
+                    React.createElement("div",{style:{height:"6px",borderRadius:"3px",background:"#e8dfd0",overflow:"hidden",marginBottom:"3px"}},
+                      React.createElement("div",{style:{height:"100%",width:barW,borderRadius:"3px",background:locColor[r.location]}})
+                    ),
+                    React.createElement("span",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",color:"#1a1208",cursor:"pointer",textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px"},
+                      onClick:()=>{setIndexFilter({type:"locations",value:r.location});setView("index");}},r.location)
+                  ),
+                  React.createElement("div",{style:{textAlign:"right",whiteSpace:"nowrap"}},
+                    React.createElement("div",{style:{fontSize:"0.82rem",color:"#2c2416"}},
+                      r.startYear+"–"+(r.isCurrent?"present":r.endYear)
+                    ),
+                    React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460"}},
+                      dur===0?"<1 yr":dur===1?"1 yr":dur+" yrs"
+                    )
+                  )
+                );
+              })
+            )
+          );
+        })(),
+
         memories.length>=3&&(()=>{
           function barChart(title,items,getColor,onClickItem){
             const max=Math.max(1,...items.map(([,c])=>c));
