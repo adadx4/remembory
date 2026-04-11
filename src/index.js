@@ -417,7 +417,14 @@ function renderBrowseCenter() {
 
 async function renderBrowseRightSidebar() {
   var rs = document.getElementById('sidebar-right'); if (!rs) return;
-  rs.innerHTML = '<div class="rs-section"><p class="loading" style="font-size:0.8rem;padding:4px 0">Loading\u2026</p></div><div class="rs-section"><a class="rs-donate" href="https://ko-fi.com/remembory" target="_blank" rel="noopener">\u2615 Support on Ko-fi</a></div>';
+  var supportHtml =
+    '<div class="rs-section">'+
+      '<div class="rs-title">Subscribe</div>'+
+      '<p style="font-size:0.78rem;color:#6a5840;line-height:1.5;margin-bottom:8px">Unlock subscriber-level memories across all Chronicles.</p>'+
+      '<a class="rs-donate" href="https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02" target="_blank" rel="noopener">&#10024; Subscribe &mdash; $20 AUD / year</a>'+
+    '</div>'+
+    '<div class="rs-section"><a class="rs-donate" href="https://ko-fi.com/remembory" target="_blank" rel="noopener">\u2615 Support on Ko-fi</a></div>';
+  rs.innerHTML = '<div class="rs-section"><p class="loading" style="font-size:0.8rem;padding:4px 0">Loading\u2026</p></div>'+supportHtml;
   try {
     var data = await (await fetch(API+'/explore/stats')).json();
     var h = '<div class="rs-title">Community</div>'+
@@ -426,7 +433,7 @@ async function renderBrowseRightSidebar() {
     if (data.subscriberMems) h += '<div class="rs-stat-row"><span>Subscriber</span><span class="rs-stat-num">'+data.subscriberMems+'</span></div>';
     if (data.connectedMems) h += '<div class="rs-stat-row"><span>Connected</span><span class="rs-stat-num">'+data.connectedMems+'</span></div>';
     if (data.taggedMems) h += '<div class="rs-stat-row"><span>Tagged</span><span class="rs-stat-num">'+data.taggedMems+'</span></div>';
-    rs.innerHTML = '<div class="rs-section">'+h+'</div><div class="rs-section"><a class="rs-donate" href="https://ko-fi.com/remembory" target="_blank" rel="noopener">\u2615 Support on Ko-fi</a></div>';
+    rs.innerHTML = '<div class="rs-section">'+h+'</div>'+supportHtml;
   } catch(e) {}
 }
 
