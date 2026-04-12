@@ -466,7 +466,7 @@ function seedData(data) { return data; }
 const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], orgLocations:{}, orgPeriods:{}, entityPhotos:{}, ownerName:"", ownerEmail:"" };
 
 function emptySubject(id, name, isSelf=false, mode=null) {
-  return { id, name, isSelf, mode, dob:"", notes:"", memories:[], candidates:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], knownSources:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{}, locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
+  return { id, name, isSelf, mode, dob:"", notes:"", memories:[], candidates:[], treePersons:[], treeFamilies:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], knownSources:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{}, locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
 }
 
 // ── Mode definitions ──────────────────────────────────────────
@@ -4167,7 +4167,8 @@ function ImportView({
   // GEDCOM state & handlers
   isSubscriber, gedPersons, gedPicked, gedPreview, gedBusy, gedSearch, setGedSearch,
   gedContext, setGedContext, gedContextSel, setGedContextSel,
-  handleGedFile, handleGedPick, commitGedImport,
+  handleGedFile, handleGedPick, commitGedImport, commitGedTreeImport,
+  isHistoryMode,
   // Shared data
   knownPeople, knownLocations, peopleEmails, peopleRelationships, persistSubject,
 }) {
@@ -4377,7 +4378,17 @@ function ImportView({
           React.createElement("strong",{style:{fontStyle:"normal",display:"block",marginBottom:"4px"}},"Biographical notes:"),
           gedPreview.subj.notes.length>300?gedPreview.subj.notes.slice(0,300)+"\u2026":gedPreview.subj.notes
         ),
-        React.createElement("div",{style:{background:"rgba(196,133,138,0.1)",border:"1px solid rgba(196,133,138,0.3)",borderRadius:"3px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.8rem",color:"#8a3030",lineHeight:1.5}},
+        isHistoryMode&&React.createElement("div",{style:{background:"rgba(196,169,98,0.1)",border:"1px solid rgba(196,169,98,0.4)",borderRadius:"4px",padding:"14px 16px",marginBottom:"16px"}},
+          React.createElement("p",{style:{margin:"0 0 10px",fontSize:"0.88rem",fontWeight:600,color:"#5a4820"}},"🌳 History Mode — Import Entire Tree"),
+          React.createElement("p",{style:{margin:"0 0 10px",fontSize:"0.82rem",color:"#6a5c48",lineHeight:1.55}},
+            "Import all "+gedPersons.persons.length+" people and their family relationships into the Tree view. "+gedPicked.fullName+" will be set as the focal ancestor. You can start a full Chronicle for any individual later."
+          ),
+          React.createElement("button",{onClick:()=>commitGedTreeImport(gedPicked.id),style:{...S.btn,width:"100%",padding:"10px",marginBottom:"8px",fontSize:"0.9rem"}},
+            "🌳 Import Full Tree ("+gedPersons.persons.length+" people)"
+          ),
+          React.createElement("p",{style:{margin:0,fontSize:"0.74rem",color:"#8a7460",fontStyle:"italic",textAlign:"center"}},"or use the button below to import only "+gedPicked.fullName+" as a Chronicle subject")
+        ),
+        !isHistoryMode&&React.createElement("div",{style:{background:"rgba(196,133,138,0.1)",border:"1px solid rgba(196,133,138,0.3)",borderRadius:"3px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.8rem",color:"#8a3030",lineHeight:1.5}},
           "This will create a new subject in your Chronicle. You can add photos, notes and your own perspectives to each memory afterwards."
         ),
         React.createElement("button",{onClick:commitGedImport,style:{...S.btn,width:"100%",fontSize:"0.95rem",padding:"11px"}},
@@ -4417,10 +4428,247 @@ function ImportView({
   );
 }
  
-function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, onSwitch}) {
+function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, onSwitch,
+  treePersons, treeFamilies, gedFocalPersonId, isHistoryMode, persistSubject, setView}) {
   const [showLinks, setShowLinks] = React.useState(false);
   const [lf, setLf] = React.useState({fromId:"", toId:"", type:"parent-of"});
+  const [tpSearch, setTpSearch] = React.useState("");
+  const [focalId, setFocalId] = React.useState(()=>gedFocalPersonId||treePersons[0]?.id||null);
+  const [depthUp, setDepthUp] = React.useState(3);
+  const [depthDown, setDepthDown] = React.useState(2);
+  const [personDetail, setPersonDetail] = React.useState(null); // tpId for detail panel
+
+  // Keep focalId in sync when gedFocalPersonId changes (e.g. after fresh import)
+  React.useEffect(()=>{ if(gedFocalPersonId) setFocalId(gedFocalPersonId); },[gedFocalPersonId]);
+
   const subLinks = subjectLinks || [];
+
+  // ── FULL TREE MODE (treePersons populated) ──────────────────────────────
+  const hasTree = treePersons && treePersons.length > 0;
+
+  if (hasTree) {
+    const tpById = Object.fromEntries(treePersons.map(p=>[p.id,p]));
+    // Build parent/child/spouse maps from treeFamilies
+    const parentsOf = {}; // childId → [parentId...]
+    const childrenOf = {}; // parentId → [childId...]
+    const spousesOf = {}; // personId → [spouseId...]
+    const famForSpouses = {}; // "id1|id2" → famId
+    (treeFamilies||[]).forEach(fam=>{
+      const {husbandId:h, wifeId:w, childIds:cs=[]} = fam;
+      cs.forEach(cid=>{
+        (parentsOf[cid]=parentsOf[cid]||[]);
+        if(h && !parentsOf[cid].includes(h)) parentsOf[cid].push(h);
+        if(w && !parentsOf[cid].includes(w)) parentsOf[cid].push(w);
+        (childrenOf[h||w||""]= childrenOf[h||w||""]||[]);
+        if(h){(childrenOf[h]=childrenOf[h]||[]);if(!childrenOf[h].includes(cid))childrenOf[h].push(cid);}
+        if(w){(childrenOf[w]=childrenOf[w]||[]);if(!childrenOf[w].includes(cid))childrenOf[w].push(cid);}
+      });
+      if(h&&w){
+        (spousesOf[h]=spousesOf[h]||[]);if(!spousesOf[h].includes(w))spousesOf[h].push(w);
+        (spousesOf[w]=spousesOf[w]||[]);if(!spousesOf[w].includes(h))spousesOf[w].push(h);
+        const k=[h,w].sort().join("|");
+        famForSpouses[k]=fam;
+      }
+    });
+
+    // Collect visible nodes from focalId outward
+    function collectAncestors(id, depth, seen=new Set()) {
+      if (!id||depth<0||seen.has(id)) return [];
+      seen.add(id); let out=[id];
+      (parentsOf[id]||[]).forEach(pid=>{ out=[...out,...collectAncestors(pid,depth-1,seen)]; });
+      return out;
+    }
+    function collectDescendants(id, depth, seen=new Set()) {
+      if (!id||depth<0||seen.has(id)) return [];
+      seen.add(id); let out=[id];
+      (childrenOf[id]||[]).forEach(cid=>{ out=[...out,...collectDescendants(cid,depth-1,seen)]; });
+      return out;
+    }
+
+    const focal = focalId && tpById[focalId] ? focalId : treePersons[0]?.id;
+    const ancestorIds = new Set(collectAncestors(focal, depthUp));
+    const descendantIds = new Set(collectDescendants(focal, depthDown));
+    // Also include spouses of all visible
+    const visibleIds = new Set([...ancestorIds, ...descendantIds]);
+    const withSpouses = new Set(visibleIds);
+    visibleIds.forEach(id=>{ (spousesOf[id]||[]).forEach(sid=>{ if(visibleIds.has(sid)) withSpouses.add(sid); }); });
+
+    // Assign generations (0 = focal, negative = ancestors, positive = descendants)
+    const genOf = {};
+    function assignGen(id, g, seen=new Set()) {
+      if(!id||seen.has(id)) return; seen.add(id); genOf[id]=g;
+      (parentsOf[id]||[]).filter(pid=>withSpouses.has(pid)&&genOf[pid]===undefined).forEach(pid=>assignGen(pid,g-1,seen));
+      (childrenOf[id]||[]).filter(cid=>withSpouses.has(cid)&&genOf[cid]===undefined).forEach(cid=>assignGen(cid,g+1,seen));
+    }
+    assignGen(focal, 0);
+    // Assign spouses same generation
+    withSpouses.forEach(id=>{ if(genOf[id]===undefined) { (spousesOf[id]||[]).forEach(sid=>{ if(genOf[sid]!==undefined) genOf[id]=genOf[sid]; }); } });
+    withSpouses.forEach(id=>{ if(genOf[id]===undefined) genOf[id]=0; });
+
+    const minG = Math.min(...[...withSpouses].map(id=>genOf[id]||0));
+    const maxG = Math.max(...[...withSpouses].map(id=>genOf[id]||0));
+    const byGen = {};
+    for(let g=minG;g<=maxG;g++) byGen[g]=[];
+    withSpouses.forEach(id=>{
+      const g=genOf[id]||0;
+      if(!byGen[g]) byGen[g]=[];
+      byGen[g].push(id);
+    });
+    // Sort each row: spouses adjacent, then by birth year
+    Object.values(byGen).forEach(arr=>arr.sort((a,b)=>{
+      const pa=tpById[a], pb=tpById[b];
+      return (parseInt(pa?.dob)||9999)-(parseInt(pb?.dob)||9999)||pa?.name.localeCompare(pb?.name||"");
+    }));
+
+    const NW=130,NH=80,HG=20,VG=60;
+    const maxRow = Math.max(1,...Object.values(byGen).map(a=>a.length));
+    const cvW = Math.max(500, maxRow*(NW+HG)-HG+60);
+    const cvH = (maxG-minG+1)*(NH+VG)-VG+60;
+    const pos={};
+    Object.entries(byGen).forEach(([g,arr])=>{
+      const rowW=arr.length*(NW+HG)-HG;
+      const sx=(cvW-rowW)/2;
+      arr.forEach((id,i)=>{ pos[id]={x:sx+i*(NW+HG),y:30+(parseInt(g)-minG)*(NH+VG)}; });
+    });
+
+    // Edges
+    const edges=[];
+    (treeFamilies||[]).forEach(fam=>{
+      const {husbandId:h, wifeId:w, childIds:cs=[]} = fam;
+      // Spouse line
+      if(h&&w&&pos[h]&&pos[w]) edges.push({type:"spouse",x1:pos[h].x+NW,y1:pos[h].y+NH/2,x2:pos[w].x,y2:pos[w].y+NH/2});
+      // Parent-child lines: from midpoint between parents to each child
+      const parents=[h,w].filter(p=>p&&pos[p]);
+      const midX = parents.length===2 ? (pos[h].x+NW+pos[w].x)/2 : parents.length===1 ? pos[parents[0]].x+NW/2 : null;
+      const midY = parents.length ? pos[parents[0]].y+NH : null;
+      cs.filter(cid=>pos[cid]&&midX!==null).forEach(cid=>{
+        edges.push({type:"parent",x1:midX,y1:midY,x2:pos[cid].x+NW/2,y2:pos[cid].y});
+      });
+    });
+
+    const detailPerson = personDetail && tpById[personDetail];
+    const linkedSubject = detailPerson?.subjectId ? subjects.find(s=>s.id===detailPerson.subjectId) : null;
+
+    function promoteToSubject(tp) {
+      const newId = "subj_tp_"+Date.now();
+      const newSubj = {
+        id:newId, name:tp.name, isSelf:false, mode:"history",
+        dob:tp.dob||"", notes:tp.notes||"", memories:[], candidates:[],
+        treePersons:[], treeFamilies:[], customTags:[], knownPeople:[], knownOrgs:[],
+        knownLocations:[], knownSources:[], peopleEmails:{}, peopleRelationships:{},
+        peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{},
+        locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{},
+        personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null,
+        backupPassword:"", legacyMessage:""
+      };
+      // Link the tree person to the new subject
+      const updatedPersons = treePersons.map(p=>p.id===tp.id?{...p,subjectId:newId}:p);
+      persistSubject({treePersons:updatedPersons});
+      persistTop({subjects:[...subjects, newSubj], activeSubjectId:newId});
+      setPersonDetail(null);
+      setView("life");
+    }
+
+    // Filter for search
+    const filtered = tpSearch.trim()
+      ? treePersons.filter(p=>p.name.toLowerCase().includes(tpSearch.toLowerCase()))
+      : null;
+
+    return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
+      // Header
+      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"16px",flexWrap:"wrap"}},
+        React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:0,color:"#1a1208"}},"Family Tree"),
+        React.createElement("span",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic"}},treePersons.length+" people"),
+        React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px",alignItems:"center",flexWrap:"wrap"}},
+          React.createElement("input",{value:tpSearch,onChange:e=>setTpSearch(e.target.value),placeholder:"Find person…",style:{...S.input,padding:"5px 10px",fontSize:"0.84rem",width:"160px"}}),
+          React.createElement("span",{style:{fontSize:"0.76rem",color:"#8a7460"}},"\u2191"),
+          [1,2,3,4].map(n=>React.createElement("button",{key:"u"+n,onClick:()=>setDepthUp(n),style:{padding:"3px 8px",border:"1px solid #c8b89a",borderRadius:"2px",background:depthUp===n?"#2c2416":"transparent",color:depthUp===n?"#f5f0e8":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.78rem"}},n)),
+          React.createElement("span",{style:{fontSize:"0.76rem",color:"#8a7460"}},"gen \u2193"),
+          [1,2,3].map(n=>React.createElement("button",{key:"d"+n,onClick:()=>setDepthDown(n),style:{padding:"3px 8px",border:"1px solid #c8b89a",borderRadius:"2px",background:depthDown===n?"#2c2416":"transparent",color:depthDown===n?"#f5f0e8":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.78rem"}},n))
+        )
+      ),
+
+      // Search results
+      filtered&&React.createElement("div",{style:{marginBottom:"16px",border:"1px solid #d4c4a8",borderRadius:"4px",maxHeight:"220px",overflowY:"auto"}},
+        filtered.length===0
+          ? React.createElement("p",{style:{padding:"12px 14px",color:"#8a7460",fontStyle:"italic",margin:0}},"No matches.")
+          : filtered.map(p=>React.createElement("div",{key:p.id,onClick:()=>{setFocalId(p.id);setTpSearch("");persistSubject({gedFocalPersonId:p.id});},style:{padding:"9px 14px",cursor:"pointer",borderBottom:"1px solid #ede0cc",display:"flex",justifyContent:"space-between",alignItems:"center"},
+              onMouseEnter:e=>e.currentTarget.style.background="rgba(200,184,154,0.12)",
+              onMouseLeave:e=>e.currentTarget.style.background="transparent"
+            },
+            React.createElement("span",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",color:"#1a1208"}},p.name),
+            React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},[p.dob,p.dod].filter(Boolean).join("–")||""),
+            p.subjectId&&React.createElement("span",{style:{fontSize:"0.7rem",padding:"1px 6px",borderRadius:"20px",background:"rgba(196,169,98,0.2)",color:"#7a5a20",border:"1px solid rgba(196,169,98,0.4)",marginLeft:"6px"}},"Chronicle")
+          ))
+      ),
+
+      // Person detail panel
+      detailPerson&&React.createElement("div",{style:{background:"rgba(255,252,245,0.97)",border:"1px solid #a8885a",borderRadius:"4px",padding:"14px 16px",marginBottom:"16px"}},
+        React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:"10px"}},
+          React.createElement("div",{style:{flex:1}},
+            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",margin:"0 0 4px",color:"#1a1208"}},detailPerson.name),
+            React.createElement("p",{style:{margin:"0 0 4px",fontSize:"0.82rem",color:"#8a7460"}},
+              [detailPerson.dob&&"b. "+detailPerson.dob, detailPerson.dod&&"d. "+detailPerson.dod].filter(Boolean).join("  ·  ")||"Dates unknown"
+            ),
+            detailPerson.birthPlace&&React.createElement("p",{style:{margin:"0 0 4px",fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},"📍 "+detailPerson.birthPlace),
+            detailPerson.notes&&React.createElement("p",{style:{margin:"4px 0 0",fontSize:"0.78rem",color:"#6a5840",lineHeight:1.5}},detailPerson.notes.slice(0,200)+(detailPerson.notes.length>200?"…":""))
+          ),
+          React.createElement("button",{onClick:()=>setPersonDetail(null),style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1rem",padding:"0 4px"}},"×")
+        ),
+        React.createElement("div",{style:{display:"flex",gap:"8px",marginTop:"12px",flexWrap:"wrap"}},
+          linkedSubject
+            ? React.createElement("button",{onClick:()=>{onSwitch(linkedSubject.id);setView("life");},style:{...S.btn,padding:"5px 12px",fontSize:"0.84rem"}},"Open Chronicle \u2192")
+            : React.createElement("button",{onClick:()=>promoteToSubject(detailPerson),style:{...S.btn,padding:"5px 12px",fontSize:"0.84rem"}},"📖 Start Chronicle"),
+          React.createElement("button",{onClick:()=>setFocalId(detailPerson.id),style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.84rem"}},"Set as Focal Ancestor")
+        )
+      ),
+
+      // Tree canvas
+      React.createElement("div",{style:{overflowX:"auto",border:"1px solid #d4c4a8",borderRadius:"4px",background:"rgba(255,252,245,0.4)"}},
+        React.createElement("div",{style:{position:"relative",width:cvW+"px",height:cvH+"px",minWidth:"100%"}},
+          React.createElement("svg",{style:{position:"absolute",top:0,left:0,width:"100%",height:"100%",pointerEvents:"none"},viewBox:`0 0 ${cvW} ${cvH}`},
+            edges.map((e,i)=>{
+              if(e.type==="spouse") return React.createElement("line",{key:i,x1:e.x1,y1:e.y1,x2:e.x2,y2:e.y2,stroke:"#e8a87a",strokeWidth:1.5,strokeDasharray:"4 3"});
+              const mx=(e.x1+e.x2)/2, my=(e.y1+e.y2)/2;
+              return React.createElement("path",{key:i,d:`M${e.x1},${e.y1} L${e.x1},${my} L${e.x2},${my} L${e.x2},${e.y2}`,fill:"none",stroke:"#c8b89a",strokeWidth:1.5});
+            })
+          ),
+          [...withSpouses].map(id=>{
+            const p=pos[id]; if(!p) return null;
+            const tp=tpById[id]; if(!tp) return null;
+            const isFocal=id===focal;
+            const hasSubject=!!tp.subjectId;
+            const linked = hasSubject ? subjects.find(s=>s.id===tp.subjectId) : null;
+            const isActive = linked && linked.id===activeSubjectId;
+            return React.createElement("div",{key:id,
+              onClick:()=>setPersonDetail(id),
+              style:{
+                position:"absolute",left:p.x+"px",top:p.y+"px",
+                width:NW+"px",height:NH+"px",
+                background:isFocal?"#2c2416":hasSubject?"rgba(196,169,98,0.2)":"rgba(255,252,245,0.97)",
+                border:isFocal?"2px solid #2c2416":hasSubject?"2px solid rgba(196,169,98,0.8)":"1px solid #d4c4a8",
+                borderRadius:"4px",padding:"6px 8px",cursor:"pointer",boxSizing:"border-box",
+                boxShadow:isFocal?"0 3px 12px rgba(0,0,0,0.2)":isActive?"0 2px 8px rgba(196,169,98,0.4)":"none",
+                transition:"all 0.15s"
+              },
+              onMouseEnter:e=>{if(!isFocal)e.currentTarget.style.borderColor="#a8885a";},
+              onMouseLeave:e=>{if(!isFocal)e.currentTarget.style.borderColor=hasSubject?"rgba(196,169,98,0.8)":"#d4c4a8";}
+            },
+              hasSubject&&React.createElement("div",{style:{position:"absolute",top:"-7px",right:"6px",fontSize:"0.6rem",padding:"0 5px",borderRadius:"20px",background:"#a8885a",color:"#fff",fontFamily:"'Crimson Text',serif"}},"Chronicle"),
+              React.createElement("div",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.85rem",color:isFocal?"#f5f0e8":"#1a1208",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.2,marginBottom:"2px"}},tp.name),
+              React.createElement("div",{style:{fontSize:"0.68rem",color:isFocal?"rgba(245,240,232,0.6)":"#8a7460"}},
+                [tp.dob&&"b."+tp.dob, tp.dod&&"d."+tp.dod].filter(Boolean).join("  ")||"\u00a0"
+              ),
+              tp.birthPlace&&React.createElement("div",{style:{fontSize:"0.64rem",color:isFocal?"rgba(245,240,232,0.5)":"#a89a7a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:"2px"}},tp.birthPlace.split(",")[0])
+            );
+          })
+        )
+      ),
+      React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"8px",textAlign:"center"}},"Click any card for details · Use generation controls to adjust depth · ↑ ancestors shown, ↓ descendants shown")
+    );
+  }
+
+  // ── SUBJECTS-ONLY MODE ──────────────────────────────────────────
 
   // Build adjacency
   const parentOf={}, childOf={}, spouseOf={};
@@ -5175,6 +5423,9 @@ function App() {
 
   const memories            = subject.memories || [];
   const candidates          = subject.candidates || [];
+  const treePersons         = subject.treePersons || [];
+  const treeFamilies        = subject.treeFamilies || [];
+  const gedFocalPersonId    = subject.gedFocalPersonId || null;
   const customTags          = subject.customTags || [];
   const knownPeople         = subject.knownPeople || [];
   const knownOrgs           = subject.knownOrgs || [];
@@ -5359,6 +5610,7 @@ function App() {
   const [gedSearch, setGedSearch]    = useState("");
   const [gedContext, setGedContext]  = useState([]);    // [{id,fullName,relationship,events,expanded}]
   const [gedContextSel, setGedContextSel] = useState(new Set()); // selected event ids
+  const [gedTreeImportDone, setGedTreeImportDone] = useState(false);
 
   const [photoQueue, setPhotoQueue] = useState([]);
   const [emailForm, setEmailForm] = useState({...newForm(),from:"",rawDate:""});
@@ -5391,7 +5643,7 @@ function App() {
   // persist: legacy-compatible — detects if patch is subject-level or top-level
   function persist(patch) {
     // If patch contains subject-level keys, route to persistSubject
-    const subjectKeys = new Set(["memories","candidates","customTags","knownPeople","knownOrgs","knownLocations","knownSources","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","locationCoords","orgLocations","orgPeriods","orgNotes","entityPhotos","personOrgs","personLocations","personGroups"]);
+    const subjectKeys = new Set(["memories","candidates","treePersons","treeFamilies","gedFocalPersonId","customTags","knownPeople","knownOrgs","knownLocations","knownSources","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","locationCoords","orgLocations","orgPeriods","orgNotes","entityPhotos","personOrgs","personLocations","personGroups"]);
     const isSubjectPatch = Object.keys(patch).some(k => subjectKeys.has(k));
     if (isSubjectPatch) {
       // strip any top-level only keys before passing to persistSubject
@@ -6063,7 +6315,7 @@ function handleEdit(m) {
         entityPhotosWithMedia[key] = med;
       }
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, candidates, knownPeople, knownOrgs, knownLocations, knownSources, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, orgLocations, orgPeriods, entityPhotos:entityPhotosWithMedia, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, // Top-level profile & settings fields
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, candidates, treePersons, treeFamilies, knownPeople, knownOrgs, knownLocations, knownSources, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, orgLocations, orgPeriods, entityPhotos:entityPhotosWithMedia, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, // Top-level profile & settings fields
     wantPublicProfile:data.wantPublicProfile||false, profileAbout:data.profileAbout||"", profileImageUrl:data.profileImageUrl||"", allowFollowers:data.allowFollowers!==false, profilePrivacy:data.profilePrivacy||"open", profileDisplayName:data.profileDisplayName||"", carerMode:data.carerMode||false, carerName:data.carerName||"", carerEmail:data.carerEmail||"", suppressConnectRequests:data.suppressConnectRequests||[]}, null, 2);
   }
 
@@ -6568,7 +6820,50 @@ function handleEdit(m) {
       return contextPeople;
     }
 
-    return { persons, buildMemories, buildContextMemories };
+    function buildTreeData() {
+      const treePersons = Object.entries(indiMap).map(([gedId, rec]) => {
+        const nameNode = rec.children.find(n=>n.tag==="NAME");
+        let name = nameNode ? fullText(nameNode) : "Unknown";
+        name = name.replace(/\//g,"").replace(/\s+/g," ").trim();
+        const birt = rec.children.find(n=>n.tag==="BIRT");
+        const deat = rec.children.find(n=>n.tag==="DEAT");
+        const birtDate = birt ? parseDate(child(birt,"DATE")) : null;
+        const deatDate = deat ? parseDate(child(deat,"DATE")) : null;
+        const sex = child(rec,"SEX") || "";
+        const topNotes = rec.children.filter(n=>n.tag==="NOTE").map(n=>fullText(n)).filter(Boolean).join("\n\n");
+        return {
+          id: "tp_"+gedId.replace(/@/g,""),
+          gedId, name, sex,
+          dob: birtDate?.year ? String(birtDate.year) : "",
+          dod: deatDate?.year ? String(deatDate.year) : "",
+          birthPlace: birt ? (child(birt,"PLAC")||"") : "",
+          deathPlace: deat ? (child(deat,"PLAC")||"") : "",
+          notes: topNotes,
+          subjectId: null,
+        };
+      });
+
+      const treeFamilies = Object.entries(famMap).map(([gedId, rec]) => {
+        const husbRef = child(rec,"HUSB");
+        const wifeRef = child(rec,"WIFE");
+        const childRefs = rec.children.filter(n=>n.tag==="CHIL").map(n=>n.value);
+        const marrNode = rec.children.find(n=>n.tag==="MARR");
+        const marrDate = marrNode ? parseDate(child(marrNode,"DATE")) : null;
+        return {
+          id: "tf_"+gedId.replace(/@/g,""),
+          gedId,
+          husbandId: husbRef ? "tp_"+husbRef.replace(/@/g,"") : null,
+          wifeId: wifeRef ? "tp_"+wifeRef.replace(/@/g,"") : null,
+          childIds: childRefs.map(r=>"tp_"+r.replace(/@/g,"")),
+          marriageYear: marrDate?.year || null,
+          marriagePlace: marrNode ? (child(marrNode,"PLAC")||"") : "",
+        };
+      });
+
+      return { treePersons, treeFamilies };
+    }
+
+    return { persons, buildMemories, buildContextMemories, buildTreeData };
   }
 
   function handleGedFile(e) {
@@ -6636,6 +6931,25 @@ function handleEdit(m) {
     setGedContext([]); setGedContextSel(new Set());
     setView("life");
     alert(`Imported ${allMems.length} memories for ${subj.name} — ${mems.length} personal events and ${contextMems.length} from ${gedContext.length} overlapping people.`);
+  }
+
+  function commitGedTreeImport(focalGedId) {
+    if (!gedPersons) return;
+    const { treePersons: newPersons, treeFamilies: newFamilies } = gedPersons.buildTreeData();
+    // Merge: preserve any existing records (matched by gedId), keep subjectId links
+    const existingById = Object.fromEntries((treePersons||[]).map(p=>[p.gedId,p]));
+    const merged = newPersons.map(p => existingById[p.gedId]
+      ? {...p, subjectId: existingById[p.gedId].subjectId}
+      : p
+    );
+    // Mark focal person
+    const gedFocalPersonId = focalGedId ? ("tp_"+focalGedId.replace(/@/g,"")) : (merged[0]?.id||null);
+    persistSubject({treePersons:merged, treeFamilies:newFamilies, gedFocalPersonId});
+    setGedPersons(null); setGedPicked(null); setGedPreview(null);
+    setGedContext([]); setGedContextSel(new Set());
+    setGedTreeImportDone(true);
+    setTimeout(()=>setGedTreeImportDone(false), 4000);
+    setView("tree");
   }
 
   function importBackup(e) {
@@ -7472,7 +7786,8 @@ function handleEdit(m) {
       // ── FAMILY TREE VIEW ──
       view==="tree"&&React.createElement(FamilyTreeView,{
         subjects, activeSubjectId, subjectLinks,
-        persistTop,
+        persistTop, persistSubject, setView,
+        treePersons, treeFamilies, gedFocalPersonId, isHistoryMode,
         onSwitch: id=>{ switchSubject(id); setView("life"); }
       }),
 
@@ -7910,7 +8225,8 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         isSubscriber, gedPersons, gedPicked, gedPreview, gedBusy,
         gedSearch, setGedSearch, gedContext, setGedContext,
         gedContextSel, setGedContextSel,
-        handleGedFile, handleGedPick, commitGedImport,
+        handleGedFile, handleGedPick, commitGedImport, commitGedTreeImport,
+        isHistoryMode,
         knownPeople, knownLocations, peopleEmails, peopleRelationships, persistSubject,
       }),
                         
