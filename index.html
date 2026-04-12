@@ -958,7 +958,16 @@
     <a href="https://remembory.net/chronicle.html" target="_blank" rel="noopener" class="btn-primary">Your Private Chronicle</a>
   </div>
   <p class="hero-note">Chronicle is a single HTML file — no account, no cloud, completely private. Remembory Social (coming soon) will allow you to share memories with loved ones.</p>
-  <p class="hero-note" style="margin-top:10px; animation-delay:0.9s;">Unlock sharing, social features &amp; genealogy mode — <a href="https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02" target="_blank" rel="noopener" style="color:var(--gold-dark); text-decoration:none; border-bottom:1px solid rgba(168,136,90,0.35);">✨ Subscribe for $20 AUD/year</a></p>
+  <p class="hero-note" style="margin-top:10px; animation-delay:0.9s;">Unlock sharing, social features &amp; genealogy mode —
+    <span id="hero-sub-toggle">
+      <a href="#" onclick="event.preventDefault();document.getElementById('hero-sub-toggle').style.display='none';document.getElementById('hero-sub-options').style.display='inline-flex';" style="color:var(--gold-dark); text-decoration:none; border-bottom:1px solid rgba(168,136,90,0.35);">✨ Subscribe for $20 AUD/year</a>
+    </span>
+    <span id="hero-sub-options" style="display:none;gap:10px;align-items:center;flex-wrap:wrap;">
+      <a href="https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02" target="_blank" rel="noopener" style="color:var(--gold-dark);text-decoration:none;border-bottom:1px solid rgba(168,136,90,0.35);">💳 Pay by card</a>
+      <span style="color:var(--gold-light);font-size:0.85em;">or</span>
+      <a href="https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-05R23708A75872801NHNR24Q&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net" target="_blank" rel="noopener" style="color:#003087;text-decoration:none;border-bottom:1px solid rgba(0,48,135,0.3);">🅿 PayPal</a>
+    </span>
+  </p>
 </section>
 
 <!-- Product intro -->
@@ -1233,7 +1242,16 @@
   <p>Chronicle · Free personal life journal</p>
   <p><a href="manual.html" style="color:var(--gold-dark); text-decoration:none; font-family:'Crimson Text',serif;">User Manual</a></p>
   <p style="font-style:italic; color:var(--ink-faint);">Built with care. Yours to keep.</p>
-  <p style="margin-top:12px;"><a href="https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02" target="_blank" rel="noopener" style="color:var(--gold-dark); text-decoration:none; font-family:'Crimson Text',serif; font-size:0.9rem; border-bottom:1px solid rgba(168,136,90,0.35);">✨ Subscribe to Remembory Social</a></p>
+  <p style="margin-top:12px;">
+    <span id="footer-sub-toggle">
+      <a href="#" onclick="event.preventDefault();document.getElementById('footer-sub-toggle').style.display='none';document.getElementById('footer-sub-options').style.display='inline-flex';" style="color:var(--gold-dark);text-decoration:none;font-family:'Crimson Text',serif;font-size:0.9rem;border-bottom:1px solid rgba(168,136,90,0.35);">✨ Subscribe to Remembory Social</a>
+    </span>
+    <span id="footer-sub-options" style="display:none;gap:10px;align-items:center;flex-wrap:wrap;font-family:'Crimson Text',serif;font-size:0.9rem;">
+      <a href="https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02" target="_blank" rel="noopener" style="color:var(--gold-dark);text-decoration:none;border-bottom:1px solid rgba(168,136,90,0.35);">💳 Card</a>
+      <span style="color:var(--gold-light);font-size:0.85em;">or</span>
+      <a href="https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-05R23708A75872801NHNR24Q&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net" target="_blank" rel="noopener" style="color:#003087;text-decoration:none;border-bottom:1px solid rgba(0,48,135,0.3);">🅿 PayPal</a>
+    </span>
+  </p>
 </footer>
 
 <script>
