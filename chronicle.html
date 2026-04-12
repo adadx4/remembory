@@ -1364,7 +1364,7 @@ function ModePicker({subjectName, onPick}) {
 }
 
 // ── SubjectManager component ──────────────────────────────────
-function SubjectManager({subjects, activeSubjectId, carerName, carerEmail, carerMode, onSwitch, onAdd, onEdit, onDelete, onToggleCarerMode, onUpdateCarer, onClose}) {
+function SubjectManager({subjects, activeSubjectId, carerName, carerEmail, onSwitch, onAdd, onEdit, onDelete, onUpdateCarer, onClose}) {
   const [editingId, setEditingId] = React.useState(null);
   const [draft, setDraft] = React.useState({name:"", dob:"", notes:"", mode:null});
   const [adding, setAdding] = React.useState(false);
@@ -3427,8 +3427,7 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// EXTRACTED COMPONENT: SettingsView
-// ════════════════════════════════════════════════════════════════
+// ── SettingsView ──────────────────────────────────────────────
 function SettingsView({
   subject, subjects, ownerName, ownerEmail, carerEmail,
   activePassword, data, memories,
@@ -4933,10 +4932,22 @@ function App() {
     ].sort((a,b) => (typeof a==='string'?a:a.label).localeCompare(typeof b==='string'?b:b.label));
 
     if (editingId) {
-      const updated = memories.map(m=>m.id===editingId?primary:m).sort((a,b)=>sortKey(a)-sortKey(b));
+      // Preserve addedBy, allow contributor name correction via edit form
+      const {addedByName, ...primaryClean} = primary;
+      const orig = memories.find(m=>m.id===editingId);
+      const editedPrimary = orig?.addedBy
+        ? {...primaryClean, addedBy:{...orig.addedBy, ...(addedByName!==undefined&&{name:addedByName})}}
+        : primaryClean;
+      const updated = memories.map(m=>m.id===editingId?editedPrimary:m).sort((a,b)=>sortKey(a)-sortKey(b));
       persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs});
       setEditingId(null); setSelected(editingId); setForm(newForm()); setView("detail");
     } else {
+      // Stamp addedBy on new memories in Legacy/carer mode
+      if (isCarerMode) {
+        const attrib = {name:carerName||"", on:new Date().toISOString().slice(0,10)};
+        primary = {...primary, addedBy:attrib};
+        if (secondary) secondary = {...secondary, addedBy:attrib};
+      }
       const toAdd = secondary ? [primary, secondary] : [primary];
       const updated = [...memories,...toAdd].sort((a,b)=>sortKey(a)-sortKey(b));
       persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs});
@@ -4949,7 +4960,7 @@ function App() {
 
 function handleEdit(m) {
     // Look up structured address from knownLocations
-    let editForm = {...m, locationLabel: m.location || "", locationStreet: "", locationTown: "", locationState: "", locationCountry: "", locationPrivacy: m.locationPrivacy || "town"};
+    let editForm = {...m, locationLabel: m.location || "", locationStreet: "", locationTown: "", locationState: "", locationCountry: "", locationPrivacy: m.locationPrivacy || "town", addedByName: m.addedBy?.name ?? ""};
     if (m.location) {
       const known = findKnownLocation(knownLocations, m.location);
       if (known && typeof known === 'object') {
