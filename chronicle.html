@@ -46,9 +46,38 @@ function useWindowSize() {
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const TAGS = ["childhood","family","travel","education","work","love","health","milestone","home","friendship","adventure","loss"];
 const WORKER_URL = "https://social.remembory.net";
+const STRIPE_URL  = "https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02";
+const PAYPAL_URL  = "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-05R23708A75872801NHNR24Q&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net";
+
+// ── Subscribe buttons helper ────────────────────────────────────
+// Renders Stripe + PayPal options. mode: "buttons"|"links"|"full"
+function SubOptions({mode="buttons"}) {
+  const stripeStyle = mode==="full"
+    ? {...S.btn,display:"flex",alignItems:"center",justifyContent:"center",gap:"6px",textDecoration:"none",width:"100%",marginBottom:"8px",padding:"12px"}
+    : mode==="links"
+    ? {color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)",fontSize:"inherit"}
+    : {...S.btn,padding:"6px 14px",fontSize:"0.84rem",textDecoration:"none",display:"inline-block"};
+  const paypalStyle = mode==="full"
+    ? {...S.btnOutline,display:"flex",alignItems:"center",justifyContent:"center",gap:"6px",textDecoration:"none",width:"100%",padding:"12px",borderColor:"#1a9dd9",color:"#003087"}
+    : mode==="links"
+    ? {color:"#1a9dd9",textDecoration:"none",borderBottom:"1px solid rgba(26,157,217,0.4)",fontSize:"inherit"}
+    : {...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem",textDecoration:"none",display:"inline-block",borderColor:"#1a9dd9",color:"#003087"};
+  const wrap = mode==="links"
+    ? {display:"inline",gap:"12px"}
+    : {display:"flex",flexDirection:mode==="full"?"column":"row",gap:"6px",alignItems:"center",flexWrap:"wrap"};
+  return React.createElement("div",{style:wrap},
+    React.createElement("a",{href:STRIPE_URL,target:"_blank",rel:"noopener",style:stripeStyle},
+      mode==="links" ? "subscribe with card" : "💳 Card"
+    ),
+    mode==="links" && React.createElement("span",{style:{color:"#c8b89a",margin:"0 4px"}}," or "),
+    React.createElement("a",{href:PAYPAL_URL,target:"_blank",rel:"noopener",style:paypalStyle},
+      mode==="links" ? "PayPal" : "🅿 PayPal"
+    )
+  );
+}
 
 // ── Licence key validation ─────────────────────────────────────
-// Keys are issued by Remembory (Stripe subscription or manual).
+// Keys are issued by Remembory (Stripe or PayPal subscription, or manual).
 // Validated against the social worker. Cached in localStorage for offline use.
 const LS_CACHE_KEY = "chronicle-licence-cache";
 
@@ -3372,8 +3401,9 @@ function SettingsView({
               "Enable public profile"),
             React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,margin:0}},
               isSubscriber ? "Enables visibility controls on memories and your public profile page."
-                : React.createElement(React.Fragment,null,"Requires a subscription. ",
-                    React.createElement("a",{href:"https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02",target:"_blank",rel:"noopener",style:{color:"#a8885a"}},"Subscribe \u2192")))
+                : React.createElement(React.Fragment,null,
+                    React.createElement("span",null,"Requires a subscription. "),
+                    React.createElement(SubOptions,{mode:"links"})))
           )
         )
       ),
@@ -3408,8 +3438,7 @@ function SettingsView({
                   style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem"}
                 },"Apply")
               ),
-              React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic"}},
-                React.createElement("a",{href:"https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02",target:"_blank",rel:"noopener",style:{color:"#a8885a"}},"Subscribe \u2014 $20 AUD / year \u2192")),
+              React.createElement("div",{style:{marginTop:"4px"}},React.createElement(SubOptions,{mode:"buttons"})),
               React.createElement("p",{style:{fontSize:"0.78rem",color:"#a8a090",marginTop:"6px"}},
                 React.createElement("a",{href:"https://social.remembory.net/license/recover",target:"_blank",rel:"noopener",style:{color:"#a8885a"}},"Lost your key? Recover it here \u2192"))
             )
@@ -3441,7 +3470,7 @@ function SettingsView({
 
       !isSubscriber&&React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
         "Unlock sharing & genealogy mode \u2014 ",
-        React.createElement("a",{href:"https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02",target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"\u2728 subscribe"),
+        React.createElement(SubOptions,{mode:"links"}),
         "."
       ),
       React.createElement("p",{style:{fontSize:"0.72rem",color:"#b0a090",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
@@ -3786,8 +3815,7 @@ function ImportView({
           React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",fontStyle:"italic",color:"#1a1208",marginBottom:"10px"}},"Genealogy Mode"),
           React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,maxWidth:"380px",margin:"0 auto 16px"}},
             "GEDCOM import is a subscriber feature. Import a family tree, flesh out your ancestors\u2019 lives, and connect genealogy research to narrative."),
-          React.createElement("a",{href:"https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02",target:"_blank",rel:"noopener",style:{...S.btn,display:"inline-block",padding:"10px 24px",textDecoration:"none",fontSize:"0.9rem"}},
-            "Subscribe to unlock \u2192")
+          React.createElement(SubOptions,{mode:"full"})
         )
       : React.createElement("div",null,
       // No file loaded yet
@@ -6077,7 +6105,7 @@ function handleEdit(m) {
         "\u2728 Enjoying Chronicle? A subscription unlocks sharing, social features, and genealogy mode — and helps keep the project going."
       ),
       React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0,alignItems:"center"}},
-        React.createElement("a",{href:"https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02",target:"_blank",rel:"noopener",style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem",textDecoration:"none",display:"inline-block"}},"Subscribe \u2192"),
+        React.createElement(SubOptions,{mode:"buttons"}),
         React.createElement("button",{onClick:()=>dismissSubscribeNag(false),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.8rem",padding:"4px 8px",fontFamily:"'Crimson Text',serif",whiteSpace:"nowrap"}},"Not now"),
         React.createElement("button",{onClick:()=>dismissSubscribeNag(true),style:{background:"transparent",border:"none",color:"#b0a080",cursor:"pointer",fontSize:"0.75rem",padding:"4px 6px"}},"Don\u2019t show again")
       )
@@ -6416,7 +6444,10 @@ function handleEdit(m) {
           React.createElement("span",{style:{color:"#c8b89a",flexShrink:0}},"›"),
           React.createElement("span",{style:{fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},breadcrumb)
         ),
-        !isMobile&&!isSubscriber&&React.createElement("a",{href:"https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02",target:"_blank",rel:"noopener",style:{display:"inline-flex",alignItems:"center",gap:"4px",padding:"4px 10px",border:"1px solid rgba(168,136,90,0.45)",borderRadius:"20px",color:"#a8885a",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",flexShrink:0,transition:"all 0.15s"},onMouseEnter:e=>{e.currentTarget.style.background="rgba(168,136,90,0.08)";},onMouseLeave:e=>{e.currentTarget.style.background="transparent";}},"✨ Subscribe")
+        !isMobile&&!isSubscriber&&React.createElement("div",{style:{display:"flex",gap:"4px",alignItems:"center"}},
+          React.createElement("a",{href:STRIPE_URL,target:"_blank",rel:"noopener",title:"Subscribe with card",style:{display:"inline-flex",alignItems:"center",padding:"4px 10px",border:"1px solid rgba(168,136,90,0.45)",borderRadius:"20px",color:"#a8885a",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",flexShrink:0,transition:"all 0.15s"},onMouseEnter:e=>{e.currentTarget.style.background="rgba(168,136,90,0.08)";},onMouseLeave:e=>{e.currentTarget.style.background="transparent";}},"✨ Subscribe"),
+          React.createElement("a",{href:PAYPAL_URL,target:"_blank",rel:"noopener",title:"Subscribe with PayPal",style:{display:"inline-flex",alignItems:"center",padding:"4px 9px",border:"1px solid rgba(26,157,217,0.45)",borderRadius:"20px",color:"#003087",fontSize:"0.76rem",fontFamily:"'Crimson Text',serif",textDecoration:"none",whiteSpace:"nowrap",flexShrink:0,transition:"all 0.15s"},onMouseEnter:e=>{e.currentTarget.style.background="rgba(26,157,217,0.08)";},onMouseLeave:e=>{e.currentTarget.style.background="transparent";}},"🅿 PayPal")
+        )
       ),
       React.createElement("div",{style:{display:"flex",gap:"6px",alignItems:"center",flexShrink:0}},
         saveStatus==="saved"&&React.createElement("span",{style:{fontSize:"0.75rem",color:"#89b08a"}},"✓"),
