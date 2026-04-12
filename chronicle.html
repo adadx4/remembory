@@ -432,8 +432,52 @@ function seedData(data) { return data; }
 
 const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], orgLocations:{}, orgPeriods:{}, entityPhotos:{}, ownerName:"", ownerEmail:"" };
 
-function emptySubject(id, name, isSelf=false) {
-  return { id, name, isSelf, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{}, locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
+function emptySubject(id, name, isSelf=false, mode=null) {
+  return { id, name, isSelf, mode, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{}, locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
+}
+
+// ── Mode definitions ──────────────────────────────────────────
+const MODES = {
+  personal: {
+    id:"personal", label:"Personal", icon:"◎",
+    tagline:"Your own life story",
+    desc:"Record your own memories, build your personal timeline, and share with friends and family.",
+    isSelf:true,
+    color:"#8b9dc3", bg:"rgba(139,157,195,0.1)", border:"rgba(139,157,195,0.4)",
+    addMemory:"Record a Memory",
+    addMemoryFor: name => `Record a Memory`,
+    emptyTitle: name => `${name ? name+"'s" : "Your"} chronicle is empty.`,
+    emptyPrompt: name => `Press + Add to record your first memory.`,
+    subtitle: (name, count, decades) => count===0 ? "Your story begins here." : `${count} ${count===1?"memory":"memories"} across ${decades} ${decades===1?"decade":"decades"}`,
+  },
+  legacy: {
+    id:"legacy", label:"Legacy", icon:"◈",
+    tagline:"Record for someone else",
+    desc:"Preserve the story of a loved one — a parent, grandparent, or friend. Free for one contributor; subscribe to invite others.",
+    isSelf:false,
+    color:"#89b08a", bg:"rgba(137,176,138,0.1)", border:"rgba(137,176,138,0.4)",
+    addMemory: name => `Record a Memory for ${name||"them"}`,
+    emptyTitle: name => `${name ? name+"'s" : "This"} chronicle is empty.`,
+    emptyPrompt: name => `Press + Add to record a memory for ${name||"them"}.`,
+    subtitle: (name, count, decades) => count===0 ? `${name ? name+"'s" : "Their"} story begins here.` : `${count} ${count===1?"memory":"memories"} across ${decades} ${decades===1?"decade":"decades"}`,
+  },
+  history: {
+    id:"history", label:"History", icon:"◇",
+    tagline:"Research & family history",
+    desc:"Build a biographical chronicle from research, records, and family trees. Construct timelines and connect lives across generations.",
+    isSelf:false,
+    color:"#c4a962", bg:"rgba(196,169,98,0.1)", border:"rgba(196,169,98,0.4)",
+    addMemory: name => `Add a Biographical Entry${name?" for "+name:""}`,
+    emptyTitle: name => `${name ? name+"'s" : "This"} chronicle is empty.`,
+    emptyPrompt: name => `Press + Add to record a biographical entry.`,
+    subtitle: (name, count, decades) => count===0 ? `Research begins here.` : `${count} ${count===1?"entry":"entries"} across ${decades} ${decades===1?"decade":"decades"}`,
+  },
+};
+
+function modeFor(subject) {
+  if (subject?.mode && MODES[subject.mode]) return MODES[subject.mode];
+  // Legacy fallback: derive from isSelf
+  return subject?.isSelf ? MODES.personal : MODES.legacy;
 }
 
 // Migrate flat data → subjects structure
@@ -1271,23 +1315,73 @@ function linkify(text) {
   return parts.length === 1 && typeof parts[0] === "string" ? text : parts;
 }
 
+// ── ModeCard ──────────────────────────────────────────────────
+function ModeCard({mode, selected, onSelect}) {
+  const m = MODES[mode];
+  return React.createElement("div",{
+    onClick:()=>onSelect(mode),
+    style:{
+      padding:"16px 18px", borderRadius:"6px", cursor:"pointer",
+      border:`2px solid ${selected?m.color:m.border}`,
+      background:selected?m.bg:"rgba(255,252,245,0.6)",
+      transition:"all 0.15s", marginBottom:"10px",
+    },
+    onMouseEnter:e=>{if(!selected){e.currentTarget.style.borderColor=m.color;e.currentTarget.style.background=m.bg;}},
+    onMouseLeave:e=>{if(!selected){e.currentTarget.style.borderColor=m.border;e.currentTarget.style.background="rgba(255,252,245,0.6)";}},
+  },
+    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"4px"}},
+      React.createElement("span",{style:{fontSize:"1.2rem",color:m.color}},m.icon),
+      React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",fontWeight:600}},m.label),
+      React.createElement("span",{style:{fontSize:"0.76rem",color:m.color,fontStyle:"italic",marginLeft:"2px"}},m.tagline)
+    ),
+    React.createElement("p",{style:{fontSize:"0.84rem",color:"#6a5840",lineHeight:1.5,margin:0,paddingLeft:"28px"}},m.desc)
+  );
+}
+
+// ── ModePicker (first-launch full-screen) ─────────────────────
+function ModePicker({subjectName, onPick}) {
+  const [selected, setSelected] = React.useState(null);
+  return React.createElement("div",{style:{
+    position:"fixed",inset:0,background:"#f7f2ea",zIndex:700,
+    display:"flex",alignItems:"center",justifyContent:"center",padding:"24px",overflowY:"auto"
+  }},
+    React.createElement("div",{style:{maxWidth:"500px",width:"100%"}},
+      React.createElement("div",{style:{textAlign:"center",marginBottom:"28px"}},
+        React.createElement("div",{style:{fontSize:"0.75rem",letterSpacing:"0.14em",textTransform:"uppercase",color:"#a8885a",marginBottom:"8px",fontFamily:"'Crimson Text',serif"}},"Chronicle"),
+        React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",color:"#1a1208",margin:"0 0 8px"}},
+          subjectName ? `What is ${subjectName}'s chronicle for?` : "What is this chronicle for?"),
+        React.createElement("p",{style:{color:"#8a7460",fontSize:"0.92rem",lineHeight:1.6,margin:0}},
+          "This helps Chronicle tailor the language and features to your purpose. You can change it later in Settings.")
+      ),
+      Object.values(MODES).map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:selected===m.id,onSelect:setSelected})),
+      React.createElement("button",{
+        onClick:()=>{ if(selected) onPick(selected); },
+        disabled:!selected,
+        style:{...S.btn,width:"100%",marginTop:"8px",opacity:selected?1:0.4,cursor:selected?"pointer":"not-allowed",fontSize:"1rem",padding:"13px"}
+      },"Continue")
+    )
+  );
+}
+
 // ── SubjectManager component ──────────────────────────────────
 function SubjectManager({subjects, activeSubjectId, carerName, carerEmail, carerMode, onSwitch, onAdd, onEdit, onDelete, onToggleCarerMode, onUpdateCarer, onClose}) {
   const [editingId, setEditingId] = React.useState(null);
-  const [draft, setDraft] = React.useState({name:"", dob:"", notes:"", isSelf:false});
+  const [draft, setDraft] = React.useState({name:"", dob:"", notes:"", mode:null});
   const [adding, setAdding] = React.useState(false);
   const [carerDraft, setCarerDraft] = React.useState({name:carerName, email:carerEmail});
 
-  function startAdd() { setDraft({name:"",dob:"",notes:"",isSelf:false}); setAdding(true); setEditingId(null); }
-  function startEdit(s) { setDraft({name:s.name,dob:s.dob||"",notes:s.notes||"",isSelf:s.isSelf}); setEditingId(s.id); setAdding(false); }
+  function startAdd() { setDraft({name:"",dob:"",notes:"",mode:null}); setAdding(true); setEditingId(null); }
+  function startEdit(s) { setDraft({name:s.name,dob:s.dob||"",notes:s.notes||"",mode:s.mode||null}); setEditingId(s.id); setAdding(false); }
   function commitAdd() {
-    if (!draft.name.trim()) return;
-    onAdd({...draft, name:draft.name.trim()});
+    if (!draft.name.trim() || !draft.mode) return;
+    const isSelf = MODES[draft.mode]?.isSelf || false;
+    onAdd({...draft, name:draft.name.trim(), isSelf});
     setAdding(false);
   }
   function commitEdit() {
     if (!draft.name.trim()) return;
-    onEdit(editingId, {...draft, name:draft.name.trim()});
+    const isSelf = draft.mode ? (MODES[draft.mode]?.isSelf || false) : undefined;
+    onEdit(editingId, {...draft, name:draft.name.trim(), ...(isSelf!==undefined?{isSelf}:{})});
     setEditingId(null);
   }
 
@@ -1315,9 +1409,9 @@ function SubjectManager({subjects, activeSubjectId, carerName, carerEmail, carer
               React.createElement("input",{value:draft.name,onChange:e=>setDraft(d=>({...d,name:e.target.value})),placeholder:"Name *",style:inputStyle,autoFocus:true}),
               React.createElement("input",{value:draft.dob,onChange:e=>setDraft(d=>({...d,dob:e.target.value})),placeholder:"Year of birth (optional)",style:inputStyle}),
               React.createElement("textarea",{value:draft.notes,onChange:e=>setDraft(d=>({...d,notes:e.target.value})),placeholder:"Notes (optional — family, context, etc.)",style:{...inputStyle,resize:"vertical",minHeight:"60px"}}),
-              React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"0.85rem",color:"#6a5c48",cursor:"pointer"}},
-                React.createElement("input",{type:"checkbox",checked:draft.isSelf,onChange:e=>setDraft(d=>({...d,isSelf:e.target.checked}))}),
-                "This is me (my own memories)"
+              React.createElement("div",{style:{marginTop:"4px"}},
+                React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}},"Chronicle type"),
+                Object.values(MODES).map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:draft.mode===m.id,onSelect:v=>setDraft(d=>({...d,mode:v}))}))
               ),
               React.createElement("div",{style:{display:"flex",gap:"8px"}},
                 React.createElement("button",{onClick:commitEdit,style:btnStyle},"Save"),
@@ -1328,7 +1422,7 @@ function SubjectManager({subjects, activeSubjectId, carerName, carerEmail, carer
               React.createElement("div",{style:{flex:1}},
                 React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"8px"}},
                   React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208"}}),
-                  s.isSelf&&React.createElement("span",{style:{fontSize:"0.7rem",background:"rgba(100,120,160,0.15)",color:"#4a5a7a",border:"1px solid rgba(100,120,160,0.3)",borderRadius:"20px",padding:"1px 8px"}}, "me"),
+                  (()=>{const m=modeFor(s);return React.createElement("span",{style:{fontSize:"0.7rem",background:m.color+"22",color:m.color,border:`1px solid ${m.color}55`,borderRadius:"20px",padding:"1px 8px"}},m.icon+" "+m.label);})(),
                   React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208"}},s.name),
                   s.dob&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},`b. ${s.dob}`)
                 ),
@@ -1349,12 +1443,12 @@ function SubjectManager({subjects, activeSubjectId, carerName, carerEmail, carer
           React.createElement("input",{value:draft.name,onChange:e=>setDraft(d=>({...d,name:e.target.value})),placeholder:"Name *",style:inputStyle,autoFocus:true}),
           React.createElement("input",{value:draft.dob,onChange:e=>setDraft(d=>({...d,dob:e.target.value})),placeholder:"Year of birth (optional)",style:inputStyle}),
           React.createElement("textarea",{value:draft.notes,onChange:e=>setDraft(d=>({...d,notes:e.target.value})),placeholder:"Notes (optional)",style:{...inputStyle,resize:"vertical",minHeight:"60px"}}),
-          React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"0.85rem",color:"#6a5c48",cursor:"pointer"}},
-            React.createElement("input",{type:"checkbox",checked:draft.isSelf,onChange:e=>setDraft(d=>({...d,isSelf:e.target.checked}))}),
-            "This is me (my own memories)"
+          React.createElement("div",{style:{marginTop:"4px"}},
+            React.createElement("p",{style:{fontSize:"0.76rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#a8885a",fontWeight:600,marginBottom:"8px"}},"Chronicle type"),
+            Object.values(MODES).map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:draft.mode===m.id,onSelect:v=>setDraft(d=>({...d,mode:v}))}))
           ),
           React.createElement("div",{style:{display:"flex",gap:"8px"}},
-            React.createElement("button",{onClick:commitAdd,style:btnStyle},"Add"),
+            React.createElement("button",{onClick:commitAdd,disabled:!draft.name.trim()||!draft.mode,style:{...btnStyle,opacity:(!draft.name.trim()||!draft.mode)?0.45:1}},"Add"),
             React.createElement("button",{onClick:()=>setAdding(false),style:btnOut},"Cancel")
           )
         )
@@ -3381,7 +3475,11 @@ function SettingsView({
         React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 12px"}},
           subject.isSelf ? "Your name is shown when you share memories with others." : "The person whose memories this is."),
         React.createElement("input",{value:ownerName,onChange:e=>persistSubject({name:e.target.value}),placeholder:"Your name",style:{...S.input,marginBottom:"10px"}}),
-        React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:S.input})
+        React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:{...S.input,marginBottom:"16px"}}),
+        React.createElement("p",{style:{fontSize:"0.76rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#a8885a",fontWeight:600,margin:"0 0 8px"}},"Chronicle type"),
+        React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
+          Object.values(MODES).map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:subject.mode===m.id,onSelect:v=>persistSubject({mode:v,isSelf:MODES[v]?.isSelf||false})}))
+        )
       ),
 
       // ── Public profile toggle ──
@@ -4110,7 +4208,7 @@ function AddEditForm({
   customTags, addCustomTag, removeCustomTag,
   wantPublicProfile, persistSubject,
   setForm, newForm, setEditingId, setView,
-  isCarerMode, ownerName, carerName,
+  isCarerMode, ownerName, carerName, subject,
 }) {
   // Auto-expand sections that already have content (important for edit mode)
   const [expanded, setExpanded] = React.useState(() => {
@@ -4126,7 +4224,8 @@ function AddEditForm({
   });
   const toggle = k => setExpanded(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
   const canSave = !!(form.title?.trim() && form.year);
-  const addTitle = isCarerMode && ownerName ? `Record a Memory for ${ownerName}` : "Record a Memory";
+  const sm = modeFor(subject);
+  const addTitle = typeof sm.addMemory==="function" ? sm.addMemory(ownerName||subject?.name) : (sm.addMemory||"Record a Memory");
 
   // Pill button for optional sections
   function secToggle(k, label, icon) {
@@ -6003,7 +6102,7 @@ function handleEdit(m) {
     if (view==="year") return `${zoomDecade}s › ${zoomYear}`;
     if (view==="detail") { const m=memories.find(x=>x.id===selected); return zoomYear?`${zoomDecade}s › ${zoomYear} › ${m?.title}`:zoomDecade?`${zoomDecade}s › ${m?.title}`:m?.title; }
     if (view==="timeline") return "All memories";
-    if (view==="add") return isCarerMode&&ownerName ? `Add memory for ${ownerName}` : "Add memory";
+    if (view==="add") { const sm=modeFor(subject); return typeof sm.addMemory==="function"?sm.addMemory(ownerName||subject?.name):(sm.addMemory||"Add memory"); }
     if (view==="edit") return "Edit memory";
     if (view==="import") return "Import";
     if (view==="prompt") return "Prompter";
@@ -6132,20 +6231,31 @@ function handleEdit(m) {
       )
     ),
 
+    // ── MODE PICKER (first-launch for subjects with no mode) ──
+    view==="life"&&!subject.mode&&React.createElement(ModePicker,{
+      subjectName: subject.name,
+      onPick: mode => {
+        const isSelf = MODES[mode]?.isSelf||false;
+        const newSubjects = subjects.map(s=>s.id===subject.id?{...s,mode,isSelf}:s);
+        const newData = {...data, subjects:newSubjects};
+        setData(newData); saveData(newData);
+      }
+    }),
+
     // ── SUBJECT MANAGER ──
     showSubjectMgr&&React.createElement(SubjectManager,{
       subjects, activeSubjectId, carerName, carerEmail,
       onSwitch: id => switchSubject(id),
       onAdd: draft => {
         const id = "subj_" + Date.now();
-        const s = {...emptySubject(id, draft.name, draft.isSelf), dob:draft.dob||"", notes:draft.notes||""};
+        const s = {...emptySubject(id, draft.name, MODES[draft.mode]?.isSelf||false, draft.mode||null), dob:draft.dob||"", notes:draft.notes||""};
         const newData = {...data, subjects:[...subjects, s], activeSubjectId: id};
         setData(newData); saveData(newData);
         setView("life"); setSelected(null); setIndexFilter(null);
         setShowSubjectMgr(false);
       },
       onEdit: (id, draft) => {
-        const newSubjects = subjects.map(s => s.id===id ? {...s, name:draft.name, dob:draft.dob||"", notes:draft.notes||"", isSelf:draft.isSelf} : s);
+        const newSubjects = subjects.map(s => s.id===id ? {...s, name:draft.name, dob:draft.dob||"", notes:draft.notes||"", mode:draft.mode||null, isSelf:MODES[draft.mode]?.isSelf||false} : s);
         const newData = {...data, subjects:newSubjects};
         setData(newData); saveData(newData);
       },
@@ -6435,7 +6545,7 @@ function handleEdit(m) {
           title:"Switch person",
           style:{display:"flex",alignItems:"center",gap:"5px",background:"rgba(200,168,122,0.12)",border:"1px solid rgba(200,168,122,0.4)",borderRadius:"20px",padding:"3px 10px 3px 8px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.82rem",color:"#6a4a28",whiteSpace:"nowrap",maxWidth:isMobile?"120px":"180px",overflow:"hidden",flexShrink:0}
         },
-          React.createElement("span",{style:{fontSize:"0.8rem",flexShrink:0}},isCarerMode?"🫂":subject.isSelf?"👤":"🧑"),
+          React.createElement("span",{style:{fontSize:"0.8rem",flexShrink:0,color:modeFor(subject).color}},modeFor(subject).icon),
           isCarerMode&&React.createElement("span",{style:{fontSize:"0.68rem",color:"#7a5a20",opacity:0.8,flexShrink:0}},carerName?"recording for":"for"),
           React.createElement("span",{style:{overflow:"hidden",textOverflow:"ellipsis",fontWeight:isCarerMode?600:400}},subject.name),
           subjects.length>1&&React.createElement("span",{style:{opacity:0.5,fontSize:"0.7rem",flexShrink:0,marginLeft:"2px"}},"▾")
@@ -6987,12 +7097,12 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
                         
       // ── LIFE VIEW ──
       view==="life"&&React.createElement("div",{style:{animation:"fadeIn 0.35s ease"}},
-        React.createElement("p",{style:{fontStyle:"italic",color:"#8a7460",marginBottom:"22px",fontSize:"0.95rem"}},memories.length===0?(isCarerMode&&ownerName?`${ownerName}'s story begins here.`:"Your story begins here."):`${memories.length} ${memories.length===1?"memory":"memories"} across ${allDecades.length} ${allDecades.length===1?"decade":"decades"}`),
-        memories.length===0&&React.createElement("div",{style:{textAlign:"center",padding:"60px 20px",color:"#8a7460"}},
-          React.createElement("div",{style:{fontSize:"3rem",marginBottom:"12px",opacity:0.3}},"◎"),
-          React.createElement("p",{style:{fontFamily:"'Playfair Display',serif",fontStyle:"italic",fontSize:"1.2rem",margin:"0 0 8px"}},isCarerMode&&ownerName?`${ownerName}'s chronicle is empty.`:"Your chronicle is empty."),
-          React.createElement("p",{style:{fontSize:"0.95rem",margin:0}},isCarerMode&&ownerName?`Press + Add to record a memory for ${ownerName}.`:"Press + Add to record your first memory.")
-        ),
+        React.createElement("p",{style:{fontStyle:"italic",color:"#8a7460",marginBottom:"22px",fontSize:"0.95rem"}},modeFor(subject).subtitle(subject.name, memories.length, allDecades.length)),
+        memories.length===0&&(()=>{const sm=modeFor(subject);return React.createElement("div",{style:{textAlign:"center",padding:"60px 20px",color:"#8a7460"}},
+          React.createElement("div",{style:{fontSize:"3rem",marginBottom:"12px",opacity:0.4}},sm.icon),
+          React.createElement("p",{style:{fontFamily:"'Playfair Display',serif",fontStyle:"italic",fontSize:"1.2rem",margin:"0 0 8px"}},sm.emptyTitle(subject.name)),
+          React.createElement("p",{style:{fontSize:"0.95rem",margin:0}},sm.emptyPrompt(subject.name))
+        );})(),
         React.createElement("div",{style:{display:"grid",gridTemplateColumns:isMobile?"repeat(auto-fill, minmax(140px, 1fr))":"repeat(auto-fill, minmax(190px, 1fr))",gap:isMobile?"10px":"14px"}},
           (()=>{
             const globalMax=Math.max(1,...allDecades.flatMap(dec=>Array.from({length:10},(_,i)=>memories.filter(m=>m.year===dec+i).length)));
@@ -7333,7 +7443,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         customTags, addCustomTag, removeCustomTag,
         wantPublicProfile, persistSubject,
         setForm, newForm, setEditingId, setView,
-        isCarerMode, ownerName, carerName,
+        isCarerMode, ownerName, carerName, subject,
       }),
 
     )
