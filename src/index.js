@@ -72,6 +72,125 @@ async function verifyStripeSignature(bodyText, sigHeader, secret) {
   return diff === 0;
 }
 
+// ── Guest contribution form ───────────────────────────────────────────────────
+function contributionFormPage(code, subjectName, ownerNote) {
+  const apiUrl = `https://share.remembory.net/contribute/${esc(code)}`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>Share a Memory — Chronicle by Remembory</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Georgia, serif; background: #f7f2ea; color: #2c2416; min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px 60px; }
+    .card { background: #fffcf5; border: 1px solid #d4c4a8; border-radius: 8px; padding: 32px 28px; max-width: 520px; width: 100%; box-shadow: 0 8px 40px rgba(44,36,22,0.10); }
+    .logo { font-size: 0.82rem; color: #a8885a; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 20px; font-family: Arial, sans-serif; }
+    h1 { font-size: 1.4rem; font-style: italic; color: #1a1208; margin-bottom: 8px; line-height: 1.3; }
+    .sub { font-size: 0.9rem; color: #6a5840; line-height: 1.6; margin-bottom: 20px; }
+    .owner-note { background: #fff8ec; border: 1px solid #e8d4a0; border-radius: 6px; padding: 12px 14px; margin-bottom: 20px; font-size: 0.88rem; color: #5a4820; line-height: 1.6; font-style: italic; }
+    label { display: block; font-size: 0.78rem; font-family: Arial, sans-serif; letter-spacing: 0.05em; text-transform: uppercase; color: #8a7460; margin-bottom: 4px; margin-top: 16px; }
+    input, textarea { width: 100%; padding: 9px 11px; border: 1px solid #c8b89a; border-radius: 4px; font-family: Georgia, serif; font-size: 0.95rem; color: #2c2416; background: #fffcf5; }
+    textarea { resize: vertical; min-height: 100px; }
+    input:focus, textarea:focus { outline: none; border-color: #a8885a; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .mem-block { background: #f5f0e8; border: 1px solid #d4c4a8; border-radius: 6px; padding: 16px; margin-top: 16px; position: relative; }
+    .mem-block h3 { font-size: 0.88rem; font-family: Arial, sans-serif; color: #6a5840; margin-bottom: 2px; }
+    .remove-btn { position: absolute; top: 10px; right: 12px; background: none; border: none; cursor: pointer; color: #c87060; font-size: 1rem; }
+    .add-btn { display: block; width: 100%; margin-top: 14px; padding: 9px; border: 1px dashed #a8885a; border-radius: 4px; background: transparent; color: #a8885a; font-family: Georgia, serif; font-size: 0.92rem; cursor: pointer; }
+    .add-btn:hover { background: rgba(168,136,90,0.07); }
+    .submit-btn { display: block; width: 100%; margin-top: 24px; padding: 14px; background: #2c2416; color: #f5f0e8; border: none; border-radius: 4px; font-family: Georgia, serif; font-size: 1rem; cursor: pointer; transition: opacity 0.15s; }
+    .submit-btn:hover:not(:disabled) { opacity: 0.85; }
+    .submit-btn:disabled { opacity: 0.5; cursor: default; }
+    .success { text-align: center; padding: 40px 0; display: none; }
+    .success h2 { font-size: 1.3rem; font-style: italic; margin-bottom: 10px; }
+    .success p { font-size: 0.9rem; color: #6a5840; }
+    .err { color: #b04040; font-size: 0.85rem; margin-top: 8px; display: none; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">Chronicle by Remembory</div>
+  <div id="form-wrap">
+    <h1>Share a memory${subjectName ? ` about ${esc(subjectName)}` : ""}</h1>
+    <p class="sub">You've been invited to contribute memories. They'll be delivered privately to the Chronicle owner — nothing is published.</p>
+    ${ownerNote ? `<div class="owner-note">${esc(ownerNote)}</div>` : ""}
+    <label>Your name</label>
+    <input id="contributor-name" type="text" placeholder="How you'd like to be credited" maxlength="100">
+    <div id="memories-list"></div>
+    <button class="add-btn" onclick="addMemory()">+ Add a memory</button>
+    <button class="submit-btn" id="submit-btn" onclick="submitForm()">Send memories</button>
+    <div class="err" id="err-msg"></div>
+  </div>
+  <div class="success" id="success-wrap">
+    <h2>Thank you!</h2>
+    <p>Your memories have been sent. The Chronicle owner will review them privately.</p>
+  </div>
+</div>
+<script>
+var API = ${JSON.stringify(apiUrl)};
+var memCount = 0;
+function addMemory() {
+  memCount++;
+  var id = 'mem' + memCount;
+  var div = document.createElement('div');
+  div.className = 'mem-block';
+  div.id = id;
+  div.innerHTML = '<h3>Memory #' + memCount + '</h3>' +
+    (memCount > 1 ? '<button class="remove-btn" onclick="removeMemory(\\''+id+'\\')">✕</button>' : '') +
+    '<label>Title</label><input class="m-title" type="text" maxlength="200" placeholder="e.g. Summer holiday 1987">' +
+    '<label>What do you remember?</label><textarea class="m-content" maxlength="4000" placeholder="Share the memory in as much detail as you like..."></textarea>' +
+    '<div class="row2"><div><label>Year</label><input class="m-year" type="number" min="1800" max="2099" placeholder="1987"></div>' +
+    '<div><label>Location (optional)</label><input class="m-loc" type="text" maxlength="200" placeholder="e.g. Cornwall"></div></div>';
+  document.getElementById('memories-list').appendChild(div);
+}
+function removeMemory(id) { var el = document.getElementById(id); if (el) el.remove(); }
+function submitForm() {
+  var name = document.getElementById('contributor-name').value.trim();
+  var blocks = document.querySelectorAll('.mem-block');
+  var err = document.getElementById('err-msg');
+  err.style.display = 'none';
+  var memories = [];
+  blocks.forEach(function(b) {
+    var title = b.querySelector('.m-title').value.trim();
+    var content = b.querySelector('.m-content').value.trim();
+    if (!title && !content) return;
+    memories.push({ title: title, content: content,
+      year: parseInt(b.querySelector('.m-year').value) || 0,
+      location: b.querySelector('.m-loc').value.trim() });
+  });
+  if (memories.length === 0) { err.textContent = 'Please add at least one memory.'; err.style.display = 'block'; return; }
+  var btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contributorName: name || 'Anonymous', memories: memories }) })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        document.getElementById('form-wrap').style.display = 'none';
+        document.getElementById('success-wrap').style.display = 'block';
+      } else {
+        err.textContent = data.error || 'Something went wrong. Please try again.';
+        err.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Send memories';
+      }
+    }).catch(function() {
+      err.textContent = 'Network error. Please check your connection and try again.';
+      err.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Send memories';
+    });
+}
+addMemory();
+</script>
+</body>
+</html>`;
+}
+
+function contributionExpiredPage() {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Chronicle — Link expired</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Georgia,serif;background:#f7f2ea;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}.card{background:#fffcf5;border:1px solid #d4c4a8;border-radius:8px;padding:36px 28px;max-width:400px;text-align:center;}h1{font-size:1.3rem;font-style:italic;margin-bottom:12px;}p{color:#6a5840;font-size:0.9rem;line-height:1.6;}a{color:#a8885a;}</style></head><body><div class="card"><h1>This link has expired</h1><p>Contribution links expire after one year. Ask the person who shared it to create a new one.</p><p style="margin-top:16px"><a href="https://remembory.net">Visit Remembory</a></p></div></body></html>`;
+}
+
 // ── Bridge page (share links) ─────────────────────────────────────────────────
 function bridgePage(code, senderName, memCount) {
   const chronicleUrl = `https://remembory.net/chronicle.html?share=${code}`;
@@ -1291,6 +1410,88 @@ export default {
         // Clear the queue after fetching
         await env.SHARES.delete("deliveries:" + emailHash);
         return json({ deliveries: full.filter(Boolean) });
+      } catch (e) {
+        return json({ error: "Server error: " + e.message }, 500);
+      }
+    }
+
+    // POST /contribute/create — create a guest contribution link
+    if (request.method === "POST" && path === "/contribute/create") {
+      try {
+        const body = await request.json();
+        const { ownerEmail, subjectName, subjectId, note } = body;
+        if (!ownerEmail || !ownerEmail.includes("@")) return json({ error: "Missing ownerEmail" }, 400);
+        const code = "gc_" + crypto.randomUUID().slice(0, 10);
+        const ownerEmailHash = await sha256hex(ownerEmail.trim().toLowerCase());
+        const payload = { ownerEmailHash, subjectName: subjectName || "", subjectId: subjectId || "",
+          note: note || "", createdAt: new Date().toISOString() };
+        await env.SHARES.put("contrib:" + code, JSON.stringify(payload), { expirationTtl: 60 * 60 * 24 * 365 });
+        return json({ code, url: `https://share.remembory.net/contribute/${code}` });
+      } catch (e) {
+        return json({ error: "Server error: " + e.message }, 500);
+      }
+    }
+
+    // GET /contribute/:code — serve guest contribution form
+    if (request.method === "GET" && path.startsWith("/contribute/")) {
+      const code = path.slice("/contribute/".length);
+      if (!code) return json({ error: "No code" }, 400);
+      const raw = await env.SHARES.get("contrib:" + code);
+      if (!raw) return new Response(contributionExpiredPage(), {
+        status: 410, headers: { "Content-Type": "text/html;charset=UTF-8" },
+      });
+      const contrib = JSON.parse(raw);
+      return new Response(contributionFormPage(code, contrib.subjectName, contrib.note), {
+        headers: { "Content-Type": "text/html;charset=UTF-8", "X-Frame-Options": "DENY", "Cache-Control": "no-store" },
+      });
+    }
+
+    // POST /contribute/:code — accept guest submission
+    if (request.method === "POST" && path.startsWith("/contribute/")) {
+      const code = path.slice("/contribute/".length);
+      if (!code) return json({ error: "No code" }, 400);
+      try {
+        const raw = await env.SHARES.get("contrib:" + code);
+        if (!raw) return json({ error: "Link not found or expired" }, 404);
+        const contrib = JSON.parse(raw);
+        const body = await request.json();
+        const { contributorName, memories } = body;
+        if (!memories || !Array.isArray(memories) || memories.length === 0) {
+          return json({ error: "No memories provided" }, 400);
+        }
+        // Sanitise: keep only safe fields from guest submission
+        const safe = memories.map(m => ({
+          id: "gc_" + crypto.randomUUID().slice(0, 8),
+          title: String(m.title || "").slice(0, 200),
+          content: String(m.content || "").slice(0, 4000),
+          year: parseInt(m.year) || 0,
+          month: parseInt(m.month) || 0,
+          day: parseInt(m.day) || 0,
+          location: String(m.location || "").slice(0, 200),
+          mood: String(m.mood || "").slice(0, 40),
+          tags: Array.isArray(m.tags) ? m.tags.slice(0, 10).map(t => String(t).slice(0, 40)) : [],
+          visibility: "private",
+          _guestContributor: String(contributorName || "Anonymous").slice(0, 100),
+          _contributedAt: new Date().toISOString(),
+        }));
+        // Push to owner's delivery queue under a share-style payload
+        const shareCode = "gc_sub_" + crypto.randomUUID().slice(0, 8);
+        const sharePayload = {
+          memories: safe,
+          sharedBy: String(contributorName || "Anonymous").slice(0, 100),
+          sharedAt: new Date().toISOString(),
+          _type: "guest_contribution",
+          _subjectId: contrib.subjectId || "",
+          _subjectName: contrib.subjectName || "",
+        };
+        await env.SHARES.put(shareCode, JSON.stringify(sharePayload), { expirationTtl: 60 * 60 * 24 * 90 });
+        const existing = await env.SHARES.get("deliveries:" + contrib.ownerEmailHash);
+        const arr = existing ? JSON.parse(existing) : [];
+        arr.push({ shareId: shareCode, fromName: String(contributorName || "Anonymous").slice(0, 100),
+          fromEmail: "", sentAt: new Date().toISOString(), _type: "guest_contribution" });
+        await env.SHARES.put("deliveries:" + contrib.ownerEmailHash, JSON.stringify(arr),
+          { expirationTtl: 60 * 60 * 24 * 365 });
+        return json({ ok: true });
       } catch (e) {
         return json({ error: "Server error: " + e.message }, 500);
       }

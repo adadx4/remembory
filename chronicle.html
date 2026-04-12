@@ -466,7 +466,7 @@ function seedData(data) { return data; }
 const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], orgLocations:{}, orgPeriods:{}, entityPhotos:{}, ownerName:"", ownerEmail:"" };
 
 function emptySubject(id, name, isSelf=false, mode=null) {
-  return { id, name, isSelf, mode, dob:"", notes:"", memories:[], candidates:[], treePersons:[], treeFamilies:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], knownSources:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{}, locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
+  return { id, name, isSelf, mode, dob:"", notes:"", memories:[], candidates:[], treePersons:[], treeFamilies:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], knownSources:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{}, locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], contributionLinks:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
 }
 
 // ── Mode definitions ──────────────────────────────────────────
@@ -3864,10 +3864,16 @@ function SettingsView({
 // ── SharingView ───────────────────────────────────────────────
 function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShareCodeInput,
   shareCodeStatus, importFromCode, setView, setSelected, ownerEmail,
-  subject, isCarerMode, acceptShare, setPendingConnectRequest, onShareBadgeCount}) {
+  subject, isCarerMode, acceptShare, setPendingConnectRequest, onShareBadgeCount,
+  contributionLinks, persistSubject}) {
 
   const isLegacyMode = subject && !subject.isSelf;
   const [tab, setTab] = React.useState(isLegacyMode ? "contributions" : "received");
+
+  // Contribution link creation state
+  const [linkNote, setLinkNote] = React.useState("");
+  const [linkBusy, setLinkBusy] = React.useState(false);
+  const [linkCopied, setLinkCopied] = React.useState(null); // code that was just copied
   const [pendingDeliveries, setPendingDeliveries] = React.useState([]);
 
   // Inline review state (replaces the App-level modal)
@@ -3918,6 +3924,36 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
   function acceptOne(delivery, mem, overrides={}) {
     const finalMem = {...mem, ...overrides};
     acceptShare({...delivery, memories:[finalMem]});
+  }
+
+  async function createContributionLink() {
+    if (!ownerEmail) return;
+    setLinkBusy(true);
+    try {
+      const r = await fetch(WORKER_URL + "/contribute/create", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          ownerEmail, subjectName: subject?.name || ownerName,
+          subjectId: subject?.id || "", note: linkNote.trim(),
+        }),
+      });
+      const d = await r.json();
+      if (d.url) {
+        const newLink = { code: d.code, url: d.url, note: linkNote.trim(),
+          subjectName: subject?.name || ownerName, createdAt: new Date().toISOString() };
+        persistSubject({ contributionLinks: [...(contributionLinks||[]), newLink] });
+        setLinkNote("");
+        navigator.clipboard?.writeText(d.url).catch(()=>{});
+        setLinkCopied(d.code);
+        setTimeout(() => setLinkCopied(null), 3000);
+      }
+    } catch {}
+    setLinkBusy(false);
+  }
+
+  function revokeContributionLink(code) {
+    persistSubject({ contributionLinks: (contributionLinks||[]).filter(l=>l.code!==code) });
   }
 
   const cardStyle = {background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"16px 20px",marginBottom:"14px"};
@@ -4038,6 +4074,7 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
         ["received","Received"],
         ["sent","Sent"],
         ["codes","Receive a Share"],
+        isLegacyMode&&["links","Contribution Links"],
       ].filter(Boolean).map(([t,label])=>
         React.createElement("button",{key:t,onClick:()=>setTab(t),style:tab===t?tabActive:tabInactive},
           label,
@@ -4051,7 +4088,7 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
       pendingDeliveries.length===0
         ? React.createElement("div",{style:{color:"#8a7460",fontStyle:"italic",padding:"20px 0"}},
             React.createElement("p",{style:{margin:"0 0 6px"}},"No pending contributions."),
-            React.createElement("p",{style:{fontSize:"0.84rem",margin:0}},"When collaborators send memories via share code, they will appear here for review.")
+            React.createElement("p",{style:{fontSize:"0.84rem",margin:0,lineHeight:1.6}},"When collaborators submit memories via a contribution link (see the \u201cContribution Links\u201d tab), they will appear here for review.")
           )
         : pendingDeliveries.map((delivery,di)=>
             React.createElement("div",{key:di,style:{...cardStyle,borderColor:"#7a9e8a",background:"rgba(122,158,138,0.05)"}},
@@ -4135,6 +4172,57 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
               );
             })
           )
+    ),
+
+    // CONTRIBUTION LINKS tab (Legacy/History mode)
+    tab==="links"&&React.createElement("div",null,
+      React.createElement("div",{style:cardStyle},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 6px"}},"Create a contribution link"),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 12px",lineHeight:1.6}},
+          "Share this link with family members or collaborators. They can submit memories without needing Chronicle \u2014 submissions arrive in your Contributions inbox."
+        ),
+        !ownerEmail&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#c4858a",fontStyle:"italic",marginBottom:"10px"}},"Add your email address in Settings to create contribution links."),
+        ownerEmail&&React.createElement("div",null,
+          React.createElement("label",{style:{...S.label,marginTop:0}},"Optional note for contributors"),
+          React.createElement("input",{
+            type:"text", value:linkNote,
+            onChange:e=>setLinkNote(e.target.value),
+            placeholder:'e.g. "Please share memories from the 1980s"',
+            style:{...S.input,marginBottom:"10px"},
+            maxLength:300,
+          }),
+          React.createElement("button",{
+            onClick:createContributionLink,
+            disabled:linkBusy,
+            style:{...S.btn,padding:"9px 18px",opacity:linkBusy?0.5:1},
+          },linkBusy?"Creating…":"📎 Create link & copy")
+        )
+      ),
+      (contributionLinks||[]).length>0&&React.createElement("div",null,
+        React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em",margin:"20px 0 8px"}},"Active links"),
+        (contributionLinks||[]).slice().reverse().map(link=>
+          React.createElement("div",{key:link.code,style:{...cardStyle,display:"flex",alignItems:"flex-start",gap:"12px",flexWrap:"wrap"}},
+            React.createElement("div",{style:{flex:1,minWidth:0}},
+              React.createElement("div",{style:{fontFamily:"monospace",fontSize:"0.78rem",color:"#4a5a7a",marginBottom:"4px",wordBreak:"break-all"}},link.url),
+              link.note&&React.createElement("p",{style:{fontSize:"0.84rem",color:"#6a5840",margin:"2px 0 0",fontStyle:"italic"}},'"'+link.note+'"'),
+              React.createElement("p",{style:{fontSize:"0.75rem",color:"#b0a090",margin:"4px 0 0"}},
+                "Created "+new Date(link.createdAt).toLocaleDateString()
+              )
+            ),
+            React.createElement("div",{style:{display:"flex",gap:"6px",flexShrink:0}},
+              React.createElement("button",{
+                onClick:()=>{ navigator.clipboard?.writeText(link.url).catch(()=>{}); setLinkCopied(link.code); setTimeout(()=>setLinkCopied(null),3000); },
+                style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.8rem",whiteSpace:"nowrap"},
+              },linkCopied===link.code?"✓ Copied":"Copy"),
+              React.createElement("button",{
+                onClick:()=>{ if(window.confirm("Revoke this contribution link? People with the link will no longer be able to submit memories.")) revokeContributionLink(link.code); },
+                style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"},
+              },"Revoke")
+            )
+          )
+        )
+      ),
+      (contributionLinks||[]).length===0&&React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",padding:"10px 0"}},"No contribution links created yet.")
     ),
 
     // RECEIVE A SHARE tab
@@ -5448,6 +5536,7 @@ function App() {
   const peopleRelationships = subject.peopleRelationships || {};
   const peopleNotes         = subject.peopleNotes || {};
   const shareHistory          = subject.shareHistory || [];
+  const contributionLinks     = subject.contributionLinks || [];
   const legacyMessage         = subject.legacyMessage || "";
   const orgNotes            = subject.orgNotes || {};
   const orgLocations        = subject.orgLocations || {};
@@ -5643,7 +5732,7 @@ function App() {
   // persist: legacy-compatible — detects if patch is subject-level or top-level
   function persist(patch) {
     // If patch contains subject-level keys, route to persistSubject
-    const subjectKeys = new Set(["memories","candidates","treePersons","treeFamilies","gedFocalPersonId","customTags","knownPeople","knownOrgs","knownLocations","knownSources","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","locationCoords","orgLocations","orgPeriods","orgNotes","entityPhotos","personOrgs","personLocations","personGroups"]);
+    const subjectKeys = new Set(["memories","candidates","treePersons","treeFamilies","gedFocalPersonId","customTags","knownPeople","knownOrgs","knownLocations","knownSources","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","contributionLinks","locationNotes","locationCoords","orgLocations","orgPeriods","orgNotes","entityPhotos","personOrgs","personLocations","personGroups"]);
     const isSubjectPatch = Object.keys(patch).some(k => subjectKeys.has(k));
     if (isSubjectPatch) {
       // strip any top-level only keys before passing to persistSubject
@@ -7909,6 +7998,7 @@ function handleEdit(m) {
         ownerEmail, subject, isCarerMode,
         acceptShare, setPendingConnectRequest,
         onShareBadgeCount: n => setShareBadgeCount(n),
+        contributionLinks, persistSubject,
       }),
 
       view==="settings"&&React.createElement(SettingsView,{
