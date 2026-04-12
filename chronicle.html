@@ -3429,7 +3429,7 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
 // ════════════════════════════════════════════════════════════════
 // ── SettingsView ──────────────────────────────────────────────
 function SettingsView({
-  subject, subjects, ownerName, ownerEmail, carerEmail,
+  subject, subjects, ownerName, ownerEmail, carerName, carerEmail,
   activePassword, data, memories,
   wantPublicProfile, isSubscriber, licenceKey, licenceStatus,
   legacyMessage, setLegacyMessage,
@@ -3464,7 +3464,7 @@ function SettingsView({
     // ══════════════ ACCOUNT TAB ══════════════
     settingsTab==="account"&&React.createElement(React.Fragment,null,
 
-      // ── Identity ──
+      // ── Subject identity ──
       React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
         React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
           React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},subject.isSelf?"Your name":"Subject name"),
@@ -3472,13 +3472,21 @@ function SettingsView({
             subjects.length>1 ? `Switch (${subjects.length} people) \u2192` : "Manage people \u2192")
         ),
         React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 12px"}},
-          subject.isSelf ? "Your name is shown when you share memories with others." : "The person whose memories this is."),
-        React.createElement("input",{value:ownerName,onChange:e=>persistSubject({name:e.target.value}),placeholder:"Your name",style:{...S.input,marginBottom:"10px"}}),
-        React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:{...S.input,marginBottom:"16px"}}),
+          subject.isSelf ? "Your name is shown when you share memories with others." : "The person whose story is being recorded."),
+        React.createElement("input",{value:ownerName,onChange:e=>persistSubject({name:e.target.value}),placeholder:subject.isSelf?"Your name":"Their name",style:{...S.input,marginBottom:subject.isSelf?"10px":"16px"}}),
+        subject.isSelf&&React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:{...S.input,marginBottom:"16px"}}),
         React.createElement("p",{style:{fontSize:"0.76rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#a8885a",fontWeight:600,margin:"0 0 8px"}},"Chronicle type"),
         React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
           Object.values(MODES).map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:subject.mode===m.id,onSelect:v=>persistSubject({mode:v,isSelf:MODES[v]?.isSelf||false})}))
         )
+      ),
+
+      // ── Chronicler details (non-personal mode only) ──
+      !subject.isSelf&&React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Your details"),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 12px"}},"Your name is recorded as the contributor on each memory you add."),
+        React.createElement("input",{value:carerName,onChange:e=>persistTop({carerName:e.target.value}),placeholder:"Your name",style:{...S.input,marginBottom:"10px"}}),
+        React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:S.input})
       ),
 
       // ── Public profile toggle ──
@@ -6789,7 +6797,7 @@ function handleEdit(m) {
       }),
 
       view==="settings"&&React.createElement(SettingsView,{
-        subject, subjects, ownerName, ownerEmail, carerEmail,
+        subject, subjects, ownerName, ownerEmail, carerName, carerEmail,
         activePassword, data, memories,
         wantPublicProfile, isSubscriber, licenceKey, licenceStatus,
         legacyMessage, setLegacyMessage,
