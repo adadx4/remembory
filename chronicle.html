@@ -1674,11 +1674,22 @@ function RelationshipRow({rel, people, memCount, onView, onRename}) {
 }
 
 function RelationshipIndex({memories, peopleRelationships, onView, onRenameRelationship}) {
+  const [search, setSearch] = React.useState("");
   const allRels=[...new Set(Object.values(peopleRelationships).map(r=>(r||"").trim()).filter(Boolean))].sort();
   if(allRels.length===0) return React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No relationships tagged yet.");
+  const q = search.trim().toLowerCase();
+  const filtered = q ? allRels.filter(rel => {
+    if(rel.toLowerCase().includes(q)) return true;
+    const people=Object.entries(peopleRelationships).filter(([,r])=>(r||"").trim()===rel).map(([n])=>n);
+    return people.some(p=>p.toLowerCase().includes(q));
+  }) : allRels;
   return React.createElement("div",null,
-    React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 16px"}},allRels.length+" relationship type"+(allRels.length===1?"":"s")+" · click a name to see memories · rename to merge types"),
-    allRels.map(rel=>{
+    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"12px",gap:"12px"}},
+      React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},allRels.length+" relationship type"+(allRels.length===1?"":"s")+" · click a name to see memories · rename to merge types"),
+    ),
+    React.createElement("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Search relationships or people…",style:{...S.input,marginBottom:"14px",padding:"7px 11px",fontSize:"0.88rem"}}),
+    filtered.length===0&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No matches."),
+    filtered.map(rel=>{
       const people=Object.entries(peopleRelationships).filter(([,r])=>(r||"").trim()===rel).map(([n])=>n);
       const mc=memories.filter(m=>m.people?.some(p=>people.includes(p))).length;
       return React.createElement(RelationshipRow,{key:rel,rel,people,memCount:mc,onView,onRename:onRenameRelationship});
@@ -1689,6 +1700,7 @@ function RelationshipIndex({memories, peopleRelationships, onView, onRenameRelat
 function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setLocationAddress,entityPhotos,onSetEntityPhoto,setIndexFilter,persistSubject}) {
   const [addingLoc, setAddingLoc] = React.useState(false);
   const [newLoc, setNewLoc] = React.useState("");
+  const [search, setSearch] = React.useState("");
   function commitAdd(){
     const v=newLoc.trim();
     if(!v)return;
@@ -1717,21 +1729,31 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
       React.createElement("button",{onClick:()=>{setAddingLoc(false);setNewLoc("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.86rem"}},"Cancel")
     ),
     knownLocations.length===0&&!addingLoc&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No locations recorded yet."),
-    knownLocations.map(loc=>{
-      const name    = typeof loc === 'string' ? loc : loc.label;
-      const count   = memories.filter(m=>m.location===name||m.locations?.includes(name)).length;
-      const coords  = (typeof loc==='object' ? loc.coords : null) || null;
-      const street  = (typeof loc==='object' ? loc.street  : "") || "";
-      const town    = (typeof loc==='object' ? loc.town    : "") || "";
-      const state   = (typeof loc==='object' ? loc.state   : "") || "";
-      const country = (typeof loc==='object' ? loc.country : "") || "";
-      return React.createElement(LocationRow,{key:name,name,count,notes:locationNotes?.[name],
-        coords, street, town, state, country,
-        photo:(entityPhotos||{})["location:"+name]||null,onSetPhoto:onSetEntityPhoto,
-        onRename:renameLocation,onDelete:deleteLocation,onSetNotes:setLocationNotes,
-        onSetCoords:setLocationCoords,onSetAddress:setLocationAddress,
-        onView:()=>setIndexFilter({type:"locations",value:name})});
-    })
+    knownLocations.length>0&&React.createElement("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Search locations…",style:{...S.input,marginBottom:"10px",padding:"7px 11px",fontSize:"0.88rem"}}),
+    (()=>{
+      const q=search.trim().toLowerCase();
+      const visible=q?knownLocations.filter(loc=>{
+        const name=typeof loc==='string'?loc:loc.label;
+        const parts=[name,loc.town,loc.state,loc.country].filter(Boolean);
+        return parts.some(p=>p.toLowerCase().includes(q));
+      }):knownLocations;
+      if(q&&visible.length===0) return React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No matches.");
+      return visible.map(loc=>{
+        const name    = typeof loc === 'string' ? loc : loc.label;
+        const count   = memories.filter(m=>m.location===name||m.locations?.includes(name)).length;
+        const coords  = (typeof loc==='object' ? loc.coords : null) || null;
+        const street  = (typeof loc==='object' ? loc.street  : "") || "";
+        const town    = (typeof loc==='object' ? loc.town    : "") || "";
+        const state   = (typeof loc==='object' ? loc.state   : "") || "";
+        const country = (typeof loc==='object' ? loc.country : "") || "";
+        return React.createElement(LocationRow,{key:name,name,count,notes:locationNotes?.[name],
+          coords, street, town, state, country,
+          photo:(entityPhotos||{})["location:"+name]||null,onSetPhoto:onSetEntityPhoto,
+          onRename:renameLocation,onDelete:deleteLocation,onSetNotes:setLocationNotes,
+          onSetCoords:setLocationCoords,onSetAddress:setLocationAddress,
+          onView:()=>setIndexFilter({type:"locations",value:name})});
+      });
+    })()
   );
 }
 
@@ -2038,6 +2060,7 @@ function GroupRow({groupName, members, notes, onRename, onDelete, onSetNotes, on
 function GroupsManager({personGroups, knownPeople, memories, onSetGroups, onViewGroup}) {
   const [adding, setAdding] = React.useState(false);
   const [newGroupName, setNewGroupName] = React.useState("");
+  const [search, setSearch] = React.useState("");
   const groups = Object.entries(personGroups||{}).sort((a,b)=>a[0].localeCompare(b[0]));
 
   function commitAdd(){
@@ -2069,10 +2092,16 @@ function GroupsManager({personGroups, knownPeople, memories, onSetGroups, onView
       React.createElement("button",{onClick:()=>{setAdding(false);setNewGroupName("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.86rem"}},"Cancel")
     ),
     groups.length===0&&!adding&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic",margin:"8px 0"}},"No groups yet. Groups let you add several people to a memory at once."),
-    groups.map(([name,data])=>React.createElement(GroupRow,{key:name,groupName:name,
-      members:data.members||[],notes:data.notes||"",knownPeople,
-      onRename:renameGroup,onDelete:deleteGroup,onSetNotes:setGroupNotes,onSetMembers:setGroupMembers,
-      onView:()=>onViewGroup(name,data.members||[])}))
+    groups.length>0&&React.createElement("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Search groups or members…",style:{...S.input,marginBottom:"10px",padding:"7px 11px",fontSize:"0.88rem"}}),
+    (()=>{
+      const q=search.trim().toLowerCase();
+      const visible=q?groups.filter(([name,data])=>name.toLowerCase().includes(q)||(data.members||[]).some(m=>m.toLowerCase().includes(q))):groups;
+      if(q&&visible.length===0) return React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No matches.");
+      return visible.map(([name,data])=>React.createElement(GroupRow,{key:name,groupName:name,
+        members:data.members||[],notes:data.notes||"",knownPeople,
+        onRename:renameGroup,onDelete:deleteGroup,onSetNotes:setGroupNotes,onSetMembers:setGroupMembers,
+        onView:()=>onViewGroup(name,data.members||[])}));
+    })()
   );
 }
 
@@ -6962,47 +6991,88 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
 
         // ── RESIDENCE TIMELINE ──
         (()=>{
-          const currentYear = new Date().getFullYear();
+          const now = new Date();
+          const currentFrac = now.getFullYear() + (now.getMonth()/12) + (now.getDate()/365);
+
+          // Convert a memory to a fractional year using all available date precision
+          function memFrac(m) {
+            if (!m.year) return 0;
+            if ((m.fuzzy==="day"||m.fuzzy==="month") && m.month) {
+              const dayFrac = (m.fuzzy==="day" && m.day) ? (m.day-1)/365 : 0;
+              return m.year + (m.month-1)/12 + dayFrac;
+            }
+            if (m.fuzzy==="season" && m.season) {
+              const sm = {Early:1,Mid:6,Late:10};
+              return m.year + (sm[m.season]||0)/12;
+            }
+            return m.year;
+          }
+
+          // Format a fractional year as "Month YYYY" or just "YYYY"
+          function fracLabel(f) {
+            const yr = Math.floor(f);
+            const mo = Math.round((f-yr)*12);
+            return mo>0 ? MONTHS[Math.min(mo,11)]+" "+yr : String(yr);
+          }
+
+          // Duration in fractional years → human label
+          function durLabel(dy) {
+            const totalMonths = Math.round(dy*12);
+            if (totalMonths < 2) return "<1 month";
+            if (totalMonths < 12) return totalMonths+" mo";
+            const yrs = Math.floor(totalMonths/12);
+            const mos = totalMonths%12;
+            return yrs+"y"+(mos>0?" "+mos+"m":"");
+          }
+
           const homeMs = memories
             .filter(m => m.year && m.location && (m.tags||[]).includes("home"))
-            .sort((a,b) => a.year!==b.year ? a.year-b.year : (a.month||0)-(b.month||0));
+            .sort((a,b) => memFrac(a)-memFrac(b));
           if (homeMs.length === 0) return null;
+
           // Build periods — collapse consecutive same-location entries
           const residences = [];
           homeMs.forEach((m,i) => {
             const last = residences[residences.length-1];
-            const nextYear = homeMs[i+1] ? homeMs[i+1].year : currentYear;
+            const startFrac = memFrac(m);
+            const endFrac = homeMs[i+1] ? memFrac(homeMs[i+1]) : currentFrac;
+            const isCurrent = !homeMs[i+1];
             if (last && last.location === m.location) {
-              last.endYear = nextYear;
-              last.isCurrent = !homeMs[i+1];
+              last.endFrac = endFrac;
+              last.isCurrent = isCurrent;
             } else {
-              residences.push({location:m.location, startYear:m.year, endYear:nextYear, isCurrent:!homeMs[i+1], memId:m.id});
+              residences.push({location:m.location, startFrac, endFrac, isCurrent, memId:m.id});
             }
           });
-          const minYear = residences[0].startYear;
-          const span = Math.max(1, currentYear - minYear);
+
+          const minFrac = residences[0].startFrac;
+          const span = Math.max(0.1, currentFrac - minFrac);
+
           // Assign a distinct colour per unique location
           const palette = ["#a87e6b","#7a9e9f","#8b9dc3","#89b08a","#c4a962","#9b8ea8","#c4858a","#b5936b"];
           const locColor = {};
           residences.forEach(r => { if(!locColor[r.location]) locColor[r.location] = palette[Object.keys(locColor).length % palette.length]; });
-          // Decade tick marks, always include start and current year
+
+          // Decade ticks between start and now
+          const minYear = Math.floor(minFrac);
           const ticks = [];
           const fd = Math.ceil((minYear+1)/10)*10;
-          for(let y=fd; y<currentYear; y+=10) ticks.push(y);
+          for(let y=fd; y<Math.floor(currentFrac); y+=10) ticks.push(y);
+
           return React.createElement("div",{style:{marginTop:"22px",background:"rgba(255,252,245,0.85)",border:"1px solid #e0d4be",borderRadius:"4px",padding:"16px 14px"}},
             React.createElement("h4",{style:{margin:"0 0 14px",fontFamily:"'Playfair Display',serif",fontSize:"0.8rem",color:"#8a7460",fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase"}},"Residences"),
             // Segmented bar
             React.createElement("div",{style:{position:"relative"}},
               React.createElement("div",{style:{display:"flex",height:"30px",borderRadius:"3px",overflow:"hidden",width:"100%"}},
                 residences.map((r,i) => {
-                  const w = Math.max(0.5, (r.endYear-r.startYear)/span*100).toFixed(2)+"%";
+                  const w = Math.max(0.5, (r.endFrac-r.startFrac)/span*100).toFixed(2)+"%";
                   return React.createElement("div",{key:i,
-                    title:`${r.location}: ${r.startYear}–${r.isCurrent?"present":r.endYear}`,
+                    title:`${r.location}: ${fracLabel(r.startFrac)}–${r.isCurrent?"present":fracLabel(r.endFrac)}`,
                     style:{width:w,background:locColor[r.location],display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0,cursor:"pointer"},
                     onClick:()=>{setIndexFilter({type:"locations",value:r.location});setView("index");}
                   },
                     React.createElement("span",{style:{fontSize:"0.68rem",fontWeight:600,color:"#fff",textShadow:"0 1px 2px rgba(0,0,0,0.45)",padding:"0 4px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}},
-                      (r.endYear-r.startYear)/span > 0.09 ? r.location : ""
+                      (r.endFrac-r.startFrac)/span > 0.09 ? r.location : ""
                     )
                   );
                 })
@@ -7010,15 +7080,15 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
               // Year ruler
               React.createElement("div",{style:{position:"relative",height:"18px",marginTop:"3px",fontSize:"0.64rem",color:"#8a7460"}},
                 React.createElement("span",{style:{position:"absolute",left:0}},minYear),
-                ticks.map(yr=>React.createElement("span",{key:yr,style:{position:"absolute",left:((yr-minYear)/span*100).toFixed(2)+"%",transform:"translateX(-50%)"}},yr)),
-                React.createElement("span",{style:{position:"absolute",right:0}},currentYear)
+                ticks.map(yr=>React.createElement("span",{key:yr,style:{position:"absolute",left:((yr-minFrac)/span*100).toFixed(2)+"%",transform:"translateX(-50%)"}},yr)),
+                React.createElement("span",{style:{position:"absolute",right:0}},Math.floor(currentFrac))
               )
             ),
             // Detail list
             React.createElement("div",{style:{marginTop:"14px",display:"flex",flexDirection:"column",gap:"7px"}},
               residences.map((r,i)=>{
-                const dur = r.isCurrent ? currentYear-r.startYear : r.endYear-r.startYear;
-                const barW = Math.max(1, (r.endYear-r.startYear)/span*100).toFixed(1)+"%";
+                const dy = r.endFrac - r.startFrac;
+                const barW = Math.max(1, dy/span*100).toFixed(1)+"%";
                 return React.createElement("div",{key:i,style:{display:"grid",gridTemplateColumns:"10px 1fr auto",gap:"8px",alignItems:"center"}},
                   React.createElement("div",{style:{width:"10px",height:"10px",borderRadius:"2px",background:locColor[r.location]}}),
                   React.createElement("div",null,
@@ -7030,11 +7100,9 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
                   ),
                   React.createElement("div",{style:{textAlign:"right",whiteSpace:"nowrap"}},
                     React.createElement("div",{style:{fontSize:"0.82rem",color:"#2c2416"}},
-                      r.startYear+"–"+(r.isCurrent?"present":r.endYear)
+                      fracLabel(r.startFrac)+"–"+(r.isCurrent?"present":fracLabel(r.endFrac))
                     ),
-                    React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460"}},
-                      dur===0?"<1 yr":dur===1?"1 yr":dur+" yrs"
-                    )
+                    React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460"}},durLabel(dy))
                   )
                 );
               })
