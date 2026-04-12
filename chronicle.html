@@ -6989,12 +6989,11 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
           });})()
         ),
 
-        // ── RESIDENCE TIMELINE ──
+        // ── LIFE TIMELINE ──
         (()=>{
           const now = new Date();
-          const currentFrac = now.getFullYear() + (now.getMonth()/12) + (now.getDate()/365);
+          const currentFrac = now.getFullYear() + now.getMonth()/12 + now.getDate()/365;
 
-          // Convert a memory to a fractional year using all available date precision
           function memFrac(m) {
             if (!m.year) return 0;
             if ((m.fuzzy==="day"||m.fuzzy==="month") && m.month) {
@@ -7002,110 +7001,165 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
               return m.year + (m.month-1)/12 + dayFrac;
             }
             if (m.fuzzy==="season" && m.season) {
-              const sm = {Early:1,Mid:6,Late:10};
-              return m.year + (sm[m.season]||0)/12;
+              return m.year + ({Early:1,Mid:6,Late:10}[m.season]||0)/12;
             }
             return m.year;
           }
-
-          // Format a fractional year as "Month YYYY" or just "YYYY"
           function fracLabel(f) {
-            const yr = Math.floor(f);
-            const mo = Math.round((f-yr)*12);
+            const yr = Math.floor(f), mo = Math.round((f-yr)*12);
             return mo>0 ? MONTHS[Math.min(mo,11)]+" "+yr : String(yr);
           }
-
-          // Duration in fractional years → human label
           function durLabel(dy) {
-            const totalMonths = Math.round(dy*12);
-            if (totalMonths < 2) return "<1 month";
-            if (totalMonths < 12) return totalMonths+" mo";
-            const yrs = Math.floor(totalMonths/12);
-            const mos = totalMonths%12;
-            return yrs+"y"+(mos>0?" "+mos+"m":"");
+            const tm = Math.round(dy*12);
+            if (tm<2) return "<1 mo";
+            if (tm<12) return tm+" mo";
+            const y=Math.floor(tm/12), m=tm%12;
+            return y+"y"+(m>0?" "+m+"m":"");
           }
 
+          // ── Residence: continuous, extends to present ──
           const homeMs = memories
             .filter(m => m.year && m.location && (m.tags||[]).includes("home"))
             .sort((a,b) => memFrac(a)-memFrac(b));
-          if (homeMs.length === 0) return null;
-
-          // Build periods — collapse consecutive same-location entries
           const residences = [];
           homeMs.forEach((m,i) => {
             const last = residences[residences.length-1];
-            const startFrac = memFrac(m);
-            const endFrac = homeMs[i+1] ? memFrac(homeMs[i+1]) : currentFrac;
+            const sf = memFrac(m);
+            const ef = homeMs[i+1] ? memFrac(homeMs[i+1]) : currentFrac;
             const isCurrent = !homeMs[i+1];
-            if (last && last.location === m.location) {
-              last.endFrac = endFrac;
-              last.isCurrent = isCurrent;
-            } else {
-              residences.push({location:m.location, startFrac, endFrac, isCurrent, memId:m.id});
-            }
+            if (last && last.label===m.location) { last.endFrac=ef; last.isCurrent=isCurrent; }
+            else residences.push({label:m.location, startFrac:sf, endFrac:ef, isCurrent, fType:"locations"});
           });
 
-          const minFrac = residences[0].startFrac;
-          const span = Math.max(0.1, currentFrac - minFrac);
+          // ── Sparse rows: work and education — gaps allowed ──
+          // Label = first org if set, otherwise location
+          function buildPeriods(tag) {
+            const tagged = memories
+              .filter(m => m.year && (m.tags||[]).includes(tag) && ((m.orgs||[])[0]||m.location))
+              .map(m => { const org=(m.orgs||[])[0]; return {frac:memFrac(m), label:org||m.location, fType:org?"orgs":"locations"}; })
+              .sort((a,b)=>a.frac-b.frac);
+            const out = [];
+            let i=0;
+            while(i<tagged.length) {
+              const {label,fType} = tagged[i];
+              let j=i;
+              while(j+1<tagged.length && tagged[j+1].label===label) j++;
+              out.push({label, startFrac:tagged[i].frac, endFrac:tagged[j].frac, isCurrent:false, fType});
+              i=j+1;
+            }
+            return out;
+          }
+          const eduPeriods  = buildPeriods("education");
+          const workPeriods = buildPeriods("work");
 
-          // Assign a distinct colour per unique location
-          const palette = ["#a87e6b","#7a9e9f","#8b9dc3","#89b08a","#c4a962","#9b8ea8","#c4858a","#b5936b"];
-          const locColor = {};
-          residences.forEach(r => { if(!locColor[r.location]) locColor[r.location] = palette[Object.keys(locColor).length % palette.length]; });
+          if (!residences.length && !eduPeriods.length && !workPeriods.length) return null;
 
-          // Decade ticks between start and now
-          const minYear = Math.floor(minFrac);
-          const ticks = [];
-          const fd = Math.ceil((minYear+1)/10)*10;
-          for(let y=fd; y<Math.floor(currentFrac); y+=10) ticks.push(y);
+          // ── Shared time axis ──
+          const allFracs = [...residences,...eduPeriods,...workPeriods].map(r=>r.startFrac);
+          const minFrac  = Math.min(...allFracs);
+          const span     = Math.max(0.1, currentFrac - minFrac);
+          const minYear  = Math.floor(minFrac);
+          const ticks    = [];
+          for(let y=Math.ceil((minYear+1)/10)*10; y<Math.floor(currentFrac); y+=10) ticks.push(y);
 
-          return React.createElement("div",{style:{marginTop:"22px",background:"rgba(255,252,245,0.85)",border:"1px solid #e0d4be",borderRadius:"4px",padding:"16px 14px"}},
-            React.createElement("h4",{style:{margin:"0 0 14px",fontFamily:"'Playfair Display',serif",fontSize:"0.8rem",color:"#8a7460",fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase"}},"Residences"),
-            // Segmented bar
-            React.createElement("div",{style:{position:"relative"}},
-              React.createElement("div",{style:{display:"flex",height:"30px",borderRadius:"3px",overflow:"hidden",width:"100%"}},
-                residences.map((r,i) => {
-                  const w = Math.max(0.5, (r.endFrac-r.startFrac)/span*100).toFixed(2)+"%";
-                  return React.createElement("div",{key:i,
-                    title:`${r.location}: ${fracLabel(r.startFrac)}–${r.isCurrent?"present":fracLabel(r.endFrac)}`,
-                    style:{width:w,background:locColor[r.location],display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0,cursor:"pointer"},
-                    onClick:()=>{setIndexFilter({type:"locations",value:r.location});setView("index");}
+          // ── Colour palettes per row type ──
+          const RES_PAL  = ["#a87e6b","#c4a962","#c4858a","#b5936b","#d4986b"];
+          const EDU_PAL  = ["#8b9dc3","#7a8ec0","#9b8ea8","#6d80b0","#a090c0"];
+          const WORK_PAL = ["#7a9e9f","#89b08a","#5a8e8e","#6a9e7a","#7a8e6a"];
+          function makeColFn(pal) {
+            const cache={};
+            return l=>{ if(!cache[l]) cache[l]=pal[Object.keys(cache).length%pal.length]; return cache[l]; };
+          }
+          const resCol=makeColFn(RES_PAL), eduCol=makeColFn(EDU_PAL), workCol=makeColFn(WORK_PAL);
+          // Pre-seed colours in order of appearance
+          residences.forEach(r=>resCol(r.label));
+          eduPeriods.forEach(r=>eduCol(r.label));
+          workPeriods.forEach(r=>workCol(r.label));
+
+          const LABEL_W = "76px";
+
+          // ── Track renderer ──
+          function track(rowLabel, periods, colFn, continuous) {
+            return React.createElement("div",{style:{display:"flex",gap:"8px",alignItems:"center",marginBottom:"5px"}},
+              React.createElement("div",{style:{width:LABEL_W,flexShrink:0,fontSize:"0.7rem",color:"#8a7460",fontWeight:600,letterSpacing:"0.05em",textTransform:"uppercase",textAlign:"right",paddingRight:"2px"}},rowLabel),
+              React.createElement("div",{style:{flex:1,position:"relative",height:"24px"}},
+                // Gray track background
+                React.createElement("div",{style:{position:"absolute",inset:0,background:"#e8dfd0",borderRadius:"3px"}}),
+                // Segments
+                periods.map((r,i)=>{
+                  const rawW = (r.endFrac-r.startFrac)/span*100;
+                  const left = ((r.startFrac-minFrac)/span*100).toFixed(3)+"%";
+                  const width = Math.max(0.6, rawW).toFixed(3)+"%";
+                  const col = colFn(r.label);
+                  const tooltip = r.label+": "+fracLabel(r.startFrac)+"–"+(r.isCurrent?"present":fracLabel(r.endFrac))+" ("+durLabel(r.endFrac-r.startFrac)+")";
+                  return React.createElement("div",{key:i,title:tooltip,
+                    style:{position:"absolute",left,width,top:0,bottom:0,background:col,borderRadius:"2px",
+                      display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",cursor:"pointer"},
+                    onClick:()=>{setIndexFilter({type:r.fType,value:r.label});setView("index");}
                   },
-                    React.createElement("span",{style:{fontSize:"0.68rem",fontWeight:600,color:"#fff",textShadow:"0 1px 2px rgba(0,0,0,0.45)",padding:"0 4px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}},
-                      (r.endFrac-r.startFrac)/span > 0.09 ? r.location : ""
-                    )
+                    rawW/100*span>0.5&&React.createElement("span",{style:{fontSize:"0.64rem",fontWeight:600,color:"#fff",
+                      textShadow:"0 1px 2px rgba(0,0,0,0.5)",padding:"0 3px",whiteSpace:"nowrap",overflow:"hidden",
+                      textOverflow:"ellipsis",maxWidth:"100%"}},r.label)
                   );
                 })
-              ),
-              // Year ruler
-              React.createElement("div",{style:{position:"relative",height:"18px",marginTop:"3px",fontSize:"0.64rem",color:"#8a7460"}},
+              )
+            );
+          }
+
+          // ── Detail legend per row ──
+          function legend(periods, colFn) {
+            if (!periods.length) return null;
+            return React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"5px"}},
+              periods.map((r,i)=>{
+                const dy=r.endFrac-r.startFrac;
+                return React.createElement("div",{key:i,style:{display:"grid",gridTemplateColumns:"8px 1fr auto",gap:"8px",alignItems:"center",cursor:"pointer"},
+                  onClick:()=>{setIndexFilter({type:r.fType,value:r.label});setView("index");}},
+                  React.createElement("div",{style:{width:"8px",height:"8px",borderRadius:"2px",flexShrink:0,background:colFn(r.label)}}),
+                  React.createElement("span",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.9rem",color:"#1a1208",
+                    textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px",overflow:"hidden",
+                    textOverflow:"ellipsis",whiteSpace:"nowrap"}},r.label),
+                  React.createElement("span",{style:{fontSize:"0.76rem",color:"#8a7460",whiteSpace:"nowrap",textAlign:"right"}},
+                    fracLabel(r.startFrac)+"–"+(r.isCurrent?"present":fracLabel(r.endFrac))+" · "+durLabel(dy))
+                );
+              })
+            );
+          }
+
+          const hasEdu  = eduPeriods.length>0;
+          const hasWork = workPeriods.length>0;
+
+          return React.createElement("div",{style:{marginTop:"22px",background:"rgba(255,252,245,0.85)",border:"1px solid #e0d4be",borderRadius:"4px",padding:"16px 14px"}},
+            React.createElement("h4",{style:{margin:"0 0 14px",fontFamily:"'Playfair Display',serif",fontSize:"0.8rem",color:"#8a7460",fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase"}},"Life Timeline"),
+
+            // ── Chart rows ──
+            residences.length>0&&track("Residence", residences, resCol, true),
+            hasEdu&&track("Education", eduPeriods, eduCol, false),
+            hasWork&&track("Work", workPeriods, workCol, false),
+
+            // ── Shared year ruler ──
+            React.createElement("div",{style:{display:"flex",gap:"8px",marginTop:"2px"}},
+              React.createElement("div",{style:{width:LABEL_W,flexShrink:0}}),
+              React.createElement("div",{style:{flex:1,position:"relative",height:"16px",fontSize:"0.62rem",color:"#8a7460"}},
                 React.createElement("span",{style:{position:"absolute",left:0}},minYear),
-                ticks.map(yr=>React.createElement("span",{key:yr,style:{position:"absolute",left:((yr-minFrac)/span*100).toFixed(2)+"%",transform:"translateX(-50%)"}},yr)),
+                ticks.map(y=>React.createElement("span",{key:y,style:{position:"absolute",left:((y-minFrac)/span*100).toFixed(2)+"%",transform:"translateX(-50%)"}},y)),
                 React.createElement("span",{style:{position:"absolute",right:0}},Math.floor(currentFrac))
               )
             ),
-            // Detail list
-            React.createElement("div",{style:{marginTop:"14px",display:"flex",flexDirection:"column",gap:"7px"}},
-              residences.map((r,i)=>{
-                const dy = r.endFrac - r.startFrac;
-                const barW = Math.max(1, dy/span*100).toFixed(1)+"%";
-                return React.createElement("div",{key:i,style:{display:"grid",gridTemplateColumns:"10px 1fr auto",gap:"8px",alignItems:"center"}},
-                  React.createElement("div",{style:{width:"10px",height:"10px",borderRadius:"2px",background:locColor[r.location]}}),
-                  React.createElement("div",null,
-                    React.createElement("div",{style:{height:"6px",borderRadius:"3px",background:"#e8dfd0",overflow:"hidden",marginBottom:"3px"}},
-                      React.createElement("div",{style:{height:"100%",width:barW,borderRadius:"3px",background:locColor[r.location]}})
-                    ),
-                    React.createElement("span",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",color:"#1a1208",cursor:"pointer",textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px"},
-                      onClick:()=>{setIndexFilter({type:"locations",value:r.location});setView("index");}},r.location)
-                  ),
-                  React.createElement("div",{style:{textAlign:"right",whiteSpace:"nowrap"}},
-                    React.createElement("div",{style:{fontSize:"0.82rem",color:"#2c2416"}},
-                      fracLabel(r.startFrac)+"–"+(r.isCurrent?"present":fracLabel(r.endFrac))
-                    ),
-                    React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460"}},durLabel(dy))
-                  )
-                );
-              })
+
+            // ── Detail legend ──
+            React.createElement("div",{style:{marginTop:"14px",display:"grid",gridTemplateColumns:isMobile||(!hasEdu&&!hasWork)?"1fr":(hasEdu&&hasWork?"repeat(3,1fr)":"repeat(2,1fr)"),gap:"12px 20px",borderTop:"1px solid #e8dfd0",paddingTop:"12px"}},
+              residences.length>0&&React.createElement("div",null,
+                React.createElement("div",{style:{fontSize:"0.68rem",color:"#8a7460",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"6px"}},"Residence"),
+                legend(residences,resCol)
+              ),
+              hasEdu&&React.createElement("div",null,
+                React.createElement("div",{style:{fontSize:"0.68rem",color:"#8a7460",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"6px"}},"Education"),
+                legend(eduPeriods,eduCol)
+              ),
+              hasWork&&React.createElement("div",null,
+                React.createElement("div",{style:{fontSize:"0.68rem",color:"#8a7460",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"6px"}},"Work"),
+                legend(workPeriods,workCol)
+              )
             )
           );
         })(),
