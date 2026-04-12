@@ -245,7 +245,7 @@ function knownLocationValues(knownLocations, field) {
 }
 
 function newForm() {
-  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], sourceIds:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town" };
+  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], sourceIds:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town", researchNote:"", candidateConfidence:"possible" };
 }
 
 // ── Storage ────────────────────────────────────────────────────
@@ -466,7 +466,7 @@ function seedData(data) { return data; }
 const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], orgLocations:{}, orgPeriods:{}, entityPhotos:{}, ownerName:"", ownerEmail:"" };
 
 function emptySubject(id, name, isSelf=false, mode=null) {
-  return { id, name, isSelf, mode, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], knownSources:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{}, locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
+  return { id, name, isSelf, mode, dob:"", notes:"", memories:[], candidates:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], knownSources:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{}, locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
 }
 
 // ── Mode definitions ──────────────────────────────────────────
@@ -4417,6 +4417,75 @@ function ImportView({
   );
 }
  
+const CANDIDATE_CONFIDENCE = [
+  {id:"possible",  label:"Possible",  color:"#8a7460"},
+  {id:"probable",  label:"Probable",  color:"#5a7a6a"},
+];
+
+function CandidatesPanel({candidates, memories, knownSources, isMobile, onEdit, onAccept, onReject, onAddNew}) {
+  const [open, setOpen] = React.useState(true);
+  if (!candidates.length && !open) return null;
+
+  const confColor = id => CANDIDATE_CONFIDENCE.find(c=>c.id===id)?.color || "#8a7460";
+  const confLabel = id => CANDIDATE_CONFIDENCE.find(c=>c.id===id)?.label || id;
+  const isDup = c => memories.some(m=>m.year===c.year && m.title.trim().toLowerCase()===c.title.trim().toLowerCase());
+
+  return React.createElement("div",{style:{marginTop:"32px",borderTop:"2px solid rgba(196,169,98,0.3)",paddingTop:"20px"}},
+    // Header bar
+    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:open?"18px":"0",cursor:"pointer"},onClick:()=>setOpen(o=>!o)},
+      React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",fontStyle:"italic",color:"#5a4820"}},
+        "📥 Candidates"
+      ),
+      React.createElement("span",{style:{fontSize:"0.72rem",padding:"1px 8px",borderRadius:"20px",background:"rgba(196,169,98,0.2)",color:"#7a5a20",border:"1px solid rgba(196,169,98,0.4)"}},
+        candidates.length
+      ),
+      React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic",flex:1}},"unverified entries awaiting review"),
+      React.createElement("span",{style:{color:"#8a7460",fontSize:"0.8rem"}},open?"▲":"▼"),
+      React.createElement("button",{onClick:e=>{e.stopPropagation();onAddNew();},style:{marginLeft:"auto",padding:"3px 12px",borderRadius:"3px",border:"1px solid rgba(196,169,98,0.5)",background:"transparent",color:"#7a5a20",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem"}},
+        "+ Add Candidate"
+      )
+    ),
+
+    open&&React.createElement("div",null,
+      candidates.length===0
+        ? React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic",fontSize:"0.9rem"}},"No candidates yet. Use \u201cSave as Candidate\u201d when adding an entry to hold it here for review.")
+        : candidates.map(c=>{
+            const dup = isDup(c);
+            const cc  = confColor(c.candidateConfidence||"possible");
+            const mSources = (c.sourceIds||[]).map(id=>(knownSources||[]).find(s=>s.id===id)).filter(Boolean);
+            return React.createElement("div",{key:c.id,style:{background:"rgba(255,252,245,0.85)",border:"1px solid rgba(196,169,98,0.35)",borderRadius:"4px",padding:"12px 14px",marginBottom:"10px",borderLeft:"3px solid "+cc}},
+              // Title row
+              React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:"8px",flexWrap:"wrap"}},
+                React.createElement("span",{style:{fontFamily:"'Crimson Text',serif",fontSize:"1rem",color:"#1a1208",fontWeight:600,flex:1}},c.title),
+                c.year&&React.createElement("span",{style:{fontSize:"0.8rem",color:"#8a7460",fontStyle:"italic",flexShrink:0}},c.year),
+                React.createElement("span",{style:{fontSize:"0.7rem",padding:"1px 7px",borderRadius:"20px",background:cc+"22",color:cc,border:"1px solid "+cc+"55",flexShrink:0}},confLabel(c.candidateConfidence||"possible")),
+                dup&&React.createElement("span",{style:{fontSize:"0.7rem",padding:"1px 7px",borderRadius:"20px",background:"rgba(196,100,100,0.1)",color:"#8a3030",border:"1px solid rgba(196,100,100,0.3)",flexShrink:0}},"⚠ Possible duplicate")
+              ),
+              // Location / content snippet
+              (c.location||c.content)&&React.createElement("div",{style:{fontSize:"0.82rem",color:"#7a6a58",margin:"4px 0",fontStyle:"italic"}},
+                c.location&&React.createElement("span",null,"📍 "+c.location+(c.content?" — ":"")),
+                c.content&&React.createElement("span",null,c.content.slice(0,120)+(c.content.length>120?"…":""))
+              ),
+              // Research note
+              c.researchNote&&React.createElement("div",{style:{fontSize:"0.78rem",color:"#6a5840",background:"rgba(196,169,98,0.08)",padding:"5px 8px",borderRadius:"2px",margin:"6px 0",borderLeft:"2px solid rgba(196,169,98,0.4)"}},
+                "📝 "+c.researchNote
+              ),
+              // Sources
+              mSources.length>0&&React.createElement("div",{style:{display:"flex",gap:"5px",flexWrap:"wrap",margin:"6px 0"}},
+                mSources.map(s=>{const ti=SOURCE_TYPES.find(x=>x.id===s.type)||SOURCE_TYPES[SOURCE_TYPES.length-1];return React.createElement("span",{key:s.id,style:{fontSize:"0.72rem",padding:"1px 7px",borderRadius:"20px",background:"rgba(196,169,98,0.1)",border:"1px solid rgba(196,169,98,0.3)",color:"#5a4820"}},ti.icon+" "+s.title);})
+              ),
+              // Actions
+              React.createElement("div",{style:{display:"flex",gap:"7px",marginTop:"10px",flexWrap:"wrap"}},
+                React.createElement("button",{onClick:()=>onAccept(c.id),style:{padding:"4px 12px",borderRadius:"3px",border:"1px solid rgba(74,122,90,0.5)",background:"rgba(74,122,90,0.08)",color:"#2d5a3a",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem"}},"✓ Accept"),
+                React.createElement("button",{onClick:()=>onEdit(c),style:{padding:"4px 12px",borderRadius:"3px",border:"1px solid #c8b89a",background:"transparent",color:"#5a4820",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem"}},"Edit"),
+                React.createElement("button",{onClick:()=>onReject(c.id),style:{padding:"4px 12px",borderRadius:"3px",border:"1px solid rgba(196,100,100,0.4)",background:"transparent",color:"#8a3030",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem"}},"Reject")
+              )
+            );
+          })
+    )
+  );
+}
+
 function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) {
   const [editing, setEditing] = React.useState(null);
   const [form, setForm] = React.useState({title:"", type:"other", confidence:"unknown", year:"", url:"", notes:""});
@@ -4649,6 +4718,7 @@ function AddEditForm({
   wantPublicProfile, persistSubject,
   setForm, newForm, setEditingId, setView,
   isCarerMode, ownerName, carerName, subject,
+  isHistoryMode, editingCandidateId, handleSaveCandidateSubmit, handleAcceptFromForm,
 }) {
   // Auto-expand sections that already have content (important for edit mode)
   const [expanded, setExpanded] = React.useState(() => {
@@ -4879,13 +4949,29 @@ function AddEditForm({
       )
     )),
 
+    // ── Research note (History mode) ──
+    isHistoryMode&&sec(React.createElement("div",null,
+      React.createElement("label",{style:S.label},"Research Note"),
+      React.createElement("textarea",{value:form.researchNote||"",onChange:e=>updateForm({researchNote:e.target.value}),placeholder:"Repository, reference number, why this is uncertain, what still needs verification\u2026",rows:2,style:{...S.input,resize:"vertical"}}),
+      React.createElement("div",{style:{display:"flex",gap:"6px",marginTop:"8px",alignItems:"center"}},
+        React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58"}},"\u00b5 Confidence:"),
+        CANDIDATE_CONFIDENCE.map(c=>React.createElement("button",{key:c.id,onClick:()=>updateForm({candidateConfidence:c.id}),style:{padding:"2px 10px",borderRadius:"20px",border:"1px solid "+c.color+"55",background:(form.candidateConfidence||"possible")===c.id?c.color+"22":"transparent",color:c.color,cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.8rem"}},c.label))
+      )
+    )),
+
     // ── Sticky save footer ──
     React.createElement("div",{style:{position:"sticky",bottom:0,background:"rgba(245,240,232,0.97)",borderTop:"1px solid #d4c4a8",padding:"12px 0",marginTop:"20px",backdropFilter:"blur(4px)"}},
-      React.createElement("div",{style:{display:"flex",gap:"10px",alignItems:"center"}},
-        React.createElement("button",{onClick:canSave?handleSubmit:undefined,disabled:!canSave,style:{...S.btn,opacity:canSave?1:0.45,cursor:canSave?"pointer":"not-allowed"}},
-          view==="edit"?"Save Changes":isCarerMode&&ownerName?`Save to ${ownerName}'s Chronicle`:"Save to Chronicle"),
-        React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView(view==="edit"?"detail":"life"); },style:S.btnOutline},"Cancel"),
-        !canSave&&React.createElement("span",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginLeft:"4px"}},
+      React.createElement("div",{style:{display:"flex",gap:"10px",alignItems:"center",flexWrap:"wrap"}},
+        editingCandidateId
+          ? React.createElement(React.Fragment,null,
+              React.createElement("button",{onClick:canSave?handleSaveCandidateSubmit:undefined,disabled:!canSave,style:{...S.btn,opacity:canSave?1:0.45,cursor:canSave?"pointer":"not-allowed"}},"Save Candidate"),
+              React.createElement("button",{onClick:canSave?handleAcceptFromForm:undefined,disabled:!canSave,style:{...S.btn,background:"rgba(74,122,90,0.85)",opacity:canSave?1:0.45,cursor:canSave?"pointer":"not-allowed"}},"✓ Accept into Timeline")
+            )
+          : React.createElement("button",{onClick:canSave?handleSubmit:undefined,disabled:!canSave,style:{...S.btn,opacity:canSave?1:0.45,cursor:canSave?"pointer":"not-allowed"}},
+              view==="edit"?"Save Changes":isCarerMode&&ownerName?`Save to ${ownerName}'s Chronicle`:"Save to Chronicle"),
+        isHistoryMode&&!editingCandidateId&&view==="add"&&React.createElement("button",{onClick:canSave?handleSaveCandidateSubmit:undefined,disabled:!canSave,style:{...S.btnOutline,borderColor:"rgba(196,169,98,0.6)",color:"#7a5a20",opacity:canSave?1:0.45,cursor:canSave?"pointer":"not-allowed"}},"📥 Save as Candidate"),
+        React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setEditingCandidateId&&setEditingCandidateId(null); setView(editingCandidateId?"life":view==="edit"?"detail":"life"); },style:S.btnOutline},"Cancel"),
+        !canSave&&React.createElement("span",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic"}},
           !form.title?.trim()?"Add a title to save":!form.year?"Add a date to save":"")
       )
     )
@@ -4935,10 +5021,12 @@ function App() {
   const subject = subjects.find(s=>s.id===activeSubjectId) || subjects[0] || emptySubject("default","",true);
 
   const memories            = subject.memories || [];
+  const candidates          = subject.candidates || [];
   const customTags          = subject.customTags || [];
   const knownPeople         = subject.knownPeople || [];
   const knownOrgs           = subject.knownOrgs || [];
   const knownSources        = subject.knownSources || [];
+  const isHistoryMode       = subject?.mode === "history";
   const locationNotes = subject.locationNotes || {};
   // Migrate: absorb any coords stored in the legacy label-keyed dict into the location objects.
   // After migration, coords live on knownLocations[i].coords so the label is free to change
@@ -4996,6 +5084,7 @@ function App() {
   }
   const [selected, setSelected] = useState(null);
   const [editingId, setEditingId] = useState(null);
+  const [editingCandidateId, setEditingCandidateId] = useState(null);
   const [zoomDecade, setZoomDecade] = useState(null);
   const [zoomYear, setZoomYear] = useState(null);
   const [scrollToDecade, setScrollToDecade] = useState(null);
@@ -5148,7 +5237,7 @@ function App() {
   // persist: legacy-compatible — detects if patch is subject-level or top-level
   function persist(patch) {
     // If patch contains subject-level keys, route to persistSubject
-    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","knownSources","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","locationCoords","orgLocations","orgPeriods","orgNotes","entityPhotos","personOrgs","personLocations","personGroups"]);
+    const subjectKeys = new Set(["memories","candidates","customTags","knownPeople","knownOrgs","knownLocations","knownSources","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","locationCoords","orgLocations","orgPeriods","orgNotes","entityPhotos","personOrgs","personLocations","personGroups"]);
     const isSubjectPatch = Object.keys(patch).some(k => subjectKeys.has(k));
     if (isSubjectPatch) {
       // strip any top-level only keys before passing to persistSubject
@@ -5380,6 +5469,9 @@ function App() {
       return;
     }
 
+    // Editing a candidate → save back to candidates array (not memories)
+    if (editingCandidateId) { saveCandidate(primary, updatedKnownLocs); return; }
+
     commitMemory(primary, null, updatedKnownLocs);
   }
 
@@ -5424,6 +5516,79 @@ function App() {
       else setView("life");
     }
     setPendingEndMemory(null);
+  }
+
+  // ── Candidate ops ────────────────────────────────────────────
+  function saveCandidate(primary, updatedKnownLocs) {
+    const newPeople = [...new Set([...knownPeople,...(primary.people||[])])].sort();
+    const newOrgs   = [...new Set([...knownOrgs,...(primary.orgs||[])])].sort();
+    const baseLocs  = updatedKnownLocs || knownLocations;
+    const existingLabels = new Set(baseLocs.map(l=>typeof l==='string'?l:l.label));
+    const allFormLocs = [primary.location,...(primary.locations||[])].filter(Boolean);
+    const newLocs = [...baseLocs,...allFormLocs.filter(l=>!existingLabels.has(l)).map(l=>({label:l,street:"",town:"",state:"",country:""}))].sort((a,b)=>(typeof a==='string'?a:a.label).localeCompare(typeof b==='string'?b:b.label));
+    if (editingCandidateId) {
+      const updated = candidates.map(c=>c.id===editingCandidateId?{...primary}:c);
+      persistSubject({candidates:updated,knownPeople:newPeople,knownOrgs:newOrgs,knownLocations:newLocs});
+      setEditingCandidateId(null); setEditingId(null);
+    } else {
+      persistSubject({candidates:[...candidates,primary],knownPeople:newPeople,knownOrgs:newOrgs,knownLocations:newLocs});
+    }
+    setForm(newForm()); setView("life");
+  }
+
+  function acceptCandidate(id) {
+    const c = candidates.find(x=>x.id===id); if(!c) return;
+    const {researchNote:_rn, candidateConfidence:_cc, ...memData} = c;
+    const updated = [...memories, memData].sort((a,b)=>sortKey(a)-sortKey(b));
+    persistSubject({memories:updated, candidates:candidates.filter(x=>x.id!==id)});
+  }
+
+  function rejectCandidate(id) {
+    if (!window.confirm("Discard this candidate entry?")) return;
+    persistSubject({candidates:candidates.filter(c=>c.id!==id)});
+  }
+
+  function handleEditCandidate(c) {
+    let editForm = {...c, locationLabel:c.location||"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:c.locationPrivacy||"town"};
+    if (c.location) {
+      const known = findKnownLocation(knownLocations, c.location);
+      if (known && typeof known === 'object') { editForm.locationLabel=known.label||c.location; editForm.locationStreet=known.street||""; editForm.locationTown=known.town||""; editForm.locationState=known.state||""; editForm.locationCountry=known.country||""; }
+    }
+    setForm({...newForm(),...editForm});
+    setEditingId(c.id); setEditingCandidateId(c.id);
+    setView("edit");
+  }
+
+  function handleSaveCandidateSubmit() {
+    if (!form.title.trim()) return;
+    const locationLabel = (form.locationLabel||"").trim();
+    const formWithLoc = {...form, location:locationLabel};
+    const primaryId = editingCandidateId || (Date.now().toString()+Math.random().toString(36).slice(2));
+    const primary = {...formWithLoc, id:primaryId};
+    let updatedKnownLocs = knownLocations;
+    if (locationLabel) {
+      const fStreet=(form.locationStreet||"").trim(), fTown=(form.locationTown||"").trim(), fState=(form.locationState||"").trim(), fCountry=(form.locationCountry||"").trim();
+      const existingIdx=knownLocations.findIndex(l=>(typeof l==='string'?l:l.label)===locationLabel);
+      if (existingIdx>=0) {
+        updatedKnownLocs=knownLocations.map((l,i)=>{ if(i!==existingIdx) return l; const base=typeof l==='string'?{label:l,street:"",town:"",state:"",country:""}:l; return {...base,label:locationLabel,...(fStreet?{street:fStreet}:{}),...(fTown?{town:fTown}:{}),...(fState?{state:fState}:{}),...(fCountry?{country:fCountry}:{})}; });
+      } else {
+        updatedKnownLocs=[...knownLocations,{label:locationLabel,street:fStreet,town:fTown,state:fState,country:fCountry}].sort((a,b)=>(typeof a==='string'?a:a.label).localeCompare(typeof b==='string'?b:b.label));
+      }
+    }
+    saveCandidate(primary, updatedKnownLocs);
+  }
+
+  function handleAcceptFromForm() {
+    if (!form.title.trim() || !editingCandidateId) return;
+    const locationLabel = (form.locationLabel||"").trim();
+    const formWithLoc = {...form, location:locationLabel};
+    const {researchNote:_rn, candidateConfidence:_cc, ...memData} = {...formWithLoc, id:editingCandidateId};
+    const newPeople = [...new Set([...knownPeople,...(memData.people||[])])].sort();
+    const newOrgs   = [...new Set([...knownOrgs,...(memData.orgs||[])])].sort();
+    const updated = [...memories, memData].sort((a,b)=>sortKey(a)-sortKey(b));
+    persistSubject({memories:updated, candidates:candidates.filter(c=>c.id!==editingCandidateId), knownPeople:newPeople, knownOrgs:newOrgs});
+    setEditingCandidateId(null); setEditingId(null); setForm(newForm());
+    setSelected(editingCandidateId); setView("detail");
   }
 
 function handleEdit(m) {
@@ -5744,7 +5909,7 @@ function handleEdit(m) {
         entityPhotosWithMedia[key] = med;
       }
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, knownSources, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, orgLocations, orgPeriods, entityPhotos:entityPhotosWithMedia, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, // Top-level profile & settings fields
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, candidates, knownPeople, knownOrgs, knownLocations, knownSources, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, orgLocations, orgPeriods, entityPhotos:entityPhotosWithMedia, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, // Top-level profile & settings fields
     wantPublicProfile:data.wantPublicProfile||false, profileAbout:data.profileAbout||"", profileImageUrl:data.profileImageUrl||"", allowFollowers:data.allowFollowers!==false, profilePrivacy:data.profilePrivacy||"open", profileDisplayName:data.profileDisplayName||"", carerMode:data.carerMode||false, carerName:data.carerName||"", carerEmail:data.carerEmail||"", suppressConnectRequests:data.suppressConnectRequests||[]}, null, 2);
   }
 
@@ -6396,6 +6561,9 @@ function handleEdit(m) {
       const backupSources=d.knownSources||[];
       const existingSrcIds=new Set(knownSources.map(s=>s.id));
       const mergedSources=[...knownSources,...backupSources.filter(s=>!existingSrcIds.has(s.id))];
+      const backupCandidates=d.candidates||[];
+      const existingCandIds=new Set(candidates.map(c=>c.id));
+      const mergedCandidates=[...candidates,...backupCandidates.filter(c=>!existingCandIds.has(c.id))];
       const updatedPeopleEmails = {...(peopleEmails||{})};
       if (senderName && senderEmail) updatedPeopleEmails[senderName] = senderEmail;
       const mergedRelationships = {...(d.peopleRelationships||{}), ...(data.peopleRelationships||{})};
@@ -6418,7 +6586,7 @@ function handleEdit(m) {
         }
       }));
       // Use functional setData to avoid stale closure — importBackup runs inside async FileReader callback
-      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,knownSources:mergedSources,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,orgLocations:mergedOrgLocations,orgPeriods:mergedOrgPeriods,entityPhotos:mergedEntityPhotos,locationNotes:mergedLocationNotes,locationCoords:mergedLocationCoords,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,lastImport:new Date().toISOString()};
+      const subjectPatch = {memories:finalMems,candidates:mergedCandidates,knownPeople:mergedPeople,knownOrgs:mergedOrgs,knownSources:mergedSources,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,orgLocations:mergedOrgLocations,orgPeriods:mergedOrgPeriods,entityPhotos:mergedEntityPhotos,locationNotes:mergedLocationNotes,locationCoords:mergedLocationCoords,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,lastImport:new Date().toISOString()};
       setData(prev => {
         const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
         const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
@@ -7626,6 +7794,15 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
           }
         }),
 
+        // ── CANDIDATES (History mode) ──
+        isHistoryMode&&React.createElement(CandidatesPanel,{
+          candidates, memories, knownSources, isMobile,
+          onEdit: handleEditCandidate,
+          onAccept: acceptCandidate,
+          onReject: rejectCandidate,
+          onAddNew: ()=>{ setForm(newForm()); setEditingId(null); setEditingCandidateId(null); setView("add"); }
+        }),
+
         memories.length>=3&&(()=>{
           function barChart(title,items,getColor,onClickItem){
             const max=Math.max(1,...items.map(([,c])=>c));
@@ -7768,6 +7945,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         wantPublicProfile, persistSubject,
         setForm, newForm, setEditingId, setView,
         isCarerMode, ownerName, carerName, subject,
+        isHistoryMode, editingCandidateId, handleSaveCandidateSubmit, handleAcceptFromForm,
       }),
 
     )
