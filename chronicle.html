@@ -6573,9 +6573,17 @@ function handleEdit(m) {
           React.createElement("span",{style:{color:"#c8b89a",flexShrink:0}},"›"),
           React.createElement("span",{style:{fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},breadcrumb)
         ),
-        !isMobile&&!isSubscriber&&React.createElement("div",{style:{display:"inline-flex",alignItems:"center",gap:"6px",padding:"4px 10px",border:"1px solid rgba(168,136,90,0.45)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",whiteSpace:"nowrap",flexShrink:0,background:"transparent"}},
-          "✨ ",React.createElement(SubOptions,{mode:"links"})
-        )
+        !isMobile&&!isSubscriber&&(()=>{
+          const [subOpen, setSubOpen] = React.useState(false);
+          const pillStyle = {display:"inline-flex",alignItems:"center",gap:"6px",padding:"4px 10px",border:"1px solid rgba(168,136,90,0.45)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",whiteSpace:"nowrap",flexShrink:0,background:"transparent"};
+          return subOpen
+            ? React.createElement("div",{style:{...pillStyle,gap:"8px"}},
+                React.createElement("a",{href:STRIPE_URL,target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"💳 Card"),
+                React.createElement("span",{style:{color:"#c8b89a"}},"·"),
+                React.createElement("a",{href:PAYPAL_URL,target:"_blank",rel:"noopener",style:{color:"#003087",textDecoration:"none",borderBottom:"1px solid rgba(0,48,135,0.3)"}},"🅿 PayPal")
+              )
+            : React.createElement("button",{onClick:()=>setSubOpen(true),style:{...pillStyle,cursor:"pointer",border:"1px solid rgba(168,136,90,0.45)",color:"#a8885a",background:"transparent"}},"✨ Subscribe");
+        })()
       ),
       React.createElement("div",{style:{display:"flex",gap:"6px",alignItems:"center",flexShrink:0}},
         saveStatus==="saved"&&React.createElement("span",{style:{fontSize:"0.75rem",color:"#89b08a"}},"✓"),
