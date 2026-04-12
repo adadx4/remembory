@@ -6444,10 +6444,7 @@ function handleEdit(m) {
           React.createElement("span",{style:{color:"#c8b89a",flexShrink:0}},"›"),
           React.createElement("span",{style:{fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},breadcrumb)
         ),
-        !isMobile&&!isSubscriber&&React.createElement("div",{style:{display:"flex",gap:"4px",alignItems:"center"}},
-          React.createElement("a",{href:STRIPE_URL,target:"_blank",rel:"noopener",title:"Subscribe with card",style:{display:"inline-flex",alignItems:"center",padding:"4px 10px",border:"1px solid rgba(168,136,90,0.45)",borderRadius:"20px",color:"#a8885a",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",flexShrink:0,transition:"all 0.15s"},onMouseEnter:e=>{e.currentTarget.style.background="rgba(168,136,90,0.08)";},onMouseLeave:e=>{e.currentTarget.style.background="transparent";}},"✨ Subscribe"),
-          React.createElement("a",{href:PAYPAL_URL,target:"_blank",rel:"noopener",title:"Subscribe with PayPal",style:{display:"inline-flex",alignItems:"center",padding:"4px 9px",border:"1px solid rgba(26,157,217,0.45)",borderRadius:"20px",color:"#003087",fontSize:"0.76rem",fontFamily:"'Crimson Text',serif",textDecoration:"none",whiteSpace:"nowrap",flexShrink:0,transition:"all 0.15s"},onMouseEnter:e=>{e.currentTarget.style.background="rgba(26,157,217,0.08)";},onMouseLeave:e=>{e.currentTarget.style.background="transparent";}},"🅿 PayPal")
-        )
+        !isMobile&&!isSubscriber&&React.createElement("a",{href:STRIPE_URL,target:"_blank",rel:"noopener",style:{display:"inline-flex",alignItems:"center",padding:"4px 10px",border:"1px solid rgba(168,136,90,0.45)",borderRadius:"20px",color:"#a8885a",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"none",whiteSpace:"nowrap",flexShrink:0,transition:"all 0.15s"},onMouseEnter:e=>{e.currentTarget.style.background="rgba(168,136,90,0.08)";},onMouseLeave:e=>{e.currentTarget.style.background="transparent";}},"✨ Subscribe")
       ),
       React.createElement("div",{style:{display:"flex",gap:"6px",alignItems:"center",flexShrink:0}},
         saveStatus==="saved"&&React.createElement("span",{style:{fontSize:"0.75rem",color:"#89b08a"}},"✓"),
