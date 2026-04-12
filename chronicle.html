@@ -139,6 +139,27 @@ const TAG_COLORS = {
 };
 const STORAGE_KEY = "chronicle-v1";
 
+const SOURCE_TYPES = [
+  {id:"census",      label:"Census",          icon:"📋"},
+  {id:"vital",       label:"Vital record",    icon:"📜"},
+  {id:"newspaper",   label:"Newspaper",       icon:"📰"},
+  {id:"photograph",  label:"Photograph",      icon:"📷"},
+  {id:"directory",   label:"Directory",       icon:"📖"},
+  {id:"military",    label:"Military record", icon:"🎖"},
+  {id:"immigration", label:"Immigration",     icon:"⚓"},
+  {id:"probate",     label:"Probate / will",  icon:"⚖"},
+  {id:"church",      label:"Church record",   icon:"⛪"},
+  {id:"oral",        label:"Oral history",    icon:"🗣"},
+  {id:"dna",         label:"DNA",             icon:"🧬"},
+  {id:"other",       label:"Other",           icon:"📂"},
+];
+const SOURCE_CONFIDENCE = [
+  {id:"primary",    label:"Primary",    hint:"Original record created at the time of the event"},
+  {id:"secondary",  label:"Secondary",  hint:"Created after the event, or from memory"},
+  {id:"derivative", label:"Derivative", hint:"Transcription or extract of an original"},
+  {id:"unknown",    label:"Unknown",    hint:"Confidence not assessed"},
+];
+
 // ── Styles ─────────────────────────────────────────────────────
 const S = {
   input: { width:"100%", padding:"10px 13px", background:"rgba(255,252,245,0.9)", border:"1px solid #c8b89a", borderRadius:"2px", fontFamily:"'Crimson Text', serif", fontSize:"1rem", color:"#2c2416", outline:"none" },
@@ -224,7 +245,7 @@ function knownLocationValues(knownLocations, field) {
 }
 
 function newForm() {
-  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town" };
+  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], sourceIds:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town" };
 }
 
 // ── Storage ────────────────────────────────────────────────────
@@ -445,7 +466,7 @@ function seedData(data) { return data; }
 const EMPTY_DATA = { memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], orgLocations:{}, orgPeriods:{}, entityPhotos:{}, ownerName:"", ownerEmail:"" };
 
 function emptySubject(id, name, isSelf=false, mode=null) {
-  return { id, name, isSelf, mode, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{}, locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
+  return { id, name, isSelf, mode, dob:"", notes:"", memories:[], customTags:[], knownPeople:[], knownOrgs:[], knownLocations:[], knownSources:[], peopleEmails:{}, peopleRelationships:{}, peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{}, locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{}, personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null, backupPassword:"", legacyMessage:"" };
 }
 
 // ── Mode definitions ──────────────────────────────────────────
@@ -4396,9 +4417,120 @@ function ImportView({
   );
 }
  
+function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) {
+  const [editing, setEditing] = React.useState(null);
+  const [form, setForm] = React.useState({title:"", type:"other", confidence:"unknown", year:"", url:"", notes:""});
+
+  function startAdd() { setForm({title:"", type:"other", confidence:"unknown", year:"", url:"", notes:""}); setEditing("new"); }
+  function startEdit(src) { setForm({title:src.title||"", type:src.type||"other", confidence:src.confidence||"unknown", year:src.year?String(src.year):"", url:src.url||"", notes:src.notes||""}); setEditing(src.id); }
+
+  function saveSource() {
+    if (!form.title.trim()) return;
+    if (editing === "new") {
+      const s = {id:"src_"+Date.now(), ...form, year:form.year?+form.year:null};
+      persistSubject({knownSources:[...knownSources, s]});
+    } else {
+      persistSubject({knownSources: knownSources.map(s=>s.id===editing?{...s,...form,year:form.year?+form.year:null}:s)});
+    }
+    setEditing(null);
+  }
+
+  function deleteSource(id) {
+    if (!window.confirm("Remove this source? Memory links to it will remain but the source details will be lost.")) return;
+    persistSubject({knownSources: knownSources.filter(s=>s.id!==id)});
+  }
+
+  const confColors = {primary:"#4a7a4a", secondary:"#7a6a20", derivative:"#5a5a8a", unknown:"#8a7460"};
+  const typeInfo = t => SOURCE_TYPES.find(x=>x.id===t) || SOURCE_TYPES[SOURCE_TYPES.length-1];
+  const confInfo = c => SOURCE_CONFIDENCE.find(x=>x.id===c) || SOURCE_CONFIDENCE[3];
+  const countMems = id => memories.filter(m=>(m.sourceIds||[]).includes(id)).length;
+  const cardStyle = {background:"rgba(255,252,245,0.9)", border:"1px solid #d4c4a8", borderRadius:"4px", padding:"14px 16px", marginBottom:"10px"};
+
+  const editForm = () => React.createElement("div",{style:{...cardStyle, border:"1px solid #a8885a", marginBottom:"18px"}},
+    React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",margin:"0 0 14px",color:"#1a1208"}}, editing==="new"?"New Source":"Edit Source"),
+    React.createElement("div",{style:{display:"grid",gap:"10px"}},
+      React.createElement("div",null,
+        React.createElement("label",{style:S.label},"Title *"),
+        React.createElement("input",{value:form.title,onChange:e=>setForm(f=>({...f,title:e.target.value})),placeholder:"e.g. 1901 England Census, Smith family photograph",style:S.input,autoFocus:true})
+      ),
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}},
+        React.createElement("div",null,
+          React.createElement("label",{style:S.label},"Type"),
+          React.createElement("select",{value:form.type,onChange:e=>setForm(f=>({...f,type:e.target.value})),style:S.select},
+            SOURCE_TYPES.map(t=>React.createElement("option",{key:t.id,value:t.id},t.icon+" "+t.label))
+          )
+        ),
+        React.createElement("div",null,
+          React.createElement("label",{style:S.label},"Confidence"),
+          React.createElement("select",{value:form.confidence,onChange:e=>setForm(f=>({...f,confidence:e.target.value})),style:S.select,title:confInfo(form.confidence)?.hint},
+            SOURCE_CONFIDENCE.map(c=>React.createElement("option",{key:c.id,value:c.id,title:c.hint},c.label))
+          )
+        )
+      ),
+      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"100px 1fr",gap:"8px"}},
+        React.createElement("div",null,
+          React.createElement("label",{style:S.label},"Year"),
+          React.createElement("input",{type:"text",inputMode:"numeric",value:form.year,onChange:e=>setForm(f=>({...f,year:e.target.value.replace(/[^0-9]/g,"")})),placeholder:"e.g. 1901",style:S.input})
+        ),
+        React.createElement("div",null,
+          React.createElement("label",{style:S.label},"URL"),
+          React.createElement("input",{type:"url",value:form.url,onChange:e=>setForm(f=>({...f,url:e.target.value})),placeholder:"https://…",style:S.input})
+        )
+      ),
+      React.createElement("div",null,
+        React.createElement("label",{style:S.label},"Notes"),
+        React.createElement("textarea",{value:form.notes,onChange:e=>setForm(f=>({...f,notes:e.target.value})),placeholder:"Repository, call number, transcript notes…",rows:2,style:{...S.input,resize:"vertical"}})
+      )
+    ),
+    React.createElement("div",{style:{display:"flex",gap:"8px",marginTop:"12px"}},
+      React.createElement("button",{onClick:saveSource,disabled:!form.title.trim(),style:{...S.btn,opacity:form.title.trim()?1:0.45}},"Save"),
+      React.createElement("button",{onClick:()=>setEditing(null),style:S.btnOutline},"Cancel")
+    )
+  );
+
+  return React.createElement("div",null,
+    React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"18px"}},
+      React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic",fontSize:"0.9rem",margin:0}},
+        knownSources.length===0?"No sources yet.":knownSources.length+" source"+(knownSources.length===1?"":"s")
+      ),
+      React.createElement("button",{onClick:startAdd,style:{...S.btn,padding:"6px 14px",fontSize:"0.88rem"}},"+ Add Source")
+    ),
+    editing&&editForm(),
+    knownSources.length===0&&!editing
+      ? React.createElement("div",{style:{textAlign:"center",padding:"40px 0",color:"#7a6a58"}},
+          React.createElement("p",{style:{fontSize:"1.6rem",margin:"0 0 8px"}},"📚"),
+          React.createElement("p",{style:{margin:0,fontStyle:"italic"}},"Sources help you track where information came from — census records, photographs, oral history…")
+        )
+      : knownSources.map(src=>{
+          const ti=typeInfo(src.type), ci=confInfo(src.confidence), mc=countMems(src.id);
+          const cc=confColors[src.confidence||"unknown"];
+          return React.createElement("div",{key:src.id,style:cardStyle},
+            React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:"10px"}},
+              React.createElement("span",{style:{fontSize:"1.3rem",lineHeight:1,flexShrink:0,marginTop:"2px"}},ti.icon),
+              React.createElement("div",{style:{flex:1,minWidth:0}},
+                React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap"}},
+                  React.createElement("span",{style:{fontFamily:"'Crimson Text',serif",fontSize:"1rem",color:"#1a1208",fontWeight:600}},src.title),
+                  src.year&&React.createElement("span",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic"}},src.year),
+                  React.createElement("span",{style:{fontSize:"0.7rem",padding:"1px 7px",borderRadius:"20px",background:cc+"22",color:cc,border:"1px solid "+cc+"55"}},ci.label)
+                ),
+                React.createElement("div",{style:{fontSize:"0.8rem",color:"#7a6a58",marginTop:"2px"}},ti.label),
+                src.url&&React.createElement("a",{href:src.url,target:"_blank",rel:"noopener",style:{fontSize:"0.78rem",color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)",display:"inline-block",marginTop:"3px",wordBreak:"break-all"}},src.url),
+                src.notes&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"4px 0 0",lineHeight:1.5}},src.notes)
+              ),
+              React.createElement("div",{style:{display:"flex",gap:"6px",flexShrink:0,alignItems:"flex-start"}},
+                mc>0&&React.createElement("button",{onClick:()=>setIndexFilter({type:"sources",value:src.title,sourceId:src.id}),style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"20px",padding:"2px 10px",fontSize:"0.76rem",color:"#6a5840",cursor:"pointer",fontFamily:"'Crimson Text',serif"}},mc+" "+(mc===1?"entry":"entries")),
+                React.createElement("button",{onClick:()=>startEdit(src),style:{background:"none",border:"none",cursor:"pointer",color:"#8a7460",fontSize:"0.8rem",padding:"2px 4px"}},"Edit"),
+                React.createElement("button",{onClick:()=>deleteSource(src.id),style:{background:"none",border:"none",cursor:"pointer",color:"#c4858a",fontSize:"0.8rem",padding:"2px 4px"}},"×")
+              )
+            )
+          );
+        })
+  );
+}
+
 function DetailView({
   selected, memories, isMobile,
-  peopleEmails, personOrgs, shareHistory,
+  peopleEmails, personOrgs, shareHistory, knownSources,
   isSubscriber, ownerName, ownerEmail, localConnections,
   handleEdit, handleDelete, handleSavePerspectives,
   recordShare, removeShareRecord, toggleLegacy,
@@ -4453,6 +4585,25 @@ function DetailView({
     // ── Content ──
     m.content&&React.createElement("div",{style:{lineHeight:"1.85",fontSize:"1.1rem",whiteSpace:"pre-wrap",borderLeft:"3px solid #c8b89a",paddingLeft:"20px",color:"#2c2416",marginBottom:"28px"}},linkify(m.content)),
  
+    // ── Sources ──
+    (()=>{
+      const mSources = (m.sourceIds||[]).map(id=>(knownSources||[]).find(s=>s.id===id)).filter(Boolean);
+      if (!mSources.length) return null;
+      return React.createElement("div",{style:{marginBottom:"22px"}},
+        React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontFamily:"'Crimson Text',serif",letterSpacing:"0.06em",textTransform:"uppercase",margin:"0 0 8px"}},mSources.length===1?"Source":"Sources"),
+        React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
+          mSources.map(src=>{
+            const ti = SOURCE_TYPES.find(x=>x.id===src.type)||SOURCE_TYPES[SOURCE_TYPES.length-1];
+            return React.createElement("span",{key:src.id,style:{display:"inline-flex",alignItems:"center",gap:"5px",padding:"4px 10px",borderRadius:"3px",background:"rgba(196,169,98,0.1)",border:"1px solid rgba(196,169,98,0.35)",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",color:"#5a4820"}},
+              ti.icon,
+              src.url ? React.createElement("a",{href:src.url,target:"_blank",rel:"noopener",style:{color:"#5a4820",textDecoration:"none",borderBottom:"1px solid rgba(90,72,32,0.3)"}},src.title) : src.title,
+              src.year&&React.createElement("span",{style:{opacity:0.6,fontSize:"0.75rem"}},src.year)
+            );
+          })
+        )
+      );
+    })(),
+
     // ── Perspectives panel ──
     (m.sharedBy||(m.perspectives&&m.perspectives.length>0))&&React.createElement(PerspectivesPanel,{
       memory:m,
@@ -4492,7 +4643,7 @@ function DetailView({
 function AddEditForm({
   view, form, updateForm, editingId,
   handleSubmit, handleMedia, fileInputRef,
-  knownPeople, knownOrgs, knownLocations,
+  knownPeople, knownOrgs, knownLocations, knownSources,
   peopleEmails, peopleRelationships, personGroups,
   customTags, addCustomTag, removeCustomTag,
   wantPublicProfile, persistSubject,
@@ -4509,6 +4660,7 @@ function AddEditForm({
     if ((form.orgs||[]).length) s.add("orgs");
     if ((form.mediaUrls||[]).length) s.add("photos");
     if (form.visibility && form.visibility !== "private") s.add("visibility");
+    if ((form.sourceIds||[]).length) s.add("sources");
     return s;
   });
   const toggle = k => setExpanded(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
@@ -4604,6 +4756,7 @@ function AddEditForm({
       secToggle("people",    "People",        "\ud83d\udc64"),
       secToggle("orgs",      "Organisation",  "\ud83c\udfdb"),
       secToggle("photos",    "Photos",        "\ud83d\uddbc"),
+      knownSources&&knownSources.length>0&&secToggle("sources", "Sources", "\ud83d\udcda"),
       wantPublicProfile&&secToggle("visibility","Visibility",  "\ud83d\udd12")
     ),
 
@@ -4677,6 +4830,29 @@ function AddEditForm({
       ),
       React.createElement("input",{ref:fileInputRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:handleMedia})
     )),
+
+    // ── Sources ──
+    expanded.has("sources")&&sec((()=>{
+      const srcIds = form.sourceIds || [];
+      return React.createElement("div",null,
+        React.createElement("label",{style:S.label},"Sources"),
+        React.createElement("p",{style:{fontSize:"0.76rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 8px"}},"Which records or sources support this entry?"),
+        (knownSources||[]).length===0
+          ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic"}},"No sources yet \u2014 add sources in the Sources tab of the Index.")
+          : React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"6px"}},
+              (knownSources||[]).map(src=>{
+                const ti = SOURCE_TYPES.find(x=>x.id===src.type)||SOURCE_TYPES[SOURCE_TYPES.length-1];
+                const on = srcIds.includes(src.id);
+                return React.createElement("label",{key:src.id,style:{display:"flex",alignItems:"center",gap:"9px",cursor:"pointer",userSelect:"none",padding:"7px 10px",borderRadius:"3px",background:on?"rgba(196,169,98,0.12)":"transparent",border:on?"1px solid rgba(196,169,98,0.4)":"1px solid transparent",transition:"all 0.15s"}},
+                  React.createElement("input",{type:"checkbox",checked:on,onChange:()=>updateForm({sourceIds:on?srcIds.filter(id=>id!==src.id):[...srcIds,src.id]}),style:{accentColor:"#2c2416",cursor:"pointer",flexShrink:0}}),
+                  React.createElement("span",{style:{fontSize:"0.95rem"}},ti.icon),
+                  React.createElement("span",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",color:"#2c2416"}},src.title),
+                  src.year&&React.createElement("span",{style:{fontSize:"0.76rem",color:"#8a7460",marginLeft:"auto"}},src.year)
+                );
+              })
+            )
+      );
+    })()),
 
     // ── Visibility ──
     expanded.has("visibility")&&wantPublicProfile&&sec(React.createElement("div",null,
@@ -4762,6 +4938,7 @@ function App() {
   const customTags          = subject.customTags || [];
   const knownPeople         = subject.knownPeople || [];
   const knownOrgs           = subject.knownOrgs || [];
+  const knownSources        = subject.knownSources || [];
   const locationNotes = subject.locationNotes || {};
   // Migrate: absorb any coords stored in the legacy label-keyed dict into the location objects.
   // After migration, coords live on knownLocations[i].coords so the label is free to change
@@ -4971,7 +5148,7 @@ function App() {
   // persist: legacy-compatible — detects if patch is subject-level or top-level
   function persist(patch) {
     // If patch contains subject-level keys, route to persistSubject
-    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","locationCoords","orgLocations","orgPeriods","orgNotes","entityPhotos","personOrgs","personLocations","personGroups"]);
+    const subjectKeys = new Set(["memories","customTags","knownPeople","knownOrgs","knownLocations","knownSources","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","locationNotes","locationCoords","orgLocations","orgPeriods","orgNotes","entityPhotos","personOrgs","personLocations","personGroups"]);
     const isSubjectPatch = Object.keys(patch).some(k => subjectKeys.has(k));
     if (isSubjectPatch) {
       // strip any top-level only keys before passing to persistSubject
@@ -5567,7 +5744,7 @@ function handleEdit(m) {
         entityPhotosWithMedia[key] = med;
       }
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, orgLocations, orgPeriods, entityPhotos:entityPhotosWithMedia, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, // Top-level profile & settings fields
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, knownPeople, knownOrgs, knownLocations, knownSources, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, orgLocations, orgPeriods, entityPhotos:entityPhotosWithMedia, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, // Top-level profile & settings fields
     wantPublicProfile:data.wantPublicProfile||false, profileAbout:data.profileAbout||"", profileImageUrl:data.profileImageUrl||"", allowFollowers:data.allowFollowers!==false, profilePrivacy:data.profilePrivacy||"open", profileDisplayName:data.profileDisplayName||"", carerMode:data.carerMode||false, carerName:data.carerName||"", carerEmail:data.carerEmail||"", suppressConnectRequests:data.suppressConnectRequests||[]}, null, 2);
   }
 
@@ -6216,6 +6393,9 @@ function handleEdit(m) {
       const mergedTags=[...new Set([...customTags,...(d.customTags||[])])];
       const backupLocs=d.knownLocations||[...new Set(d.memories.flatMap(m=>[m.location,...(m.locations||[])].filter(Boolean)))];
       const mergedLocs=[...new Set([...knownLocations,...backupLocs])].sort();
+      const backupSources=d.knownSources||[];
+      const existingSrcIds=new Set(knownSources.map(s=>s.id));
+      const mergedSources=[...knownSources,...backupSources.filter(s=>!existingSrcIds.has(s.id))];
       const updatedPeopleEmails = {...(peopleEmails||{})};
       if (senderName && senderEmail) updatedPeopleEmails[senderName] = senderEmail;
       const mergedRelationships = {...(d.peopleRelationships||{}), ...(data.peopleRelationships||{})};
@@ -6238,7 +6418,7 @@ function handleEdit(m) {
         }
       }));
       // Use functional setData to avoid stale closure — importBackup runs inside async FileReader callback
-      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,orgLocations:mergedOrgLocations,orgPeriods:mergedOrgPeriods,entityPhotos:mergedEntityPhotos,locationNotes:mergedLocationNotes,locationCoords:mergedLocationCoords,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,lastImport:new Date().toISOString()};
+      const subjectPatch = {memories:finalMems,knownPeople:mergedPeople,knownOrgs:mergedOrgs,knownSources:mergedSources,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,orgLocations:mergedOrgLocations,orgPeriods:mergedOrgPeriods,entityPhotos:mergedEntityPhotos,locationNotes:mergedLocationNotes,locationCoords:mergedLocationCoords,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,lastImport:new Date().toISOString()};
       setData(prev => {
         const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
         const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
@@ -6983,6 +7163,7 @@ function handleEdit(m) {
           {id:"relationships", label:"🔗 Relationships", items:[], getCount:()=>0},
           {id:"groups", label:"👥 Groups", items:[], getCount:()=>0},
           {id:"tags", label:"🏷 Tags", items:allTags, getCount:v=>memories.filter(m=>m.tags?.includes(v)).length},
+          {id:"sources", label:"📚 Sources", items:knownSources, getCount:()=>0},
         ];
         const activeTab = tabs.find(t=>t.id===indexTab)||tabs[0];
 
@@ -6995,6 +7176,7 @@ function handleEdit(m) {
             if(indexFilter.type==="tags") return m.tags?.includes(indexFilter.value);
             if(indexFilter.type==="relationships") return (indexFilter.people||[]).some(p=>m.people?.includes(p));
             if(indexFilter.type==="groups") return (indexFilter.people||[]).some(p=>m.people?.includes(p));
+            if(indexFilter.type==="sources") return (m.sourceIds||[]).includes(indexFilter.sourceId);
             return false;
           }).sort((a,b)=>sortKey(a)-sortKey(b));
           return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
@@ -7042,6 +7224,8 @@ function handleEdit(m) {
             ? React.createElement(GroupsManager,{personGroups,knownPeople,memories,
                 onSetGroups:setPersonGroups,
                 onViewGroup:(name,people)=>setIndexFilter({type:"groups",value:name,people})})
+            : indexTab==="sources"
+            ? React.createElement(SourcesPanel,{knownSources,memories,persistSubject,setIndexFilter})
             // Tags: pill grid
             : activeTab.items.length===0
             ? React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"Nothing here yet.")
@@ -7570,7 +7754,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
 
       view==="detail"&&selected&&React.createElement(DetailView,{
         selected, memories, isMobile,
-        peopleEmails, personOrgs, shareHistory,
+        peopleEmails, personOrgs, shareHistory, knownSources,
         isSubscriber, ownerName, ownerEmail, localConnections,
         handleEdit, handleDelete, handleSavePerspectives,
         recordShare, removeShareRecord, toggleLegacy,
@@ -7578,7 +7762,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
       (view==="add"||view==="edit")&&React.createElement(AddEditForm,{
         view, form, updateForm, editingId,
         handleSubmit, handleMedia, fileInputRef,
-        knownPeople, knownOrgs, knownLocations,
+        knownPeople, knownOrgs, knownLocations, knownSources,
         peopleEmails, peopleRelationships, personGroups,
         customTags, addCustomTag, removeCustomTag,
         wantPublicProfile, persistSubject,
