@@ -7291,6 +7291,25 @@ function handleEdit(m) {
     }
   }, [view, scrollToDecade]);
 
+  // ── Delivery polling ─────────────────────────────────────────
+  // Check for pending deliveries every 5 minutes without clearing the queue.
+  React.useEffect(() => {
+    if (!ownerEmail) return;
+    async function poll() {
+      try {
+        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ownerEmail.trim().toLowerCase()));
+        const emailHash = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+        const r = await fetch(WORKER_URL + "/my/deliveries/count?emailHash=" + emailHash);
+        if (!r.ok) return;
+        const d = await r.json();
+        if (typeof d.count === "number") setShareBadgeCount(d.count);
+      } catch {}
+    }
+    poll(); // immediate check on mount / email change
+    const id = setInterval(poll, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [ownerEmail]);
+
   // ── Navigation ───────────────────────────────────────────────
   function goBack() {
     if (view==="index" && indexFilter) { setIndexFilter(null); return; }

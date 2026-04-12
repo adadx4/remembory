@@ -1390,6 +1390,21 @@ export default {
       }
     }
 
+    // GET /my/deliveries/count?emailHash=... — return pending count without clearing
+    if (request.method === "GET" && path === "/my/deliveries/count") {
+      try {
+        const emailHash = url.searchParams.get("emailHash") || "";
+        if (!/^[0-9a-f]{64}$/.test(emailHash)) return json({ error: "Invalid emailHash" }, 400);
+        const raw = await env.SHARES.get("deliveries:" + emailHash);
+        if (!raw) return json({ count: 0 });
+        const arr = JSON.parse(raw);
+        const count = arr.length; // count by delivery batch; full memory count resolved on fetch
+        return json({ count });
+      } catch (e) {
+        return json({ error: "Server error: " + e.message }, 500);
+      }
+    }
+
     // POST /my/deliveries/fetch — retrieve and clear pending deliveries for an email address
     if (request.method === "POST" && path === "/my/deliveries/fetch") {
       try {
