@@ -944,7 +944,17 @@
 
 <!-- Nav -->
 <ul class="nav-links">
-  <li><a href="https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02" target="_blank" rel="noopener" style="font-size:0.88rem;color:#a8885a;text-decoration:none;border-bottom:1px solid rgba(168,136,90,0.4);">✨ Subscribe</a></li>
+  <li style="display:flex;align-items:center;gap:6px;font-size:0.88rem;font-family:'Crimson Text',serif;">
+    <span style="color:#a8885a;">✨</span>
+    <span id="nav-sub-toggle">
+      <a href="#" onclick="event.preventDefault();document.getElementById('nav-sub-toggle').style.display='none';document.getElementById('nav-sub-options').style.display='inline-flex';" style="color:#a8885a;text-decoration:none;border-bottom:1px solid rgba(168,136,90,0.4);">Subscribe</a>
+    </span>
+    <span id="nav-sub-options" style="display:none;gap:8px;align-items:center;">
+      <a href="https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02" target="_blank" rel="noopener" style="color:#a8885a;text-decoration:none;border-bottom:1px solid rgba(168,136,90,0.4);">💳 Card</a>
+      <span style="color:#c8b89a;">·</span>
+      <a href="https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-05R23708A75872801NHNR24Q&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net" target="_blank" rel="noopener" style="color:#003087;text-decoration:none;border-bottom:1px solid rgba(0,48,135,0.3);">🅿 PayPal</a>
+    </span>
+  </li>
   <li><a href="https://remembory.net/chronicle.html" target="_blank" rel="noopener" class="nav-cta">Your Private Chronicle</a></li>
 </ul>
 
