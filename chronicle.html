@@ -2583,7 +2583,7 @@ async function geocode(name, cache) {
 }
 
 // ── MapView component ──────────────────────────────────────────
-function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords, knownLocations }) {
+function MapView({ memories, onSelectLocation, onSelectMemory, locationCoords, onSaveCoords, knownLocations }) {
   // Build a map from label → structured address for better geocoding
   const knownLocMap = React.useMemo(() => {
     const m = {};
@@ -2594,6 +2594,7 @@ function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords, kno
   const mapInstanceRef = useRef(null);
   const [status, setStatus] = useState(""); // loading message
   const [geocodeCache, setGeocodeCache] = useState(loadGeocodeCache);
+  const [selectedLoc, setSelectedLoc] = useState(null);
   const [useEnglish, setUseEnglish] = useState(true);
   const tileLayers = React.useRef({});
 
@@ -2681,12 +2682,7 @@ function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords, kno
         });
 
         const marker = L.marker([coords.lat, coords.lng], { icon }).addTo(map);
-        const popupContent = `
-          <h4>${loc}</h4>
-          <p>${count} ${count===1?"memory":"memories"}</p>
-          <button onclick="window._chronicleSelectLocation('${loc.replace(/'/g,"\\'")}')">View memories →</button>
-        `;
-        marker.bindPopup(popupContent);
+        marker.on("click", () => window._chronicleSetSelectedLoc(loc));
         markers.push(marker);
       }
 
@@ -2711,16 +2707,14 @@ function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords, kno
       }
     }
 
-    // Expose callback for popup buttons
-    window._chronicleSelectLocation = (loc) => {
-      onSelectLocation(loc);
-    };
+    // Expose callback for pin clicks (stable setSelectedLoc doesn't need cleanup re-registration)
+    window._chronicleSetSelectedLoc = (loc) => setSelectedLoc(loc);
 
     placePins();
 
     return () => {
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
-      delete window._chronicleSelectLocation;
+      delete window._chronicleSetSelectedLoc;
     };
   }, []); // only run once on mount
 
@@ -2734,7 +2728,7 @@ function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords, kno
         )
       : React.createElement("div",null,
           React.createElement("div", {ref:mapRef, className:"chronicle-map"}),
-          React.createElement("div",{style:{display:"flex",gap:"16px",marginTop:"10px",fontSize:"0.8rem",color:"#8a7460"}},
+          React.createElement("div",{style:{display:"flex",gap:"16px",marginTop:"10px",fontSize:"0.8rem",color:"#8a7460",flexWrap:"wrap"}},
             React.createElement("span",null,
               React.createElement("span",{style:{display:"inline-block",width:"12px",height:"12px",borderRadius:"50%",background:"#c8a87a",border:"2px solid #2c2416",verticalAlign:"middle",marginRight:"5px"}}),
               "Primary location"
@@ -2754,6 +2748,40 @@ function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords, kno
               },
               style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.78rem",marginLeft:"auto",whiteSpace:"nowrap"}
             }, useEnglish ? "Switch to local names" : "Switch to English names")
+          ),
+          // ── Location detail panel ──
+          selectedLoc&&React.createElement("div",{style:{marginTop:"14px",border:"1px solid #c8b89a",borderRadius:"4px",background:"rgba(255,252,245,0.97)",padding:"14px 16px"}},
+            React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:"8px",marginBottom:"10px"}},
+              React.createElement("div",{style:{flex:1}},
+                React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.15rem",color:"#1a1208",margin:"0 0 3px"}},selectedLoc),
+                (()=>{const kl=knownLocMap[selectedLoc];if(!kl)return null;const parts=[kl.street,kl.town,kl.state,kl.country].filter(Boolean);return parts.length?React.createElement("p",{style:{margin:"0 0 2px",fontSize:"0.8rem",color:"#8a7460"}},parts.join(", ")):null;})(),
+                geocodeCache[selectedLoc]&&React.createElement("p",{style:{margin:"0",fontSize:"0.72rem",color:"#a89a7a",fontStyle:"italic"}},
+                  `📍 ${geocodeCache[selectedLoc].lat?.toFixed(5)}, ${geocodeCache[selectedLoc].lng?.toFixed(5)}`)
+              ),
+              React.createElement("button",{onClick:()=>setSelectedLoc(null),style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1.1rem",padding:"0 4px",lineHeight:1}},"×")
+            ),
+            // Memory list
+            (locationMemories[selectedLoc]||[]).length===0
+              ? React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",fontSize:"0.88rem",margin:"0"}},"No memories at this location.")
+              : React.createElement("div",null,
+                  (locationMemories[selectedLoc]||[]).slice(0,7).map(m=>
+                    React.createElement("div",{key:m.id,
+                      onClick:()=>onSelectMemory&&onSelectMemory(m.id),
+                      style:{padding:"7px 0",borderTop:"1px solid #ede5d4",cursor:onSelectMemory?"pointer":"default",fontSize:"0.9rem",color:"#2c2416",display:"flex",alignItems:"baseline",gap:"8px"},
+                      onMouseEnter:e=>{ if(onSelectMemory) e.currentTarget.style.color="#a8885a"; },
+                      onMouseLeave:e=>{ e.currentTarget.style.color="#2c2416"; }
+                    },
+                      React.createElement("span",{style:{fontSize:"0.72rem",color:"#a89a7a",flexShrink:0,minWidth:"38px"}},m.date?.year||""),
+                      m.title
+                    )
+                  ),
+                  (locationMemories[selectedLoc]||[]).length>7&&React.createElement("p",{style:{margin:"6px 0 0",fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},
+                    `+ ${(locationMemories[selectedLoc]).length-7} more`)
+                ),
+            React.createElement("div",{style:{display:"flex",gap:"8px",marginTop:"12px",flexWrap:"wrap"}},
+              React.createElement("button",{onClick:()=>onSelectLocation(selectedLoc),style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem"}},"View all in Index →"),
+              React.createElement("button",{onClick:()=>onSelectLocation(selectedLoc),style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem"}},"Edit location →")
+            )
           )
         )
   );
@@ -4647,6 +4675,20 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
   const [depthUp, setDepthUp] = React.useState(3);
   const [depthDown, setDepthDown] = React.useState(2);
   const [personDetail, setPersonDetail] = React.useState(null); // tpId for detail panel
+  const [treePan, setTreePan] = React.useState({x:0,y:0});
+  const [treeZoom, setTreeZoom] = React.useState(1);
+  const treeContainerRef = React.useRef(null);
+  const treeDragging = React.useRef(null);
+
+  // Reset pan/zoom when focal changes
+  React.useEffect(()=>{ setTreePan({x:0,y:0}); setTreeZoom(1); },[focalId]);
+  // Non-passive wheel listener for zoom
+  React.useEffect(()=>{
+    const el=treeContainerRef.current; if(!el) return;
+    const onWh=e=>{ e.preventDefault(); setTreeZoom(z=>Math.max(0.25,Math.min(3,e.deltaY<0?z*1.1:z*0.9))); };
+    el.addEventListener("wheel",onWh,{passive:false});
+    return ()=>el.removeEventListener("wheel",onWh);
+  });
 
   // Keep focalId in sync when gedFocalPersonId changes (e.g. after fresh import)
   React.useEffect(()=>{ if(gedFocalPersonId) setFocalId(gedFocalPersonId); },[gedFocalPersonId]);
@@ -4724,11 +4766,20 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       if(!byGen[g]) byGen[g]=[];
       byGen[g].push(id);
     });
-    // Sort each row: spouses adjacent, then by birth year
-    Object.values(byGen).forEach(arr=>arr.sort((a,b)=>{
-      const pa=tpById[a], pb=tpById[b];
-      return (parseInt(pa?.dob)||9999)-(parseInt(pb?.dob)||9999)||pa?.name.localeCompare(pb?.name||"");
-    }));
+    // Sort each row: birth year first, then pull spouses adjacent
+    Object.values(byGen).forEach(arr=>{
+      arr.sort((a,b)=>{
+        const pa=tpById[a],pb=tpById[b];
+        return (parseInt(pa?.dob)||9999)-(parseInt(pb?.dob)||9999)||(pa?.name||"").localeCompare(pb?.name||"");
+      });
+      const inRow=new Set(arr); const done=new Set(); const ordered=[];
+      for(const id of arr){
+        if(done.has(id)) continue;
+        done.add(id); ordered.push(id);
+        (spousesOf[id]||[]).filter(sid=>inRow.has(sid)&&!done.has(sid)).forEach(sid=>{done.add(sid);ordered.push(sid);});
+      }
+      arr.length=0; ordered.forEach(id=>arr.push(id));
+    });
 
     const NW=130,NH=80,HG=20,VG=60;
     const maxRow = Math.max(1,...Object.values(byGen).map(a=>a.length));
@@ -4833,9 +4884,16 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
         )
       ),
 
-      // Tree canvas
-      React.createElement("div",{style:{overflowX:"auto",border:"1px solid #d4c4a8",borderRadius:"4px",background:"rgba(255,252,245,0.4)"}},
-        React.createElement("div",{style:{position:"relative",width:cvW+"px",height:cvH+"px",minWidth:"100%"}},
+      // Tree canvas — pan (drag) + zoom (scroll wheel / pinch)
+      React.createElement("div",{
+        ref:treeContainerRef,
+        style:{position:"relative",overflow:"hidden",border:"1px solid #d4c4a8",borderRadius:"4px",background:"rgba(255,252,245,0.4)",height:"520px",cursor:treeDragging.current?"grabbing":"grab",userSelect:"none",touchAction:"none"},
+        onPointerDown:e=>{ e.currentTarget.setPointerCapture(e.pointerId); treeDragging.current={sx:e.clientX-treePan.x,sy:e.clientY-treePan.y}; },
+        onPointerMove:e=>{ if(!treeDragging.current) return; setTreePan({x:e.clientX-treeDragging.current.sx,y:e.clientY-treeDragging.current.sy}); },
+        onPointerUp:()=>{ treeDragging.current=null; },
+        onPointerLeave:()=>{ treeDragging.current=null; }
+      },
+        React.createElement("div",{style:{position:"absolute",top:0,left:0,width:cvW+"px",height:cvH+"px",transform:`translate(${treePan.x}px,${treePan.y}px) scale(${treeZoom})`,transformOrigin:"0 0"}},
           React.createElement("svg",{style:{position:"absolute",top:0,left:0,width:"100%",height:"100%",pointerEvents:"none"},viewBox:`0 0 ${cvW} ${cvH}`},
             edges.map((e,i)=>{
               if(e.type==="spouse") return React.createElement("line",{key:i,x1:e.x1,y1:e.y1,x2:e.x2,y2:e.y2,stroke:"#e8a87a",strokeWidth:1.5,strokeDasharray:"4 3"});
@@ -4851,7 +4909,7 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
             const linked = hasSubject ? subjects.find(s=>s.id===tp.subjectId) : null;
             const isActive = linked && linked.id===activeSubjectId;
             return React.createElement("div",{key:id,
-              onClick:()=>setPersonDetail(id),
+              onClick:e=>{ e.stopPropagation(); setPersonDetail(id); },
               style:{
                 position:"absolute",left:p.x+"px",top:p.y+"px",
                 width:NW+"px",height:NH+"px",
@@ -4859,7 +4917,6 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
                 border:isFocal?"2px solid #2c2416":hasSubject?"2px solid rgba(196,169,98,0.8)":"1px solid #d4c4a8",
                 borderRadius:"4px",padding:"6px 8px",cursor:"pointer",boxSizing:"border-box",
                 boxShadow:isFocal?"0 3px 12px rgba(0,0,0,0.2)":isActive?"0 2px 8px rgba(196,169,98,0.4)":"none",
-                transition:"all 0.15s"
               },
               onMouseEnter:e=>{if(!isFocal)e.currentTarget.style.borderColor="#a8885a";},
               onMouseLeave:e=>{if(!isFocal)e.currentTarget.style.borderColor=hasSubject?"rgba(196,169,98,0.8)":"#d4c4a8";}
@@ -4872,9 +4929,15 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
               tp.birthPlace&&React.createElement("div",{style:{fontSize:"0.64rem",color:isFocal?"rgba(245,240,232,0.5)":"#a89a7a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:"2px"}},tp.birthPlace.split(",")[0])
             );
           })
+        ),
+        // Zoom controls overlay
+        React.createElement("div",{style:{position:"absolute",bottom:"10px",right:"10px",display:"flex",gap:"4px",zIndex:10}},
+          React.createElement("button",{onPointerDown:e=>e.stopPropagation(),onClick:()=>setTreeZoom(z=>Math.min(3,z*1.2)),style:{width:"28px",height:"28px",border:"1px solid #c8b89a",borderRadius:"3px",background:"rgba(255,252,245,0.95)",cursor:"pointer",fontSize:"1rem",lineHeight:1}},"+"),
+          React.createElement("button",{onPointerDown:e=>e.stopPropagation(),onClick:()=>setTreeZoom(z=>Math.max(0.25,z*0.8)),style:{width:"28px",height:"28px",border:"1px solid #c8b89a",borderRadius:"3px",background:"rgba(255,252,245,0.95)",cursor:"pointer",fontSize:"1rem",lineHeight:1}},"−"),
+          React.createElement("button",{onPointerDown:e=>e.stopPropagation(),onClick:()=>{setTreePan({x:0,y:0});setTreeZoom(1);},style:{padding:"0 8px",height:"28px",border:"1px solid #c8b89a",borderRadius:"3px",background:"rgba(255,252,245,0.95)",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.78rem",color:"#8a7460"}},"\u21ba Fit")
         )
       ),
-      React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"8px",textAlign:"center"}},"Click any card for details · Use generation controls to adjust depth · ↑ ancestors shown, ↓ descendants shown")
+      React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"8px",textAlign:"center"}},"Drag to pan · Scroll to zoom · Click any card for details")
     );
   }
 
@@ -8053,7 +8116,8 @@ function handleEdit(m) {
             setIndexFilter({type:"locations",value:loc});
             setIndexTab("locations");
             setView("index");
-          }
+          },
+          onSelectMemory: id => { setSelected(id); setView("detail"); }
         })
       ),
 
