@@ -88,6 +88,42 @@ function SubscribePill() {
   return React.createElement("button",{onClick:()=>setOpen(true),style:{...pill,cursor:"pointer",background:"transparent",color:"#a8885a"}},"✨ Subscribe");
 }
 
+// ── Dropdown nav menu ──────────────────────────────────────────
+function NavDropdown({label, items, isActive, badge}) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(()=>{
+    if (!open) return;
+    function h(e){ if(ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    function k(e){ if(e.key==="Escape") setOpen(false); }
+    document.addEventListener("mousedown",h);
+    document.addEventListener("keydown",k);
+    return ()=>{ document.removeEventListener("mousedown",h); document.removeEventListener("keydown",k); };
+  },[open]);
+  const btnStyle={padding:"7px 12px",border:"1px solid",borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",background:isActive||open?"#2c2416":"transparent",color:isActive||open?"#f5f0e8":"#8a7460",borderColor:isActive||open?"#2c2416":"#c8b89a",whiteSpace:"nowrap",position:"relative"};
+  const menuStyle={position:"absolute",top:"calc(100% + 4px)",right:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"3px",boxShadow:"0 4px 20px rgba(26,18,8,0.14)",minWidth:"180px",zIndex:500,overflow:"hidden"};
+  return React.createElement("div",{ref,style:{position:"relative"}},
+    React.createElement("button",{onClick:()=>setOpen(o=>!o),style:btnStyle},
+      label,
+      React.createElement("span",{style:{marginLeft:"5px",fontSize:"0.6rem",opacity:0.55}},"▾"),
+      badge>0&&React.createElement("span",{style:{position:"absolute",top:"-5px",right:"-5px",background:"#4a7a5a",color:"#fff",borderRadius:"50%",width:"16px",height:"16px",fontSize:"0.65rem",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif",fontWeight:600,lineHeight:1}},badge)
+    ),
+    open&&React.createElement("div",{style:menuStyle},
+      items.map((item,i)=>{
+        if(item.divider) return React.createElement("div",{key:i,style:{height:"1px",background:"#e8dcc8",margin:"3px 0"}});
+        const locked=item.subOnly&&item.disabled;
+        const iStyle={display:"flex",alignItems:"center",gap:"6px",width:"100%",padding:"9px 16px",border:"none",background:item.active?"rgba(44,36,22,0.07)":"transparent",textAlign:"left",cursor:locked?"default":"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.9rem",color:locked?"#b8a890":item.active?"#1a1208":"#2c2416",fontWeight:item.active?600:400,textDecoration:"none",boxSizing:"border-box"};
+        const inner=React.createElement(React.Fragment,null,
+          React.createElement("span",{style:{flex:1}},item.label),
+          locked&&React.createElement("span",{style:{fontSize:"0.68rem",color:"#c8b89a",fontStyle:"italic"}},"🔒 sub")
+        );
+        if(item.href) return React.createElement("a",{key:i,href:item.href,target:item.external?"_blank":undefined,rel:item.external?"noopener":undefined,style:{...iStyle,display:"flex"},onClick:()=>setOpen(false)},inner);
+        return React.createElement("button",{key:i,disabled:locked,onClick:()=>{if(!locked&&item.action){item.action();setOpen(false);}},style:iStyle,title:locked?"Requires a subscription":undefined},inner);
+      })
+    )
+  );
+}
+
 // ── Licence key validation ─────────────────────────────────────
 // Keys are issued by Remembory (Stripe or PayPal subscription, or manual).
 // Validated against the social worker. Cached in localStorage for offline use.
@@ -7892,43 +7928,46 @@ function handleEdit(m) {
         saveStatus==="error"&&React.createElement("span",{style:{fontSize:"0.75rem",color:"#c4858a"}},"⚠"),
         // ── Desktop nav ──
         !isMobile&&!["add","edit"].includes(view)&&(()=>{
-          const nb=(label,v,active)=>React.createElement("button",{key:v,onClick:()=>{setIndexFilter(null);setView(v);},style:{padding:"7px 12px",border:"1px solid",borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",background:active?"#2c2416":"transparent",color:active?"#f5f0e8":"#8a7460",borderColor:active?"#2c2416":"#c8b89a",whiteSpace:"nowrap"}},label);
-          const sep=()=>React.createElement("span",{style:{width:"1px",height:"18px",background:"#d4c4a8",flexShrink:0}});
           const exploreUrl=(()=>{const base="https://social.remembory.net/";const p=[];if(socialKey)p.push("key="+encodeURIComponent(socialKey));if(profileState?.identifier)p.push("id="+profileState.identifier);return p.length?base+"?"+p.join("&"):base;})();
+          const lifeActive=["life","timeline","decade","year","index","map","tree"].includes(view);
+          const socialActive=["sharing","public-profile","legacy"].includes(view);
+          const addActive=["add","prompt","import"].includes(view);
+          const settingsActive=["settings","print"].includes(view);
           return React.createElement(React.Fragment,null,
-            // Life / List
-            React.createElement("div",{style:{display:"flex",border:"1px solid #c8b89a",borderRadius:"2px",overflow:"hidden"}},
-              React.createElement("button",{onClick:()=>setView("life"),style:{padding:"7px 12px",border:"none",borderRight:"1px solid #c8b89a",background:view==="life"?"#2c2416":"transparent",color:view==="life"?"#f5f0e8":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem"}},"◉ Life"),
-              React.createElement("button",{onClick:()=>setView("timeline"),style:{padding:"7px 12px",border:"none",...(subjects.length>1?{borderRight:"1px solid #c8b89a"}:{}),background:view==="timeline"?"#2c2416":"transparent",color:view==="timeline"?"#f5f0e8":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem"}},"≡ List"),
-              subjects.length>1&&React.createElement("button",{onClick:()=>setView("tree"),style:{padding:"7px 12px",border:"none",background:view==="tree"?"#2c2416":"transparent",color:view==="tree"?"#f5f0e8":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem"}},"🌳 Tree")
-            ),
-            // Index / Map
-            React.createElement("div",{style:{display:"flex",border:"1px solid #c8b89a",borderRadius:"2px",overflow:"hidden"}},
-              React.createElement("button",{onClick:()=>{setIndexFilter(null);setView("index");},style:{padding:"7px 12px",border:"none",borderRight:"1px solid #c8b89a",background:view==="index"?"#2c2416":"transparent",color:view==="index"?"#f5f0e8":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem"}},"☰ Index"),
-              React.createElement("button",{onClick:()=>setView("map"),style:{padding:"7px 12px",border:"none",background:view==="map"?"#2c2416":"transparent",color:view==="map"?"#f5f0e8":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem"}},"🗺 Map")
-            ),
-            // Prompt
-            nb("✦ Prompt","prompt",view==="prompt"),
-            // Profile / Explore
-            React.createElement("div",{style:{display:"flex",border:"1px solid #c8b89a",borderRadius:"2px",overflow:"hidden"}},
-              isSubscriber&&wantPublicProfile&&React.createElement("button",{onClick:()=>setView("public-profile"),style:{padding:"7px 12px",border:"none",borderRight:"1px solid #c8b89a",background:view==="public-profile"?"#2c2416":"transparent",color:view==="public-profile"?"#f5f0e8":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem"}},"◎ Profile"),
-              React.createElement("a",{href:exploreUrl,target:"_blank",rel:"noopener",style:{padding:"7px 12px",border:"none",background:"transparent",color:"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",textDecoration:"none",display:"inline-flex",alignItems:"center",whiteSpace:"nowrap"}},"Explore ↗")
-            ),
-            // Sharing / Import
-            React.createElement("div",{style:{display:"flex",border:"1px solid #c8b89a",borderRadius:"2px",overflow:"hidden"}},
-              React.createElement("button",{onClick:()=>setView("sharing"),style:{padding:"7px 12px",border:"none",borderRight:"1px solid #c8b89a",background:view==="sharing"?"#2c2416":"transparent",color:view==="sharing"?"#f5f0e8":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",position:"relative"}},
-                "⇌ Sharing",
-                shareBadgeCount>0&&React.createElement("span",{style:{position:"absolute",top:"-5px",right:"-5px",background:"#4a7a5a",color:"#fff",borderRadius:"50%",width:"16px",height:"16px",fontSize:"0.65rem",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif",fontWeight:600,lineHeight:1}},shareBadgeCount)
-              ),
-              React.createElement("button",{onClick:()=>setView("import"),style:{padding:"7px 12px",border:"none",background:view==="import"?"#2c2416":"transparent",color:view==="import"?"#f5f0e8":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem"}},"↑ Import")
-            ),
-            // Settings
-            React.createElement("button",{onClick:()=>setView("settings"),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.84rem",position:"relative"}},
-              "⚙ Settings",
-              notifications.length>0&&React.createElement("span",{style:{position:"absolute",top:"-5px",right:"-5px",background:"#c4858a",color:"#fff",borderRadius:"50%",width:"16px",height:"16px",fontSize:"0.65rem",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif",fontWeight:600,lineHeight:1}},notifications.length)
-            ),
-            sep(),
-            // Add memory
+            React.createElement(NavDropdown,{label:"Life",isActive:lifeActive,items:[
+              {label:"◉ Overview",action:()=>setView("life"),active:view==="life"},
+              {label:"≡ List",action:()=>setView("timeline"),active:view==="timeline"},
+              {label:"☰ Index",action:()=>{setIndexFilter(null);setView("index");},active:view==="index"},
+              {label:"🗺 Map",action:()=>setView("map"),active:view==="map"},
+              {label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
+            ]}),
+            React.createElement(NavDropdown,{label:"Social",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,items:[
+              {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing"},
+              {label:"◎ Profile",action:()=>setView("public-profile"),active:view==="public-profile",subOnly:true,disabled:!isSubscriber},
+              {label:"Explore ↗",href:exploreUrl,external:true,subOnly:true,disabled:!isSubscriber},
+              {divider:true},
+              {label:"🌟 Legacy",action:()=>setView("legacy"),active:view==="legacy"},
+            ]}),
+            React.createElement(NavDropdown,{label:"Add",isActive:addActive,items:[
+              {label:"+ Add memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
+              {label:"✦ Prompt",action:()=>setView("prompt"),active:view==="prompt"},
+              {divider:true},
+              {label:"↑ Photos / Email",action:()=>setView("import"),active:view==="import"},
+              {label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
+            ]}),
+            React.createElement(NavDropdown,{label:"Settings",isActive:settingsActive,badge:notifications.length>0?notifications.length:0,items:[
+              {label:"Account",action:()=>setView("settings"),active:view==="settings"},
+              {label:"Backup & Restore",action:()=>setView("settings")},
+              {divider:true},
+              {label:"🖨 Print / Export",action:()=>setView("print"),active:view==="print"},
+            ]}),
+            React.createElement(NavDropdown,{label:"Help",isActive:false,items:[
+              {label:"Manual",href:"https://remembory.net/manual.html",external:true},
+              {label:"Tips & Tricks",href:"https://remembory.net/tips.html",external:true},
+              {divider:true},
+              {label:"Contact",href:"mailto:hello@remembory.net"},
+            ]}),
+            React.createElement("span",{style:{width:"1px",height:"18px",background:"#d4c4a8",flexShrink:0}}),
             showAdd&&React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView("add"); },style:{...S.btn,padding:"7px 15px",fontSize:"0.9rem"}},"+ Add")
           );
         })(),
