@@ -4939,20 +4939,89 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
 
     function promoteToSubject(tp) {
       const newId = "subj_tp_"+Date.now();
+
+      // ── Personal events from stored tree data ──────────────────
+      const personalMems = (tp.events||[]).map((ev,i)=>({
+        ...ev,
+        id:"subj_"+newId+"_"+i,
+        fromGedcom:true,
+      }));
+
+      // ── Context events from close relatives in the tree ────────
+      // Build family maps from stored treeFamilies
+      const tpById = Object.fromEntries(treePersons.map(p=>[p.id,p]));
+      const parentsOf={}, childrenOf={}, spousesOf={};
+      (treeFamilies||[]).forEach(fam=>{
+        const h=fam.husbandId, w=fam.wifeId;
+        (fam.childIds||[]).forEach(cid=>{
+          if(h){(parentsOf[cid]=parentsOf[cid]||[]).push(h);(childrenOf[h]=childrenOf[h]||[]).push(cid);}
+          if(w){(parentsOf[cid]=parentsOf[cid]||[]).push(w);(childrenOf[w]=childrenOf[w]||[]).push(cid);}
+        });
+        if(h&&w){(spousesOf[h]=spousesOf[h]||[]).push(w);(spousesOf[w]=spousesOf[w]||[]).push(h);}
+      });
+
+      const subBirth = parseInt(tp.dob)||0;
+      const subDeath = parseInt(tp.dod)||new Date().getFullYear();
+      const subParents    = parentsOf[tp.id]||[];
+      const subGrandpars  = subParents.flatMap(p=>parentsOf[p]||[]);
+      const subSiblings   = subParents.flatMap(p=>childrenOf[p]||[]).filter(id=>id!==tp.id);
+      const subChildren   = childrenOf[tp.id]||[];
+      const subSpouses    = spousesOf[tp.id]||[];
+      const subAuntsUncles= subGrandpars.flatMap(g=>childrenOf[g]||[]).filter(id=>!subParents.includes(id)&&id!==tp.id);
+
+      function relLabel(id) {
+        if(subSpouses.includes(id))    return "Spouse";
+        if(subParents.includes(id))    return "Parent";
+        if(subChildren.includes(id))   return "Child";
+        if(subSiblings.includes(id))   return "Sibling";
+        if(subGrandpars.includes(id))  return "Grandparent";
+        if(subAuntsUncles.includes(id))return "Aunt/Uncle";
+        return "";
+      }
+
+      const relativeIds = new Set([...subSpouses,...subParents,...subChildren,...subSiblings,...subGrandpars,...subAuntsUncles]);
+      const contextMems = []; const rels = {};
+      let ctxIdx = 0;
+      relativeIds.forEach(relId=>{
+        const rel = tpById[relId]; if(!rel||!rel.events?.length) return;
+        const relBirth=parseInt(rel.dob)||0, relDeath=parseInt(rel.dod)||new Date().getFullYear();
+        if(relDeath<subBirth||relBirth>subDeath) return;
+        const rl = relLabel(relId);
+        if(rl) rels[rel.name]=rl;
+        rel.events.forEach(ev=>{
+          const yr=ev.year; if(!yr||yr<subBirth||yr>subDeath) return;
+          const rlTag = rl?" ["+rl+"]":"";
+          const verb = ev.title.charAt(0).toLowerCase()+ev.title.slice(1);
+          contextMems.push({
+            ...ev,
+            id:"ctx_"+newId+"_"+(ctxIdx++),
+            title: rel.name+rlTag+" "+verb,
+            people:[rel.name,...(ev.people||[])],
+            gedcomContext:true, visibility:"private",
+          });
+        });
+      });
+      contextMems.sort((a,b)=>(a.year||0)-(b.year||0));
+
+      const allMems = [...personalMems,...contextMems].sort((a,b)=>(a.year||0)-(b.year||0));
+      const allKnownPeople = [...new Set([...personalMems.flatMap(m=>m.people||[]),...Object.keys(rels)])].sort();
+      const allKnownLocs   = [...new Set(allMems.map(m=>m.location).filter(Boolean))].sort();
+
       const newSubj = {
         id:newId, name:tp.name, isSelf:false, mode:"history",
-        dob:tp.dob||"", notes:tp.notes||"", memories:[], candidates:[],
-        treePersons:[], treeFamilies:[], customTags:[], knownPeople:[], knownOrgs:[],
-        knownLocations:[], knownSources:[], peopleEmails:{}, peopleRelationships:{},
+        dob:tp.dob||"", notes:tp.notes||"",
+        memories:allMems, candidates:[],
+        knownPeople:allKnownPeople, knownOrgs:[], knownLocations:allKnownLocs,
+        knownSources:[], peopleEmails:{}, peopleRelationships:rels,
         peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{},
         locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{},
-        personGroups:{}, shareHistory:[], lastBackup:null, lastImport:null,
-        backupPassword:"", legacyMessage:""
+        personGroups:{}, customTags:[], shareHistory:[], lastBackup:null, lastImport:null,
+        backupPassword:"", legacyMessage:"", treePersons:[], treeFamilies:[],
       };
-      // Link the tree person to the new subject
+
       const updatedPersons = treePersons.map(p=>p.id===tp.id?{...p,subjectId:newId}:p);
       persistSubject({treePersons:updatedPersons});
-      persistTop({subjects:[...subjects, newSubj], activeSubjectId:newId});
+      persistTop({subjects:[...subjects,newSubj], activeSubjectId:newId});
       setPersonDetail(null);
       setView("life");
     }
@@ -7240,6 +7309,10 @@ function handleEdit(m) {
         const deatDate = deat ? parseDate(child(deat,"DATE")) : null;
         const sex = child(rec,"SEX") || "";
         const topNotes = rec.children.filter(n=>n.tag==="NOTE").map(n=>fullText(n)).filter(Boolean).join("\n\n");
+        // Build and store personal events so "Start Chronicle" can pre-populate memories later
+        const personForBuild = { id: gedId, rec, fullName: name, sex,
+          birtYear: birtDate?.year||null, deatYear: deatDate?.year||null };
+        const { mems } = buildMemories(personForBuild);
         return {
           id: "tp_"+gedId.replace(/@/g,""),
           gedId, name, sex,
@@ -7249,6 +7322,7 @@ function handleEdit(m) {
           deathPlace: deat ? (child(deat,"PLAC")||"") : "",
           notes: topNotes,
           subjectId: null,
+          events: mems,
         };
       });
 
