@@ -89,8 +89,8 @@ function SubscribePill() {
 }
 
 // ── Dropdown nav menu ──────────────────────────────────────────
-// variant: "desktop" | "mobile"  direction: "down" | "up"
-function NavDropdown({label, icon, items, isActive, badge, variant="desktop", direction="down"}) {
+// variant: "desktop" | "mobile"  direction: "down" | "up"  menuAlign: "left"|"center"|"right"
+function NavDropdown({label, icon, items, isActive, badge, variant="desktop", direction="down", menuAlign="right"}) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
   React.useEffect(()=>{
@@ -106,7 +106,7 @@ function NavDropdown({label, icon, items, isActive, badge, variant="desktop", di
   const btnStyle = isMobileVariant
     ? {flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:isActive||open?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:isActive||open?"2px solid #2c2416":"2px solid transparent",position:"relative",whiteSpace:"nowrap"}
     : {padding:"7px 12px",border:"1px solid",borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",background:isActive||open?"#2c2416":"transparent",color:isActive||open?"#f5f0e8":"#8a7460",borderColor:isActive||open?"#2c2416":"#c8b89a",whiteSpace:"nowrap",position:"relative"};
-  const menuStyle={position:"absolute",left:isMobileVariant?"50%":undefined,transform:isMobileVariant?"translateX(-50%)":undefined,right:isMobileVariant?undefined:0,[direction==="up"?"bottom":"top"]:"calc(100% + 4px)",background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"3px",boxShadow:"0 4px 20px rgba(26,18,8,0.14)",minWidth:"190px",zIndex:500,overflow:"hidden"};
+  const menuStyle={position:"absolute",left:menuAlign==="left"?0:menuAlign==="center"?"50%":undefined,right:menuAlign==="right"?0:undefined,transform:menuAlign==="center"?"translateX(-50%)":undefined,[direction==="up"?"bottom":"top"]:"calc(100% + 4px)",background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"3px",boxShadow:"0 4px 20px rgba(26,18,8,0.14)",minWidth:"190px",zIndex:500,overflow:"hidden"};
 
   return React.createElement("div",{ref,style:{position:"relative",flex:isMobileVariant?1:undefined,display:isMobileVariant?"flex":undefined,justifyContent:isMobileVariant?"center":undefined}},
     React.createElement("button",{onClick:()=>setOpen(o=>!o),style:btnStyle},
@@ -7915,7 +7915,7 @@ function handleEdit(m) {
         React.createElement("button",{
           onClick:()=>setShowSubjectMgr(true),
           title:"Switch person",
-          style:{display:"flex",alignItems:"center",gap:"6px",background:"rgba(200,168,122,0.12)",border:"1px solid rgba(200,168,122,0.4)",borderRadius:"20px",padding:"5px 14px 5px 10px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:isMobile?"0.9rem":"1rem",color:"#6a4a28",whiteSpace:"nowrap",maxWidth:isMobile?"160px":"320px",overflow:"hidden",flexShrink:0}
+          style:{display:"flex",alignItems:"center",gap:"6px",background:"rgba(200,168,122,0.12)",border:"1px solid rgba(200,168,122,0.4)",borderRadius:"20px",padding:"5px 14px 5px 10px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:isMobile?"0.9rem":"1rem",color:"#6a4a28",whiteSpace:"nowrap",maxWidth:isMobile?"calc(100vw - 190px)":"320px",overflow:"hidden",flex:"1 1 auto",minWidth:0}
         },
           React.createElement("span",{style:{fontSize:"0.8rem",flexShrink:0,color:modeFor(subject).color}},modeFor(subject).icon),
           isCarerMode&&React.createElement("span",{style:{fontSize:"0.68rem",color:"#7a5a20",opacity:0.8,flexShrink:0}},carerName?"recording for":"for"),
@@ -7989,21 +7989,21 @@ function handleEdit(m) {
       const addActive=["add","prompt","import"].includes(view);
       const settingsActive=["settings","print"].includes(view);
       return React.createElement("nav",{style:{position:"fixed",bottom:0,left:0,right:0,zIndex:200,background:"rgba(245,240,232,0.97)",borderTop:"1px solid #c8b89a",display:"flex",backdropFilter:"blur(8px)",paddingBottom:"env(safe-area-inset-bottom, 0px)"}},
-        React.createElement(NavDropdown,{label:"Life",icon:"◉",isActive:lifeActive,variant:"mobile",direction:"up",items:[
+        React.createElement(NavDropdown,{label:"Life",icon:"◉",isActive:lifeActive,variant:"mobile",direction:"up",menuAlign:"left",items:[
           {label:"◉ Overview",action:()=>setView("life"),active:view==="life"},
           {label:"≡ List",action:()=>setView("timeline"),active:view==="timeline"},
           {label:"☰ Index",action:()=>{setIndexFilter(null);setView("index");},active:view==="index"},
           {label:"🗺 Map",action:()=>setView("map"),active:view==="map"},
           {label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
         ]}),
-        React.createElement(NavDropdown,{label:"Social",icon:"⇌",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,variant:"mobile",direction:"up",items:[
+        React.createElement(NavDropdown,{label:"Social",icon:"⇌",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,variant:"mobile",direction:"up",menuAlign:"left",items:[
           {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing"},
           {label:"◎ Profile",action:()=>setView("public-profile"),active:view==="public-profile",subOnly:true,disabled:!isSubscriber},
           {label:"Explore ↗",href:exploreUrl,external:true,subOnly:true,disabled:!isSubscriber},
           {divider:true},
           {label:"🌟 Legacy",action:()=>setView("legacy"),active:view==="legacy"},
         ]}),
-        React.createElement(NavDropdown,{label:"Add",icon:"＋",isActive:addActive,variant:"mobile",direction:"up",items:[
+        React.createElement(NavDropdown,{label:"Add",icon:"＋",isActive:addActive,variant:"mobile",direction:"up",menuAlign:"center",items:[
           {label:"+ Add memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
           {label:"✦ Prompt",action:()=>setView("prompt"),active:view==="prompt"},
           {divider:true},
