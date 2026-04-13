@@ -89,7 +89,8 @@ function SubscribePill() {
 }
 
 // ── Dropdown nav menu ──────────────────────────────────────────
-function NavDropdown({label, items, isActive, badge}) {
+// variant: "desktop" | "mobile"  direction: "down" | "up"
+function NavDropdown({label, icon, items, isActive, badge, variant="desktop", direction="down"}) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
   React.useEffect(()=>{
@@ -100,13 +101,28 @@ function NavDropdown({label, items, isActive, badge}) {
     document.addEventListener("keydown",k);
     return ()=>{ document.removeEventListener("mousedown",h); document.removeEventListener("keydown",k); };
   },[open]);
-  const btnStyle={padding:"7px 12px",border:"1px solid",borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",background:isActive||open?"#2c2416":"transparent",color:isActive||open?"#f5f0e8":"#8a7460",borderColor:isActive||open?"#2c2416":"#c8b89a",whiteSpace:"nowrap",position:"relative"};
-  const menuStyle={position:"absolute",top:"calc(100% + 4px)",right:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"3px",boxShadow:"0 4px 20px rgba(26,18,8,0.14)",minWidth:"180px",zIndex:500,overflow:"hidden"};
-  return React.createElement("div",{ref,style:{position:"relative"}},
+
+  const isMobileVariant = variant==="mobile";
+  const btnStyle = isMobileVariant
+    ? {flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:isActive||open?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:isActive||open?"2px solid #2c2416":"2px solid transparent",position:"relative",whiteSpace:"nowrap"}
+    : {padding:"7px 12px",border:"1px solid",borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",background:isActive||open?"#2c2416":"transparent",color:isActive||open?"#f5f0e8":"#8a7460",borderColor:isActive||open?"#2c2416":"#c8b89a",whiteSpace:"nowrap",position:"relative"};
+  const menuStyle={position:"absolute",left:isMobileVariant?"50%":undefined,transform:isMobileVariant?"translateX(-50%)":undefined,right:isMobileVariant?undefined:0,[direction==="up"?"bottom":"top"]:"calc(100% + 4px)",background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"3px",boxShadow:"0 4px 20px rgba(26,18,8,0.14)",minWidth:"190px",zIndex:500,overflow:"hidden"};
+
+  return React.createElement("div",{ref,style:{position:"relative",flex:isMobileVariant?1:undefined,display:isMobileVariant?"flex":undefined,justifyContent:isMobileVariant?"center":undefined}},
     React.createElement("button",{onClick:()=>setOpen(o=>!o),style:btnStyle},
-      label,
-      React.createElement("span",{style:{marginLeft:"5px",fontSize:"0.6rem",opacity:0.55}},"▾"),
-      badge>0&&React.createElement("span",{style:{position:"absolute",top:"-5px",right:"-5px",background:"#4a7a5a",color:"#fff",borderRadius:"50%",width:"16px",height:"16px",fontSize:"0.65rem",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif",fontWeight:600,lineHeight:1}},badge)
+      isMobileVariant
+        ? React.createElement(React.Fragment,null,
+            React.createElement("span",{style:{fontSize:"1.1rem",lineHeight:1,position:"relative"}},
+              icon,
+              badge>0&&React.createElement("span",{style:{position:"absolute",top:"-4px",right:"-6px",background:"#4a7a5a",color:"#fff",borderRadius:"50%",width:"13px",height:"13px",fontSize:"0.6rem",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif",fontWeight:600,lineHeight:1}},badge)
+            ),
+            label
+          )
+        : React.createElement(React.Fragment,null,
+            label,
+            React.createElement("span",{style:{marginLeft:"5px",fontSize:"0.6rem",opacity:0.55}},"▾"),
+            badge>0&&React.createElement("span",{style:{position:"absolute",top:"-5px",right:"-5px",background:"#4a7a5a",color:"#fff",borderRadius:"50%",width:"16px",height:"16px",fontSize:"0.65rem",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif",fontWeight:600,lineHeight:1}},badge)
+          )
     ),
     open&&React.createElement("div",{style:menuStyle},
       items.map((item,i)=>{
@@ -7960,35 +7976,54 @@ function handleEdit(m) {
         })(),
         // Back button (desktop edit views + mobile)
         showBack&&React.createElement("button",{onClick:goBack,style:{...S.btnOutline,padding:isMobile?"8px 14px":"7px 13px",fontSize:"0.9rem"}},"← Back"),
-        // Mobile: Back + Add
-        isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView("add"); },style:{...S.btn,padding:"8px 16px",fontSize:"0.9rem"}},"+ Add")
+        // Mobile: Back only (Add is in the mobile nav dropdown)
+
       )
     ),
 
 // ── MOBILE BOTTOM NAV ──
-    isMobile&&!["add","edit"].includes(view)&&React.createElement("nav",{style:{position:"fixed",bottom:0,left:0,right:0,zIndex:200,background:"rgba(245,240,232,0.97)",borderTop:"1px solid #c8b89a",display:"flex",backdropFilter:"blur(8px)",paddingBottom:"env(safe-area-inset-bottom, 0px)"}},
-      [
-        ["life","◉","Life"],
-        ["index","☰","Index"],
-        ...(subjects.length>1?[["tree","🌳","Tree"]]:[["map","🗺","Map"]]),
-        ["sharing","⇌","Sharing", shareBadgeCount>0?shareBadgeCount:0],
-        ["settings","⚙","Settings"],
-      ].map(([v,icon,label,badge])=>React.createElement("button",{key:v,onClick:()=>{ setIndexFilter(null); setView(v); },style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:view===v?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:view===v?"2px solid #2c2416":"2px solid transparent",position:"relative"}},
-        React.createElement("span",{style:{fontSize:"1.1rem",lineHeight:1,position:"relative"}},
-          icon,
-          badge>0&&React.createElement("span",{style:{position:"absolute",top:"-4px",right:"-6px",background:"#4a7a5a",color:"#fff",borderRadius:"50%",width:"13px",height:"13px",fontSize:"0.6rem",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif",fontWeight:600,lineHeight:1}},badge)
-        ),
-        label
-      )),
-      React.createElement("a",{key:"explore",href:(()=>{const base="https://social.remembory.net/";const params=[];if(socialKey)params.push("key="+encodeURIComponent(socialKey));if(profileState?.identifier)params.push("id="+profileState.identifier);return params.length?base+"?"+params.join("&"):base;})(),target:"_blank",rel:"noopener",style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:"2px solid transparent",textDecoration:"none"}},
-        React.createElement("span",{style:{fontSize:"1.1rem",lineHeight:1}},"↗"),
-        "Explore"
-      ),
-      isSubscriber&&wantPublicProfile&&React.createElement("button",{key:"profile",onClick:()=>setView("public-profile"),style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"10px 4px 8px",border:"none",background:"transparent",color:view==="public-profile"?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.68rem",gap:"3px",borderTop:view==="public-profile"?"2px solid #2c2416":"2px solid transparent"}},
-        React.createElement("span",{style:{fontSize:"1.1rem",lineHeight:1}},"◎"),
-        "Profile"
-      )
-    ),
+    isMobile&&!["add","edit"].includes(view)&&(()=>{
+      const exploreUrl=(()=>{const base="https://social.remembory.net/";const p=[];if(socialKey)p.push("key="+encodeURIComponent(socialKey));if(profileState?.identifier)p.push("id="+profileState.identifier);return p.length?base+"?"+p.join("&"):base;})();
+      const lifeActive=["life","timeline","decade","year","index","map","tree"].includes(view);
+      const socialActive=["sharing","public-profile","legacy"].includes(view);
+      const addActive=["add","prompt","import"].includes(view);
+      const settingsActive=["settings","print"].includes(view);
+      return React.createElement("nav",{style:{position:"fixed",bottom:0,left:0,right:0,zIndex:200,background:"rgba(245,240,232,0.97)",borderTop:"1px solid #c8b89a",display:"flex",backdropFilter:"blur(8px)",paddingBottom:"env(safe-area-inset-bottom, 0px)"}},
+        React.createElement(NavDropdown,{label:"Life",icon:"◉",isActive:lifeActive,variant:"mobile",direction:"up",items:[
+          {label:"◉ Overview",action:()=>setView("life"),active:view==="life"},
+          {label:"≡ List",action:()=>setView("timeline"),active:view==="timeline"},
+          {label:"☰ Index",action:()=>{setIndexFilter(null);setView("index");},active:view==="index"},
+          {label:"🗺 Map",action:()=>setView("map"),active:view==="map"},
+          {label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
+        ]}),
+        React.createElement(NavDropdown,{label:"Social",icon:"⇌",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,variant:"mobile",direction:"up",items:[
+          {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing"},
+          {label:"◎ Profile",action:()=>setView("public-profile"),active:view==="public-profile",subOnly:true,disabled:!isSubscriber},
+          {label:"Explore ↗",href:exploreUrl,external:true,subOnly:true,disabled:!isSubscriber},
+          {divider:true},
+          {label:"🌟 Legacy",action:()=>setView("legacy"),active:view==="legacy"},
+        ]}),
+        React.createElement(NavDropdown,{label:"Add",icon:"＋",isActive:addActive,variant:"mobile",direction:"up",items:[
+          {label:"+ Add memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
+          {label:"✦ Prompt",action:()=>setView("prompt"),active:view==="prompt"},
+          {divider:true},
+          {label:"↑ Photos / Email",action:()=>setView("import"),active:view==="import"},
+          {label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
+        ]}),
+        React.createElement(NavDropdown,{label:"Settings",icon:"⚙",isActive:settingsActive,badge:notifications.length>0?notifications.length:0,variant:"mobile",direction:"up",items:[
+          {label:"Account",action:()=>setView("settings"),active:view==="settings"},
+          {label:"Backup & Restore",action:()=>setView("settings")},
+          {divider:true},
+          {label:"🖨 Print / Export",action:()=>setView("print"),active:view==="print"},
+        ]}),
+        React.createElement(NavDropdown,{label:"Help",icon:"?",isActive:false,variant:"mobile",direction:"up",items:[
+          {label:"Manual",href:"https://remembory.net/manual.html",external:true},
+          {label:"Tips & Tricks",href:"https://remembory.net/tips.html",external:true},
+          {divider:true},
+          {label:"Contact",href:"mailto:hello@remembory.net"},
+        ]})
+      );
+    })(),
 
 
     // ── MAIN CONTENT ──
