@@ -4743,7 +4743,8 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
     // Also include spouses of all visible
     const visibleIds = new Set([...ancestorIds, ...descendantIds]);
     const withSpouses = new Set(visibleIds);
-    visibleIds.forEach(id=>{ (spousesOf[id]||[]).forEach(sid=>{ if(visibleIds.has(sid)) withSpouses.add(sid); }); });
+    // Add ALL spouses of visible people, not only those already in visibleIds
+    visibleIds.forEach(id=>{ (spousesOf[id]||[]).forEach(sid=>{ withSpouses.add(sid); }); });
 
     // Assign generations (0 = focal, negative = ancestors, positive = descendants)
     const genOf = {};
@@ -4887,9 +4888,9 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       // Tree canvas — pan (drag) + zoom (scroll wheel / pinch)
       React.createElement("div",{
         ref:treeContainerRef,
-        style:{position:"relative",overflow:"hidden",border:"1px solid #d4c4a8",borderRadius:"4px",background:"rgba(255,252,245,0.4)",height:"520px",cursor:treeDragging.current?"grabbing":"grab",userSelect:"none",touchAction:"none"},
-        onPointerDown:e=>{ e.currentTarget.setPointerCapture(e.pointerId); treeDragging.current={sx:e.clientX-treePan.x,sy:e.clientY-treePan.y}; },
-        onPointerMove:e=>{ if(!treeDragging.current) return; setTreePan({x:e.clientX-treeDragging.current.sx,y:e.clientY-treeDragging.current.sy}); },
+        style:{position:"relative",overflow:"hidden",border:"1px solid #d4c4a8",borderRadius:"4px",background:"rgba(255,252,245,0.4)",height:"520px",cursor:treeDragging.current?.started?"grabbing":"grab",userSelect:"none",touchAction:"none"},
+        onPointerDown:e=>{ treeDragging.current={sx:e.clientX-treePan.x,sy:e.clientY-treePan.y,ox:e.clientX,oy:e.clientY,started:false,el:e.currentTarget,pid:e.pointerId}; },
+        onPointerMove:e=>{ const d=treeDragging.current; if(!d) return; if(!d.started){if(Math.abs(e.clientX-d.ox)<5&&Math.abs(e.clientY-d.oy)<5)return; d.started=true; d.el.setPointerCapture(d.pid);} setTreePan({x:e.clientX-d.sx,y:e.clientY-d.sy}); },
         onPointerUp:()=>{ treeDragging.current=null; },
         onPointerLeave:()=>{ treeDragging.current=null; }
       },
@@ -4909,7 +4910,7 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
             const linked = hasSubject ? subjects.find(s=>s.id===tp.subjectId) : null;
             const isActive = linked && linked.id===activeSubjectId;
             return React.createElement("div",{key:id,
-              onClick:e=>{ e.stopPropagation(); setPersonDetail(id); },
+              onClick:()=>setPersonDetail(id),
               style:{
                 position:"absolute",left:p.x+"px",top:p.y+"px",
                 width:NW+"px",height:NH+"px",
