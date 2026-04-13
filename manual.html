@@ -494,11 +494,18 @@
       <a href="#email-import" class="section-link">From email</a>
       <a href="#genealogy" class="section-link">Family tree (GEDCOM)</a>
 
+      <div class="sidebar-chapter">History Mode</div>
+      <a href="#history-mode">History Mode</a>
+      <a href="#history-sources" class="section-link">Sources</a>
+      <a href="#history-confidence" class="section-link">Candidate confidence</a>
+      <a href="#history-research-note" class="section-link">Research notes</a>
+
       <div class="sidebar-chapter">Sharing</div>
       <a href="#sharing">Sharing Memories</a>
-      <a href="#share-email" class="section-link">Sharing by email</a>
       <a href="#share-link" class="section-link">Sharing by link</a>
+      <a href="#share-auto" class="section-link">Auto-delivery</a>
       <a href="#receiving" class="section-link">Receiving a shared memory</a>
+      <a href="#contribution-links" class="section-link">Contribution links</a>
       <a href="#perspectives">Perspectives</a>
       <a href="#dominant" class="section-link">Dominant perspective</a>
 
@@ -521,11 +528,11 @@
     <div class="callout" style="background:rgba(200,168,122,0.08);border:1px solid rgba(200,168,122,0.3);border-radius:4px;padding:16px 20px;margin-bottom:28px">
       <strong style="font-family:'Playfair Display',serif;font-size:1rem;color:#1a1208">What's new</strong>
       <ul style="margin:8px 0 0 18px;font-size:.95rem;color:#6a5c48;line-height:1.8">
-        <li><strong>Public Profile</strong> — publish a public profile at share.remembory.net. Enable in Settings → Account.</li>
-        <li><strong>Remembory Social</strong> — explore public Chronicles at <a href="https://share.remembory.net/explore">share.remembory.net/explore</a>. Follow profiles, leave guestbook notes, react to memories.</li>
-        <li><strong>Visibility levels</strong> — set each memory to Private, Public, Subscribers only, Connected, or Tagged people only.</li>
-        <li><strong>Cloud sync</strong> — sync Chronicle across devices using a file in your cloud folder (iCloud, Dropbox etc.). Settings → Backup &amp; Restore.</li>
-        <li><strong>Profile privacy</strong> — control who can view your public profile: Open, Subscribers only, or Connected people only.</li>
+        <li><strong>History Mode</strong> — a dedicated Chronicle type for researching historical subjects. Add sources with citation types, confidence levels (possible/probable), and research notes. See <a href="#history-mode" style="color:var(--gold-dark)">History Mode</a>.</li>
+        <li><strong>Family Tree import</strong> — import a full GEDCOM and choose a focal subject. Chronicle pulls in all overlapping relatives and their events together in one pass. See <a href="#genealogy" style="color:var(--gold-dark)">Genealogy &amp; GEDCOM</a>.</li>
+        <li><strong>Auto-delivery for connected recipients</strong> — when you share with someone whose email is in your Connections, Chronicle delivers the memory directly to their inbox — no link to copy and send. See <a href="#sharing" style="color:var(--gold-dark)">Sharing Memories</a>.</li>
+        <li><strong>Guest contribution links</strong> — generate a permanent link that lets anyone submit memories and documents directly into your Chronicle inbox. Perfect for collaborative research. See <a href="#contribution-links" style="color:var(--gold-dark)">Contribution Links</a>.</li>
+        <li><strong>Accept all</strong> — in the Sharing inbox, accept an entire batch of incoming memories with one click rather than one at a time.</li>
       </ul>
     </div>
       <div class="subtitle">User Manual</div>
@@ -931,6 +938,72 @@
 
     <div class="divider"></div>
 
+    <!-- History Mode -->
+    <section class="section">
+      <h1 id="history-mode">History Mode</h1>
+      <p class="chapter-intro">History Mode is a dedicated Chronicle type designed for researching a historical subject — an ancestor, a public figure, or anyone whose life you are piecing together from records rather than personal memory. It gives you genealogy-specific tools that don't belong in a personal journal.</p>
+
+      <p>When you create or switch a subject to History Mode, Chronicle adapts: the timeline shows <em>entries</em> rather than <em>memories</em>, the Add form reveals research-specific fields, and the Source tools become prominent throughout.</p>
+
+      <div class="note"><strong>History Mode requires a subscription.</strong> See <a href="#subscription">Subscription</a> for details.</div>
+
+      <h2 id="history-sources">Sources</h2>
+      <p>Every entry in a History Mode Chronicle can be backed by one or more sources — the records, documents, or testimonies from which the information was derived.</p>
+
+      <p>Chronicle supports the following source types:</p>
+      <table class="ftable">
+        <thead><tr><th>Type</th><th>Examples</th></tr></thead>
+        <tbody>
+          <tr><td>Document</td><td>Birth certificate, will, census record, land title</td></tr>
+          <tr><td>Photo</td><td>Photograph, portrait, illustration</td></tr>
+          <tr><td>Record</td><td>Church register, passenger list, newspaper, electoral roll</td></tr>
+          <tr><td>Oral history</td><td>Interview, family story, recorded testimony</td></tr>
+          <tr><td>Research</td><td>Published family history, genealogical database, DNA evidence</td></tr>
+          <tr><td>Other</td><td>Anything else</td></tr>
+        </tbody>
+      </table>
+
+      <p>Each source also carries a <strong>confidence level</strong> — Primary (a first-hand record), Secondary (derived or reported), or Questionable (uncertain or disputed).</p>
+
+      <p>To add sources to an entry:</p>
+      <ol class="steps">
+        <li>Open or edit any entry in a History Mode Chronicle</li>
+        <li>Expand the <strong>Sources</strong> section (click the section toggle if collapsed)</li>
+        <li>Click <strong>+ add source</strong></li>
+        <li>Enter a title, choose the source type and confidence level, and optionally add a URL or note</li>
+        <li>Click <strong>Save</strong></li>
+      </ol>
+      <p>You can also manage sources globally from <strong>Index → Sources</strong>, where all sources across all entries are listed and can be edited or linked to new entries.</p>
+
+      <h2 id="history-confidence">Candidate Confidence</h2>
+      <p>In historical research, you often know something is <em>probably</em> true but can't prove it conclusively. History Mode lets you mark entries with a candidate confidence level rather than asserting them as established facts.</p>
+
+      <table class="ftable">
+        <thead><tr><th>Level</th><th>When to use it</th></tr></thead>
+        <tbody>
+          <tr><td>Established</td><td>The default. Reasonably well-supported by sources.</td></tr>
+          <tr><td>Probable</td><td>Likely true — good circumstantial evidence or reasonable inference</td></tr>
+          <tr><td>Possible</td><td>Could be true — some supporting evidence but significant uncertainty</td></tr>
+        </tbody>
+      </table>
+
+      <p>Probable and Possible entries display a coloured confidence badge in the detail view and are visually distinguished in the timeline, so you can see at a glance which parts of your reconstruction are solid and which are still hypotheses.</p>
+
+      <h2 id="history-research-note">Research Notes</h2>
+      <p>Each entry can carry a <strong>Research Note</strong> — a private working note separate from the entry's main content. Use this to record:</p>
+      <ul>
+        <li>Why you have confidence (or doubt) in this entry</li>
+        <li>Contradictions between sources</li>
+        <li>Open questions to investigate further</li>
+        <li>Where to look next</li>
+      </ul>
+      <p>Research notes appear in the detail view beneath the entry and are not included in print output — they are working notes, not published content.</p>
+
+      <p>To add a research note, open or edit an entry and expand the <strong>Research Note</strong> section. Click the confidence buttons (Probable / Possible) to set the candidate confidence alongside the note.</p>
+    </section>
+
+    <div class="divider"></div>
+
     <!-- Sharing -->
     <section class="section">
       <h1 id="sharing">Sharing Memories</h1>
@@ -940,7 +1013,7 @@
       <div class="note">Enter your licence key in <strong>⚙ Settings → Subscription</strong> to unlock sharing. See <a href="#subscription">Subscription</a> for how to get one.</div>
 
       <h2>How Sharing Works</h2>
-      <p>Sharing in Chronicle is link-based. When you share a memory, a private short link is created. The recipient clicks the link, sees a preview, and downloads a file that imports automatically into their Chronicle. The link is single-use — it stops working once collected.</p>
+      <p>Sharing in Chronicle is link-based. When you share a memory, a private short link is created. The recipient clicks the link, sees a preview, and the memory imports automatically into their Chronicle. The link is single-use — it stops working once collected.</p>
       <p>A personal note is required to share — at least one sentence explaining why you are sharing. This keeps sharing thoughtful rather than mechanical.</p>
 
       <h2 id="share-link">Sharing a Memory</h2>
@@ -954,6 +1027,24 @@
         <li>Copy the link and send it by any means — text message, email, messaging app</li>
       </ol>
       <div class="note">The link expires after 30 days and is deleted once the recipient collects it. Your memories never leave your device permanently — the shared payload is a temporary copy.</div>
+
+      <h2 id="share-auto">Auto-delivery for Connected Recipients</h2>
+      <p>If a recipient has an email address in your People registry or Connections, Chronicle can deliver the memory directly to their Chronicle inbox — without you needing to copy and send a link manually.</p>
+
+      <p>When you click <strong>Get shareable link</strong> and some recipients have known email addresses, the share panel displays the delivery mode for each:</p>
+      <ul>
+        <li><strong>→ inbox</strong> — the memory will be delivered directly. Nothing to copy or send — just click the button.</li>
+        <li><strong>Copy link</strong> — the recipient doesn't have a known email, so you copy the link and send it yourself.</li>
+      </ul>
+
+      <p>To add an email address to someone in your People index:</p>
+      <ol class="steps">
+        <li>Go to <strong>Index → People tab</strong></li>
+        <li>Find the person and expand their entry</li>
+        <li>Enter their email address in the email field</li>
+      </ol>
+      <p>Alternatively, when adding a connection in <strong>⚙ Settings → Connections</strong>, you can include their email address at that point.</p>
+      <div class="tip">Setting up email addresses for family members once means sharing with them in future requires zero extra steps — just click Share and the delivery happens automatically.</div>
 
       <h2 id="receiving">Receiving a Shared Memory</h2>
       <ol class="steps">
@@ -970,6 +1061,35 @@
         <li><strong>Known sender</strong> — the dialog appears normally with a warm "Save to my Chronicle" button</li>
         <li><strong>Unknown sender</strong> — an amber warning appears noting the sender is not in your contacts. The accept button is more subdued and labelled "Accept anyway". This gives you pause to consider whether you know who sent the file before accepting.</li>
       </ul>
+
+      <h3>Accepting multiple memories at once</h3>
+      <p>When a delivery contains more than one memory, each appears individually with its own <strong>Accept</strong> button. You can also click <strong>✓ Accept all</strong> to save every memory in the delivery at once — useful when someone has shared a whole batch of family memories.</p>
+
+      <h2 id="contribution-links">Contribution Links</h2>
+      <p>A contribution link is a permanent invite link you can share with anyone — a researcher, a family member, a historical society — inviting them to submit memories, documents, or information directly into your Chronicle inbox. Unlike a share link, a contribution link doesn't expire and can be used multiple times.</p>
+
+      <p>The person who receives the link doesn't need a Chronicle account. They fill in a simple form with their name, a subject, and their contribution. When they submit, it arrives in your <strong>Sharing → Contributions</strong> inbox where you can review and accept each submission individually.</p>
+
+      <h3>Creating a Contribution Link</h3>
+      <ol class="steps">
+        <li>Click the <strong>✉ Share</strong> button in the navigation (or on any memory)</li>
+        <li>Select the <strong>Contribution Links</strong> tab</li>
+        <li>Add an optional note to display on the contribution form (e.g. what kind of information you are looking for)</li>
+        <li>Click <strong>Create contribution link</strong></li>
+        <li>Copy the link and send it to whoever you want to invite</li>
+      </ol>
+      <div class="tip">Contribution links are ideal for History Mode Chronicles — share the link with other researchers or distant relatives and let them add what they know directly to your research without needing to set up Chronicle themselves.</div>
+
+      <h3>Reviewing Contributions</h3>
+      <ol class="steps">
+        <li>Go to <strong>Share → Contributions tab</strong> (or look for the badge on the Share button)</li>
+        <li>Review each submission — you can see the contributor's name, their content, and any attached notes</li>
+        <li>Click <strong>Accept</strong> to add it to your Chronicle, or dismiss to ignore it</li>
+      </ol>
+      <div class="note">Contributions are not automatically added to your Chronicle — you review and accept each one. You stay in full control of what enters your records.</div>
+
+      <h3>Revoking a Link</h3>
+      <p>In the <strong>Contribution Links</strong> tab, click <strong>Revoke</strong> next to any link to deactivate it. Anyone who visits the link after revocation will see an expired-link page.</p>
     </section>
 
     <div class="divider"></div>
@@ -1078,11 +1198,11 @@
       <h2>What Requires a Subscription</h2>
       <ul>
         <li>Sending shared memories to others</li>
-        <li>Genealogy mode — GEDCOM import</li>
-        <li>Public timelines <em>(coming soon)</em></li>
+        <li>History Mode — GEDCOM import, Sources, Research Notes, Candidate Confidence</li>
+        <li>Guest contribution links</li>
       </ul>
 
-      <div class="note">Subscriptions coming soon. Support us in the meantime at <a href="https://ko-fi.com/remembory" target="_blank" rel="noopener">ko-fi.com/remembory</a>.</div>
+      <div class="note">Subscribe at <a href="https://remembory.net/#subscribe" target="_blank" rel="noopener">remembory.net</a> — $20 AUD/year via card or PayPal.</div>
     </section>
 
     <div class="divider"></div>
