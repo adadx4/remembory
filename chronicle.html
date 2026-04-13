@@ -4939,20 +4939,25 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
 
     function promoteToSubject(tp) {
       const newId = "subj_tp_"+Date.now();
+      let idx = 0;
+      function mkId() { return "tp_mem_"+newId+"_"+(idx++); }
+      function mkMem(title, year, month, day, fuzzy, location, people, extra={}) {
+        if (!year) return null;
+        return { id:mkId(), title, year, month:month||1, day:day||1,
+          fuzzy:fuzzy||"year", season:"Early",
+          location:location||"", locations:location?[location]:[],
+          tags:["genealogy"], people:people||[], orgs:[], mediaUrls:[],
+          endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false,
+          perspectives:[], fromGedcom:true, content:"", ...extra };
+      }
 
-      // ── Personal events from stored tree data ──────────────────
-      const personalMems = (tp.events||[]).map((ev,i)=>({
-        ...ev,
-        id:"subj_"+newId+"_"+i,
-        fromGedcom:true,
-      }));
-
-      // ── Context events from close relatives in the tree ────────
       // Build family maps from stored treeFamilies
       const tpById = Object.fromEntries(treePersons.map(p=>[p.id,p]));
-      const parentsOf={}, childrenOf={}, spousesOf={};
+      const parentsOf={}, childrenOf={}, spousesOf={}, famOf={};
       (treeFamilies||[]).forEach(fam=>{
         const h=fam.husbandId, w=fam.wifeId;
+        const famKey = [h,w].filter(Boolean).sort().join("|");
+        if(famKey) famOf[famKey]=fam;
         (fam.childIds||[]).forEach(cid=>{
           if(h){(parentsOf[cid]=parentsOf[cid]||[]).push(h);(childrenOf[h]=childrenOf[h]||[]).push(cid);}
           if(w){(parentsOf[cid]=parentsOf[cid]||[]).push(w);(childrenOf[w]=childrenOf[w]||[]).push(cid);}
@@ -4962,49 +4967,94 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
 
       const subBirth = parseInt(tp.dob)||0;
       const subDeath = parseInt(tp.dod)||new Date().getFullYear();
+
+      // ── Personal events derived from stored tree data ──────────
+      const personalMems = [];
+      // Birth
+      personalMems.push(mkMem("Born", parseInt(tp.dob)||null, null, null, "year", tp.birthPlace, []));
+      // Death
+      personalMems.push(mkMem("Died", parseInt(tp.dod)||null, null, null, "year", tp.deathPlace, []));
+      // Marriages + children per family
+      (treeFamilies||[]).forEach(fam=>{
+        const isHusb = fam.husbandId===tp.id;
+        const isWife  = fam.wifeId===tp.id;
+        if(!isHusb&&!isWife) return;
+        const spouseId = isHusb ? fam.wifeId : fam.husbandId;
+        const spouse = spouseId ? tpById[spouseId] : null;
+        const spouseName = spouse?.name||null;
+        if(fam.marriageYear) {
+          personalMems.push(mkMem(
+            spouseName ? "Married "+spouseName : "Married",
+            fam.marriageYear, null, null, "year", fam.marriagePlace||"",
+            spouseName?[spouseName]:[]
+          ));
+        }
+        // Children's births
+        (fam.childIds||[]).forEach(cid=>{
+          const ch=tpById[cid]; if(!ch) return;
+          const yr=parseInt(ch.dob)||null;
+          personalMems.push(mkMem("Birth of "+ch.name, yr, null, null, "year", ch.birthPlace||"", [ch.name]));
+          const dy=parseInt(ch.dod)||null;
+          if(dy) personalMems.push(mkMem("Death of "+ch.name, dy, null, null, "year", ch.deathPlace||"", [ch.name]));
+        });
+      });
+
+      // ── Context events from close relatives ────────────────────
       const subParents    = parentsOf[tp.id]||[];
       const subGrandpars  = subParents.flatMap(p=>parentsOf[p]||[]);
-      const subSiblings   = subParents.flatMap(p=>childrenOf[p]||[]).filter(id=>id!==tp.id);
       const subChildren   = childrenOf[tp.id]||[];
+      const subSiblings   = subParents.flatMap(p=>childrenOf[p]||[]).filter(id=>id!==tp.id);
       const subSpouses    = spousesOf[tp.id]||[];
       const subAuntsUncles= subGrandpars.flatMap(g=>childrenOf[g]||[]).filter(id=>!subParents.includes(id)&&id!==tp.id);
 
       function relLabel(id) {
-        if(subSpouses.includes(id))    return "Spouse";
-        if(subParents.includes(id))    return "Parent";
-        if(subChildren.includes(id))   return "Child";
-        if(subSiblings.includes(id))   return "Sibling";
-        if(subGrandpars.includes(id))  return "Grandparent";
-        if(subAuntsUncles.includes(id))return "Aunt/Uncle";
+        if(subSpouses.includes(id))     return "Spouse";
+        if(subParents.includes(id))     return "Parent";
+        if(subChildren.includes(id))    return "Child";
+        if(subSiblings.includes(id))    return "Sibling";
+        if(subGrandpars.includes(id))   return "Grandparent";
+        if(subAuntsUncles.includes(id)) return "Aunt/Uncle";
         return "";
       }
 
-      const relativeIds = new Set([...subSpouses,...subParents,...subChildren,...subSiblings,...subGrandpars,...subAuntsUncles]);
-      const contextMems = []; const rels = {};
-      let ctxIdx = 0;
+      const relativeIds = [...new Set([...subSpouses,...subParents,...subChildren,...subSiblings,...subGrandpars,...subAuntsUncles])];
+      const contextMems = [];
+      const rels = {};
+
       relativeIds.forEach(relId=>{
-        const rel = tpById[relId]; if(!rel||!rel.events?.length) return;
+        const rel = tpById[relId]; if(!rel) return;
         const relBirth=parseInt(rel.dob)||0, relDeath=parseInt(rel.dod)||new Date().getFullYear();
         if(relDeath<subBirth||relBirth>subDeath) return;
         const rl = relLabel(relId);
         if(rl) rels[rel.name]=rl;
-        rel.events.forEach(ev=>{
-          const yr=ev.year; if(!yr||yr<subBirth||yr>subDeath) return;
-          const rlTag = rl?" ["+rl+"]":"";
-          const verb = ev.title.charAt(0).toLowerCase()+ev.title.slice(1);
-          contextMems.push({
-            ...ev,
-            id:"ctx_"+newId+"_"+(ctxIdx++),
-            title: rel.name+rlTag+" "+verb,
-            people:[rel.name,...(ev.people||[])],
-            gedcomContext:true, visibility:"private",
+        const rlTag = rl?" ["+rl+"]":"";
+        function addCtx(title, year, loc, people) {
+          if(!year||year<subBirth||year>subDeath) return;
+          const verb = title.charAt(0).toLowerCase()+title.slice(1);
+          const m = mkMem(rel.name+rlTag+" "+verb, year, null, null, "year", loc, [rel.name,...(people||[])],
+            {gedcomContext:true, visibility:"private"});
+          if(m) contextMems.push(m);
+        }
+        addCtx("Born", parseInt(rel.dob)||null, rel.birthPlace||"", []);
+        addCtx("Died", parseInt(rel.dod)||null, rel.deathPlace||"", []);
+        // Their marriages and children
+        (treeFamilies||[]).forEach(fam=>{
+          if(fam.husbandId!==relId&&fam.wifeId!==relId) return;
+          const spId = fam.husbandId===relId ? fam.wifeId : fam.husbandId;
+          const sp = spId ? tpById[spId] : null;
+          if(fam.marriageYear) addCtx(sp?"Married "+sp.name:"Married", fam.marriageYear, fam.marriagePlace||"", sp?[sp.name]:[]);
+          (fam.childIds||[]).forEach(cid=>{
+            const ch=tpById[cid]; if(!ch) return;
+            addCtx("Birth of "+ch.name, parseInt(ch.dob)||null, ch.birthPlace||"", [ch.name]);
+            if(ch.dod) addCtx("Death of "+ch.name, parseInt(ch.dod)||null, ch.deathPlace||"", [ch.name]);
           });
         });
       });
+
       contextMems.sort((a,b)=>(a.year||0)-(b.year||0));
 
-      const allMems = [...personalMems,...contextMems].sort((a,b)=>(a.year||0)-(b.year||0));
-      const allKnownPeople = [...new Set([...personalMems.flatMap(m=>m.people||[]),...Object.keys(rels)])].sort();
+      const allMems = [...personalMems.filter(Boolean),...contextMems].sort((a,b)=>(a.year||0)-(b.year||0));
+      const allKnownPeople = [...new Set([...allMems.flatMap(m=>m.people||[])])].sort();
       const allKnownLocs   = [...new Set(allMems.map(m=>m.location).filter(Boolean))].sort();
 
       const newSubj = {
@@ -7309,10 +7359,6 @@ function handleEdit(m) {
         const deatDate = deat ? parseDate(child(deat,"DATE")) : null;
         const sex = child(rec,"SEX") || "";
         const topNotes = rec.children.filter(n=>n.tag==="NOTE").map(n=>fullText(n)).filter(Boolean).join("\n\n");
-        // Build and store personal events so "Start Chronicle" can pre-populate memories later
-        const personForBuild = { id: gedId, rec, fullName: name, sex,
-          birtYear: birtDate?.year||null, deatYear: deatDate?.year||null };
-        const { mems } = buildMemories(personForBuild);
         return {
           id: "tp_"+gedId.replace(/@/g,""),
           gedId, name, sex,
@@ -7322,7 +7368,6 @@ function handleEdit(m) {
           deathPlace: deat ? (child(deat,"PLAC")||"") : "",
           notes: topNotes,
           subjectId: null,
-          events: mems,
         };
       });
 
