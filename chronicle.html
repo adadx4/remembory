@@ -502,7 +502,7 @@ const MODES = {
     color:"#c4a962", bg:"rgba(196,169,98,0.1)", border:"rgba(196,169,98,0.4)",
     addMemory: name => `Add a Biographical Entry${name?" for "+name:""}`,
     emptyTitle: name => `${name ? name+"'s" : "This"} chronicle is empty.`,
-    emptyPrompt: name => `Press + Add to record a biographical entry.`,
+    emptyPrompt: name => `Press + Add to record a biographical entry, or use Import \u2192 Family Tree to bring in a GEDCOM file and build a timeline from records.`,
     subtitle: (name, count, decades) => count===0 ? `Research begins here.` : `${count} ${count===1?"entry":"entries"} across ${decades} ${decades===1?"decade":"decades"}`,
   },
 };
@@ -5173,6 +5173,7 @@ function DetailView({
   isSubscriber, ownerName, ownerEmail, localConnections,
   handleEdit, handleDelete, handleSavePerspectives,
   recordShare, removeShareRecord, toggleLegacy,
+  isHistoryMode,
 }) {
   const m = memories.find(x => x.id === selected);
   if (!m) return null;
@@ -5243,6 +5244,23 @@ function DetailView({
       );
     })(),
 
+    // ── Research provenance (History entries) ──
+    (m.researchNote||m.candidateConfidence||m._guestContributor)&&React.createElement("div",{style:{background:"rgba(196,169,98,0.06)",border:"1px solid rgba(196,169,98,0.25)",borderRadius:"4px",padding:"12px 14px",marginBottom:"22px"}},
+      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap",marginBottom:m.researchNote?"8px":"0"}},
+        React.createElement("span",{style:{fontSize:"0.7rem",textTransform:"uppercase",letterSpacing:"0.08em",color:"#a89060",fontFamily:"Arial,sans-serif"}},
+          "Research"
+        ),
+        m.candidateConfidence&&(()=>{
+          const cc = CANDIDATE_CONFIDENCE.find(c=>c.id===m.candidateConfidence);
+          return cc ? React.createElement("span",{style:{fontSize:"0.72rem",padding:"1px 8px",borderRadius:"20px",background:cc.color+"22",color:cc.color,border:"1px solid "+cc.color+"55"}},cc.label+" confidence") : null;
+        })(),
+        m._guestContributor&&React.createElement("span",{style:{fontSize:"0.72rem",color:"#8a7460",fontStyle:"italic"}},
+          "contributed by "+m._guestContributor+(m._contributedAt?" · "+new Date(m._contributedAt).toLocaleDateString():"")
+        )
+      ),
+      m.researchNote&&React.createElement("p",{style:{fontSize:"0.88rem",color:"#5a4820",lineHeight:1.6,margin:0,fontStyle:"italic",whiteSpace:"pre-wrap"}},m.researchNote)
+    ),
+
     // ── Perspectives panel ──
     (m.sharedBy||(m.perspectives&&m.perspectives.length>0))&&React.createElement(PerspectivesPanel,{
       memory:m,
@@ -5267,8 +5285,8 @@ function DetailView({
           )
     ),
  
-    // Legacy toggle — subtle link rather than prominent checkbox
-    React.createElement("div",{style:{marginBottom:"24px"}},
+    // Legacy toggle — hidden in History mode (not applicable to research entries)
+    !isHistoryMode&&React.createElement("div",{style:{marginBottom:"24px"}},
       React.createElement("button",{onClick:()=>toggleLegacy(m.id),style:{
         background:"none",border:"none",padding:0,cursor:"pointer",
         fontFamily:"'Crimson Text',Georgia,serif",fontSize:"0.84rem",
@@ -5301,6 +5319,7 @@ function AddEditForm({
     if ((form.mediaUrls||[]).length) s.add("photos");
     if (form.visibility && form.visibility !== "private") s.add("visibility");
     if ((form.sourceIds||[]).length) s.add("sources");
+    if (form.researchNote || form.candidateConfidence) s.add("researchnote");
     return s;
   });
   const toggle = k => setExpanded(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
@@ -5396,7 +5415,8 @@ function AddEditForm({
       secToggle("people",    "People",        "\ud83d\udc64"),
       secToggle("orgs",      "Organisation",  "\ud83c\udfdb"),
       secToggle("photos",    "Photos",        "\ud83d\uddbc"),
-      knownSources&&knownSources.length>0&&secToggle("sources", "Sources", "\ud83d\udcda"),
+      (isHistoryMode||(knownSources&&knownSources.length>0))&&secToggle("sources", "Sources", "\ud83d\udcda"),
+      isHistoryMode&&secToggle("researchnote","Research Note","\ud83d\udcdd"),
       wantPublicProfile&&secToggle("visibility","Visibility",  "\ud83d\udd12")
     ),
 
@@ -5478,7 +5498,11 @@ function AddEditForm({
         React.createElement("label",{style:S.label},"Sources"),
         React.createElement("p",{style:{fontSize:"0.76rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 8px"}},"Which records or sources support this entry?"),
         (knownSources||[]).length===0
-          ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic"}},"No sources yet \u2014 add sources in the Sources tab of the Index.")
+          ? React.createElement("div",{style:{background:"rgba(196,169,98,0.07)",border:"1px dashed rgba(196,169,98,0.4)",borderRadius:"3px",padding:"10px 14px",fontSize:"0.84rem",color:"#7a6a58"}},
+              "No sources added yet. Go to ",
+              React.createElement("strong",null,"Index \u2192 Sources"),
+              " to add census records, photographs, vital records, and other sources. Once added they\u2019ll appear here to link to entries."
+            )
           : React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"6px"}},
               (knownSources||[]).map(src=>{
                 const ti = SOURCE_TYPES.find(x=>x.id===src.type)||SOURCE_TYPES[SOURCE_TYPES.length-1];
@@ -5519,8 +5543,8 @@ function AddEditForm({
       )
     )),
 
-    // ── Research note (History mode) ──
-    isHistoryMode&&sec(React.createElement("div",null,
+    // ── Research note (History mode, collapsible) ──
+    isHistoryMode&&expanded.has("researchnote")&&sec(React.createElement("div",null,
       React.createElement("label",{style:S.label},"Research Note"),
       React.createElement("textarea",{value:form.researchNote||"",onChange:e=>updateForm({researchNote:e.target.value}),placeholder:"Repository, reference number, why this is uncertain, what still needs verification\u2026",rows:2,style:{...S.input,resize:"vertical"}}),
       React.createElement("div",{style:{display:"flex",gap:"6px",marginTop:"8px",alignItems:"center"}},
@@ -8503,7 +8527,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
       // ── DECADE VIEW ──
       view==="decade"&&zoomDecade!==null&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"2rem",margin:"0 0 4px",color:"#1a1208"}},`${zoomDecade}s`),
-        React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"26px",fontSize:"0.92rem"}},`${memsForDec(zoomDecade).length} memories`),
+        React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"26px",fontSize:"0.92rem"}},`${memsForDec(zoomDecade).length} ${isHistoryMode?"entries":"memories"}`),
         Array.from({length:10},(_,i)=>zoomDecade+i).map(yr=>{
           const yMems=memsForDec(zoomDecade).filter(m=>m.year===yr);
           const empty=yMems.length===0;
@@ -8514,7 +8538,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
             ),
             React.createElement("div",{style:{flex:1,borderLeft:`3px solid ${empty?"#e0d4be":"#c8a87a"}`,paddingLeft:"14px"}},
               empty
-                ? React.createElement("div",{style:{height:"34px",display:"flex",alignItems:"center"}},React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},"no memories recorded"))
+                ? React.createElement("div",{style:{height:"34px",display:"flex",alignItems:"center"}},React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},isHistoryMode?"no entries recorded":"no memories recorded"))
                 : React.createElement("div",{style:{paddingTop:"6px",paddingBottom:"8px"}},
                     yMems.map(m=>React.createElement("div",{key:m.id,style:{display:"flex",alignItems:"baseline",gap:"7px",marginBottom:"3px"}},
                       React.createElement("span",{style:{width:"9px",height:"9px",borderRadius:"50%",background:m.tags[0]?TAG_COLORS[m.tags[0]]:"#c8b89a",flexShrink:0,display:"inline-block",marginTop:"3px"}}),
@@ -8529,7 +8553,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
       // ── YEAR VIEW ──
       view==="year"&&zoomYear!==null&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"2rem",margin:"0 0 4px",color:"#1a1208"}},zoomYear),
-        React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"22px",fontSize:"0.92rem"}},`${memsForYear(zoomYear).length} memories this year`),
+        React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"22px",fontSize:"0.92rem"}},`${memsForYear(zoomYear).length} ${isHistoryMode?"entries":"memories"} this year`),
         (()=>{
           const mems=memsForYear(zoomYear);
           const byMonth={};
@@ -8603,6 +8627,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         isSubscriber, ownerName, ownerEmail, localConnections,
         handleEdit, handleDelete, handleSavePerspectives,
         recordShare, removeShareRecord, toggleLegacy,
+        isHistoryMode,
       }),
       (view==="add"||view==="edit")&&React.createElement(AddEditForm,{
         view, form, updateForm, editingId,
