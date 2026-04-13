@@ -3811,17 +3811,6 @@ function SettingsView({
       // ── Password / lock ──
       React.createElement(PasswordCard,{activePassword,data,setActivePassword,setLocked,setData}),
 
-      // ── Receive shared memories ──
-      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Receive shared memories"),
-        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 12px",lineHeight:1.6}},"Enter a share code from someone\u2019s message or the bridge page."),
-        React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"8px"}},
-          React.createElement("input",{type:"text",value:shareCodeInput,onChange:e=>setShareCodeInput(e.target.value.trim()),onKeyDown:e=>e.key==="Enter"&&importFromCode(),placeholder:"e.g. a1b2c3d4",style:{...S.input,flex:1,fontFamily:"monospace",fontSize:"1rem",letterSpacing:"0.05em"}}),
-          React.createElement("button",{onClick:importFromCode,disabled:!shareCodeInput.trim()||shareCodeStatus==="Fetching\u2026",style:{...S.btn,padding:"9px 18px",whiteSpace:"nowrap",opacity:shareCodeInput.trim()?1:0.4}},shareCodeStatus==="Fetching\u2026"?"Fetching\u2026":"Import")
-        ),
-        shareCodeStatus&&React.createElement("p",{style:{fontSize:"0.84rem",color:shareCodeStatus.startsWith("\u2713")?"#4a7a5a":"#c4858a",fontStyle:"italic"}},shareCodeStatus)
-      ),
-
       // ── Danger zone ──
       React.createElement("div",{style:{background:"rgba(255,245,245,0.7)",border:"1px solid #e0c8c8",borderRadius:"3px",padding:"20px"}},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#8a3030",margin:"0 0 8px"}},"Reset"),
@@ -7598,8 +7587,8 @@ function handleEdit(m) {
       )
     ),
 
-    // ── MODE PICKER (first-launch for subjects with no mode) ──
-    view==="life"&&!subject.mode&&React.createElement(ModePicker,{
+    // ── MODE PICKER (only on first entry — no mode and no memories yet) ──
+    view==="life"&&!subject.mode&&memories.length===0&&React.createElement(ModePicker,{
       subjectName: subject.name,
       onPick: mode => {
         const isSelf = MODES[mode]?.isSelf||false;
@@ -7910,7 +7899,7 @@ function handleEdit(m) {
         React.createElement("button",{
           onClick:()=>setShowSubjectMgr(true),
           title:"Switch person",
-          style:{display:"flex",alignItems:"center",gap:"5px",background:"rgba(200,168,122,0.12)",border:"1px solid rgba(200,168,122,0.4)",borderRadius:"20px",padding:"3px 10px 3px 8px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.82rem",color:"#6a4a28",whiteSpace:"nowrap",maxWidth:isMobile?"120px":"180px",overflow:"hidden",flexShrink:0}
+          style:{display:"flex",alignItems:"center",gap:"6px",background:"rgba(200,168,122,0.12)",border:"1px solid rgba(200,168,122,0.4)",borderRadius:"20px",padding:"5px 14px 5px 10px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:isMobile?"0.9rem":"1rem",color:"#6a4a28",whiteSpace:"nowrap",maxWidth:isMobile?"160px":"320px",overflow:"hidden",flexShrink:0}
         },
           React.createElement("span",{style:{fontSize:"0.8rem",flexShrink:0,color:modeFor(subject).color}},modeFor(subject).icon),
           isCarerMode&&React.createElement("span",{style:{fontSize:"0.68rem",color:"#7a5a20",opacity:0.8,flexShrink:0}},carerName?"recording for":"for"),
@@ -7967,14 +7956,12 @@ function handleEdit(m) {
               {divider:true},
               {label:"Contact",href:"mailto:hello@remembory.net"},
             ]}),
-            React.createElement("span",{style:{width:"1px",height:"18px",background:"#d4c4a8",flexShrink:0}}),
-            showAdd&&React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView("add"); },style:{...S.btn,padding:"7px 15px",fontSize:"0.9rem"}},"+ Add")
           );
         })(),
         // Back button (desktop edit views + mobile)
         showBack&&React.createElement("button",{onClick:goBack,style:{...S.btnOutline,padding:isMobile?"8px 14px":"7px 13px",fontSize:"0.9rem"}},"← Back"),
-        // Mobile: only Back + Add
-        isMobile&&showAdd&&React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView("add"); },style:{...S.btn,padding:"8px 16px",fontSize:"0.9rem"}},"+ Add")
+        // Mobile: Back + Add
+        isMobile&&!["add","edit"].includes(view)&&React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setView("add"); },style:{...S.btn,padding:"8px 16px",fontSize:"0.9rem"}},"+ Add")
       )
     ),
 
