@@ -2708,14 +2708,20 @@ function MapView({ memories, onSelectLocation, locationCoords, onSaveCoords, kno
 }
 
 // ── ShareViaLink ───────────────────────────────────────────────
-function ShareViaLink({memories, senderName, senderEmail, personalMsg, deliverToEmails, onDone}) {
+function ShareViaLink({memories, senderName, senderEmail, personalMsg, deliverToEmails, deliveredToNames, allDelivered, onDone}) {
   const [status, setStatus] = useState("idle");
   const [shareUrl, setShareUrl] = useState("");
   const [shareCode, setShareCode] = useState("");
   const [shareErr, setShareErr] = useState("");
   const [copied, setCopied] = useState(false);
-  const [msgMode, setMsgMode] = useState("full"); // "full" | "link" | "code"
   const [copiedMsg, setCopiedMsg] = useState(false);
+
+  const someDelivered = !allDelivered && deliveredToNames && deliveredToNames.length > 0;
+
+  // Default message mode: "full" intro for unknown recipients, "code" if they likely have Chronicle
+  const defaultMode = someDelivered ? "code" : "full";
+  const [msgMode, setMsgMode] = useState(defaultMode);
+
   const CHRONICLE_INTRO = "I\u2019ve shared some memories with you using Chronicle \u2014 a free, private memory journal at remembory.net.\n\nChronicle lets you collect the story of a life: memories, photos, places, and the people in them. Everything is stored privately on your own device \u2014 nothing is uploaded to a server unless you choose to share it.\n\nWhen you open the link below, you\u2019ll be able to review the memories I\u2019ve shared, choose which ones to save, and add them to your own Chronicle \u2014 where you can add your own perspective, fill in your side of the story, and start building your own timeline.\n\nIt\u2019s free to use. No account or sign-up needed to get started.\n\n\u26a0 Please open the link in a browser (Safari, Chrome, Firefox) \u2014 opening from inside a messaging app may not work correctly:\n";
   const CODE_INSTRUCTIONS = "To add these memories to your Chronicle, open remembory.net/chronicle.html in your browser, go to the Sharing page, and enter this code:";
   function buildMessage() {
@@ -2808,38 +2814,62 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, deliverTo
   );
 
 
-  if (status==="done") return React.createElement("div",null,
-    React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontWeight:600,marginBottom:"12px"}},"✓ Ready — choose what to send:"),
-    React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"6px",marginBottom:"12px"}},
-      [
-        ["full","Include introductory message","good for first-time recipients"],
-        ["link","Link only","just the share URL"],
-        ["code","Share code only","for recipients who already have Chronicle"],
-      ].map(([val,label,hint])=>
-        React.createElement("label",{key:val,style:{display:"flex",alignItems:"flex-start",gap:"8px",cursor:"pointer",padding:"6px 10px",borderRadius:"3px",background:msgMode===val?"rgba(122,158,138,0.1)":"transparent",border:msgMode===val?"1px solid rgba(122,158,138,0.4)":"1px solid transparent"}},
-          React.createElement("input",{type:"radio",name:"msgMode",value:val,checked:msgMode===val,onChange:()=>setMsgMode(val),style:{marginTop:"3px",flexShrink:0}}),
-          React.createElement("div",null,
-            React.createElement("div",{style:{fontSize:"0.88rem",color:"#2c2416",lineHeight:1.4}},label),
-            React.createElement("div",{style:{fontSize:"0.75rem",color:"#8a7460"}},hint)
+  if (status==="done") {
+    // ── All-delivered confirmation (no copy needed) ──────────────────────────
+    if (allDelivered) return React.createElement("div",null,
+      React.createElement("div",{style:{background:"rgba(74,122,90,0.08)",border:"1px solid rgba(74,122,90,0.3)",borderRadius:"4px",padding:"16px 18px",marginBottom:"12px"}},
+        React.createElement("p",{style:{fontSize:"0.92rem",color:"#2a5a3a",fontWeight:600,margin:"0 0 6px"}},
+          "✓ Delivered to "+(deliveredToNames.length===1?deliveredToNames[0]:deliveredToNames.join(", "))
+        ),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",margin:0,lineHeight:1.5}},
+          (memories.length===1?"This memory has":"These "+memories.length+" memories have")+" arrived in their Chronicle inbox. No link needed."
+        )
+      ),
+      React.createElement("p",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 12px"}},
+        "If they don\u2019t see it, they can also enter code: "+shareCode+" in Sharing \u2192 Receive a Share."
+      ),
+      React.createElement("button",{onClick:onDone,style:{...S.btn,width:"100%"}},"Done")
+    );
+
+    // ── Partial delivery: banner + copy UI for the rest ──────────────────────
+    return React.createElement("div",null,
+      someDelivered&&React.createElement("div",{style:{background:"rgba(74,122,90,0.08)",border:"1px solid rgba(74,122,90,0.3)",borderRadius:"4px",padding:"10px 14px",marginBottom:"14px",fontSize:"0.84rem",color:"#2a5a3a"}},
+        "✓ Sent to "+(deliveredToNames.join(", "))+" \u2014 already in their inbox."
+      ),
+      React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontWeight:600,marginBottom:"10px"}},
+        someDelivered ? "Also send to everyone else:" : "Choose what to send:"
+      ),
+      React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"6px",marginBottom:"12px"}},
+        [
+          ["full","New to Chronicle","includes app intro + link — use for first-time recipients"],
+          ["link","Has Chronicle","just the share link"],
+          ["code","Has Chronicle (code)","short code they enter in the Sharing page"],
+        ].map(([val,label,hint])=>
+          React.createElement("label",{key:val,style:{display:"flex",alignItems:"flex-start",gap:"8px",cursor:"pointer",padding:"6px 10px",borderRadius:"3px",background:msgMode===val?"rgba(122,158,138,0.1)":"transparent",border:msgMode===val?"1px solid rgba(122,158,138,0.4)":"1px solid transparent"}},
+            React.createElement("input",{type:"radio",name:"msgMode",value:val,checked:msgMode===val,onChange:()=>setMsgMode(val),style:{marginTop:"3px",flexShrink:0}}),
+            React.createElement("div",null,
+              React.createElement("div",{style:{fontSize:"0.88rem",color:"#2c2416",lineHeight:1.4}},label),
+              React.createElement("div",{style:{fontSize:"0.75rem",color:"#8a7460"}},hint)
+            )
           )
         )
-      )
-    ),
-    React.createElement("textarea",{
-      readOnly:true,
-      value:buildMessage(),
-      onClick:e=>e.target.select(),
-      rows: msgMode==="full" ? 8 : 3,
-      style:{...S.input,width:"100%",fontSize:"0.82rem",color:"#2c2416",lineHeight:1.6,resize:"none",boxSizing:"border-box",fontFamily:"inherit",whiteSpace:"pre-wrap",marginBottom:"10px"}
-    }),
-    React.createElement("button",{onClick:copyMessage,style:{...S.btn,width:"100%",marginBottom:"8px",fontSize:"0.88rem"}},
-      copiedMsg ? "✓ Copied!" : "Copy message"
-    ),
-    React.createElement("p",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic",margin:"0"}},
-      "Link expires in 30 days and is deleted once the recipient saves it."
-    ),
-    React.createElement("button",{onClick:onDone,style:{...S.btnOutline,marginTop:"12px",color:"#8a7460",borderColor:"#c8b89a",width:"100%"}},"Done")
-  );
+      ),
+      React.createElement("textarea",{
+        readOnly:true,
+        value:buildMessage(),
+        onClick:e=>e.target.select(),
+        rows: msgMode==="full" ? 8 : 3,
+        style:{...S.input,width:"100%",fontSize:"0.82rem",color:"#2c2416",lineHeight:1.6,resize:"none",boxSizing:"border-box",fontFamily:"inherit",whiteSpace:"pre-wrap",marginBottom:"10px"}
+      }),
+      React.createElement("button",{onClick:copyMessage,style:{...S.btn,width:"100%",marginBottom:"8px",fontSize:"0.88rem"}},
+        copiedMsg ? "✓ Copied!" : "Copy message"
+      ),
+      React.createElement("p",{style:{fontSize:"0.75rem",color:"#8a7460",fontStyle:"italic",margin:"0"}},
+        "Link expires in 30 days and is deleted once the recipient saves it."
+      ),
+      React.createElement("button",{onClick:onDone,style:{...S.btnOutline,marginTop:"12px",color:"#8a7460",borderColor:"#c8b89a",width:"100%"}},"Done")
+    );
+  }
 
   return null;
 }
@@ -2858,6 +2888,20 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
 
   const effectiveEmail = ownerEmail || "";
   const allMems = memories || [];
+
+  // Resolve email for a person from either the per-subject email map or localConnections
+  function emailFor(p) {
+    return (peopleEmails||{})[p] || (localConnections||[]).find(c=>c.name===p)?.email || "";
+  }
+  // Classify a recipient: connected Chronicle user, or just a name
+  function recipientType(p) {
+    const isConn = (localConnections||[]).some(c=>c.name===p);
+    const hasEmail = !!emailFor(p);
+    if (isConn && hasEmail) return "connected_email";
+    if (isConn) return "connected_no_email";
+    if (hasEmail) return "has_email";
+    return "name_only";
+  }
 
   // Only people tagged in the current memory are offered as recipients
   const allPeople = [...new Set(memory.people||[])].sort();
@@ -2941,18 +2985,30 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
           : React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"6px"}},
               allPeople.map(person => {
                 const sel = selectedPeople.includes(person);
-                const isConn = (localConnections||[]).some(c=>c.name===person);
+                const rt = recipientType(person);
+                const borderColor = sel?"#7a9e8a":rt==="connected_email"||rt==="connected_no_email"?"#a8885a":"#d4c4a8";
+                const bg = sel?"rgba(122,158,138,0.15)":rt==="connected_email"||rt==="connected_no_email"?"rgba(168,136,90,0.08)":"rgba(255,252,245,0.8)";
+                const color = sel?"#4a7a5a":rt==="connected_email"||rt==="connected_no_email"?"#7a5a20":"#6a5c48";
+                const hint = rt==="connected_email"?"→ inbox":rt==="connected_no_email"?"Chronicle":rt==="has_email"?"→ inbox":"";
                 return React.createElement("button",{
                   key:person,
                   onClick:()=>togglePerson(person),
-                  style:{padding:"5px 12px",borderRadius:"20px",border:sel?"1px solid #7a9e8a":isConn?"1px solid #a8885a":"1px solid #d4c4a8",background:sel?"rgba(122,158,138,0.15)":isConn?"rgba(168,136,90,0.08)":"rgba(255,252,245,0.8)",color:sel?"#4a7a5a":isConn?"#7a5a20":"#6a5c48",cursor:"pointer",fontSize:"0.88rem",fontWeight:sel?600:400}
-                },isConn?"✓ "+person:person);
+                  style:{padding:"5px 12px",borderRadius:"20px",border:"1px solid "+borderColor,background:bg,color,cursor:"pointer",fontSize:"0.88rem",fontWeight:sel?600:400,display:"flex",alignItems:"center",gap:"5px"}
+                },
+                  person,
+                  hint&&React.createElement("span",{style:{fontSize:"0.7rem",opacity:0.7,fontStyle:"italic"}},hint)
+                );
               })
             ),
-        selectedPeople.length > 0 && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",marginTop:"6px",fontStyle:"italic"}},
-          "Showing memories featuring " + (selectedPeople.length===1
-            ? selectedPeople[0]
-            : selectedPeople.slice(0,-1).join(", ") + " and " + selectedPeople[selectedPeople.length-1])
+        selectedPeople.length > 0 && React.createElement("div",null,
+          React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",marginTop:"6px",fontStyle:"italic"}},
+            "Showing memories featuring " + (selectedPeople.length===1
+              ? selectedPeople[0]
+              : selectedPeople.slice(0,-1).join(", ") + " and " + selectedPeople[selectedPeople.length-1])
+          ),
+          selectedPeople.some(p=>recipientType(p)==="connected_email"||recipientType(p)==="has_email")&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#4a7a5a",marginTop:"2px"}},
+            "✓ "+selectedPeople.filter(p=>recipientType(p)==="connected_email"||recipientType(p)==="has_email").join(", ")+" will receive this directly in their Chronicle inbox."
+          )
         )
       ),
 
@@ -2995,24 +3051,27 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
         React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",marginTop:"4px",fontStyle:"italic"}},"Optional")
       ),
 
-      selectedPeople.some(p=>(localConnections||[]).some(c=>c.name===p))&&React.createElement("div",{
-        style:{background:"rgba(168,136,90,0.08)",border:"1px solid rgba(168,136,90,0.25)",borderRadius:"3px",padding:"10px 14px",marginBottom:"12px",fontSize:"0.82rem",color:"#7a5a20",lineHeight:1.6}
-      },React.createElement("strong",null,"✓ Connected")," — This person is in your connections. "),
       React.createElement("button",{
         onClick:handleGetLink,
         disabled:!canShare,
         style:{...S.btn,width:"100%",opacity:canShare?1:0.45,cursor:canShare?"pointer":"not-allowed"}
-      },"Get shareable link (" + selectedMemIds.size + " " + (selectedMemIds.size===1?"memory":"memories") + ")")
+      },selectedMemIds.size===1?"Share this memory":"Share "+selectedMemIds.size+" memories")
     ),
 
-    step==="link" && React.createElement(ShareViaLink,{
-      memories:toShare,
-      senderName:senderName,
-      senderEmail:effectiveEmail,
-      personalMsg:personalMsg,
-      deliverToEmails:selectedPeople.map(p=>(peopleEmails||{})[p]).filter(Boolean),
-      onDone:handleClose
-    })
+    step==="link" && (()=>{
+      const withEmail = selectedPeople.filter(p=>!!emailFor(p));
+      const withoutEmail = selectedPeople.filter(p=>!emailFor(p));
+      return React.createElement(ShareViaLink,{
+        memories:toShare,
+        senderName:senderName,
+        senderEmail:effectiveEmail,
+        personalMsg:personalMsg,
+        deliverToEmails:withEmail.map(p=>emailFor(p)),
+        deliveredToNames:withEmail,
+        allDelivered:withEmail.length>0 && withoutEmail.length===0,
+        onDone:handleClose
+      });
+    })()
   );
 }
 
@@ -4092,9 +4151,20 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
           )
         : pendingDeliveries.map((delivery,di)=>
             React.createElement("div",{key:di,style:{...cardStyle,borderColor:"#7a9e8a",background:"rgba(122,158,138,0.05)"}},
-              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px"}},
-                React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",margin:0}},delivery.sharedBy||"Anonymous contributor"),
-                React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},(delivery.memories||[]).length+" "+(delivery.memories?.length===1?"memory":"memories"))
+              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}},
+                React.createElement("div",null,
+                  React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",margin:0}},delivery.sharedBy||"Anonymous contributor"),
+                  React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},(delivery.memories||[]).length+" "+(delivery.memories?.length===1?"memory":"memories"))
+                ),
+                (delivery.memories||[]).length>1&&React.createElement("button",{
+                  onClick:()=>{
+                    (delivery.memories||[]).forEach(mem=>{
+                      acceptOne(delivery, mem, {addedBy:{name:delivery.sharedBy||"", on:new Date().toISOString().slice(0,10)}});
+                    });
+                    setPendingDeliveries(prev=>prev.filter((_,i)=>i!==di));
+                  },
+                  style:{...S.btn,padding:"5px 14px",fontSize:"0.8rem",whiteSpace:"nowrap"}
+                },"✓ Accept all")
               ),
               delivery.message&&React.createElement("p",{style:{fontSize:"0.88rem",color:"#5a4838",fontStyle:"italic",borderLeft:"3px solid #c8b89a",paddingLeft:"10px",margin:"0 0 10px",lineHeight:1.6}},'"'+delivery.message+'"'),
               (delivery.memories||[]).map((mem,mi)=>
@@ -4111,9 +4181,20 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
         React.createElement("p",{style:{fontSize:"0.78rem",color:"#4a7a5a",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"10px"}},"Waiting to review"),
         pendingDeliveries.map((delivery,di)=>
           React.createElement("div",{key:di,style:{...cardStyle,borderColor:"#7a9e8a",background:"rgba(122,158,138,0.05)"}},
-            React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px"}},
-              React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",margin:0}},delivery.sharedBy||"Someone"),
-              React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},(delivery.memories||[]).length+" "+(delivery.memories?.length===1?"memory":"memories"))
+            React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}},
+              React.createElement("div",null,
+                React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",margin:0}},delivery.sharedBy||"Someone"),
+                React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},(delivery.memories||[]).length+" "+(delivery.memories?.length===1?"memory":"memories"))
+              ),
+              (delivery.memories||[]).length>1&&React.createElement("button",{
+                onClick:()=>{
+                  (delivery.memories||[]).forEach(mem=>{
+                    acceptOne(delivery, mem, {addedBy:{name:delivery.sharedBy||"", on:new Date().toISOString().slice(0,10)}});
+                  });
+                  setPendingDeliveries(prev=>prev.filter((_,i)=>i!==di));
+                },
+                style:{...S.btn,padding:"5px 14px",fontSize:"0.8rem",whiteSpace:"nowrap"}
+              },"✓ Accept all")
             ),
             delivery.message&&React.createElement("p",{style:{fontSize:"0.88rem",color:"#5a4838",fontStyle:"italic",borderLeft:"3px solid #c8b89a",paddingLeft:"10px",margin:"0 0 10px",lineHeight:1.6}},'"'+delivery.message+'"'),
             (delivery.memories||[]).map((mem,mi)=>
