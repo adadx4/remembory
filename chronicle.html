@@ -297,7 +297,7 @@ function knownLocationValues(knownLocations, field) {
 }
 
 function newForm() {
-  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], sourceIds:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town", researchNote:"", candidateConfidence:"possible" };
+  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], sourceIds:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town", researchNote:"", candidateConfidence:"possible", recalledBy:"self" };
 }
 
 // ── Storage ────────────────────────────────────────────────────
@@ -5452,9 +5452,20 @@ function AddEditForm({
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",paddingBottom:"72px"}},
     React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.6rem",fontStyle:"italic",marginBottom:(form._promptHint||isCarerMode)?"10px":"18px",color:"#1a1208"}},view==="edit"?"Edit Memory":addTitle),
 
-    isCarerMode&&ownerName&&view==="add"&&React.createElement("div",{style:{background:"rgba(74,122,90,0.07)",border:"1px solid rgba(74,122,90,0.2)",borderRadius:"3px",padding:"10px 14px",marginBottom:"14px",fontSize:"0.84rem",color:"#3a5a3a",lineHeight:1.6}},
-      `You're adding this to ${ownerName}'s chronicle.`,
-      carerName&&React.createElement("span",null,` Your name (${carerName}) will be recorded as the contributor.`)
+    isCarerMode&&!isHistoryMode&&view==="add"&&React.createElement("div",{style:{background:"rgba(74,122,90,0.07)",border:"1px solid rgba(74,122,90,0.2)",borderRadius:"3px",padding:"10px 14px",marginBottom:"14px",fontSize:"0.84rem",color:"#3a5a3a",lineHeight:1.5}},
+      ownerName&&React.createElement("div",{style:{marginBottom:"8px"}},`Adding to ${ownerName}'s chronicle.`),
+      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}},
+        React.createElement("span",{style:{color:"#3a5a3a",fontWeight:600}},"Recalled by:"),
+        [["self","🧠","Their own memory"],["carer","🤝","Shared with carer"],["told","💬","Someone else told them"]].map(([val,icon,label])=>
+          React.createElement("button",{
+            key:val,
+            onClick:()=>setForm(f=>({...f,recalledBy:val})),
+            style:{padding:"3px 10px",borderRadius:"20px",border:"1px solid",cursor:"pointer",fontSize:"0.8rem",fontFamily:"'Crimson Text',serif",
+              background:(form.recalledBy||"self")===val?"rgba(74,122,90,0.2)":"transparent",
+              color:"#3a5a3a",borderColor:(form.recalledBy||"self")===val?"rgba(74,122,90,0.5)":"rgba(74,122,90,0.25)"}
+          },`${icon} ${label}`)
+        )
+      )
     ),
     form._promptHint&&React.createElement("div",{style:{background:"rgba(196,170,130,0.12)",border:"1px solid rgba(196,170,130,0.35)",borderRadius:"3px",padding:"10px 14px",marginBottom:"16px",display:"flex",alignItems:"flex-start",gap:"10px"}},
       React.createElement("span",{style:{fontSize:"1rem",flexShrink:0,marginTop:"1px"}},"\u2726"),
@@ -6207,18 +6218,21 @@ function App() {
       persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs});
       setEditingId(null); setSelected(editingId); setForm(newForm()); setView("detail");
     } else {
-      // Stamp addedBy on new memories in Legacy/carer mode
+      // Stamp addedBy / recalledBy on new memories in carer mode
       if (isCarerMode) {
         const attrib = {name:carerName||"", on:new Date().toISOString().slice(0,10)};
         primary = {...primary, addedBy:attrib};
         if (secondary) secondary = {...secondary, addedBy:attrib};
+        if (!isHistoryMode) {
+          primary = {...primary, recalledBy:form.recalledBy||"self"};
+          if (secondary) secondary = {...secondary, recalledBy:form.recalledBy||"self"};
+        }
       }
       const toAdd = secondary ? [primary, secondary] : [primary];
       const updated = [...memories,...toAdd].sort((a,b)=>sortKey(a)-sortKey(b));
       persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs});
       setForm(newForm());
-      if (isCarerMode && carerName) { setPendingAttribution({memId: primary.id}); }
-      else setView("life");
+      setView("life");
     }
     setPendingEndMemory(null);
   }
