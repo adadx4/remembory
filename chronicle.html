@@ -4798,8 +4798,6 @@ function SharedTimelineView({ memories, subjectName, setSelected, setView }) {
 
 function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, onSwitch,
   treePersons, treeFamilies, gedFocalPersonId, isHistoryMode, persistSubject, setView}) {
-  const [showLinks, setShowLinks] = React.useState(false);
-  const [lf, setLf] = React.useState({fromId:"", toId:"", type:"parent-of"});
   const [tpSearch, setTpSearch] = React.useState("");
   const [focalId, setFocalId] = React.useState(()=>gedFocalPersonId||treePersons[0]?.id||null);
   const [depthUp, setDepthUp] = React.useState(3);
@@ -4822,8 +4820,6 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
 
   // Keep focalId in sync when gedFocalPersonId changes (e.g. after fresh import)
   React.useEffect(()=>{ if(gedFocalPersonId) setFocalId(gedFocalPersonId); },[gedFocalPersonId]);
-
-  const subLinks = subjectLinks || [];
 
   // ── FULL TREE MODE (treePersons populated) ──────────────────────────────
   const hasTree = treePersons && treePersons.length > 0;
@@ -5082,151 +5078,48 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
 
   // ── SUBJECTS-ONLY MODE ──────────────────────────────────────────
 
-  // Build adjacency
-  const parentOf={}, childOf={}, spouseOf={};
-  subLinks.forEach(lk=>{
-    if(lk.type==="parent-of"){
-      (parentOf[lk.fromId]=parentOf[lk.fromId]||[]).push(lk.toId);
-      (childOf[lk.toId]=childOf[lk.toId]||[]).push(lk.fromId);
-    } else if(lk.type==="spouse-of"){
-      (spouseOf[lk.fromId]=spouseOf[lk.fromId]||[]).push(lk.toId);
-      (spouseOf[lk.toId]=spouseOf[lk.toId]||[]).push(lk.fromId);
-    }
-  });
-
-  // Assign generations via BFS from roots
-  const subjIds = new Set(subjects.map(s=>s.id));
-  const gens = {};
-  const roots = subjects.filter(s=>!(childOf[s.id]||[]).some(pid=>subjIds.has(pid)));
-  const q = roots.map(s=>[s.id,0]);
-  const vis = new Set();
-  while(q.length){
-    const [id,g]=q.shift();
-    if(vis.has(id)) continue; vis.add(id); gens[id]=g;
-    (parentOf[id]||[]).filter(cid=>subjIds.has(cid)&&!vis.has(cid)).forEach(cid=>q.push([cid,g+1]));
-  }
-  subjects.forEach(s=>{ if(gens[s.id]===undefined) gens[s.id]=0; });
-  // Normalize spouse generations (must be same row)
-  let changed=true;
-  while(changed){ changed=false; subLinks.filter(l=>l.type==="spouse-of").forEach(l=>{ const g1=gens[l.fromId],g2=gens[l.toId]; if(g1!==undefined&&g2!==undefined&&g1!==g2){const mx=Math.max(g1,g2);gens[l.fromId]=mx;gens[l.toId]=mx;changed=true;} }); }
-
-  const maxGen = subjects.length?Math.max(0,...subjects.map(s=>gens[s.id]||0)):0;
-  const byGen = {};
-  for(let g=0;g<=maxGen;g++) byGen[g]=[];
-  subjects.forEach(s=>byGen[gens[s.id]].push(s));
-  Object.values(byGen).forEach(arr=>arr.sort((a,b)=>{ const ya=a.dob?parseInt(a.dob):9999,yb=b.dob?parseInt(b.dob):9999; return ya-yb||a.name.localeCompare(b.name); }));
-
-  // Positions
-  const NW=140,NH=88,HG=28,VG=70;
-  const maxRow = Math.max(1,...Object.values(byGen).map(a=>a.length));
-  const cvW = Math.max(400, maxRow*(NW+HG)-HG+60);
-  const cvH = (maxGen+1)*(NH+VG)-VG+60;
-  const pos={};
-  Object.entries(byGen).forEach(([g,arr])=>{
-    const rowW=arr.length*(NW+HG)-HG;
-    const sx=(cvW-rowW)/2;
-    arr.forEach((s,i)=>{ pos[s.id]={x:sx+i*(NW+HG),y:30+g*(NH+VG)}; });
-  });
-
-  // Lines
-  const pcLines = subLinks.filter(l=>l.type==="parent-of").map(l=>{
-    const p=pos[l.fromId],c=pos[l.toId]; if(!p||!c) return null;
-    return {id:l.id,x1:p.x+NW/2,y1:p.y+NH,x2:c.x+NW/2,y2:c.y};
-  }).filter(Boolean);
-  const spLines=[];
-  const seenSp=new Set();
-  subLinks.filter(l=>l.type==="spouse-of").forEach(l=>{
-    const k=[l.fromId,l.toId].sort().join("|");
-    if(seenSp.has(k)) return; seenSp.add(k);
-    const p1=pos[l.fromId],p2=pos[l.toId]; if(!p1||!p2) return;
-    spLines.push({k,x1:p1.x+NW,y1:p1.y+NH/2,x2:p2.x,y2:p2.y+NH/2});
-  });
-
-  function addLink(){
-    const {fromId,toId,type}=lf; if(!fromId||!toId||fromId===toId) return;
-    if(subLinks.some(l=>l.fromId===fromId&&l.toId===toId&&l.type===type)) return;
-    persistTop({subjectLinks:[...subLinks,{id:"lk_"+Date.now(),fromId,toId,type}]});
-    setLf(f=>({...f,fromId:"",toId:""}));
-  }
-
-  const sName=id=>subjects.find(s=>s.id===id)?.name||"?";
   const modeColor=s=>{ const m=s.mode||(s.isSelf?"personal":"legacy"); return MODES[m]?.color||"#a89a7a"; };
-  const cardStyle={background:"rgba(255,252,245,0.9)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"14px 16px"};
 
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
-    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"20px",flexWrap:"wrap"}},
-      React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:0,color:"#1a1208"}},"Family Tree"),
-      React.createElement("button",{onClick:()=>setShowLinks(v=>!v),style:{...S.btn,padding:"6px 14px",fontSize:"0.88rem"}},showLinks?"× Close":"+ Manage Links"),
-      subjects.length<2&&React.createElement("span",{style:{fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic"}},"Add more people in the subject switcher to build a tree.")
+    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"6px",flexWrap:"wrap"}},
+      React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:0,color:"#1a1208"}},"Family Tree")
+    ),
+    React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",marginBottom:"20px",lineHeight:1.5}},
+      "Import a GEDCOM file (Add \u2192 Family Tree) to see the full tree with relationships, birth years, and places."
     ),
 
-    // Link management
-    showLinks&&React.createElement("div",{style:{...cardStyle,marginBottom:"20px"}},
-      React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",margin:"0 0 14px",color:"#1a1208"}},"Define Relationships"),
-      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr auto 1fr auto",gap:"8px",alignItems:"center",marginBottom:"14px"}},
-        React.createElement("select",{value:lf.fromId,onChange:e=>setLf(f=>({...f,fromId:e.target.value})),style:S.select},
-          React.createElement("option",{value:""},"Person A…"),
-          subjects.map(s=>React.createElement("option",{key:s.id,value:s.id},s.name))
-        ),
-        React.createElement("select",{value:lf.type,onChange:e=>setLf(f=>({...f,type:e.target.value})),style:{...S.select,fontSize:"0.8rem"}},
-          React.createElement("option",{value:"parent-of"},"is parent of"),
-          React.createElement("option",{value:"spouse-of"},"is spouse of")
-        ),
-        React.createElement("select",{value:lf.toId,onChange:e=>setLf(f=>({...f,toId:e.target.value})),style:S.select},
-          React.createElement("option",{value:""},"Person B…"),
-          subjects.filter(s=>s.id!==lf.fromId).map(s=>React.createElement("option",{key:s.id,value:s.id},s.name))
-        ),
-        React.createElement("button",{onClick:addLink,disabled:!lf.fromId||!lf.toId,style:{...S.btn,padding:"7px 14px",opacity:lf.fromId&&lf.toId?1:0.45}},"Add")
-      ),
-      subLinks.length===0
-        ? React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic",fontSize:"0.88rem",margin:0}},"No relationships defined yet.")
-        : React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"5px"}},
-            subLinks.map(lk=>React.createElement("div",{key:lk.id,style:{display:"flex",alignItems:"center",gap:"8px",fontSize:"0.84rem",fontFamily:"'Crimson Text',serif",padding:"4px 0",borderBottom:"1px solid #e8dfd0"}},
-              React.createElement("span",{style:{flex:1,color:"#2c2416"}},sName(lk.fromId)," ",React.createElement("em",{style:{color:"#8a7460"}},lk.type==="parent-of"?"parent of":"spouse of")," ",sName(lk.toId)),
-              React.createElement("button",{onClick:()=>persistTop({subjectLinks:subLinks.filter(l=>l.id!==lk.id)}),style:{background:"none",border:"none",cursor:"pointer",color:"#c4858a",fontSize:"0.9rem",padding:"0 4px"}},"×")
-            ))
-          )
-    ),
-
-    // Tree canvas
-    subjects.length<=1
-      ? React.createElement("div",{style:{textAlign:"center",padding:"56px 20px",color:"#8a7460",border:"1px dashed #c8b89a",borderRadius:"4px"}},
-          React.createElement("p",{style:{fontSize:"2rem",margin:"0 0 10px"}},"🌳"),
-          React.createElement("p",{style:{fontStyle:"italic",margin:0}},"Open the subject switcher (top-left) to add family members, then use \u201cManage Links\u201d to connect them.")
-        )
-      : React.createElement("div",{style:{overflowX:"auto",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"4px",background:"rgba(255,252,245,0.4)"}},
-          React.createElement("div",{style:{position:"relative",width:cvW+"px",height:cvH+"px",minWidth:"100%"}},
-            React.createElement("svg",{style:{position:"absolute",top:0,left:0,width:"100%",height:"100%",pointerEvents:"none"},viewBox:`0 0 ${cvW} ${cvH}`},
-              pcLines.map(l=>React.createElement("path",{key:l.id,d:`M${l.x1},${l.y1} C${l.x1},${(l.y1+l.y2)/2} ${l.x2},${(l.y1+l.y2)/2} ${l.x2},${l.y2}`,fill:"none",stroke:"#c8b89a",strokeWidth:2})),
-              spLines.map(l=>React.createElement("line",{key:l.k,x1:l.x1,y1:l.y1,x2:l.x2,y2:l.y2,stroke:"#e8a87a",strokeWidth:2,strokeDasharray:"5 3"}))
+    // Subject chronicle cards
+    React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"10px"}},
+      subjects.map(s=>{
+        const isActive=s.id===activeSubjectId;
+        const col=modeColor(s);
+        const dob=s.dob?s.dob.slice(0,4):null;
+        const mc=s.memories||[];
+        return React.createElement("div",{key:s.id,
+          style:{display:"flex",alignItems:"center",gap:"14px",
+            background:isActive?"#2c2416":"rgba(255,252,245,0.97)",
+            border:"1px solid "+(isActive?"#2c2416":col+"66"),
+            borderLeft:"4px solid "+(isActive?"#8a7040":col),
+            borderRadius:"4px",padding:"12px 16px",
+            boxShadow:isActive?"0 2px 10px rgba(0,0,0,0.15)":"none"}
+        },
+          React.createElement("div",{style:{flex:1,minWidth:0}},
+            React.createElement("div",{style:{fontSize:"0.62rem",color:isActive?"rgba(245,240,232,0.55)":col,letterSpacing:"0.05em",textTransform:"uppercase",marginBottom:"2px"}},
+              (MODES[s.mode||"legacy"]?.icon||"◈")+" "+(MODES[s.mode||"legacy"]?.label||"Subject")
             ),
-            subjects.map(s=>{
-              const p=pos[s.id]; if(!p) return null;
-              const isActive=s.id===activeSubjectId;
-              const col=modeColor(s);
-              const dob=s.dob?s.dob.slice(0,4):null;
-              const mc=s.memories||[];
-              return React.createElement("div",{key:s.id,
-                onClick:()=>onSwitch(s.id),
-                title:"Switch to "+s.name+"'s chronicle",
-                style:{position:"absolute",left:p.x+"px",top:p.y+"px",width:NW+"px",height:NH+"px",
-                  background:isActive?"#2c2416":"rgba(255,252,245,0.97)",
-                  border:"2px solid "+(isActive?"#2c2416":col+"99"),
-                  borderRadius:"5px",padding:"8px 11px",cursor:"pointer",boxSizing:"border-box",transition:"all 0.15s",
-                  boxShadow:isActive?"0 4px 14px rgba(0,0,0,0.25)":"0 1px 5px rgba(0,0,0,0.07)"},
-                onMouseEnter:e=>{if(!isActive){e.currentTarget.style.borderColor=col;e.currentTarget.style.transform="translateY(-2px)";}},
-                onMouseLeave:e=>{if(!isActive){e.currentTarget.style.borderColor=col+"99";e.currentTarget.style.transform="translateY(0)";}}
-              },
-                React.createElement("div",{style:{fontSize:"0.62rem",color:isActive?"rgba(245,240,232,0.55)":col,letterSpacing:"0.05em",textTransform:"uppercase",marginBottom:"2px"}},
-                  (MODES[s.mode||"legacy"]?.icon||"◈")+" "+(MODES[s.mode||"legacy"]?.label||"Subject")
-                ),
-                React.createElement("div",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",color:isActive?"#f5f0e8":"#1a1208",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.2}},s.name),
-                dob&&React.createElement("div",{style:{fontSize:"0.7rem",color:isActive?"rgba(245,240,232,0.55)":"#8a7460",marginTop:"3px"}},"b. "+dob),
-                React.createElement("div",{style:{fontSize:"0.65rem",color:isActive?"rgba(245,240,232,0.45)":"#a89a7a",marginTop:"1px",fontStyle:"italic"}},mc.length+" "+(mc.length===1?"entry":"entries"))
-              );
-            })
-          )
-        )
+            React.createElement("div",{style:{fontFamily:"'Crimson Text',serif",fontSize:"1rem",color:isActive?"#f5f0e8":"#1a1208",fontWeight:600,lineHeight:1.2}},s.name),
+            React.createElement("div",{style:{fontSize:"0.72rem",color:isActive?"rgba(245,240,232,0.5)":"#8a7460",marginTop:"3px"}},
+              [dob&&"b. "+dob, mc.length+" "+(mc.length===1?"entry":"entries")].filter(Boolean).join("  ·  ")
+            )
+          ),
+          !isActive&&React.createElement("button",{
+            onClick:()=>onSwitch(s.id),
+            style:{...S.btnOutline,padding:"5px 14px",fontSize:"0.84rem",flexShrink:0}
+          },"Open →"),
+          isActive&&React.createElement("span",{style:{fontSize:"0.74rem",color:"rgba(245,240,232,0.6)",fontStyle:"italic",flexShrink:0}},"active")
+        );
+      })
+    )
   );
 }
 
