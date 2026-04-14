@@ -5073,9 +5073,14 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
         backupPassword:"", legacyMessage:"", treePersons:[], treeFamilies:[],
       };
 
+      // Mark the tree person as linked — must write to whichever subject owns the tree,
+      // not necessarily the active subject, so update via persistTop directly.
       const updatedPersons = treePersons.map(p=>p.id===tp.id?{...p,subjectId:newId}:p);
-      persistSubject({treePersons:updatedPersons});
-      persistTop({subjects:[...subjects,newSubj], activeSubjectId:newId});
+      const treeHostSubj = subjects.find(s=>(s.treePersons||[]).length>0);
+      const updatedSubjects = subjects.map(s=>
+        s.id===treeHostSubj?.id ? {...s,treePersons:updatedPersons} : s
+      );
+      persistTop({subjects:[...updatedSubjects,newSubj], activeSubjectId:newId});
       setPersonDetail(null);
       setView("life");
     }
@@ -5199,49 +5204,15 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
     );
   }
 
-  // ── SUBJECTS-ONLY MODE ──────────────────────────────────────────
-
-  const modeColor=s=>{ const m=s.mode||(s.isSelf?"personal":"legacy"); return MODES[m]?.color||"#a89a7a"; };
-
-  return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
-    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"6px",flexWrap:"wrap"}},
-      React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:0,color:"#1a1208"}},"Family Tree")
+  // ── NO TREE DATA — prompt import ─────────────────────────────
+  return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",textAlign:"center",padding:"60px 20px",color:"#8a7460"}},
+    React.createElement("p",{style:{fontSize:"2.5rem",margin:"0 0 16px"}},"🌳"),
+    React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.4rem",fontStyle:"italic",margin:"0 0 10px",color:"#1a1208"}},"No family tree yet"),
+    React.createElement("p",{style:{fontSize:"0.9rem",maxWidth:"360px",margin:"0 auto 20px",lineHeight:1.6}},
+      "Import a GEDCOM file to see the full tree — with relationships, birth years, and places — and start chronicles for individual ancestors."
     ),
-    React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",marginBottom:"20px",lineHeight:1.5}},
-      "Import a GEDCOM file (Add \u2192 Family Tree) to see the full tree with relationships, birth years, and places."
-    ),
-
-    // Subject chronicle cards
-    React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"10px"}},
-      subjects.map(s=>{
-        const isActive=s.id===activeSubjectId;
-        const col=modeColor(s);
-        const dob=s.dob?s.dob.slice(0,4):null;
-        const mc=s.memories||[];
-        return React.createElement("div",{key:s.id,
-          style:{display:"flex",alignItems:"center",gap:"14px",
-            background:isActive?"#2c2416":"rgba(255,252,245,0.97)",
-            border:"1px solid "+(isActive?"#2c2416":col+"66"),
-            borderLeft:"4px solid "+(isActive?"#8a7040":col),
-            borderRadius:"4px",padding:"12px 16px",
-            boxShadow:isActive?"0 2px 10px rgba(0,0,0,0.15)":"none"}
-        },
-          React.createElement("div",{style:{flex:1,minWidth:0}},
-            React.createElement("div",{style:{fontSize:"0.62rem",color:isActive?"rgba(245,240,232,0.55)":col,letterSpacing:"0.05em",textTransform:"uppercase",marginBottom:"2px"}},
-              (MODES[s.mode||"legacy"]?.icon||"◈")+" "+(MODES[s.mode||"legacy"]?.label||"Subject")
-            ),
-            React.createElement("div",{style:{fontFamily:"'Crimson Text',serif",fontSize:"1rem",color:isActive?"#f5f0e8":"#1a1208",fontWeight:600,lineHeight:1.2}},s.name),
-            React.createElement("div",{style:{fontSize:"0.72rem",color:isActive?"rgba(245,240,232,0.5)":"#8a7460",marginTop:"3px"}},
-              [dob&&"b. "+dob, mc.length+" "+(mc.length===1?"entry":"entries")].filter(Boolean).join("  ·  ")
-            )
-          ),
-          !isActive&&React.createElement("button",{
-            onClick:()=>onSwitch(s.id),
-            style:{...S.btnOutline,padding:"5px 14px",fontSize:"0.84rem",flexShrink:0}
-          },"Open →"),
-          isActive&&React.createElement("span",{style:{fontSize:"0.74rem",color:"rgba(245,240,232,0.6)",fontStyle:"italic",flexShrink:0}},"active")
-        );
-      })
+    React.createElement("button",{onClick:()=>setView("import"),style:{...S.btn,padding:"9px 22px",fontSize:"0.95rem"}},
+      "Import Family Tree →"
     )
   );
 }
