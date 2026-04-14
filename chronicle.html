@@ -8825,8 +8825,10 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
 
         // ── SYNC FROM TREE (history-mode subjects linked to a tree person) ──
         (()=>{
-          if(!isHistoryMode) return null;
-          const linkedTp = treePersons.find(p=>p.subjectId===activeSubjectId);
+          if(!isHistoryMode||!treePersons.length) return null;
+          // Match by subjectId first, fall back to name match for pre-existing subjects
+          const linkedTp = treePersons.find(p=>p.subjectId===activeSubjectId)
+            || treePersons.find(p=>p.name?.trim().toLowerCase()===subject.name?.trim().toLowerCase());
           if(!linkedTp) return null;
           const hasGedcomMems = memories.some(m=>m.fromGedcom);
           return React.createElement("div",{style:{background:"rgba(196,169,98,0.08)",border:"1px solid rgba(196,169,98,0.35)",borderRadius:"4px",padding:"12px 16px",marginBottom:"20px",display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}},
