@@ -1028,7 +1028,7 @@ window.addEventListener('DOMContentLoaded', renderLeftSidebar);
 
 // ── Worker ────────────────────────────────────────────────────────────────────
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
     const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
@@ -1536,7 +1536,7 @@ export default {
           env.SHARES.put("deliveries:" + toEmailHash, JSON.stringify(arr), { expirationTtl: 60 * 60 * 24 * 365 }),
         ]);
         // Fire notification email — non-blocking, share succeeds regardless
-        sendNotificationEmail(env, { toEmail: toEmailNorm, fromName: fromName.trim(), memCount: memories.length }).catch(e => console.error("sendNotificationEmail failed:", e));
+        ctx.waitUntil(sendNotificationEmail(env, { toEmail: toEmailNorm, fromName: fromName.trim(), memCount: memories.length }).catch(e => console.error("sendNotificationEmail failed:", e)));
         return json({ ok: true, shareId });
       } catch (e) {
         return json({ error: "Server error: " + e.message }, 500);

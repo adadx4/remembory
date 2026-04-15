@@ -4010,13 +4010,15 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
   contributionLinks, persistSubject}) {
 
   const isLegacyMode = subject && !subject.isSelf;
-  const [tab, setTab] = React.useState(isLegacyMode ? "contributions" : "received");
+  const [tab, setTab] = React.useState(isLegacyMode ? "contributions" : "inbox");
 
   // Contribution link creation state
   const [linkNote, setLinkNote] = React.useState("");
   const [linkBusy, setLinkBusy] = React.useState(false);
   const [linkCopied, setLinkCopied] = React.useState(null); // code that was just copied
   const [pendingDeliveries, setPendingDeliveries] = React.useState([]);
+  const [inboxItems, setInboxItems] = React.useState([]);
+  const [serverDeclined, setServerDeclined] = React.useState([]);
 
   // Inline review state (replaces the App-level modal)
   const [reviewing, setReviewing] = React.useState(null); // {delivery, memIdx}
@@ -4025,18 +4027,35 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
 
   React.useEffect(() => {
     if (!ownerEmail) return;
-    fetch(WORKER_URL + "/my/deliveries/fetch", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({email:ownerEmail})
-    }).then(r=>r.ok?r.json():{deliveries:[]})
-      .then(d=>{
-        if (d.deliveries && d.deliveries.length) {
-          setPendingDeliveries(d.deliveries);
-          if (onShareBadgeCount) onShareBadgeCount(d.deliveries.reduce((n,del)=>(n+(del.memories||[]).length),0));
-        }
-      })
-      .catch(()=>{});
+    if (isLegacyMode) {
+      fetch(WORKER_URL + "/my/deliveries/fetch", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email:ownerEmail})
+      }).then(r=>r.ok?r.json():{deliveries:[]})
+        .then(d=>{
+          if (d.deliveries && d.deliveries.length) {
+            setPendingDeliveries(d.deliveries);
+            if (onShareBadgeCount) onShareBadgeCount(d.deliveries.reduce((n,del)=>(n+(del.memories||[]).length),0));
+          }
+        })
+        .catch(()=>{});
+    } else {
+      fetch(WORKER_URL + "/share/inbox/fetch", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email:ownerEmail})
+      }).then(r=>r.ok?r.json():{inbox:[],declined:[]})
+        .then(d=>{
+          const items = d.inbox || [];
+          const dec = d.declined || [];
+          const activeCount = items.filter(item=>!dec.some(dc=>dc.shareId===item._shareId)).length;
+          setInboxItems(items);
+          setServerDeclined(dec);
+          if (onShareBadgeCount) onShareBadgeCount(activeCount);
+        })
+        .catch(()=>{});
+    }
   }, [ownerEmail]);
 
   const received = memories.filter(m => m.sharedBy);
@@ -4044,6 +4063,35 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
   const sentMemoryCount = new Set(sent.flatMap(h => h.memIds || [])).size;
   const sentPeopleCount = new Set(sent.flatMap(h => h.people || [])).size;
   const pendingMemCount = pendingDeliveries.reduce((n,d)=>(n+(d.memories||[]).length),0);
+  const activeInboxItems = inboxItems.filter(item => !serverDeclined.some(dc => dc.shareId === item._shareId));
+  const activeInboxCount = activeInboxItems.length;
+
+  // Inbox helpers
+  async function respondToShare(shareId, action) {
+    try {
+      await fetch(WORKER_URL + "/share/inbox/respond", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email:ownerEmail, shareId, action})
+      });
+    } catch(e) {}
+  }
+  function acceptInboxItem(item) {
+    (item.memories||[]).forEach(mem => {
+      acceptShare({sharedBy:item.fromName||"Someone", sharedAt:item.sentAt||new Date().toISOString(), memories:[mem]});
+    });
+    respondToShare(item._shareId, "accept");
+    setInboxItems(prev => prev.filter(i => i._shareId !== item._shareId));
+    if (onShareBadgeCount) onShareBadgeCount(Math.max(0, activeInboxCount - 1));
+  }
+  function declineInboxItem(item) {
+    respondToShare(item._shareId, "decline");
+    setServerDeclined(prev => [...prev, {shareId:item._shareId, declinedAt:new Date().toISOString(), memIds:(item.memories||[]).map(m=>m.id)}]);
+    if (onShareBadgeCount) onShareBadgeCount(Math.max(0, activeInboxCount - 1));
+  }
+  function reconsiderItem(shareId) {
+    setServerDeclined(prev => prev.filter(d => d.shareId !== shareId));
+    if (onShareBadgeCount) onShareBadgeCount(activeInboxCount + 1);
+  }
 
   // Group sent by recipient person
   const byPerson = {};
@@ -4203,9 +4251,9 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
         React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:"#1a1208"}},sentPeopleCount),
         React.createElement("div",{style:{fontSize:"0.72rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em"}},"People shared with")
       ),
-      pendingMemCount>0&&React.createElement("div",{style:{textAlign:"center"}},
-        React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:"#4a7a5a"}},pendingMemCount),
-        React.createElement("div",{style:{fontSize:"0.72rem",color:"#4a7a5a",textTransform:"uppercase",letterSpacing:"0.06em"}},"Pending review")
+      (isLegacyMode?pendingMemCount:activeInboxCount)>0&&React.createElement("div",{style:{textAlign:"center"}},
+        React.createElement("div",{style:{fontSize:"1.6rem",fontFamily:"'Playfair Display',serif",color:"#4a7a5a"}},isLegacyMode?pendingMemCount:activeInboxCount),
+        React.createElement("div",{style:{fontSize:"0.72rem",color:"#4a7a5a",textTransform:"uppercase",letterSpacing:"0.06em"}},"In inbox")
       )
     ),
 
@@ -4213,6 +4261,7 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
     React.createElement("div",{style:{display:"flex",gap:"0",marginBottom:"24px",borderBottom:"2px solid #e0d4be"}},
       [
         isLegacyMode&&["contributions","Contributions"],
+        !isLegacyMode&&["inbox","Inbox"],
         ["received","Received"],
         ["sent","Sent"],
         ["codes","Receive a Share"],
@@ -4220,7 +4269,8 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
       ].filter(Boolean).map(([t,label])=>
         React.createElement("button",{key:t,onClick:()=>setTab(t),style:tab===t?tabActive:tabInactive},
           label,
-          t==="contributions"&&pendingMemCount>0&&React.createElement("span",{style:{position:"absolute",top:"4px",right:"2px",background:"#4a7a5a",color:"#fff",borderRadius:"20px",padding:"0 5px",fontSize:"0.65rem",fontFamily:"Arial,sans-serif",fontWeight:600,lineHeight:"14px"}},pendingMemCount)
+          t==="contributions"&&pendingMemCount>0&&React.createElement("span",{style:{position:"absolute",top:"4px",right:"2px",background:"#4a7a5a",color:"#fff",borderRadius:"20px",padding:"0 5px",fontSize:"0.65rem",fontFamily:"Arial,sans-serif",fontWeight:600,lineHeight:"14px"}},pendingMemCount),
+          t==="inbox"&&activeInboxCount>0&&React.createElement("span",{style:{position:"absolute",top:"4px",right:"2px",background:"#4a7a5a",color:"#fff",borderRadius:"20px",padding:"0 5px",fontSize:"0.65rem",fontFamily:"Arial,sans-serif",fontWeight:600,lineHeight:"14px"}},activeInboxCount)
         )
       )
     ),
@@ -4259,34 +4309,7 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
 
     // RECEIVED tab (personal mode — accepted memories with sharedBy)
     tab==="received"&&React.createElement("div",null,
-      // Pending deliveries in personal mode (old modal-style, but now inline)
-      !isLegacyMode&&pendingDeliveries.length>0&&React.createElement("div",{style:{marginBottom:"20px"}},
-        React.createElement("p",{style:{fontSize:"0.78rem",color:"#4a7a5a",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"10px"}},"Waiting to review"),
-        pendingDeliveries.map((delivery,di)=>
-          React.createElement("div",{key:di,style:{...cardStyle,borderColor:"#7a9e8a",background:"rgba(122,158,138,0.05)"}},
-            React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}},
-              React.createElement("div",null,
-                React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",margin:0}},delivery.sharedBy||"Someone"),
-                React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},(delivery.memories||[]).length+" "+(delivery.memories?.length===1?"memory":"memories"))
-              ),
-              (delivery.memories||[]).length>1&&React.createElement("button",{
-                onClick:()=>{
-                  (delivery.memories||[]).forEach(mem=>{
-                    acceptOne(delivery, mem, {addedBy:{name:delivery.sharedBy||"", on:new Date().toISOString().slice(0,10)}});
-                  });
-                  setPendingDeliveries(prev=>prev.filter((_,i)=>i!==di));
-                },
-                style:{...S.btn,padding:"5px 14px",fontSize:"0.8rem",whiteSpace:"nowrap"}
-              },"✓ Accept all")
-            ),
-            delivery.message&&React.createElement("p",{style:{fontSize:"0.88rem",color:"#5a4838",fontStyle:"italic",borderLeft:"3px solid #c8b89a",paddingLeft:"10px",margin:"0 0 10px",lineHeight:1.6}},'"'+delivery.message+'"'),
-            (delivery.memories||[]).map((mem,mi)=>
-              React.createElement(MemRow,{key:mi,delivery,mem,di,mi})
-            )
-          )
-        )
-      ),
-      received.length===0&&pendingDeliveries.length===0
+      received.length===0
         ? React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic"}},"No memories have been shared with you yet.")
         : received.length>0&&React.createElement("div",null,
             (() => {
@@ -4309,6 +4332,76 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
               );
             })()
           )
+    ),
+
+    // INBOX tab (personal mode — direct shares via /share/send)
+    tab==="inbox"&&React.createElement("div",null,
+      activeInboxItems.length===0&&serverDeclined.length===0&&
+        React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic"}},"Your inbox is empty."),
+      activeInboxItems.map(item=>
+        React.createElement("div",{key:item._shareId,style:{...cardStyle,borderColor:"#7a9e8a",background:"rgba(122,158,138,0.05)"}},
+          React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px",flexWrap:"wrap",gap:"6px"}},
+            React.createElement("div",null,
+              React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",margin:0}},item.fromName||"Someone"),
+              React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},
+                (item.memories||[]).length+" "+((item.memories||[]).length===1?"memory":"memories")+(item.sentAt?" \u00b7 "+new Date(item.sentAt).toLocaleDateString():"")
+              )
+            ),
+            React.createElement("div",{style:{display:"flex",gap:"6px",flexShrink:0}},
+              React.createElement("button",{
+                onClick:()=>acceptInboxItem(item),
+                style:{...S.btn,padding:"5px 14px",fontSize:"0.8rem",whiteSpace:"nowrap"}
+              },"\u2713 Accept all"),
+              React.createElement("button",{
+                onClick:()=>declineInboxItem(item),
+                style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8",whiteSpace:"nowrap"}
+              },"\u2715 Decline")
+            )
+          ),
+          item.message&&React.createElement("p",{style:{fontSize:"0.88rem",color:"#5a4838",fontStyle:"italic",borderLeft:"3px solid #c8b89a",paddingLeft:"10px",margin:"0 0 10px",lineHeight:1.6}},'"'+item.message+'"'),
+          (item.memories||[]).map((mem,mi)=>
+            React.createElement("div",{key:mi,style:{borderTop:"1px solid #ede4d4",paddingTop:"8px",marginTop:"4px",display:"flex",alignItems:"flex-start",gap:"8px"}},
+              React.createElement("div",{style:{flex:1}},
+                React.createElement("div",{style:{display:"flex",alignItems:"baseline",gap:"8px"}},
+                  mem.year&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#b0a090",flexShrink:0}},mem.year),
+                  React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.98rem",color:"#1a1208"}},mem.title||"Untitled"),
+                  isDuplicate(mem)&&React.createElement("span",{style:{fontSize:"0.68rem",background:"rgba(196,133,90,0.2)",color:"#7a4a18",borderRadius:"20px",padding:"1px 7px",flexShrink:0}},"possible duplicate")
+                ),
+                mem.content&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",margin:"3px 0 0",lineHeight:1.5,maxHeight:"3.5em",overflow:"hidden",textOverflow:"ellipsis",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}},mem.content)
+              ),
+              React.createElement("button",{
+                onClick:()=>{
+                  acceptShare({sharedBy:item.fromName||"Someone",sharedAt:item.sentAt||new Date().toISOString(),memories:[mem]});
+                  setInboxItems(prev=>{
+                    const updated=prev.map(it=>it._shareId!==item._shareId?it:{...it,memories:(it.memories||[]).filter((_,j)=>j!==mi)});
+                    const remaining=updated.find(it=>it._shareId===item._shareId);
+                    if(remaining&&(remaining.memories||[]).length===0) respondToShare(item._shareId,"accept");
+                    return updated.filter(it=>(it.memories||[]).length>0);
+                  });
+                },
+                style:{...S.btn,padding:"4px 10px",fontSize:"0.8rem",flexShrink:0}
+              },"\u2713 Accept")
+            )
+          )
+        )
+      ),
+      serverDeclined.length>0&&React.createElement("div",{style:{marginTop:"24px"}},
+        React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"10px"}},"Declined"),
+        serverDeclined.map(dec=>{
+          const item=inboxItems.find(i=>i._shareId===dec.shareId);
+          if(!item)return null;
+          return React.createElement("div",{key:dec.shareId,style:{...cardStyle,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",opacity:0.7}},
+            React.createElement("div",null,
+              React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208"}},item.fromName||"Someone"),
+              React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",marginLeft:"8px"}},(item.memories||[]).length+" "+((item.memories||[]).length===1?"memory":"memories"))
+            ),
+            React.createElement("button",{
+              onClick:()=>reconsiderItem(dec.shareId),
+              style:{background:"none",border:"none",color:"#a8885a",cursor:"pointer",fontSize:"0.82rem",padding:0}
+            },"Reconsider")
+          );
+        }).filter(Boolean)
+      )
     ),
 
     // SENT tab
