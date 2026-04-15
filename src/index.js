@@ -1100,8 +1100,8 @@ export default {
         });
         if (body.ownerEmail) await env.SHARES.put("profile_email:" + identifier, body.ownerEmail.trim().toLowerCase());
 
-        // Update compact profiles index
-        await updateProfilesIndex(env, {
+        // Write compact profile to its own key (no shared blob — eliminates race condition)
+        await updateProfileCompact(env, {
           identifier,
           displayName: profile.displayName,
           about: profile.about,
@@ -1131,11 +1131,7 @@ export default {
         const identifier = body.identifier;
         if (!identifier) return json({ error: "No identifier" }, 400);
         await env.SHARES.delete("profile:" + identifier);
-        const rawList = await env.SHARES.get("profiles:list");
-        if (rawList) {
-          const list = JSON.parse(rawList).filter(p => p.identifier !== identifier);
-          await env.SHARES.put("profiles:list", JSON.stringify(list));
-        }
+        await env.SHARES.delete("profile_compact:" + identifier);
         return json({ ok: true });
       } catch (e) {
         return json({ error: "Server error: " + e.message }, 500);
@@ -1177,7 +1173,7 @@ export default {
 
       const viewerIdentifier = viewerKeyHash ? await env.SHARES.get("keymap:" + viewerKeyHash) || "" : "";
 
-      const list = await getProfilesList(env);
+      const list = await getProfilesCompact(env);
       let profiles = list.filter(p => p.profilePrivacy !== "disabled");
 
       if (connectedOnly) {
@@ -1235,7 +1231,7 @@ export default {
         return json({ entries: [], hint: "Set your interests to find matching memories." });
       }
 
-      const list = await getProfilesList(env);
+      const list = await getProfilesCompact(env);
       const matched = list.filter(p => {
         if (p.profilePrivacy === "disabled") return false;
         const pi = p.presenceIndex || [];
@@ -1307,7 +1303,7 @@ export default {
       if (!viewerProfile) return json({ connections: [], following: [] });
       const viewerEmailHash = viewerProfile.ownerEmailHash || "";
       const viewerConnectionHashes = viewerProfile.connectionEmailHashes || [];
-      const list = await getProfilesList(env);
+      const list = await getProfilesCompact(env);
       const connections = [];
       for (const p of list) {
         if (p.identifier === viewerIdentifier || p.profilePrivacy === "disabled") continue;
@@ -1322,7 +1318,7 @@ export default {
 
     // GET /explore/stats — aggregate community counts
     if (request.method === "GET" && path === "/explore/stats") {
-      const list = await getProfilesList(env);
+      const list = await getProfilesCompact(env);
       const profiles = list.filter(p => p.profilePrivacy !== "disabled");
       let publicMems = 0, subscriberMems = 0, connectedMems = 0, taggedMems = 0;
       profiles.forEach(p => {
@@ -2144,7 +2140,7 @@ export default {
     if (request.method === "GET" && path === "/admin/profiles") {
       const secret = request.headers.get("X-Admin-Secret") || "";
       if (!secret || secret !== (env.ADMIN_SECRET || "")) return json({ error: "Forbidden" }, 403);
-      const list = await getProfilesList(env);
+      const list = await getProfilesCompact(env);
       const withEmails = await Promise.all(list.map(async p => {
         const email = await env.SHARES.get("profile_email:" + p.identifier);
         return { ...p, email: email || "" };
@@ -2158,10 +2154,9 @@ export default {
       if (!secret || secret !== (env.ADMIN_SECRET || "")) return json({ error: "Forbidden" }, 403);
       const { identifier } = await request.json().catch(() => ({}));
       if (!identifier) return json({ error: "Missing identifier" }, 400);
-      const list = await getProfilesList(env);
-      const filtered = list.filter(p => p.identifier !== identifier);
-      await env.SHARES.put("profiles:list", JSON.stringify(filtered));
-      return json({ ok: true, removed: list.length - filtered.length });
+      await env.SHARES.delete("profile:" + identifier);
+      await env.SHARES.delete("profile_compact:" + identifier);
+      return json({ ok: true, removed: 1 });
     }
 
     // Health check
@@ -2576,18 +2571,27 @@ function exportMailing() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function getProfilesList(env) {
-  const raw = await env.SHARES.get("profiles:list");
-  return raw ? JSON.parse(raw) : [];
+// Each profile's compact entry stored at its own key — no shared blob, no race condition.
+async function getProfilesCompact(env) {
+  const compacts = [];
+  let cursor;
+  do {
+    const result = await env.SHARES.list({ prefix: "profile_compact:", ...(cursor ? { cursor } : {}), limit: 1000 });
+    const values = await Promise.all(result.keys.map(k => env.SHARES.get(k.name)));
+    for (const v of values) {
+      if (v) { try { compacts.push(JSON.parse(v)); } catch {} }
+    }
+    cursor = result.list_complete ? undefined : result.cursor;
+  } while (cursor);
+  return compacts;
 }
 
-async function updateProfilesIndex(env, compact) {
-  const raw = await env.SHARES.get("profiles:list");
-  let list = raw ? JSON.parse(raw) : [];
-  list = list.filter(p => p.identifier !== compact.identifier);
-  list.unshift(compact); // most recently updated first
-  if (list.length > 5000) list = list.slice(0, 5000);
-  await env.SHARES.put("profiles:list", JSON.stringify(list));
+async function updateProfileCompact(env, compact) {
+  await env.SHARES.put(
+    "profile_compact:" + compact.identifier,
+    JSON.stringify(compact),
+    { expirationTtl: 60 * 60 * 24 * 365 * 2 }
+  );
 }
 
 // Look up viewer's ownerEmailHash from their profile (identified by their keyHash)
@@ -2603,9 +2607,18 @@ async function getViewerEmailHash(env, viewerKeyHash) {
 // Build feed entries: all visible memories across profiles
 // sort: "latest" (by profile updatedAt then memory year desc) | "popular" (by reactions in period)
 async function buildEntries(env, profileCompacts, viewerEmailHash, viewerIdentifier, isSubscriber, sort, cutoff) {
+  // Fetch all profiles and (if needed) reaction totals in parallel
+  const [profileRaws, reactionRaws] = await Promise.all([
+    Promise.all(profileCompacts.map(c => env.SHARES.get("profile:" + c.identifier))),
+    sort === "popular"
+      ? Promise.all(profileCompacts.map(c => env.SHARES.get("reactions:totals:" + c.identifier)))
+      : Promise.resolve(profileCompacts.map(() => null)),
+  ]);
+
   const entries = [];
-  for (const compact of profileCompacts) {
-    const raw = await env.SHARES.get("profile:" + compact.identifier);
+  for (let i = 0; i < profileCompacts.length; i++) {
+    const compact = profileCompacts[i];
+    const raw = profileRaws[i];
     if (!raw) continue;
     const profile = JSON.parse(raw);
     const isOwner = !!(viewerIdentifier && viewerIdentifier === compact.identifier);
@@ -2621,17 +2634,13 @@ async function buildEntries(env, profileCompacts, viewerEmailHash, viewerIdentif
       imageUrl: compact.imageUrl,
     };
 
-    const rawTotals = sort === "popular" ? await env.SHARES.get("reactions:totals:" + compact.identifier) : null;
-    const totals = rawTotals ? JSON.parse(rawTotals) : {};
+    const totals = reactionRaws[i] ? JSON.parse(reactionRaws[i]) : {};
 
     for (const memory of visibleMems) {
-      const reactionCount = sort === "popular"
-        ? (totals[memory.id]?.count || 0)
-        : 0;
+      const reactionCount = sort === "popular" ? (totals[memory.id]?.count || 0) : 0;
       const recentReactions = sort === "popular" && cutoff
         ? (totals[memory.id]?.lastReactedAt && new Date(totals[memory.id].lastReactedAt).getTime() > cutoff ? reactionCount : 0)
         : reactionCount;
-      // For latest, use stored total reactions for display even though sort is by date
       const displayReactions = totals[memory.id]?.count || 0;
       entries.push({
         profile: profileMeta,
