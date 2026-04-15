@@ -45,10 +45,10 @@ function useWindowSize() {
 // ── Constants ──────────────────────────────────────────────────
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const TAGS = ["childhood","family","travel","education","work","love","health","milestone","home","friendship","adventure","loss"];
-const WORKER_URL = "https://social.remembory.net";
+const WORKER_URL = "https://staging.remembory.net";
 const IS_STAGING = WORKER_URL.includes('staging');
 const STRIPE_URL  = "https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02";
-const PAYPAL_URL  = "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-05R23708A75872801NHNR24Q&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net";
+const PAYPAL_URL  = "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-05R23708A75872801NHNR24Q&return_url=https://staging.remembory.net/paypal/success&cancel_url=https://remembory.net";
 
 // ── Subscribe buttons helper ────────────────────────────────────
 // Renders Stripe + PayPal options. mode: "buttons"|"links"|"full"
@@ -167,7 +167,7 @@ async function validateLicenceKey(key) {
   // then recheck in the background so the cache stays fresh for next time.
   if (cached && cached.key === clean && cached.status === "active") {
     // Background refresh — don't await, never blocks the user
-    fetch("https://social.remembory.net/license/check?key=" + encodeURIComponent(clean))
+    fetch("https://staging.remembory.net/license/check?key=" + encodeURIComponent(clean))
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) saveLicenceCache({key: clean, checked: Date.now(), status: d.status, renewedAt: d.renewedAt}); })
       .catch(() => {});
@@ -175,7 +175,7 @@ async function validateLicenceKey(key) {
   }
   // No valid cache — must go online to activate
   try {
-    const r = await fetch("https://social.remembory.net/license/check?key=" + encodeURIComponent(clean));
+    const r = await fetch("https://staging.remembory.net/license/check?key=" + encodeURIComponent(clean));
     if (!r.ok) throw new Error("server");
     const d = await r.json();
     saveLicenceCache({key: clean, checked: Date.now(), status: d.status, renewedAt: d.renewedAt});

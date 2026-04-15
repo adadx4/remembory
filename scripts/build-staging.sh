@@ -13,15 +13,20 @@ echo "Building staging assets…"
 rm -rf "$DIST"
 mkdir -p "$DIST"
 
-# Copy all static files except src/, scripts/, dist/, wrangler.toml
-rsync -av \
-  --exclude=src/ \
-  --exclude=scripts/ \
-  --exclude=dist/ \
-  --exclude=wrangler.toml \
-  --exclude=package.json \
-  --exclude=README.md \
-  "$ROOT/" "$DIST/"
+# Copy static assets to dist/ (explicit list avoids rsync dependency on Windows)
+cp "$ROOT/chronicle.html" "$DIST/"
+cp "$ROOT/chronicle.css" "$DIST/"
+cp "$ROOT/index.html" "$DIST/"
+cp "$ROOT/manual.html" "$DIST/"
+cp "$ROOT/tips.html" "$DIST/"
+cp "$ROOT/sw.js" "$DIST/"
+cp "$ROOT/manifest.json" "$DIST/"
+cp "$ROOT/favicon.ico" "$DIST/"
+cp "$ROOT/favicon-96x96.png" "$DIST/"
+cp "$ROOT/icon-192.png" "$DIST/"
+cp "$ROOT/icon-512.png" "$DIST/"
+cp "$ROOT/icon-apple.png" "$DIST/"
+[ -f "$ROOT/CNAME" ] && cp "$ROOT/CNAME" "$DIST/"
 
 # Swap the worker URL in chronicle.html
 STAGING_WORKER="https://staging.remembory.net"
@@ -31,7 +36,14 @@ SHARE_PROD="https://share.remembory.net"
 sed -i \
   -e "s|const WORKER_URL = \"$PROD_WORKER\"|const WORKER_URL = \"$STAGING_WORKER\"|g" \
   -e "s|$SHARE_PROD|$STAGING_WORKER|g" \
+  -e "s|$PROD_WORKER|$STAGING_WORKER|g" \
   "$DIST/chronicle.html"
+
+# Rewrite prod URLs in index.html so landing page links stay within staging
+sed -i \
+  -e "s|$PROD_WORKER|$STAGING_WORKER|g" \
+  -e "s|$SHARE_PROD|$STAGING_WORKER|g" \
+  "$DIST/index.html"
 
 echo "Staging build written to dist/"
 echo "  Worker URL → $STAGING_WORKER"

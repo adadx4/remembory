@@ -40,11 +40,11 @@ directory = "./dist"
 
 [[env.staging.kv_namespaces]]
 binding = "SHARES"
-id = "REPLACE_WITH_STAGING_SHARES_KV_ID"
+id = "bb346bcd219742ffb25b089cf90e58f6"
 
 [[env.staging.kv_namespaces]]
 binding = "MAILING_LIST"
-id = "REPLACE_WITH_STAGING_MAILING_LIST_KV_ID"
+id = "8a3aef2b20cf4a13b76740237314b036"
 
 [[env.staging.routes]]
 pattern = "staging.remembory.net/*"

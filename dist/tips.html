@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chronicle Tips & Tricks — Remembory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --parchment: #f5f0e8;
+    --parchment-deep: #ede5d4;
+    --parchment-dark: #d4c4a8;
+    --ink: #1a1208;
+    --ink-mid: #2c2416;
+    --ink-light: #6a5c48;
+    --ink-faint: #8a7460;
+    --gold: #c8a87a;
+    --gold-dark: #a8885a;
+    --sage: #7a9e8a;
+    --sage-dark: #4a7a5a;
+    --sidebar-w: 280px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--parchment);
+    font-family: 'Crimson Text', Georgia, serif;
+    color: var(--ink-mid);
+    font-size: 1.05rem;
+    line-height: 1.75;
+  }
+
+  /* ── TOP NAV ── */
+  .topnav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 200;
+    background: rgba(245,240,232,0.96);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--parchment-dark);
+    padding: 13px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .topnav-brand {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--ink);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .topnav-brand span { color: var(--gold-dark); }
+
+  .topnav-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 0.88rem;
+    color: var(--ink-faint);
+  }
+  .topnav-right a { color: var(--ink-faint); text-decoration: none; transition: color 0.2s; }
+  .topnav-right a:hover { color: var(--ink); }
+  .topnav-dl {
+    background: var(--ink-mid);
+    color: var(--parchment) !important;
+    padding: 6px 16px;
+    border-radius: 2px;
+    font-family: 'Crimson Text', serif;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+  }
+  .topnav-dl:hover { background: var(--ink) !important; }
+
+  /* ── LAYOUT ── */
+  .layout { display: flex; padding-top: 52px; min-height: 100vh; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    position: fixed;
+    top: 52px; left: 0; bottom: 0;
+    overflow-y: auto;
+    background: var(--parchment-deep);
+    border-right: 1px solid var(--parchment-dark);
+    padding: 28px 0 40px;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--parchment-dark); border-radius: 2px; }
+
+  .sidebar-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold-dark);
+    padding: 0 24px 12px;
+    border-bottom: 1px solid var(--parchment-dark);
+    margin-bottom: 12px;
+  }
+
+  .sidebar nav a {
+    display: block;
+    padding: 5px 24px;
+    font-size: 0.9rem;
+    color: var(--ink-faint);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+    line-height: 1.4;
+  }
+  .sidebar nav a:hover { color: var(--ink); background: rgba(200,168,122,0.08); }
+  .sidebar nav a.active { color: var(--ink); border-left-color: var(--gold-dark); background: rgba(200,168,122,0.1); font-weight: 600; }
+  .sidebar nav a.sub { font-size: 0.82rem; padding-left: 38px; opacity: 0.8; }
+  .sidebar nav a.sub:hover { opacity: 1; }
+
+  .sidebar-chapter {
+    margin-top: 16px;
+    padding: 6px 24px 4px;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--parchment-dark);
+  }
+
+  /* ── MAIN CONTENT ── */
+  .content {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    min-width: 0;
+    padding: 56px 64px 80px;
+    max-width: 860px;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.15;
+    margin-bottom: 10px;
+    margin-top: 56px;
+    padding-top: 56px;
+    border-top: 2px solid var(--parchment-dark);
+  }
+  h1:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+
+  h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--ink-mid);
+    margin-top: 40px;
+    margin-bottom: 10px;
+  }
+
+  h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    font-style: italic;
+    color: var(--ink-light);
+    margin-top: 28px;
+    margin-bottom: 8px;
+  }
+
+  p { margin-bottom: 14px; color: var(--ink-light); }
+  p strong { color: var(--ink-mid); font-weight: 600; }
+  a { color: var(--gold-dark); }
+
+  .chapter-intro {
+    font-size: 1.12rem;
+    color: var(--ink-light);
+    font-style: italic;
+    border-left: 3px solid var(--gold);
+    padding-left: 18px;
+    margin-bottom: 28px;
+    line-height: 1.8;
+  }
+
+  .tip, .note, .warning {
+    border-radius: 3px;
+    padding: 12px 16px;
+    margin: 18px 0;
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
+  .tip { background: rgba(200,168,122,0.1); border-left: 3px solid var(--gold-dark); color: var(--ink-light); }
+  .note { background: rgba(122,158,138,0.1); border-left: 3px solid var(--sage); color: var(--sage-dark); }
+  .warning { background: rgba(196,133,138,0.1); border-left: 3px solid #c4858a; color: #7a3838; }
+  .tip::before { content: "💡 "; }
+  .note::before { content: "ℹ "; }
+  .warning::before { content: "⚠ "; }
+
+  ul, ol { padding-left: 24px; margin-bottom: 14px; color: var(--ink-light); }
+  li { margin-bottom: 6px; line-height: 1.7; }
+  li strong { color: var(--ink-mid); }
+
+  .steps { counter-reset: step; list-style: none; padding: 0; margin: 18px 0; }
+  .steps li { counter-increment: step; display: flex; gap: 14px; margin-bottom: 10px; align-items: flex-start; }
+  .steps li::before {
+    content: counter(step);
+    display: flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--gold-dark); color: var(--parchment);
+    font-size: 0.78rem; font-weight: 700; font-family: 'Crimson Text', serif;
+    flex-shrink: 0; margin-top: 2px;
+  }
+
+  .ftable { width: 100%; border-collapse: collapse; margin: 18px 0 24px; font-size: 0.95rem; }
+  .ftable th {
+    background: var(--parchment-deep); border: 1px solid var(--parchment-dark);
+    padding: 9px 14px; text-align: left; font-family: 'Crimson Text', serif;
+    font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--gold-dark); font-weight: 600;
+  }
+  .ftable td { border: 1px solid var(--parchment-dark); padding: 9px 14px; vertical-align: top; color: var(--ink-light); line-height: 1.6; }
+  .ftable tr:nth-child(even) td { background: rgba(237,229,212,0.4); }
+  .ftable td:first-child { font-weight: 600; color: var(--ink-mid); white-space: nowrap; }
+
+  .divider { height: 1px; background: linear-gradient(to right, var(--parchment-dark), transparent); margin: 36px 0; }
+
+  .example-block {
+    background: rgba(237,229,212,0.5);
+    border: 1px solid var(--parchment-dark);
+    border-radius: 3px;
+    padding: 16px 20px;
+    margin: 18px 0;
+    font-style: italic;
+    color: var(--ink-light);
+    line-height: 1.8;
+  }
+  .example-block .label {
+    font-style: normal;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--gold-dark);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  /* ── MOBILE ── */
+  .menu-toggle {
+    display: none;
+    background: none; border: 1px solid var(--parchment-dark);
+    border-radius: 2px; padding: 5px 10px;
+    font-family: 'Crimson Text', serif; font-size: 0.9rem;
+    color: var(--ink-faint); cursor: pointer;
+  }
+
+  @media (max-width: 900px) {
+    .menu-toggle { display: block; }
+    .sidebar {
+      transform: translateX(-100%);
+      transition: transform 0.25s ease;
+      z-index: 150;
+    }
+    .sidebar.open { transform: translateX(0); }
+    .content { margin-left: 0; padding: 32px 24px 60px; }
+    .topnav { padding: 13px 20px; }
+    .topnav-right .hide-mobile { display: none; }
+    h1 { font-size: 1.7rem; }
+  }
+
+  footer {
+    margin-top: 60px;
+    padding-top: 24px;
+    border-top: 1px solid var(--parchment-dark);
+    font-size: 0.84rem;
+    color: var(--ink-faint);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a href="index.html" class="topnav-brand">Remem<span>bory</span></a>
+  <div class="topnav-right">
+    <a href="index.html" class="hide-mobile">Home</a>
+    <a href="manual.html" class="hide-mobile">Manual</a>
+    <a href="https://adadx4.github.io/remembory/chronicle.html" target="_blank" class="topnav-dl">Open Chronicle →</a>
+    <button class="menu-toggle" onclick="toggleSidebar()">☰ Contents</button>
+  </div>
+</nav>
+
+<div class="layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-title">Tips &amp; Tricks</div>
+    <nav id="sidebar-nav">
+
+      <div class="sidebar-chapter">Getting started</div>
+      <a href="#where-to-begin">Where to begin</a>
+      <a href="#mining-the-past">Mining the past</a>
+
+      <div class="sidebar-chapter">Methodology</div>
+      <a href="#fuzzy-thinking">Working with fuzzy dates</a>
+      <a href="#life-chapters">Capturing life chapters</a>
+      <a href="#people-practice">People — when to tag</a>
+      <a href="#groups-tip">Using groups</a>
+      <a href="#writing-style">Writing style that lasts</a>
+
+      <div class="sidebar-chapter">Attaching files</div>
+      <a href="#linking-files">Linking to external files</a>
+      <a href="#google-drive">Google Drive &amp; Photos</a>
+      <a href="#onedrive">OneDrive</a>
+      <a href="#icloud">iCloud Drive</a>
+      <a href="#dropbox">Dropbox</a>
+
+      <div class="sidebar-chapter">Building the habit</div>
+      <a href="#keeping-going">Keeping it going</a>
+      <a href="#batch-sessions">Batch reconstruction sessions</a>
+      <a href="#sharing-practice">Sharing with family</a>
+      <a href="#index-tip">Building your index</a>
+
+      <div class="sidebar-chapter">Privacy &amp; safety</div>
+      <a href="#backups">Backups</a>
+      <a href="#privacy-notes">What Chronicle protects</a>
+
+    </nav>
+  </aside>
+
+  <main class="content">
+
+    <h1 id="where-to-begin" class="first-h1">Tips &amp; Tricks</h1>
+    <div class="callout" style="background:rgba(200,168,122,0.08);border:1px solid rgba(200,168,122,0.3);border-radius:4px;padding:16px 20px;margin-bottom:28px">
+      <strong style="font-family:'Playfair Display',serif;font-size:1rem;color:#1a1208">New in this version</strong>
+      <ul style="margin:8px 0 0 18px;font-size:.95rem;color:#6a5c48;line-height:1.8">
+        <li><strong>Auto-delivery for connections</strong> — add an email to anyone in your People index and future shares are delivered straight to their Chronicle inbox. No link to copy and send.</li>
+        <li><strong>Guest contribution links</strong> — invite anyone to submit memories or documents directly into your Chronicle inbox without setting up Chronicle themselves.</li>
+        <li><strong>Accept all</strong> — accept an entire batch of incoming shared memories with one click.</li>
+      </ul>
+    </div>
+    <p class="chapter-intro">The manual explains what each button does. This guide is about <em>how to actually use Chronicle well</em> — methodologies for reconstructing the past, habits for keeping it going, and practical tricks for attaching and linking the documents and media that belong alongside your memories.</p>
+
+    <!-- ── WHERE TO BEGIN ── -->
+    <h2 id="where-to-begin">Where to begin</h2>
+
+    <p>The blank slate can feel paralysing. The most important thing is to start anywhere — not at the beginning, not with the most significant memory, just with whatever comes to mind first. Chronicle is not a diary that requires chronological discipline. It's a net you're casting over time.</p>
+
+    <p>A good first session approach: set a 20-minute timer and write down every address you've ever lived at. Don't stop to fill in details — just get the list. Then go back and make each one a memory, adding people, dates, and notes as they surface. Addresses are a remarkable anchor for recollection. Once you've placed yourself in a house, the memories that belong there start appearing.</p>
+
+    <div class="tip">Start with places, not events. Places anchor everything else.</div>
+
+    <p>Similarly effective starting points: every school you attended, every job, every significant relationship, every car you owned. These aren't memories themselves — they're scaffolding that helps other memories attach to.</p>
+
+    <!-- ── MINING THE PAST ── -->
+    <h2 id="mining-the-past">Mining the past</h2>
+
+    <p>You remember far less than actually happened, and that's fine. But there are surprisingly rich seams of evidence about your own life scattered across sources you may not have thought to consult.</p>
+
+    <h3>Email archives</h3>
+    <p>Your sent folder is a diary you kept without knowing it. Search for dates, places, names. An email you sent in 2009 about a new job or a holiday booking will tell you exactly when things happened and who was there. Chronicle's email import feature can turn these directly into memories — export them as .eml files from most mail clients.</p>
+
+    <h3>Bank and card statements</h3>
+    <p>Restaurant charges, travel bookings, ticket purchases — financial records place you in specific places at specific times. You won't remember the dinner, but you'll remember the trip once you see the charge. Most banks let you export years of history.</p>
+
+    <h3>Social media archives</h3>
+    <p>Facebook, Instagram, and most platforms let you request a full data export of your posts and photos with dates. The posts themselves may not be worth preserving, but the dates and the photos buried in the archive often are. Go to your account settings and look for "Download your data" or similar.</p>
+
+    <h3>Photo metadata</h3>
+    <p>Photos taken on a phone contain EXIF data with the exact date and time. Even if you've lost the context, a photo tells you where you were. Chronicle reads this automatically on import — but remember that photos shared via messaging apps or social platforms usually have this data stripped.</p>
+
+    <h3>Physical documents</h3>
+    <p>Passports show entry and exit stamps. Letters have postmarks. Certificates have dates. Employment contracts note start dates. Scan or photograph these and link to them from the relevant memory — or just type the date into Chronicle and use the document as your source.</p>
+
+    <h3>Other people</h3>
+    <p>Family members and old friends often remember things about your shared life that you've forgotten. Chronicle's sharing feature lets you send memories to people who were there and invite their perspective. Sometimes the most useful thing you can do is ask someone who was present.</p>
+
+    <div class="note">The goal isn't perfect accuracy. A memory dated to "Summer 1994" because that's the best you can do is infinitely more valuable than a memory not recorded at all.</div>
+
+    <!-- ── FUZZY THINKING ── -->
+    <h1 id="fuzzy-thinking">Working with fuzzy dates</h1>
+
+    <p>Chronicle's fuzzy date system is one of its most useful features, but it requires a small shift in how you think about time. Not everything in life has a precise date attached to it — and pretending otherwise would mean losing the things you half-remember.</p>
+
+    <h2>Choosing the right precision</h2>
+
+    <table class="ftable">
+      <tr><th>You remember…</th><th>Use</th><th>Example</th></tr>
+      <tr><td>The exact date</td><td>Day</td><td>14 March 2008</td></tr>
+      <tr><td>The month but not the day</td><td>Month</td><td>March 2008</td></tr>
+      <tr><td>The season / part of year</td><td>Season</td><td>Early 2008</td></tr>
+      <tr><td>The year but not when in it</td><td>Year</td><td>2008</td></tr>
+      <tr><td>The rough era</td><td>Decade</td><td>2000s</td></tr>
+      <tr><td>A guess — no real evidence</td><td>Uncertain</td><td>2008?</td></tr>
+    </table>
+
+    <p>Use <strong>Uncertain</strong> for dates you've inferred or estimated but can't verify. Uncertain dates display with a <code>?</code> suffix and remind you to seek confirmation.</p>
+    <p>Use the coarsest precision that honestly represents what you know. It's better to say "sometime in 1987" than to guess a month and be wrong. The timeline treats fuzzy entries gracefully — a decade-level memory appears at the start of that decade, a year-level memory at the start of that year.</p>
+
+    <h2>Upgrading precision later</h2>
+    <p>You might record something as "Summer 1994" today and then find an old letter next year that pins it to July. Just edit the memory and sharpen the date. There's no cost to starting fuzzy and refining later.</p>
+
+    <div class="tip">When in doubt, go coarser. A wrong precise date is worse than an honest fuzzy one.</div>
+
+    <h2>Fuzzy dates for long-running things</h2>
+    <p>For memories that span time — a friendship that developed over years, a period of travel, a phase of life — the start date is the meaningful anchor. Use a year or decade precision for the start, and use the end date feature to capture when it concluded. The timeline will show both the opening and closing moments.</p>
+
+    <!-- ── LIFE CHAPTERS ── -->
+    <h1 id="life-chapters">Capturing life chapters</h1>
+
+    <p>Some things in life aren't events — they're chapters. A job that lasted seven years. An address you lived at for a decade. A relationship. These have both a beginning and an end, and both moments deserve their own place in the timeline.</p>
+
+    <h2>The two-entry technique</h2>
+    <p>Chronicle's end date feature is designed exactly for this. When you record a chapter — say, a job — you set a start date and an end date. Chronicle then prompts you to create a second, separate entry for the closing moment. The result is two memories sitting naturally in the timeline:</p>
+
+    <div class="example-block">
+      <span class="label">Example</span>
+      <strong>September 2015</strong> — Started at Morrison &amp; Webb<br>
+      People: James Holloway, Priya Nair<br>
+      Location: Edinburgh<br>
+      <em>First proper architecture job. The office was above a pie shop on Lothian Road…</em>
+      <br><br>
+      <strong>March 2022</strong> — Left Morrison &amp; Webb<br>
+      People: James Holloway, Priya Nair<br>
+      Location: Edinburgh<br>
+      <em>Nearly seven years. Left to go freelance. James threw a small leaving party…</em>
+    </div>
+
+    <p>Both entries carry the same people and location, but each has its own moment, its own title, and its own story. The opening entry captures the anticipation and novelty; the closing entry captures what it meant in retrospect.</p>
+
+    <h2>What works well as a two-entry chapter</h2>
+    <ul>
+      <li><strong>Jobs and careers</strong> — starting and leaving a position</li>
+      <li><strong>Addresses</strong> — moving in and moving out</li>
+      <li><strong>Relationships</strong> — meeting someone and parting ways (or getting married)</li>
+      <li><strong>Education</strong> — starting and finishing school, university, a course</li>
+      <li><strong>Projects</strong> — beginning a creative project and completing (or abandoning) it</li>
+      <li><strong>Health</strong> — the start of a difficult period and the recovery</li>
+    </ul>
+
+    <div class="tip">The closing entry is often more emotionally rich than the opening. Give it space — what did those years mean? What did you learn? Who were you when you left versus when you arrived?</div>
+
+    <!-- ── PEOPLE PRACTICE ── -->
+    <h1 id="people-practice">People — when to tag</h1>
+
+    <p>The People field is one of Chronicle's most powerful features for navigating your own past. The Index lets you pull up every memory associated with a person — which means if you tag people thoughtfully, you can reconstruct a whole relationship from the memories it touched.</p>
+
+    <h2>Tag generously</h2>
+    <p>The instinct is to only tag people when they're the central subject. But it's often more valuable to tag everyone who was meaningfully present. The holiday photo doesn't just document a place — it documents that you and your old friend were still in each other's lives in 2011.</p>
+
+    <h2>Use consistent names</h2>
+    <p>Chronicle matches people by exact name. "Mum", "Mum (Janet)", and "Janet Walsh" are three different people as far as the index is concerned. Pick one form and stick to it. The rename feature in the Index will update every memory at once if you change your mind.</p>
+
+    <div class="tip">Decide early whether you're using first names only, full names, or nicknames. First names work well for close family; full names are better for people who might share a first name with someone else.</div>
+
+    <h2>Add emails when you have them</h2>
+    <p>The email field on a person isn't just for sharing — it's a record. If a relationship ended and you no longer have contact, having their email in Chronicle is a small piece of provenance.</p>
+
+    <h2>Organisations complement people</h2>
+    <p>The Organisations field is for institutions rather than individuals — schools, employers, clubs, hospitals, places of worship. Tagging both the person and the organisation they belong to makes the Index doubly useful: you can find all memories related to a particular school, or all memories involving a particular teacher.</p>
+
+    <!-- ── GROUPS TIP ── -->
+    <h1 id="groups-tip">Using groups</h1>
+
+    <p>Groups are a layer above individual people — they let you cluster people you often write about together. Create a group in <strong>Index → Groups</strong>, add members, and a pill button for that group appears above the People field whenever you write a memory. One tap adds everyone.</p>
+
+    <p>Good candidates for groups: a household at a particular address, a circle of school friends, a work team during a specific era, the guests at a recurring annual gathering.</p>
+
+    <div class="tip">Create a group for recurring events — "Christmas at Mum's" with everyone who usually came. Adding them to each December memory takes one click instead of typing each name.</div>
+
+    <h3>Add people to your index before you need them</h3>
+    <p>You don't need a memory to add someone to your People index. Go to <strong>Index → People → + add person</strong> to record a name the moment it surfaces. The same applies to locations and organisations. People with no memories attached are sorted to the top of the Prompter queue — Chronicle will keep nudging you about them until you connect at least one memory.</p>
+
+    <!-- ── WRITING STYLE ── -->
+    <h1 id="writing-style">Writing style that lasts</h1>
+
+    <p>Chronicle memories aren't social media posts. They're not written for an audience of strangers or for the approval of people who were there. They're written for whoever finds them — including your future self, your children, or grandchildren who never knew you young.</p>
+
+    <h2>Write what a photograph can't show</h2>
+    <p>The sensory details that photographs miss are often what makes a memory alive: the smell of a place, the feeling in your stomach, the specific thing someone said. The temperature. The music that was playing. What you were worried about at the time. These details decay fastest — capture them while you can.</p>
+
+    <div class="example-block">
+      <span class="label">Less useful</span>
+      Went to Gran's house for Christmas. Had a good time.
+    </div>
+
+    <div class="example-block">
+      <span class="label">More useful</span>
+      Gran's kitchen always smelled of the same soap. She'd started putting the decorations up in November by then, which annoyed Dad though he never said so directly. We played cards after dinner and she cheated, openly, and dared anyone to mention it.
+    </div>
+
+    <h2>Write in the past tense, from now</h2>
+    <p>Chronicle entries work best when written from the perspective of now looking back — not as a diary entry from the moment. "I didn't know then that it would be the last time I'd see that house" is more valuable than the entry you'd have written that day.</p>
+
+    <h2>Short entries are fine</h2>
+    <p>Not every memory needs a full paragraph. Sometimes a date, a title, a few names, and a single sentence is exactly right. "Met Sarah for the first time at Tom's party. She was funnier than anyone I'd met." The details can always be added later.</p>
+
+    <h2>Links belong in descriptions</h2>
+    <p>Chronicle automatically turns URLs in your memory text into clickable links. Paste a link to a Google Maps location, a news article from the day of an event, a YouTube video of a concert you attended, or a scan hosted in cloud storage. The link lives with the memory permanently — as long as the destination does too.</p>
+
+    <!-- ── LINKING FILES ── -->
+    <h1 id="linking-files">Linking to external files</h1>
+
+    <p>Chronicle stores everything locally on your device — which is good for privacy but means that large files like videos, audio recordings, and lengthy documents are better hosted elsewhere and linked to. Any URL in a memory description becomes a clickable link automatically.</p>
+
+    <p>The basic workflow is the same regardless of which service you use:</p>
+
+    <ol class="steps">
+      <li>Upload or locate the file in your chosen cloud service</li>
+      <li>Generate a shareable link for that file</li>
+      <li>Paste the link into the memory's description or content field</li>
+      <li>Chronicle will render it as a clickable link automatically</li>
+    </ol>
+
+    <div class="note">Links are permanent only as long as the file remains accessible. Consider whether the service you choose will still exist and whether you'll maintain the account in future. For truly important files, Chronicle's own storage (photos embedded directly) is more reliable than external links.</div>
+
+    <!-- ── GOOGLE DRIVE ── -->
+    <h2 id="google-drive">Google Drive &amp; Google Photos</h2>
+
+    <h3>Google Drive — documents, audio, video</h3>
+    <ol class="steps">
+      <li>Open Google Drive and locate the file</li>
+      <li>Right-click the file and choose <strong>Share → Copy link</strong></li>
+      <li>In the sharing dialog, set access to <strong>Anyone with the link</strong> (or a specific person if sharing a memory only with them)</li>
+      <li>Copy the link and paste it into your Chronicle memory</li>
+    </ol>
+
+    <div class="warning">Setting a file to "Anyone with the link" means anyone who has or finds the URL can access it. For sensitive documents, share only with specific people or keep files on your device.</div>
+
+    <h3>Google Photos</h3>
+    <ol class="steps">
+      <li>Open Google Photos and select the photo or album</li>
+      <li>Click the share icon and choose <strong>Create link</strong></li>
+      <li>Copy the generated link and paste it into Chronicle</li>
+    </ol>
+
+    <div class="tip">Google Photos links to albums work well for a set of photos that belong to a single memory — a holiday, a wedding, a birthday. Link to the album rather than individual photos.</div>
+
+    <!-- ── ONEDRIVE ── -->
+    <h2 id="onedrive">Microsoft OneDrive</h2>
+
+    <ol class="steps">
+      <li>Open OneDrive (web or desktop app) and locate the file</li>
+      <li>Right-click and choose <strong>Share</strong></li>
+      <li>In the sharing panel, click <strong>Copy link</strong></li>
+      <li>By default this creates a link that requires sign-in. To make it openly accessible, click the settings icon next to the link and change to <strong>Anyone with the link</strong></li>
+      <li>Paste the link into your Chronicle memory</li>
+    </ol>
+
+    <p>OneDrive works particularly well for Word documents, scanned PDFs, and Excel files — the link opens them in Office Online without requiring a download.</p>
+
+    <!-- ── ICLOUD ── -->
+    <h2 id="icloud">iCloud Drive</h2>
+
+    <p>iCloud sharing links are available on Mac (Finder) and iPhone/iPad (Files app).</p>
+
+    <h3>On Mac</h3>
+    <ol class="steps">
+      <li>Open Finder and navigate to iCloud Drive</li>
+      <li>Right-click the file and choose <strong>Share → Copy iCloud Link</strong></li>
+      <li>The link is copied to your clipboard — paste it into Chronicle</li>
+    </ol>
+
+    <h3>On iPhone or iPad</h3>
+    <ol class="steps">
+      <li>Open the Files app and locate the file in iCloud Drive</li>
+      <li>Long-press the file and tap <strong>Share</strong></li>
+      <li>Choose <strong>Copy iCloud Link</strong> from the share sheet</li>
+      <li>Open Chronicle and paste the link into your memory</li>
+    </ol>
+
+    <div class="tip">iCloud links are particularly useful on Apple devices since they open natively in the correct app. A link to a voice memo or a Pages document will open seamlessly on any Apple device signed in to that iCloud account.</div>
+
+    <!-- ── DROPBOX ── -->
+    <h2 id="dropbox">Dropbox</h2>
+
+    <ol class="steps">
+      <li>Open Dropbox and locate the file</li>
+      <li>Hover over the file and click <strong>Share</strong>, or right-click and choose <strong>Copy Dropbox link</strong></li>
+      <li>The link defaults to requiring a Dropbox account to view. To make it openly accessible, open the link settings and switch to <strong>Anyone with the link</strong></li>
+      <li>Paste into your Chronicle memory</li>
+    </ol>
+
+    <p>Dropbox is particularly good for audio files — voice memos, recordings, interviews — since it has a built-in audio player in the browser.</p>
+
+    <!-- ── KEEPING GOING ── -->
+    <h1 id="keeping-going">Keeping it going</h1>
+
+    <p>Chronicle is most useful when it's a living document, not a one-time project. The challenge is that the past is large and the present keeps arriving. A few approaches that help.</p>
+
+    <h2 id="batch-sessions">Batch reconstruction sessions</h2>
+    <p>Set aside a couple of hours every few months specifically for looking backwards. Don't try to be comprehensive — pick one era, one theme, or one relationship and go deep. "Everything I remember about the flat in Glasgow" or "Everyone I worked with in my twenties." These focused sessions often yield more than open-ended browsing.</p>
+
+    <p>Useful triggers for a batch session:</p>
+    <ul>
+      <li>A birthday or anniversary approaching</li>
+      <li>Finding an old box of photos or letters</li>
+      <li>Hearing from someone you haven't spoken to in years</li>
+      <li>A landmark — a house you lived in being demolished, a school reunion</li>
+      <li>A long flight or train journey</li>
+    </ul>
+
+    <h2>The new memory habit</h2>
+    <p>For the present, a lightweight habit works better than an ambitious one. When something happens that you know you'll want to remember — a conversation, a meal, a decision — open Chronicle and add a bare-bones entry: title, date, people. One sentence. You can always come back and expand it. The act of recording fixes it in memory anyway.</p>
+
+    <div class="tip">The title and date are the most important things to capture while fresh. The details can be filled in later — but without the anchor of when and what, the memory is much harder to recover.</div>
+
+    <!-- ── SHARING PRACTICE ── -->
+    <h2 id="sharing-practice">Sharing memories with family</h2>
+
+    <p>Some of the most valuable Chronicle sessions happen when you share a memory with someone who was there and they add their own perspective. The memory you have of a family holiday might be completely different from your sibling's — both versions are true, and both are worth keeping.</p>
+
+    <p>A few sharing approaches that work well:</p>
+
+    <ul>
+      <li><strong>The shared occasion</strong> — after a family gathering, share the memories you created with everyone who was there. Invite them to add their perspective while it's fresh.</li>
+      <li><strong>The prompt</strong> — share an old memory with someone who was present and ask if they remember it differently. Their response often surfaces details you'd lost entirely.</li>
+      <li><strong>The gift</strong> — for elderly relatives, receiving a Chronicle memory about something they were part of can prompt them to share their own version, which you can then record.</li>
+    </ul>
+
+    <div class="note">Chronicle's sharing system is designed so that shared memories live in your Chronicle independently. The sender's version and your version coexist — neither overwrites the other.</div>
+
+    <h2>Make sharing frictionless with email connections</h2>
+    <p>The biggest barrier to sharing is the logistics — copying a link, opening a messaging app, sending it. Chronicle removes this entirely for people whose email addresses are in your People index.</p>
+
+    <p>Go to <strong>Index → People</strong>, expand anyone you share with regularly, and add their email address. From that point on, sharing with them requires no extra steps — Chronicle delivers the memory directly to their Chronicle inbox. They'll see a badge the next time they open Chronicle.</p>
+
+    <div class="tip">Add email addresses to your close family members in one session. It's five minutes of setup that pays off every time you share.</div>
+
+    <h2>Contribution links</h2>
+    <p>Contribution links let you invite knowledge in rather than send memories out. Generate a link in <strong>Share → Contribution Links</strong> and share it with family members, friends, or anyone who has memories to contribute. Anyone can submit without needing Chronicle.</p>
+
+
+    <!-- ── INDEX TIP ── -->
+    <h1 id="index-tip">Building your index</h1>
+
+    <p>The Index becomes most useful when you treat it as a living directory — not just a byproduct of writing memories. A few habits that help:</p>
+
+    <ul>
+      <li><strong>Record people as they come to mind.</strong> Add them to the People index before you have a memory to attach. Use the notes field to capture what you remember. The Prompter will suggest them until you've linked at least one memory.</li>
+      <li><strong>Set coordinates on new locations.</strong> The map won't show a location until it has coordinates. If the geocoder misses one or places it wrong, open <strong>Index → Locations → Set coords</strong> and enter them manually.</li>
+      <li><strong>Link people to their organisations.</strong> If you knew someone from work or school, link them to that organisation in the People tab. The filter chips in the index then let you pull up everyone from a particular workplace with one click.</li>
+      <li><strong>Set relationship types.</strong> A quick "family", "friend", or "colleague" label makes the People index filter chips actually useful when you're navigating later.</li>
+    </ul>
+
+    <!-- ── BACKUPS ── -->
+    <h1 id="backups">Backups</h1>
+
+    <p>Chronicle stores everything in your browser's local storage — which means it can be lost if you clear browser data, switch browsers, or lose the device. A regular backup is essential.</p>
+
+    <h2>How to back up</h2>
+    <ol class="steps">
+      <li>Open Chronicle and tap the <strong>⚙ Settings</strong> button</li>
+      <li>Click <strong>Export backup</strong></li>
+      <li>Save the downloaded JSON file somewhere safe — a cloud drive, an external disk, or both</li>
+    </ol>
+
+    <p>The backup file is self-contained: it includes all your memories, all your photos (as embedded data), and your people and organisation index. It can be imported into any copy of Chronicle on any device.</p>
+
+    <div class="tip">Name your backup files with the date: <code>chronicle-backup-2025-06.json</code>. Keep at least the last two or three versions so you can recover from accidental deletions.</div>
+
+    <h2>Backing up across devices</h2>
+    <p>Chronicle doesn't sync between devices — each instance is independent. If you use Chronicle on both a phone and a laptop, export from one and import to the other periodically to keep them aligned. The import process merges intelligently — it won't duplicate memories that already exist.</p>
+
+    <!-- ── PRIVACY ── -->
+    <h1 id="privacy-notes">What Chronicle protects</h1>
+
+    <p>Chronicle is built around a simple privacy guarantee: your data never leaves your device. There are no accounts, no servers, no analytics, no backups to the cloud unless you choose to make them.</p>
+
+    <h2>What this means in practice</h2>
+    <ul>
+      <li><strong>No one can read your Chronicle</strong> unless they have physical access to your device and open the file in your browser</li>
+      <li><strong>Sharing is opt-in and explicit</strong> — you choose exactly which memories to share, with whom, and when</li>
+      <li><strong>Photos you import</strong> are stored in your browser's local IndexedDB, not uploaded anywhere</li>
+      <li><strong>External links</strong> in descriptions are the exception — clicking them leaves your device and may be logged by the host service</li>
+    </ul>
+
+    <h2>What Chronicle doesn't protect against</h2>
+    <ul>
+      <li><strong>Device access</strong> — anyone with access to your unlocked device and browser can read your Chronicle</li>
+      <li><strong>Browser data clearing</strong> — clearing browser storage will delete your Chronicle unless you've exported a backup</li>
+      <li><strong>Share recipients</strong> — when you share a memory, the recipient has a permanent copy. Share thoughtfully</li>
+      <li><strong>Linked files</strong> — files hosted on Google Drive, OneDrive, or elsewhere are subject to those services' privacy policies</li>
+    </ul>
+
+    <div class="note">If you're recording genuinely sensitive memories — health, relationships, legal matters — consider keeping those in a separate Chronicle instance or simply not linking to externally hosted files for those entries.</div>
+
+    <div class="divider"></div>
+
+    <footer>
+      <p><a href="index.html">Remembory</a> · <a href="manual.html">User Manual</a> · <a href="https://adadx4.github.io/remembory/chronicle.html" target="_blank">Open Chronicle</a></p>
+      <p style="margin-top:6px;">Built with care. Yours to keep.</p>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+  }
+
+  document.querySelectorAll('#sidebar-nav a').forEach(a => {
+    a.addEventListener('click', () => {
+      if (window.innerWidth < 900) {
+        document.getElementById('sidebar').classList.remove('open');
+      }
+    });
+  });
+
+  const sections = [];
+  document.querySelectorAll('h1[id], h2[id]').forEach(el => {
+    sections.push({ id: el.id, top: el.offsetTop });
+  });
+
+  const navLinks = document.querySelectorAll('#sidebar-nav a');
+
+  function updateActive() {
+    const scrollY = window.scrollY + 80;
+    let current = sections[0]?.id;
+    for (const s of sections) { if (scrollY >= s.top) current = s.id; }
+    navLinks.forEach(a => {
+      const href = a.getAttribute('href').replace('#', '');
+      a.classList.toggle('active', href === current);
+    });
+  }
+
+  window.addEventListener('scroll', updateActive, { passive: true });
+  updateActive();
+
+  document.addEventListener('click', (e) => {
+    const sidebar = document.getElementById('sidebar');
+    if (window.innerWidth < 900 && sidebar.classList.contains('open')) {
+      if (!sidebar.contains(e.target) && !e.target.closest('.menu-toggle')) {
+        sidebar.classList.remove('open');
+      }
+    }
+  });
+</script>
+</body>
+</html>
