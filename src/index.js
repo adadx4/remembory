@@ -2049,83 +2049,19 @@ export default {
       return json({ ok: true, licenseKey });
     }
 
-    // GET /license/recover — self-service key recovery page (or admin lookup)
+    // GET /license/recover — admin-only key lookup
     if (request.method === "GET" && path === "/license/recover") {
       const email = (url.searchParams.get("email") || "").trim().toLowerCase();
       const adminSecret = request.headers.get("X-Admin-Secret") || "";
       const isAdmin = !!(adminSecret && adminSecret === (env.ADMIN_SECRET || ""));
-
-      let result = null;
-      if (email) {
-        const keyHash = await env.SHARES.get("license_by_email:" + email);
-        if (keyHash) {
-          const raw = await env.SHARES.get("license:" + keyHash);
-          if (raw) result = JSON.parse(raw);
-        }
-      }
-
-      // Admin JSON response
-      if (isAdmin && email) {
-        if (!result) return json({ found: false });
-        return json({ found: true, licenseKey: result.licenseKey, status: result.status, createdAt: result.createdAt, renewedAt: result.renewedAt });
-      }
-
-      // HTML recovery page
-      const found = !!(result && result.status === "active");
-      const cancelled = !!(result && result.status !== "active");
-      return new Response(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Remembory — Recover licence key</title>
-  <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Crimson Text', Georgia, serif; background: #f7f2ea; color: #2c2416; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .card { background: #fffcf5; border: 1px solid #d4c4a8; border-radius: 6px; padding: 40px 36px; max-width: 460px; width: 100%; }
-    h1 { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-style: italic; color: #1a1208; margin-bottom: 10px; }
-    .subtitle { color: #6a5840; font-size: 0.95rem; line-height: 1.6; margin-bottom: 24px; }
-    form { display: flex; flex-direction: column; gap: 10px; }
-    input { padding: 10px 13px; border: 1px solid #c8b89a; border-radius: 3px; font-family: 'Crimson Text', serif; font-size: 1rem; background: #faf7f2; color: #1a1208; }
-    input:focus { outline: none; border-color: #a8885a; }
-    button { padding: 10px; background: #2c2416; color: #f5f0e8; border: none; border-radius: 3px; font-family: 'Crimson Text', serif; font-size: 1rem; cursor: pointer; transition: opacity 0.15s; }
-    button:hover { opacity: 0.85; }
-    .key-box { background: #f0e8d8; border: 1px solid #c8b89a; border-radius: 4px; padding: 14px 18px; font-family: monospace; font-size: 1.1rem; letter-spacing: 0.06em; color: #1a1208; word-break: break-all; margin-bottom: 10px; }
-    .copy-btn { background: #2c2416; color: #f5f0e8; border: none; border-radius: 3px; padding: 8px 20px; cursor: pointer; font-family: 'Crimson Text', serif; font-size: 0.95rem; transition: opacity 0.15s; }
-    .copy-btn:hover { opacity: 0.85; }
-    .msg { font-size: 0.88rem; line-height: 1.6; padding: 12px 14px; border-radius: 3px; margin-top: 4px; }
-    .msg.warn { background: rgba(196,133,138,0.1); border: 1px solid rgba(196,133,138,0.3); color: #8a3030; }
-    .msg.info { background: rgba(74,122,90,0.08); border: 1px solid rgba(74,122,90,0.25); color: #3a5a3a; }
-    a { color: #a8885a; }
-  </style>
-</head>
-<body>
-<div class="card">
-  <h1>Recover your key</h1>
-  ${!email ? `
-  <p class="subtitle">Enter the email address you used to subscribe and we'll show your licence key.</p>
-  <form method="GET" action="/license/recover">
-    <input type="email" name="email" placeholder="your@email.com" required autofocus>
-    <button type="submit">Look up my key</button>
-  </form>
-  ` : found ? `
-  <p class="subtitle">Active licence key for <strong>${esc(email)}</strong>:</p>
-  <div class="key-box" id="lk">${esc(result.licenseKey)}</div>
-  <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('lk').textContent).then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy key',1500)})">Copy key</button>
-  <p style="font-size:0.82rem;color:#8a7460;margin-top:12px;font-style:italic">Paste this into Chronicle &rarr; Settings &rarr; Subscription.</p>
-  ` : cancelled ? `
-  <div class="msg warn">Your subscription for <strong>${esc(email)}</strong> is no longer active (${esc(result.status)}). <a href="https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02">Resubscribe &rarr;</a></div>
-  ` : `
-  <div class="msg warn">No active subscription found for <strong>${esc(email)}</strong>. Check for typos, or <a href="mailto:hello@remembory.net">contact us</a> if you think this is an error.</div>
-  <form method="GET" action="/license/recover" style="margin-top:16px">
-    <input type="email" name="email" value="${esc(email)}" required>
-    <button type="submit">Try again</button>
-  </form>
-  `}
-</div>
-</body>
-</html>`, { headers: { "Content-Type": "text/html;charset=UTF-8", "Cache-Control": "no-store" } });
+      if (!isAdmin) return json({ error: "Forbidden" }, 403);
+      if (!email) return json({ error: "email required" }, 400);
+      const keyHash = await env.SHARES.get("license_by_email:" + email);
+      if (!keyHash) return json({ found: false });
+      const raw = await env.SHARES.get("license:" + keyHash);
+      if (!raw) return json({ found: false });
+      const result = JSON.parse(raw);
+      return json({ found: true, licenseKey: result.licenseKey, status: result.status, createdAt: result.createdAt, renewedAt: result.renewedAt });
     }
 
     // ── Admin ─────────────────────────────────────────────────────────────────
