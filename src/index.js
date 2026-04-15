@@ -19,6 +19,23 @@ async function sha256hex(str) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
+async function hmacHex(secret, str) {
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function isActiveLicence(key, env) {
+  if (!key) return false;
+  const keyHash = await sha256hex(key.trim().toUpperCase());
+  const raw = await env.SHARES.get("license:" + keyHash);
+  if (!raw) return false;
+  return JSON.parse(raw).status === "active";
+}
+
 function getViewerKey(request, url) {
   return request.headers.get("X-LS-Key") || url.searchParams.get("key") || "";
 }
@@ -1309,8 +1326,9 @@ export default {
     if (request.method === "POST" && path === "/react") {
       try {
         const body = await request.json();
-        const { identifier, memId, action } = body;
+        const { identifier, memId, action, key } = body;
         if (!identifier || !memId) return json({ error: "Invalid" }, 400);
+        if (!await isActiveLicence(key, env)) return json({ error: "Forbidden" }, 403);
         const reactKey = "reactions:" + identifier + ":" + memId;
         const raw = await env.SHARES.get(reactKey);
         let count = raw ? parseInt(raw) : 0;
@@ -1385,7 +1403,7 @@ export default {
         const body = await request.json();
         const { shareId, toEmail, fromName, fromEmail } = body;
         if (!shareId || !toEmail) return json({ error: "Missing shareId or toEmail" }, 400);
-        const emailHash = await sha256hex(toEmail.trim().toLowerCase());
+        const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, toEmail.trim().toLowerCase());
         const existing = await env.SHARES.get("deliveries:" + emailHash);
         const arr = existing ? JSON.parse(existing) : [];
         // Avoid duplicates
@@ -1399,16 +1417,17 @@ export default {
       }
     }
 
-    // GET /my/deliveries/count?emailHash=... — return pending count without clearing
-    if (request.method === "GET" && path === "/my/deliveries/count") {
+    // POST /my/deliveries/count — return pending count without clearing
+    if (request.method === "POST" && path === "/my/deliveries/count") {
       try {
-        const emailHash = url.searchParams.get("emailHash") || "";
-        if (!/^[0-9a-f]{64}$/.test(emailHash)) return json({ error: "Invalid emailHash" }, 400);
+        const body = await request.json();
+        const email = (body.email || "").trim().toLowerCase();
+        if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
+        const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
         const raw = await env.SHARES.get("deliveries:" + emailHash);
         if (!raw) return json({ count: 0 });
         const arr = JSON.parse(raw);
-        const count = arr.length; // count by delivery batch; full memory count resolved on fetch
-        return json({ count });
+        return json({ count: arr.length });
       } catch (e) {
         return json({ error: "Server error: " + e.message }, 500);
       }
@@ -1420,7 +1439,7 @@ export default {
         const body = await request.json();
         const email = (body.email || "").trim().toLowerCase();
         if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
-        const emailHash = await sha256hex(email);
+        const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
         const raw = await env.SHARES.get("deliveries:" + emailHash);
         if (!raw) return json({ deliveries: [] });
         const arr = JSON.parse(raw);
@@ -1446,7 +1465,7 @@ export default {
         const { ownerEmail, subjectName, subjectId, note } = body;
         if (!ownerEmail || !ownerEmail.includes("@")) return json({ error: "Missing ownerEmail" }, 400);
         const code = "gc_" + crypto.randomUUID().slice(0, 10);
-        const ownerEmailHash = await sha256hex(ownerEmail.trim().toLowerCase());
+        const ownerEmailHash = await hmacHex(env.EMAIL_HASH_SECRET, ownerEmail.trim().toLowerCase());
         const payload = { ownerEmailHash, subjectName: subjectName || "", subjectId: subjectId || "",
           note: note || "", createdAt: new Date().toISOString() };
         await env.SHARES.put("contrib:" + code, JSON.stringify(payload), { expirationTtl: 60 * 60 * 24 * 365 });
@@ -1582,9 +1601,22 @@ export default {
       }
     }
 
-    // GET /mailing/list?secret=...
+    // POST /mailing/unsubscribe
+    if (request.method === "POST" && path === "/mailing/unsubscribe") {
+      try {
+        const body = await request.json();
+        const email = (body.email || "").trim().toLowerCase();
+        if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
+        await env.MAILING_LIST.delete("sub:" + email);
+        return json({ ok: true });
+      } catch (e) {
+        return json({ error: "Server error: " + e.message }, 500);
+      }
+    }
+
+    // GET /mailing/list
     if (request.method === "GET" && path === "/mailing/list") {
-      const secret = url.searchParams.get("secret") || request.headers.get("X-Admin-Secret");
+      const secret = request.headers.get("X-Admin-Secret") || "";
       if (!secret || secret !== (env.ADMIN_SECRET || "")) return json({ error: "Forbidden" }, 403);
       const list = await env.MAILING_LIST.list({ prefix: "sub:" });
       const subscribers = await Promise.all(list.keys.map(async k => {
@@ -1967,7 +1999,7 @@ export default {
     // GET /license/recover — self-service key recovery page (or admin lookup)
     if (request.method === "GET" && path === "/license/recover") {
       const email = (url.searchParams.get("email") || "").trim().toLowerCase();
-      const adminSecret = url.searchParams.get("secret") || request.headers.get("X-Admin-Secret") || "";
+      const adminSecret = request.headers.get("X-Admin-Secret") || "";
       const isAdmin = !!(adminSecret && adminSecret === (env.ADMIN_SECRET || ""));
 
       let result = null;
