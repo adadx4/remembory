@@ -1741,6 +1741,36 @@ export default {
         catch(e) { licenseKey = pendingRaw; } // backwards compat with old plain-string format
       }
       const found = !!licenseKey;
+      const retryCount = parseInt(url.searchParams.get("retry") || "0");
+      // Webhook may not have arrived yet — poll up to 15 times (30 seconds) before giving up
+      if (!found && retryCount < 15) {
+        const nextUrl = `/stripe/success?session_id=${encodeURIComponent(sessionId)}&retry=${retryCount + 1}`;
+        return htmlResp(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="2;url=${nextUrl}">
+  <title>Remembory — Activating…</title>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;1,400&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Crimson Text', Georgia, serif; background: #f7f2ea; color: #2c2416; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: #fffcf5; border: 1px solid #d4c4a8; border-radius: 6px; padding: 40px 36px; max-width: 480px; width: 100%; text-align: center; }
+    h1 { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-style: italic; color: #1a1208; margin-bottom: 12px; }
+    p { color: #6a5840; font-size: 1rem; line-height: 1.6; }
+    .dots { display: inline-block; animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Activating your subscription<span class="dots">\u2026</span></h1>
+  <p>Your payment was received. Please wait while we activate your licence key.</p>
+</div>
+</body>
+</html>`, 200, { "Cache-Control": "no-store" });
+      }
       return htmlResp(`<!DOCTYPE html>
 <html lang="en">
 <head>
