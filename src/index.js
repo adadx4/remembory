@@ -2292,6 +2292,7 @@ function adminPage() {
     <button class="tab active" onclick="switchTab('overview')" id="tab-overview">Overview</button>
     <button class="tab" onclick="switchTab('licenses')" id="tab-licenses">Subscriptions</button>
     <button class="tab" onclick="switchTab('generate')" id="tab-generate">Issue Key</button>
+    <button class="tab" onclick="switchTab('recover')" id="tab-recover">Recover Key</button>
     <button class="tab" onclick="switchTab('profiles')" id="tab-profiles">Profiles</button>
     <button class="tab" onclick="switchTab('mailing')" id="tab-mailing">Mailing List</button>
   </nav>
@@ -2361,6 +2362,7 @@ function switchTab(tab) {
   if (tab==='overview') renderOverview();
   else if (tab==='licenses') renderLicenses();
   else if (tab==='generate') renderGenerate();
+  else if (tab==='recover') renderRecover();
   else if (tab==='profiles') renderProfiles();
   else if (tab==='mailing') renderMailing();
 }
@@ -2509,6 +2511,40 @@ async function generateKey() {
     res.innerHTML = '<div class="msg ok" style="margin-top:10px">Key issued: <span class="key-mono">'+esc(data.licenseKey)+'</span> <span class="copy-link" data-copy="'+esc(data.licenseKey)+'">copy</span></div>';
     var c = res.querySelector('[data-copy]'); if (c) c.addEventListener('click', function(){ copyText(this.getAttribute('data-copy'),this); });
     allLicenses = []; // invalidate cache so next visit to Subscriptions tab refreshes
+  } catch(e) { res.innerHTML = '<div class="msg err" style="margin-top:10px">Failed: '+esc(e.message)+'</div>'; }
+}
+
+// ── Recover ───────────────────────────────────────────────────────────────────
+function renderRecover() {
+  document.getElementById('tab-content').innerHTML =
+    '<div class="card" style="max-width:480px">'+
+      '<div class="card-title">Recover licence key by email</div>'+
+      '<div class="form-row"><input id="rec-email" type="email" placeholder="Subscriber email…" onkeydown="if(event.key===\\'Enter\\')recoverKey()"></div>'+
+      '<button class="btn" onclick="recoverKey()">Look up</button>'+
+      '<div id="rec-result"></div>'+
+    '</div>';
+}
+
+async function recoverKey() {
+  var email = (document.getElementById('rec-email').value||'').trim().toLowerCase();
+  var res = document.getElementById('rec-result');
+  if (!email) { res.innerHTML = '<div class="msg err" style="margin-top:10px">Enter an email address.</div>'; return; }
+  res.innerHTML = '<p style="color:#8a7460;font-style:italic;margin-top:10px">Looking up…</p>';
+  try {
+    var r = await fetch(API+'/license/recover?email='+encodeURIComponent(email), { headers: {'X-Admin-Secret': secret} });
+    var data = await r.json();
+    if (!data.found) {
+      res.innerHTML = '<div class="msg err" style="margin-top:10px">No licence found for <strong>'+esc(email)+'</strong>.</div>';
+      return;
+    }
+    var statusColour = data.status==='active'?'#4a7a5a':data.status==='suspended'?'#a85a2a':'#c4858a';
+    res.innerHTML =
+      '<div class="msg ok" style="margin-top:10px">'+
+        '<div style="margin-bottom:6px">Key: <span class="key-mono">'+esc(data.licenseKey)+'</span> <span class="copy-link" data-copy="'+esc(data.licenseKey)+'">copy</span></div>'+
+        '<div style="font-size:0.82rem;color:'+statusColour+'">Status: '+esc(data.status)+'</div>'+
+        '<div style="font-size:0.82rem;color:#8a7460">Created: '+fmt(data.createdAt)+(data.renewedAt&&data.renewedAt!==data.createdAt?' · Renewed: '+fmt(data.renewedAt):'')+'</div>'+
+      '</div>';
+    var c = res.querySelector('[data-copy]'); if (c) c.addEventListener('click', function(){ copyText(this.getAttribute('data-copy'),this); });
   } catch(e) { res.innerHTML = '<div class="msg err" style="margin-top:10px">Failed: '+esc(e.message)+'</div>'; }
 }
 
