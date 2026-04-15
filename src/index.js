@@ -954,7 +954,7 @@ async function loadViewerProfile() {
     if (!r.ok) return;
     var p = await r.json();
     var av = document.getElementById('sl-av'), nm = document.getElementById('sl-nm');
-    if (av) { if (p.imageUrl) av.innerHTML = '<img src="'+esc(p.imageUrl)+'" alt="" onerror="this.style.display=\'none\'">'; else av.textContent = (p.displayName||'?')[0]; }
+    if (av) { if (p.imageUrl) av.innerHTML = '<img src="'+esc(p.imageUrl)+'" alt="" onerror="this.style.display=\\'none\\'">'; else av.textContent = (p.displayName||'?')[0]; }
     if (nm) nm.textContent = p.displayName || viewerKey;
   } catch(e) {}
 }
@@ -2583,6 +2583,17 @@ async function getProfilesCompact(env) {
     }
     cursor = result.list_complete ? undefined : result.cursor;
   } while (cursor);
+
+  // One-time migration from legacy profiles:list blob
+  if (compacts.length === 0) {
+    const raw = await env.SHARES.get("profiles:list");
+    if (raw) {
+      const list = JSON.parse(raw);
+      await Promise.all(list.map(c => updateProfileCompact(env, c)));
+      return list;
+    }
+  }
+
   return compacts;
 }
 
