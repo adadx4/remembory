@@ -2962,6 +2962,9 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
   const [selectedMemIds, setSelectedMemIds] = useState(new Set([memory.id]));
   const [personalMsg, setPersonalMsg] = useState("");
   const [msgError, setMsgError] = useState("");
+  const [emailInputs, setEmailInputs] = useState({}); // {personName: emailString} for ad-hoc emails
+  const [sendStatus, setSendStatus] = useState("idle"); // idle | sending | sent | error
+  const [sendError, setSendError] = useState("");
 
   useEffect(()=>{ if(ownerName && !senderName) setSenderName(ownerName); }, [ownerName]);
 
@@ -3009,11 +3012,54 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
     setSelectedMemIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   }
 
+  function effectiveEmailFor(p) {
+    return emailFor(p) || (emailInputs[p]||"").trim();
+  }
+
   function handleGetLink() {
     if (!senderName.trim()) { alert("Please enter your name first."); return; }
     setMsgError("");
     if (onRecordShare && selectedPeople.length) onRecordShare(selectedPeople, selectedMemIds);
     setStep("link");
+  }
+
+  async function handleSend() {
+    if (!senderName.trim()) { alert("Please enter your name first."); return; }
+    setSendStatus("sending");
+    setSendError("");
+    try {
+      const toShare = allMems.filter(m => selectedMemIds.has(m.id));
+      // Sanitise: resolve mediaId blobs to data URLs, strip sender from people arrays
+      const sanitised = await Promise.all(toShare.map(async m => {
+        const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async med => {
+          if (med.mediaId) {
+            try {
+              const blob = await idbGet(med.mediaId);
+              if (blob) return await new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = () => resolve({url:reader.result,name:med.name,mediaId:med.mediaId});
+                reader.onerror = () => resolve(med);
+                reader.readAsDataURL(blob);
+              });
+            } catch(e) {}
+          }
+          return med;
+        }));
+        return {...m, people:(m.people||[]).filter(p=>p!==senderName.trim()), mediaUrls};
+      }));
+      if (JSON.stringify(sanitised).length > 20 * 1024 * 1024) throw new Error("Share package too large (>20 MB). Remove large photos and try again.");
+      await Promise.all(selectedPeople.filter(p=>effectiveEmailFor(p)).map(p =>
+        fetch(WORKER_URL + "/share/send", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({toEmail:effectiveEmailFor(p), fromName:senderName.trim(), fromEmail:effectiveEmail, message:personalMsg, memories:sanitised})
+        }).then(r=>{ if(!r.ok) throw new Error("Server error "+r.status); })
+      ));
+      if (onRecordShare && selectedPeople.length) onRecordShare(selectedPeople, selectedMemIds);
+      setSendStatus("sent");
+    } catch(e) {
+      setSendError(e.message || String(e));
+      setSendStatus("error");
+    }
   }
 
   function handleClose() {
@@ -3022,6 +3068,9 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
     setPersonalMsg("");
     setSelectedPeople([]);
     setSelectedMemIds(new Set([memory.id]));
+    setEmailInputs({});
+    setSendStatus("idle");
+    setSendError("");
   }
 
   if (!open) return React.createElement("button",{
@@ -3085,8 +3134,20 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
               ? selectedPeople[0]
               : selectedPeople.slice(0,-1).join(", ") + " and " + selectedPeople[selectedPeople.length-1])
           ),
-          selectedPeople.some(p=>recipientType(p)==="connected_email"||recipientType(p)==="has_email")&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#4a7a5a",marginTop:"2px"}},
-            "✓ "+selectedPeople.filter(p=>recipientType(p)==="connected_email"||recipientType(p)==="has_email").join(", ")+" will receive this directly in their Chronicle inbox."
+          // Inline email inputs for selected people without a known email
+          selectedPeople.filter(p=>!emailFor(p)).length > 0 && React.createElement("div",{style:{marginTop:"8px",display:"flex",flexDirection:"column",gap:"6px"}},
+            selectedPeople.filter(p=>!emailFor(p)).map(p=>
+              React.createElement("div",{key:p,style:{display:"flex",alignItems:"center",gap:"8px"}},
+                React.createElement("span",{style:{fontSize:"0.82rem",color:"#6a5840",minWidth:"80px",flexShrink:0}},p),
+                React.createElement("input",{
+                  type:"email",
+                  value:emailInputs[p]||"",
+                  onChange:e=>setEmailInputs(prev=>({...prev,[p]:e.target.value})),
+                  placeholder:"their email (optional)",
+                  style:{...S.input,fontSize:"0.82rem",padding:"4px 8px",flex:1}
+                })
+              )
+            )
           )
         )
       ),
@@ -3130,11 +3191,39 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
         React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",marginTop:"4px",fontStyle:"italic"}},"Optional")
       ),
 
-      React.createElement("button",{
-        onClick:handleGetLink,
-        disabled:!canShare,
-        style:{...S.btn,width:"100%",opacity:canShare?1:0.45,cursor:canShare?"pointer":"not-allowed"}
-      },selectedMemIds.size===1?"Share this memory":"Share "+selectedMemIds.size+" memories")
+      (()=>{
+        const recipsWithEmail = selectedPeople.filter(p=>effectiveEmailFor(p));
+        const recipsNoEmail = selectedPeople.filter(p=>!effectiveEmailFor(p));
+        const canSend = canShare && recipsWithEmail.length > 0 && sendStatus !== "sending";
+        const memLabel = selectedMemIds.size===1 ? "this memory" : selectedMemIds.size+" memories";
+        if (sendStatus==="error") return React.createElement("div",null,
+          React.createElement("p",{style:{color:"#c4858a",fontSize:"0.84rem",marginBottom:"8px"}},"\u26a0 "+sendError),
+          React.createElement("button",{onClick:()=>setSendStatus("idle"),style:{...S.btnOutline,fontSize:"0.84rem",padding:"6px 14px"}},"Try again")
+        );
+        return React.createElement("div",null,
+          recipsWithEmail.length > 0 && React.createElement("button",{
+            onClick:handleSend,
+            disabled:!canSend,
+            style:{...S.btn,width:"100%",opacity:canSend?1:0.45,cursor:canSend?"pointer":"not-allowed",marginBottom:"8px"}
+          }, sendStatus==="sending" ? "Sending\u2026" : (recipsNoEmail.length>0 ? "Send to "+recipsWithEmail.join(", ") : "Send "+memLabel)),
+          React.createElement("button",{
+            onClick:handleGetLink,
+            disabled:!canShare,
+            style:{...S.btnOutline,width:"100%",opacity:canShare?1:0.45,cursor:canShare?"pointer":"not-allowed",fontSize:"0.84rem"}
+          }, recipsWithEmail.length > 0 ? "Share as link instead" : (selectedMemIds.size===1?"Share this memory":"Share "+selectedMemIds.size+" memories"))
+        );
+      })()
+    ),
+
+    step==="compose" && sendStatus==="sent" && React.createElement("div",{style:{textAlign:"center",padding:"24px 0"}},
+      React.createElement("div",{style:{fontSize:"1.5rem",marginBottom:"8px"}},"\u2713"),
+      React.createElement("p",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 6px"}},
+        selectedMemIds.size===1 ? "Memory sent" : selectedMemIds.size+" memories sent"
+      ),
+      React.createElement("p",{style:{fontSize:"0.84rem",color:"#8a7460",margin:"0 0 16px"}},
+        selectedPeople.filter(p=>effectiveEmailFor(p)).join(" and ")+" will see it in their Chronicle inbox."
+      ),
+      React.createElement("button",{onClick:handleClose,style:{...S.btnOutline,padding:"7px 20px"}},"Done")
     ),
 
     step==="link" && (()=>{

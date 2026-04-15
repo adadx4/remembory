@@ -49,7 +49,7 @@ async function checkRateLimit(env, ip, action, limit, windowSecs) {
 }
 
 async function sendNotificationEmail(env, { toEmail, fromName, memCount }) {
-  if (!env.RESEND_API_KEY) { console.error("RESEND_API_KEY not set"); return; }
+  if (!env.RESEND_API_KEY) return;
   const subject = fromName + " shared " + (memCount === 1 ? "a memory" : memCount + " memories") + " with you on Chronicle";
   const text = [
     fromName + " has shared " + (memCount === 1 ? "a memory" : memCount + " memories") + " with you on Chronicle by Remembory.",
@@ -76,8 +76,6 @@ async function sendNotificationEmail(env, { toEmail, fromName, memCount }) {
       text,
     }),
   });
-  const resBody = await res.text();
-  console.log("Resend response:", res.status, resBody);
 }
 
 function getViewerKey(request, url) {
@@ -1536,7 +1534,7 @@ export default {
           env.SHARES.put("deliveries:" + toEmailHash, JSON.stringify(arr), { expirationTtl: 60 * 60 * 24 * 365 }),
         ]);
         // Fire notification email — non-blocking, share succeeds regardless
-        ctx.waitUntil(sendNotificationEmail(env, { toEmail: toEmailNorm, fromName: fromName.trim(), memCount: memories.length }).catch(e => console.error("sendNotificationEmail failed:", e)));
+        ctx.waitUntil(sendNotificationEmail(env, { toEmail: toEmailNorm, fromName: fromName.trim(), memCount: memories.length }).catch(() => {}));
         return json({ ok: true, shareId });
       } catch (e) {
         return json({ error: "Server error: " + e.message }, 500);
