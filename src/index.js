@@ -48,6 +48,36 @@ async function checkRateLimit(env, ip, action, limit, windowSecs) {
   return true;
 }
 
+async function sendNotificationEmail(env, { toEmail, fromName, memCount }) {
+  if (!env.RESEND_API_KEY) return;
+  const subject = fromName + " shared " + (memCount === 1 ? "a memory" : memCount + " memories") + " with you on Chronicle";
+  const text = [
+    fromName + " has shared " + (memCount === 1 ? "a memory" : memCount + " memories") + " with you on Chronicle by Remembory.",
+    "",
+    "Open Chronicle to review and accept " + (memCount === 1 ? "it" : "them") + ":",
+    "https://remembory.net/chronicle.html",
+    "",
+    "In Chronicle, go to Sharing \u2192 Inbox.",
+    "",
+    "---",
+    "You received this because someone sent memories to this email address using Remembory.",
+    "Nothing is added to your Chronicle without your action.",
+  ].join("\n");
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + env.RESEND_API_KEY,
+    },
+    body: JSON.stringify({
+      from: "Chronicle by Remembory <noreply@remembory.net>",
+      to: [toEmail],
+      subject,
+      text,
+    }),
+  });
+}
+
 function getViewerKey(request, url) {
   return request.headers.get("X-LS-Key") || url.searchParams.get("key") || "";
 }
@@ -1464,6 +1494,111 @@ export default {
         // Clear the queue after fetching
         await env.SHARES.delete("deliveries:" + emailHash);
         return json({ deliveries: full.filter(Boolean) });
+      } catch (e) {
+        return json({ error: "Server error: " + e.message }, 500);
+      }
+    }
+
+    // POST /share/send — unified send: stores payload, queues delivery, fires notification email
+    if (request.method === "POST" && path === "/share/send") {
+      if (!await checkRateLimit(env, clientIp, "share_send", 5, 3600)) return json({ error: "Too many requests" }, 429);
+      try {
+        const body = await request.json();
+        const { toEmail, fromName, fromEmail, message, memories } = body;
+        if (!toEmail || !toEmail.includes("@")) return json({ error: "Invalid recipient email" }, 400);
+        if (!memories || !Array.isArray(memories) || memories.length === 0) return json({ error: "No memories provided" }, 400);
+        if (!fromName?.trim()) return json({ error: "Sender name required" }, 400);
+        const toEmailNorm = toEmail.trim().toLowerCase();
+        const fromEmailNorm = (fromEmail || "").trim().toLowerCase();
+        const toEmailHash = await hmacHex(env.EMAIL_HASH_SECRET, toEmailNorm);
+        const fromEmailHash = fromEmailNorm ? await hmacHex(env.EMAIL_HASH_SECRET, fromEmailNorm) : "";
+        if (fromEmailHash && fromEmailHash === toEmailHash) return json({ error: "Cannot send to yourself" }, 400);
+        const shareId = crypto.randomUUID().slice(0, 8);
+        const now = new Date().toISOString();
+        const payload = {
+          sharedBy: fromName.trim(), sharedByEmail: fromEmailNorm,
+          message: (message || "").trim().slice(0, 2000),
+          requestConnect: true, memories, sharedAt: now, collected: false,
+          _type: "direct_send", _toEmailHash: toEmailHash, _fromEmailHash: fromEmailHash,
+        };
+        const bodyStr = JSON.stringify(payload);
+        if (bodyStr.length > 20 * 1024 * 1024) return json({ error: "Share package too large" }, 400);
+        // Store payload and push to delivery queue in parallel
+        const existingRaw = await env.SHARES.get("deliveries:" + toEmailHash);
+        const arr = existingRaw ? JSON.parse(existingRaw) : [];
+        if (!arr.find(d => d.shareId === shareId)) {
+          arr.push({ shareId, fromName: fromName.trim(), fromEmail: fromEmailNorm, sentAt: now, _type: "direct_send" });
+        }
+        await Promise.all([
+          env.SHARES.put(shareId, bodyStr, { expirationTtl: 60 * 60 * 24 * 30 }),
+          env.SHARES.put("deliveries:" + toEmailHash, JSON.stringify(arr), { expirationTtl: 60 * 60 * 24 * 365 }),
+        ]);
+        // Fire notification email — non-blocking, share succeeds regardless
+        sendNotificationEmail(env, { toEmail: toEmailNorm, fromName: fromName.trim(), memCount: memories.length }).catch(() => {});
+        return json({ ok: true, shareId });
+      } catch (e) {
+        return json({ error: "Server error: " + e.message }, 500);
+      }
+    }
+
+    // POST /share/inbox/fetch — read inbox without clearing (idempotent)
+    if (request.method === "POST" && path === "/share/inbox/fetch") {
+      if (!await checkRateLimit(env, clientIp, "inbox_fetch", 30, 60)) return json({ error: "Too many requests" }, 429);
+      try {
+        const body = await request.json();
+        const email = (body.email || "").trim().toLowerCase();
+        if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
+        const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
+        const [deliveriesRaw, declinedRaw] = await Promise.all([
+          env.SHARES.get("deliveries:" + emailHash),
+          env.SHARES.get("inbox:declined:" + emailHash),
+        ]);
+        const stubs = deliveriesRaw ? JSON.parse(deliveriesRaw) : [];
+        const declined = declinedRaw ? JSON.parse(declinedRaw) : [];
+        const payloads = await Promise.all(stubs.map(async stub => {
+          const raw = await env.SHARES.get(stub.shareId);
+          if (!raw) return null;
+          return { ...JSON.parse(raw), _shareId: stub.shareId, _deliveredAt: stub.sentAt, _type: stub._type || "direct_send" };
+        }));
+        return json({ inbox: payloads.filter(Boolean), declined });
+      } catch (e) {
+        return json({ error: "Server error: " + e.message }, 500);
+      }
+    }
+
+    // POST /share/inbox/respond — accept, decline, or dismiss inbox items
+    if (request.method === "POST" && path === "/share/inbox/respond") {
+      if (!await checkRateLimit(env, clientIp, "inbox_respond", 60, 60)) return json({ error: "Too many requests" }, 429);
+      try {
+        const body = await request.json();
+        const { shareId, action, memIds } = body;
+        const email = (body.email || "").trim().toLowerCase();
+        if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
+        if (!shareId || !action) return json({ error: "Missing shareId or action" }, 400);
+        const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
+        if (action === "decline") {
+          const raw = await env.SHARES.get("inbox:declined:" + emailHash);
+          const declinedArr = raw ? JSON.parse(raw) : [];
+          const existing = declinedArr.find(d => d.shareId === shareId);
+          if (existing) {
+            existing.memIds = [...new Set([...existing.memIds, ...(memIds || [])])];
+          } else {
+            declinedArr.push({ shareId, declinedAt: new Date().toISOString(), memIds: memIds || [] });
+          }
+          await env.SHARES.put("inbox:declined:" + emailHash, JSON.stringify(declinedArr), { expirationTtl: 60 * 60 * 24 * 365 });
+        }
+        if (action === "accept" || action === "dismiss_all") {
+          const deliveriesRaw = await env.SHARES.get("deliveries:" + emailHash);
+          if (deliveriesRaw) {
+            const arr = JSON.parse(deliveriesRaw).filter(d => d.shareId !== shareId);
+            if (arr.length === 0) {
+              await env.SHARES.delete("deliveries:" + emailHash);
+            } else {
+              await env.SHARES.put("deliveries:" + emailHash, JSON.stringify(arr), { expirationTtl: 60 * 60 * 24 * 365 });
+            }
+          }
+        }
+        return json({ ok: true });
       } catch (e) {
         return json({ error: "Server error: " + e.message }, 500);
       }

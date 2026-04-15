@@ -3862,7 +3862,7 @@ function SettingsView({
               ),
               React.createElement("div",{style:{marginTop:"4px"}},React.createElement(SubOptions,{mode:"buttons"})),
               React.createElement("p",{style:{fontSize:"0.78rem",color:"#a8a090",marginTop:"6px"}},
-                React.createElement("a",{href:WORKER_URL+"/license/recover",target:"_blank",rel:"noopener",style:{color:"#a8885a"}},"Lost your key? Recover it here \u2192"))
+                "Lost your key? Contact us at ",React.createElement("a",{href:"mailto:hello@remembory.net",style:{color:"#a8885a"}},"hello@remembory.net"))
             )
       ),
 
@@ -6167,7 +6167,8 @@ function App() {
     // Also rename in localConnections
     try { const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]"); const ci=conns.findIndex(c=>c.name===oldName); if(ci>=0){conns[ci]={...conns[ci],name:n};localStorage.setItem("chronicle-connections",JSON.stringify(conns));setLocalConnections(conns);} } catch(e){}
     const updPhotos={...entityPhotos}; if(updPhotos["person:"+oldName]!==undefined){updPhotos["person:"+n]=updPhotos["person:"+oldName];delete updPhotos["person:"+oldName];}
-    persistSubject({memories:updMems,knownPeople:updKnown,peopleRelationships:updRels,peopleNotes:updNotes,personOrgs:updPOrgs,personLocations:updPLocs,personGroups:updGroups,peopleEmails:updEmails,entityPhotos:updPhotos});
+    const updShareHistory=(shareHistory||[]).map(h=>({...h,people:h.people.map(p=>p===oldName?n:p)}));
+    persistSubject({memories:updMems,knownPeople:updKnown,peopleRelationships:updRels,peopleNotes:updNotes,personOrgs:updPOrgs,personLocations:updPLocs,personGroups:updGroups,peopleEmails:updEmails,entityPhotos:updPhotos,shareHistory:updShareHistory});
   }
   function deletePerson(name) {
     const updMems=memories.map(m=>({...m,people:m.people?.filter(p=>p!==name)||[]}));
