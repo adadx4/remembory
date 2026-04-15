@@ -156,12 +156,10 @@ function clearLicenceCache() {
   try { localStorage.removeItem(LS_CACHE_KEY); } catch(e) {}
 }
 
-const PROMO_CODES = ["REMEMBER2025","FAMILY2025","FRIEND2025"];
 async function validateLicenceKey(key) {
   if (!key) return null;
   const clean = key.trim();
   if (!clean) return null;
-  if (PROMO_CODES.includes(clean.toUpperCase())) return {valid:true, tier:"subscriber", expiresAt:null, promo:true};
   const cached = loadLicenceCache();
   // If we have a valid cached result for this key, use it immediately —
   // then recheck in the background so the cache stays fresh for next time.
@@ -3825,7 +3823,7 @@ function SettingsView({
         ),
         isSubscriber
           ? React.createElement("div",null,
-              React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"6px"}},licenceStatus?.promo?"\u2713 Subscriber (promo)":"\u2713 Subscriber"),
+              React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"6px"}},"\u2713 Subscriber"),
               React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"Sharing and Genealogy Mode are enabled."),
               React.createElement("button",{onClick:()=>saveLicenceKey(""),style:{...S.btnOutline,fontSize:"0.82rem",padding:"5px 12px",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove key")
             )
@@ -3840,7 +3838,7 @@ function SettingsView({
                   onChange:e=>saveLicenceKey(e.target.value),
                   onKeyDown:e=>{if(e.key==="Enter")saveLicenceKey(e.target.value);},
                   id:"licence-key-input",
-                  placeholder:"Paste your licence key (REM-XXXX-…) or promo code\u2026",
+                  placeholder:"Paste your licence key (REM-XXXX-…)\u2026",
                   style:{...S.input,flex:1,fontSize:"0.88rem",fontFamily:"monospace",letterSpacing:"0.05em"}}),
                 React.createElement("button",{
                   onClick:()=>{ const el=document.getElementById("licence-key-input"); saveLicenceKey(el?el.value:licenceKey); },
