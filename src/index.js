@@ -1576,11 +1576,21 @@ export default {
         const body = await request.json();
         if (!body.keyHash || !body.ciphertext) return json({ error: "Invalid payload" }, 400);
         if (!/^[0-9a-f]{64}$/.test(body.keyHash)) return json({ error: "Invalid key" }, 400);
+        if (body.knownPushedAt) {
+          const existing = await env.SHARES.get("sync:" + body.keyHash);
+          if (existing) {
+            const stored = JSON.parse(existing);
+            if (stored.pushedAt && stored.pushedAt > body.knownPushedAt) {
+              return json({ error: "conflict", storedPushedAt: stored.pushedAt }, 409);
+            }
+          }
+        }
+        const pushedAt = new Date().toISOString();
         await env.SHARES.put("sync:" + body.keyHash, JSON.stringify({
           ciphertext: body.ciphertext, iv: body.iv, salt: body.salt,
-          checkIv: body.checkIv, check: body.check, pushedAt: new Date().toISOString(),
+          checkIv: body.checkIv, check: body.check, pushedAt,
         }), { expirationTtl: 60 * 60 * 24 * 90 });
-        return json({ ok: true });
+        return json({ ok: true, pushedAt });
       } catch (e) {
         return json({ error: "Server error: " + e.message }, 500);
       }

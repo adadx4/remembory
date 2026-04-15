@@ -36,7 +36,6 @@ SHARE_PROD="https://share.remembory.net"
 sed -i \
   -e "s|const WORKER_URL = \"$PROD_WORKER\"|const WORKER_URL = \"$STAGING_WORKER\"|g" \
   -e "s|$SHARE_PROD|$STAGING_WORKER|g" \
-  -e "s|$PROD_WORKER|$STAGING_WORKER|g" \
   "$DIST/chronicle.html"
 
 # Rewrite prod URLs in index.html so landing page links stay within staging

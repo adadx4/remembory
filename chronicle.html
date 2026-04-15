@@ -3646,6 +3646,14 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
   const [passphrase, setPassphrase] = React.useState("");
   const [showPass, setShowPass] = React.useState(false);
   const [status, setStatus] = React.useState(""); // "", "pushing", "pulling", "done", "error:..."
+  const [lastPushedAt, setLastPushedAt] = React.useState(() => {
+    try { return localStorage.getItem("chronicle-sync-pushedat") || ""; } catch(e) { return ""; }
+  });
+
+  function savePushedAt(ts) {
+    setLastPushedAt(ts);
+    try { localStorage.setItem("chronicle-sync-pushedat", ts); } catch(e) {}
+  }
 
   async function keyHash(licKey) {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(licKey.trim().toUpperCase()));
@@ -3663,9 +3671,12 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
       const res = await fetch(WORKER_URL + "/sync/push", {
         method: "POST",
         headers: {"Content-Type":"application/json","X-Chronicle-Client":"1"},
-        body: JSON.stringify({keyHash: hash, ...encrypted}),
+        body: JSON.stringify({keyHash: hash, ...encrypted, ...(lastPushedAt ? {knownPushedAt: lastPushedAt} : {})}),
       });
+      if (res.status === 409) { setStatus("error:Another device pushed more recently — pull first to avoid overwriting it, then push again."); return; }
       if (!res.ok) { const e=await res.json().catch(()=>({})); setStatus("error:"+(e.error||res.status)); return; }
+      const pushResult = await res.json().catch(()=>({}));
+      if (pushResult.pushedAt) savePushedAt(pushResult.pushedAt);
       setStatus("done");
       setTimeout(()=>setStatus(""),3000);
     } catch(e) { setStatus("error:"+e.message); }
@@ -3683,6 +3694,7 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
       const stored = await res.json();
       const plain = await decryptData(passphrase, stored);
       if (!plain) { setStatus("error:Wrong passphrase — could not decrypt."); return; }
+      if (stored.pushedAt) savePushedAt(stored.pushedAt);
       const fakeEvt = {target:{files:[new File([plain],"chronicle-sync.json",{type:"application/json"})]}};
       importBackup(fakeEvt);
       setStatus("done");
@@ -3825,6 +3837,9 @@ function SettingsView({
           ? React.createElement("div",null,
               React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"6px"}},"\u2713 Subscriber"),
               React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"Sharing and Genealogy Mode are enabled."),
+              !activePassword&&React.createElement("div",{style:{background:"rgba(168,136,90,0.08)",border:"1px solid rgba(168,136,90,0.3)",borderRadius:"3px",padding:"9px 12px",marginBottom:"12px",fontSize:"0.8rem",color:"#5a4020",lineHeight:1.5}},
+                "\uD83D\uDD13 Your licence key is saved in plain text on this device \u2014 anyone who opens Chronicle here could use it. Set a password below to encrypt it along with all your memories."
+              ),
               React.createElement("button",{onClick:()=>saveLicenceKey(""),style:{...S.btnOutline,fontSize:"0.82rem",padding:"5px 12px",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove key")
             )
           : React.createElement("div",null,
