@@ -36,6 +36,18 @@ async function isActiveLicence(key, env) {
   return JSON.parse(raw).status === "active";
 }
 
+// Rate limiting via KV — returns true if request is allowed, false if limit exceeded.
+// Uses a fixed window per IP address. Window key expires automatically after 2x the window.
+async function checkRateLimit(env, ip, action, limit, windowSecs) {
+  const window = Math.floor(Date.now() / 1000 / windowSecs);
+  const key = `rl:${action}:${ip}:${window}`;
+  const raw = await env.SHARES.get(key);
+  const count = raw ? parseInt(raw) : 0;
+  if (count >= limit) return false;
+  await env.SHARES.put(key, String(count + 1), { expirationTtl: windowSecs * 2 });
+  return true;
+}
+
 function getViewerKey(request, url) {
   return request.headers.get("X-LS-Key") || url.searchParams.get("key") || "";
 }
@@ -987,6 +999,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
+    const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
 
     // Base URL — adapts automatically for staging vs production
     const baseUrl = `${url.protocol}//${url.hostname}`;
@@ -1324,6 +1337,7 @@ export default {
 
     // POST /react
     if (request.method === "POST" && path === "/react") {
+      if (!await checkRateLimit(env, clientIp, "react", 30, 60)) return json({ error: "Too many requests" }, 429);
       try {
         const body = await request.json();
         const { identifier, memId, action, key } = body;
@@ -1383,6 +1397,7 @@ export default {
 
     // POST /share
     if (request.method === "POST" && path === "/share") {
+      if (!await checkRateLimit(env, clientIp, "share", 10, 60)) return json({ error: "Too many requests" }, 429);
       try {
         const body = await request.json();
         if (!body.memories || !Array.isArray(body.memories)) {
@@ -1588,6 +1603,7 @@ export default {
 
     // POST /mailing/subscribe
     if (request.method === "POST" && path === "/mailing/subscribe") {
+      if (!await checkRateLimit(env, clientIp, "subscribe", 5, 600)) return json({ error: "Too many requests" }, 429);
       try {
         const text = await request.text();
         let email = "";
@@ -1965,6 +1981,7 @@ export default {
 
     // GET /license/check?key=…
     if (request.method === "GET" && path === "/license/check") {
+      if (!await checkRateLimit(env, clientIp, "liccheck", 20, 60)) return json({ error: "Too many requests" }, 429);
       const key = getViewerKey(request, url);
       if (!key) return json({ valid: false });
       const keyHash = await sha256hex(key.trim().toUpperCase());
