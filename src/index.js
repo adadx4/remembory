@@ -971,6 +971,19 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
+    // Base URL — adapts automatically for staging vs production
+    const baseUrl = `${url.protocol}//${url.hostname}`;
+    const isProd = url.hostname === "social.remembory.net" || url.hostname === "share.remembory.net";
+    const socialBase = isProd ? "https://social.remembory.net" : baseUrl;
+    const shareBase  = isProd ? "https://share.remembory.net"  : baseUrl;
+    // Rewrite hardcoded URLs in HTML responses for non-production environments
+    function htmlResp(content, status = 200, extraHeaders = {}) {
+      const body = isProd ? content : content
+        .replace(/https:\/\/social\.remembory\.net/g, baseUrl)
+        .replace(/https:\/\/share\.remembory\.net/g, baseUrl);
+      return new Response(body, { status, headers: { "Content-Type": "text/html;charset=UTF-8", ...extraHeaders } });
+    }
+
     // CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: CORS });
@@ -980,9 +993,7 @@ export default {
 
     // Serve Explore page at root and /explore
     if (request.method === "GET" && (path === "/" || path === "/explore" || path === "")) {
-      return new Response(explorePage(), {
-        headers: { "Content-Type": "text/html;charset=UTF-8", "Cache-Control": "public,max-age=300" },
-      });
+      return htmlResp(explorePage(), 200, { "Cache-Control": "public,max-age=300" });
     }
 
     // GET /p/:identifier — individual profile page
@@ -1002,9 +1013,7 @@ export default {
         ? (profile.memories || [])
         : (profile.memories || []).filter(m => canViewMemory(m, vEmailHash, profile.connectionEmailHashes || [], isSub));
       const connectionLevel = isOwner ? "owner" : (vEmailHash && (profile.connectionEmailHashes || []).includes(vEmailHash)) ? "connected" : "public";
-      return new Response(profilePage(profile, visibleMems, isOwner, viewerKey, viewerIdentifier || "", connectionLevel), {
-        headers: { "Content-Type": "text/html;charset=UTF-8", "Cache-Control": "no-store" },
-      });
+      return htmlResp(profilePage(profile, visibleMems, isOwner, viewerKey, viewerIdentifier || "", connectionLevel), 200, { "Cache-Control": "no-store" });
     }
 
     // POST /profile/publish
@@ -1077,7 +1086,7 @@ export default {
           presenceIndex: profile.presenceIndex,
         });
 
-        return json({ ok: true, identifier, url: "https://social.remembory.net/p/" + identifier });
+        return json({ ok: true, identifier, url: `${socialBase}/p/${identifier}` });
       } catch (e) {
         return json({ error: "Server error: " + e.message }, 500);
       }
@@ -1364,7 +1373,7 @@ export default {
         const code = crypto.randomUUID().slice(0, 8);
         const payload = { ...body, sharedAt: new Date().toISOString(), collected: false };
         await env.SHARES.put(code, JSON.stringify(payload), { expirationTtl: 60 * 60 * 24 * 30 });
-        return json({ url: `https://share.remembory.net/s/${code}`, code });
+        return json({ url: `${shareBase}/s/${code}`, code });
       } catch (e) {
         return json({ error: "Server error: " + e.message }, 500);
       }
@@ -1441,7 +1450,7 @@ export default {
         const payload = { ownerEmailHash, subjectName: subjectName || "", subjectId: subjectId || "",
           note: note || "", createdAt: new Date().toISOString() };
         await env.SHARES.put("contrib:" + code, JSON.stringify(payload), { expirationTtl: 60 * 60 * 24 * 365 });
-        return json({ code, url: `https://share.remembory.net/contribute/${code}` });
+        return json({ code, url: `${shareBase}/contribute/${code}` });
       } catch (e) {
         return json({ error: "Server error: " + e.message }, 500);
       }
@@ -1452,13 +1461,9 @@ export default {
       const code = path.slice("/contribute/".length);
       if (!code) return json({ error: "No code" }, 400);
       const raw = await env.SHARES.get("contrib:" + code);
-      if (!raw) return new Response(contributionExpiredPage(), {
-        status: 410, headers: { "Content-Type": "text/html;charset=UTF-8" },
-      });
+      if (!raw) return htmlResp(contributionExpiredPage(), 410);
       const contrib = JSON.parse(raw);
-      return new Response(contributionFormPage(code, contrib.subjectName, contrib.note), {
-        headers: { "Content-Type": "text/html;charset=UTF-8", "X-Frame-Options": "DENY", "Cache-Control": "no-store" },
-      });
+      return htmlResp(contributionFormPage(code, contrib.subjectName, contrib.note), 200, { "X-Frame-Options": "DENY", "Cache-Control": "no-store" });
     }
 
     // POST /contribute/:code — accept guest submission
@@ -1530,9 +1535,7 @@ export default {
         await env.SHARES.put(code, JSON.stringify({ ...data, collected: true }), { expirationTtl: 60 * 60 * 24 });
         return json(data);
       }
-      return new Response(bridgePage(code, data.sharedBy || "", data.memories?.length || 0), {
-        headers: { "Content-Type": "text/html;charset=UTF-8", "X-Frame-Options": "DENY", "Cache-Control": "no-store" },
-      });
+      return htmlResp(bridgePage(code, data.sharedBy || "", data.memories?.length || 0), 200, { "X-Frame-Options": "DENY", "Cache-Control": "no-store" });
     }
 
     // ── Sync ──────────────────────────────────────────────────────────────────
@@ -1684,7 +1687,7 @@ export default {
         catch(e) { licenseKey = pendingRaw; } // backwards compat with old plain-string format
       }
       const found = !!licenseKey;
-      return new Response(`<!DOCTYPE html>
+      return htmlResp(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -1755,7 +1758,7 @@ export default {
   `}
 </div>
 </body>
-</html>`, { headers: { "Content-Type": "text/html;charset=UTF-8", "Cache-Control": "no-store" } });
+</html>`, 200, { "Cache-Control": "no-store" });
     }
 
     // ── PayPal ────────────────────────────────────────────────────────────────
@@ -2044,7 +2047,7 @@ export default {
 
     // GET /admin — dashboard HTML
     if (request.method === "GET" && path === "/admin") {
-      return new Response(adminPage(), { headers: { "Content-Type": "text/html;charset=UTF-8", "Cache-Control": "no-store" } });
+      return htmlResp(adminPage(), 200, { "Cache-Control": "no-store" });
     }
 
     // GET /admin/licenses — list all licenses

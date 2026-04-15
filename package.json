@@ -1,0 +1,9 @@
+{
+  "name": "remembory-share",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "deploy:staging": "bash scripts/build-staging.sh",
+    "deploy:staging:dry": "bash scripts/build-staging.sh --dry-run"
+  }
+}

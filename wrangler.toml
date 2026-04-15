@@ -25,3 +25,27 @@ id = "e9a03844192b46828417a458140de7f6"
 
 # Secrets (set via wrangler secret put):
 # ADMIN_SECRET — protects GET /mailing/list
+
+# ── Staging environment ───────────────────────────────────────────────────────
+# Deploy with: npm run deploy:staging (or: wrangler deploy --env staging)
+# Before first deploy, create KV namespaces:
+#   wrangler kv namespace create SHARES --env staging
+#   wrangler kv namespace create MAILING_LIST --env staging
+# Then paste the returned IDs below.
+[env.staging]
+name = "remembory-staging"
+
+[env.staging.assets]
+directory = "./dist"
+
+[[env.staging.kv_namespaces]]
+binding = "SHARES"
+id = "REPLACE_WITH_STAGING_SHARES_KV_ID"
+
+[[env.staging.kv_namespaces]]
+binding = "MAILING_LIST"
+id = "REPLACE_WITH_STAGING_MAILING_LIST_KV_ID"
+
+[[env.staging.routes]]
+pattern = "staging.remembory.net/*"
+zone_name = "remembory.net"

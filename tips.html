@@ -309,8 +309,6 @@
       <a href="#life-chapters">Capturing life chapters</a>
       <a href="#people-practice">People — when to tag</a>
       <a href="#groups-tip">Using groups</a>
-      <a href="#genealogy-tip">Working with genealogy</a>
-      <a href="#history-mode-tip">History Mode workflow</a>
       <a href="#writing-style">Writing style that lasts</a>
 
       <div class="sidebar-chapter">Attaching files</div>
@@ -339,8 +337,6 @@
     <div class="callout" style="background:rgba(200,168,122,0.08);border:1px solid rgba(200,168,122,0.3);border-radius:4px;padding:16px 20px;margin-bottom:28px">
       <strong style="font-family:'Playfair Display',serif;font-size:1rem;color:#1a1208">New in this version</strong>
       <ul style="margin:8px 0 0 18px;font-size:.95rem;color:#6a5c48;line-height:1.8">
-        <li><strong>History Mode</strong> — research a historical subject with a dedicated Chronicle. Adds Sources, Research Notes, and Candidate Confidence (possible/probable) to every entry.</li>
-        <li><strong>Full family tree import</strong> — import a GEDCOM and choose a focal subject. All overlapping relatives are pulled in together in one preview — no need to import person by person.</li>
         <li><strong>Auto-delivery for connections</strong> — add an email to anyone in your People index and future shares are delivered straight to their Chronicle inbox. No link to copy and send.</li>
         <li><strong>Guest contribution links</strong> — invite anyone to submit memories or documents directly into your Chronicle inbox without setting up Chronicle themselves.</li>
         <li><strong>Accept all</strong> — accept an entire batch of incoming shared memories with one click.</li>
@@ -401,7 +397,7 @@
       <tr><td>A guess — no real evidence</td><td>Uncertain</td><td>2008?</td></tr>
     </table>
 
-    <p>Use <strong>Uncertain</strong> for dates you've inferred or estimated but can't verify — especially useful for genealogy research. Uncertain dates display with a <code>?</code> suffix and remind you to seek confirmation.</p>
+    <p>Use <strong>Uncertain</strong> for dates you've inferred or estimated but can't verify. Uncertain dates display with a <code>?</code> suffix and remind you to seek confirmation.</p>
     <p>Use the coarsest precision that honestly represents what you know. It's better to say "sometime in 1987" than to guess a month and be wrong. The timeline treats fuzzy entries gracefully — a decade-level memory appears at the start of that decade, a year-level memory at the start of that year.</p>
 
     <h2>Upgrading precision later</h2>
@@ -477,67 +473,6 @@
 
     <h3>Add people to your index before you need them</h3>
     <p>You don't need a memory to add someone to your People index. Go to <strong>Index → People → + add person</strong> to record a name the moment it surfaces. The same applies to locations and organisations. People with no memories attached are sorted to the top of the Prompter queue — Chronicle will keep nudging you about them until you connect at least one memory.</p>
-
-    <!-- ── GENEALOGY TIPS ── -->
-    <div class="divider"></div>
-    <h1 id="genealogy-tip">Working with genealogy data</h1>
-
-    <p>Genealogy mode imports a GEDCOM file and builds a contextual picture of your subject's life — not just their own events, but the events of everyone in their family branch whose life overlapped with theirs. Here's how to get the most from it.</p>
-
-    <h2>Start with someone who bridges past and present</h2>
-    <p>The most useful subjects to import are people who connect the deep past to someone you knew personally — a grandparent or great-grandparent. Starting from that person pulls in their parents, siblings, children, cousins, and in-laws, giving you a rich cast of characters all at once.</p>
-
-    <h2>Be selective in the preview</h2>
-    <p>The import preview shows all overlapping family members and all their events. You don't need to import everything. In a large family tree a great-grandparent might have dozens of relatives — import the people and events that are genuinely relevant to the story you want to tell. Tick or untick individual events, or collapse entire people you don't need.</p>
-
-    <h2>Mark guessed dates as Uncertain</h2>
-    <p>Genealogy data is full of estimated dates — birth years inferred from census records, marriage years calculated from children's ages. GEDCOM files flag these with qualifiers like <em>Abt.</em> or <em>BET…AND</em>. Chronicle strips these qualifiers to get a usable year, but the uncertainty is real. After importing, open any memory with a doubtful date and set it to <strong>Uncertain</strong>. This keeps your timeline honest and reminds you which dates need further research.</p>
-
-    <div class="tip">After a GEDCOM import, browse the List view sorted by date. Any memories with suspiciously wrong dates — like relatives' events landing in the subject's birth year — should be corrected or marked Uncertain.</div>
-
-    <h2>Add what the GEDCOM can't tell you</h2>
-    <p>GEDCOM events are facts without texture — born, married, died, resided. Chronicle's value is the layer you add on top: what you were told about this person, photos you've found, documents you've seen, stories passed down. The GEDCOM gives you the skeleton; you add the life.</p>
-
-    <div class="note">Genealogy mode requires a subscription ($20/year). See <a href="https://remembory.net/#subscribe" target="_blank" rel="noopener">remembory.net</a> for details.</div>
-
-    <!-- ── HISTORY MODE WORKFLOW ── -->
-    <h1 id="history-mode-tip">History Mode workflow</h1>
-
-    <p>History Mode transforms Chronicle into a researcher's workbench. Rather than recording personal memories, you are assembling evidence, weighing sources, and building a picture of a life from the outside. The workflow is different from personal journalling — here's how to approach it.</p>
-
-    <h2>Sources first, entries second</h2>
-    <p>The temptation is to start typing entries immediately — a birth year from Ancestry, a residence from a census. Resist. Add the source first: go to <strong>Index → Sources</strong> and record the document. Then create the entry and link the source to it. This ensures every claim in your Chronicle is traceable to evidence rather than assembled from memory after the fact.</p>
-
-    <div class="tip">Think of Sources as your footnotes. An entry without a source is an assertion; an entry with a source is a finding.</div>
-
-    <h2>Use confidence levels honestly</h2>
-    <p>History Mode provides three confidence levels: Established, Probable, and Possible. Use them honestly rather than defaulting to Established for everything.</p>
-    <ul>
-      <li><strong>Established</strong> — backed by a primary source (a certificate, a register entry, a contemporary document)</li>
-      <li><strong>Probable</strong> — strongly suggested by secondary evidence (census ages, newspaper mentions, family letters)</li>
-      <li><strong>Possible</strong> — an inference, a family tradition, or a hypothesis worth investigating</li>
-    </ul>
-    <p>Keeping confidence levels honest means you always know which parts of your timeline are solid ground and which are still working hypotheses. Future evidence may promote a Possible to Probable or Established — just edit the entry.</p>
-
-    <h2>Research notes as a working journal</h2>
-    <p>Every entry's Research Note field is a private space for your reasoning — not published in print output, not shown to guests. Use it to record:</p>
-    <ul>
-      <li>Why you believe what you believe about this entry</li>
-      <li>Contradictions between sources you haven't resolved</li>
-      <li>Leads to follow up — "check 1891 census", "look for marriage register at St Mary's"</li>
-      <li>Alternative interpretations you've considered and set aside</li>
-    </ul>
-    <p>Treat the Research Note as the conversation you're having with the evidence. The main entry content is the conclusion; the Research Note is the argument.</p>
-
-    <h2>Invite collaborators with contribution links</h2>
-    <p>You're rarely the only person researching a family line. History Mode's contribution links let you open up your research to others without giving them direct access to your Chronicle.</p>
-    <p>Generate a link from <strong>Share → Contribution Links</strong> and send it to a distant relative, a local historian, or a family Facebook group. Contributors fill in a form — no Chronicle needed. Their submissions land in your inbox for review. You decide what to accept.</p>
-
-    <div class="tip">A good contribution link note is specific: "I'm researching the Bateson family of Moorabbin, Victoria, 1880–1940. Any memories, photos, or documents gratefully received." Specific prompts get specific responses.</div>
-
-    <h2>Keep personal and historical Chronicles separate</h2>
-    <p>Your personal Chronicle and a History Mode Chronicle serve completely different purposes. In your personal Chronicle, you are the subject — you are recording your own lived experience. In a History Mode Chronicle, you are the researcher — your subject is someone else.</p>
-    <p>Chronicle's subject system lets you maintain both simultaneously. Use <strong>⚙ Settings → Subjects</strong> to switch between them. Your personal memories won't mix with your genealogical research, and the right tools appear automatically for each context.</p>
 
     <!-- ── WRITING STYLE ── -->
     <h1 id="writing-style">Writing style that lasts</h1>
@@ -695,8 +630,8 @@
 
     <div class="tip">Add email addresses to your close family members in one session. It's five minutes of setup that pays off every time you share.</div>
 
-    <h2>Contribution links for historical sharing</h2>
-    <p>For family history research, contribution links are more useful than share links. Rather than sending memories out, you're inviting knowledge in. Generate a link in <strong>Share → Contribution Links</strong> and share it wherever the knowledge lives — a family group chat, a genealogy forum, an email to a cousin you've just traced. Anyone can submit without needing Chronicle.</p>
+    <h2>Contribution links</h2>
+    <p>Contribution links let you invite knowledge in rather than send memories out. Generate a link in <strong>Share → Contribution Links</strong> and share it with family members, friends, or anyone who has memories to contribute. Anyone can submit without needing Chronicle.</p>
 
 
     <!-- ── INDEX TIP ── -->

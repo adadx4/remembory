@@ -492,14 +492,6 @@
       <a href="#import">Importing Memories</a>
       <a href="#photo-import" class="section-link">From photos</a>
       <a href="#email-import" class="section-link">From email</a>
-      <a href="#genealogy" class="section-link">Family tree (GEDCOM)</a>
-
-      <div class="sidebar-chapter">History Mode</div>
-      <a href="#history-mode">History Mode</a>
-      <a href="#history-sources" class="section-link">Sources</a>
-      <a href="#history-confidence" class="section-link">Candidate confidence</a>
-      <a href="#history-research-note" class="section-link">Research notes</a>
-
       <div class="sidebar-chapter">Sharing</div>
       <a href="#sharing">Sharing Memories</a>
       <a href="#share-link" class="section-link">Sharing by link</a>
@@ -528,8 +520,6 @@
     <div class="callout" style="background:rgba(200,168,122,0.08);border:1px solid rgba(200,168,122,0.3);border-radius:4px;padding:16px 20px;margin-bottom:28px">
       <strong style="font-family:'Playfair Display',serif;font-size:1rem;color:#1a1208">What's new</strong>
       <ul style="margin:8px 0 0 18px;font-size:.95rem;color:#6a5c48;line-height:1.8">
-        <li><strong>History Mode</strong> — a dedicated Chronicle type for researching historical subjects. Add sources with citation types, confidence levels (possible/probable), and research notes. See <a href="#history-mode" style="color:var(--gold-dark)">History Mode</a>.</li>
-        <li><strong>Family Tree import</strong> — import a full GEDCOM and choose a focal subject. Chronicle pulls in all overlapping relatives and their events together in one pass. See <a href="#genealogy" style="color:var(--gold-dark)">Genealogy &amp; GEDCOM</a>.</li>
         <li><strong>Auto-delivery for connected recipients</strong> — when you share with someone whose email is in your Connections, Chronicle delivers the memory directly to their inbox — no link to copy and send. See <a href="#sharing" style="color:var(--gold-dark)">Sharing Memories</a>.</li>
         <li><strong>Guest contribution links</strong> — generate a permanent link that lets anyone submit memories and documents directly into your Chronicle inbox. Perfect for collaborative research. See <a href="#contribution-links" style="color:var(--gold-dark)">Contribution Links</a>.</li>
         <li><strong>Accept all</strong> — in the Sharing inbox, accept an entire batch of incoming memories with one click rather than one at a time.</li>
@@ -664,12 +654,12 @@
           <tr><td>Part of year</td><td>You remember roughly when in the year — Early, Mid, or Late</td><td>Early 1985</td></tr>
           <tr><td>Year</td><td>You remember the year but not much else</td><td>1985</td></tr>
           <tr><td>Decade</td><td>You only know the rough era</td><td>1980s</td></tr>
-          <tr><td>Uncertain</td><td>You have a best guess but no evidence — useful for family history estimates</td><td>1985?</td></tr>
+          <tr><td>Uncertain</td><td>You have a best guess but no evidence</td><td>1985?</td></tr>
         </tbody>
       </table>
 
       <p>Use the date type selector to choose your precision level, then fill in the fields that appear.</p>
-      <p>The <strong>Uncertain</strong> option is particularly useful for genealogy imports and family history research, where a date may be inferred but not proven. Memories marked as uncertain display with a <code>?</code> suffix so you can tell at a glance which dates need verification.</p>
+      <p>Memories marked as uncertain display with a <code>?</code> suffix so you can tell at a glance which dates need verification.</p>
       <div class="tip">Don't let uncertainty stop you from recording a memory. A memory with just a year is infinitely better than no memory at all.</div>
 
       <h2 id="visibility">Visibility</h2>
@@ -900,110 +890,6 @@
 
     <div class="divider"></div>
 
-    <!-- Genealogy -->
-    <section class="section">
-      <h1 id="genealogy">Genealogy &amp; GEDCOM</h1>
-      <p class="chapter-intro">Chronicle can import a GEDCOM file — the standard export from Ancestry, MyHeritage, FamilySearch, and most genealogy apps. Rather than importing a single ancestor in isolation, Chronicle imports your chosen subject <em>in context</em> — finding everyone in the same branch of the family tree whose life overlapped with theirs.</p>
-
-      <div class="note"><strong>Genealogy mode requires a subscription.</strong> See <a href="#subscription">Subscription</a> for details.</div>
-
-      <h2>Importing a GEDCOM File</h2>
-      <ol class="steps">
-        <li>Click <strong>Import</strong> in the navigation</li>
-        <li>Select the <strong>Family Tree</strong> tab</li>
-        <li>Drag your <code>.ged</code> file onto the drop zone, or click to browse</li>
-        <li>Chronicle lists everyone in the file — type in the search box to filter by name</li>
-        <li>Click a person to see the import preview</li>
-        <li>Review and adjust the event selection, then click <strong>Import [name] →</strong></li>
-      </ol>
-      <div class="tip">Export the GEDCOM from your genealogy app first. Chronicle doesn't connect to any external service — the import is entirely local.</div>
-
-      <h2>The Import Preview</h2>
-      <p>After selecting a subject, Chronicle shows a two-panel preview before importing anything.</p>
-      <p>The top panel — shown with an amber background — lists the subject's own personal events: their birth, marriages, residences, emigration, military service, and so on.</p>
-      <p>Below that is a list of overlapping family members: everyone descended from the subject's great-grandparents whose lifespan intersected with the subject's. Each person shows their relationship (Father, Sister, Cousin, Brother-in-law, etc.) and their life dates. Expand any person to see their individual events, and tick or untick to select exactly which events you want to import.</p>
-      <p>Use <strong>Select all</strong> and <strong>Select none</strong> at the top to adjust the whole group at once.</p>
-
-      <h2>What Gets Imported</h2>
-      <p>Each selected event becomes one memory in your Chronicle. Events belonging to the subject are imported as standard memories. Events belonging to relatives are imported with a sage-green tint so you can tell at a glance which memories are about the subject directly and which are about people around them.</p>
-      <p>The memory title includes the person's name and their relationship in brackets — for example, <em>Margaret Louisa Hardiman [Mother] resided in Moorabbin</em> or <em>John Bateson [Grandfather] died in Victoria</em>. All people are tagged in each memory and added to your People index with their relationship type pre-filled.</p>
-
-      <h2>Dates in GEDCOM Files</h2>
-      <p>GEDCOM files often contain approximate or uncertain dates. Chronicle handles a wide range of date formats automatically, including ranges like <em>BET 1880 AND 1885</em> (takes the lower bound), prefixed dates like <em>Abt. 1855</em>, and various non-standard formats from different genealogy apps. Where a date cannot be reliably parsed, the event is not imported.</p>
-      <p>Dates imported from GEDCOM are automatically marked as <strong>Uncertain</strong> where appropriate — you can change this in the edit form once you have verified the date from a primary source.</p>
-
-      <h2>Map View with Genealogy Data</h2>
-      <p>After importing, the Map view shows three types of pins: amber for the subject's own locations, green for locations from relatives' events, and blue for additional/secondary locations. This gives you a clear visual picture of where your subject's family spread across during their lifetime.</p>
-    </section>
-
-    <div class="divider"></div>
-
-    <!-- History Mode -->
-    <section class="section">
-      <h1 id="history-mode">History Mode</h1>
-      <p class="chapter-intro">History Mode is a dedicated Chronicle type designed for researching a historical subject — an ancestor, a public figure, or anyone whose life you are piecing together from records rather than personal memory. It gives you genealogy-specific tools that don't belong in a personal journal.</p>
-
-      <p>When you create or switch a subject to History Mode, Chronicle adapts: the timeline shows <em>entries</em> rather than <em>memories</em>, the Add form reveals research-specific fields, and the Source tools become prominent throughout.</p>
-
-      <div class="note"><strong>History Mode requires a subscription.</strong> See <a href="#subscription">Subscription</a> for details.</div>
-
-      <h2 id="history-sources">Sources</h2>
-      <p>Every entry in a History Mode Chronicle can be backed by one or more sources — the records, documents, or testimonies from which the information was derived.</p>
-
-      <p>Chronicle supports the following source types:</p>
-      <table class="ftable">
-        <thead><tr><th>Type</th><th>Examples</th></tr></thead>
-        <tbody>
-          <tr><td>Document</td><td>Birth certificate, will, census record, land title</td></tr>
-          <tr><td>Photo</td><td>Photograph, portrait, illustration</td></tr>
-          <tr><td>Record</td><td>Church register, passenger list, newspaper, electoral roll</td></tr>
-          <tr><td>Oral history</td><td>Interview, family story, recorded testimony</td></tr>
-          <tr><td>Research</td><td>Published family history, genealogical database, DNA evidence</td></tr>
-          <tr><td>Other</td><td>Anything else</td></tr>
-        </tbody>
-      </table>
-
-      <p>Each source also carries a <strong>confidence level</strong> — Primary (a first-hand record), Secondary (derived or reported), or Questionable (uncertain or disputed).</p>
-
-      <p>To add sources to an entry:</p>
-      <ol class="steps">
-        <li>Open or edit any entry in a History Mode Chronicle</li>
-        <li>Expand the <strong>Sources</strong> section (click the section toggle if collapsed)</li>
-        <li>Click <strong>+ add source</strong></li>
-        <li>Enter a title, choose the source type and confidence level, and optionally add a URL or note</li>
-        <li>Click <strong>Save</strong></li>
-      </ol>
-      <p>You can also manage sources globally from <strong>Index → Sources</strong>, where all sources across all entries are listed and can be edited or linked to new entries.</p>
-
-      <h2 id="history-confidence">Candidate Confidence</h2>
-      <p>In historical research, you often know something is <em>probably</em> true but can't prove it conclusively. History Mode lets you mark entries with a candidate confidence level rather than asserting them as established facts.</p>
-
-      <table class="ftable">
-        <thead><tr><th>Level</th><th>When to use it</th></tr></thead>
-        <tbody>
-          <tr><td>Established</td><td>The default. Reasonably well-supported by sources.</td></tr>
-          <tr><td>Probable</td><td>Likely true — good circumstantial evidence or reasonable inference</td></tr>
-          <tr><td>Possible</td><td>Could be true — some supporting evidence but significant uncertainty</td></tr>
-        </tbody>
-      </table>
-
-      <p>Probable and Possible entries display a coloured confidence badge in the detail view and are visually distinguished in the timeline, so you can see at a glance which parts of your reconstruction are solid and which are still hypotheses.</p>
-
-      <h2 id="history-research-note">Research Notes</h2>
-      <p>Each entry can carry a <strong>Research Note</strong> — a private working note separate from the entry's main content. Use this to record:</p>
-      <ul>
-        <li>Why you have confidence (or doubt) in this entry</li>
-        <li>Contradictions between sources</li>
-        <li>Open questions to investigate further</li>
-        <li>Where to look next</li>
-      </ul>
-      <p>Research notes appear in the detail view beneath the entry and are not included in print output — they are working notes, not published content.</p>
-
-      <p>To add a research note, open or edit an entry and expand the <strong>Research Note</strong> section. Click the confidence buttons (Probable / Possible) to set the candidate confidence alongside the note.</p>
-    </section>
-
-    <div class="divider"></div>
-
     <!-- Sharing -->
     <section class="section">
       <h1 id="sharing">Sharing Memories</h1>
@@ -1078,7 +964,7 @@
         <li>Click <strong>Create contribution link</strong></li>
         <li>Copy the link and send it to whoever you want to invite</li>
       </ol>
-      <div class="tip">Contribution links are ideal for History Mode Chronicles — share the link with other researchers or distant relatives and let them add what they know directly to your research without needing to set up Chronicle themselves.</div>
+      <div class="tip">Share your contribution link with family members or friends and let them add what they know directly to your Chronicle inbox without needing to set up Chronicle themselves.</div>
 
       <h3>Reviewing Contributions</h3>
       <ol class="steps">
@@ -1198,7 +1084,6 @@
       <h2>What Requires a Subscription</h2>
       <ul>
         <li>Sending shared memories to others</li>
-        <li>History Mode — GEDCOM import, Sources, Research Notes, Candidate Confidence</li>
         <li>Guest contribution links</li>
       </ul>
 
