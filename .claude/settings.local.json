@@ -3,7 +3,9 @@
     "allow": [
       "Bash(git pull *)",
       "Bash(npx wrangler *)",
-      "Bash(npm --version)"
+      "Bash(npm --version)",
+      "Bash(npm run *)",
+      "Bash(cmd.exe /c \"npm run deploy:staging\")"
     ]
   }
 }
