@@ -6791,13 +6791,26 @@ function handleEdit(m) {
     }
   }
 
-  function acceptShare(d) {
+  async function acceptShare(d) {
     const isShared = !!d.sharedBy;
     const senderName = d.sharedBy || null;
     // Compute existingIds early so incomingMems.map can skip content-wrapping for already-owned memories
     const existingIds = new Set(memories.map(m=>m.id));
     const senderEmail = d.sharedByEmail || null;
-    const incomingMems = d.memories.map(m => {
+    // Store received photos into IndexedDB
+    const incomingMems = await Promise.all(d.memories.map(async m => {
+      if (m.mediaUrls && m.mediaUrls.length > 0) {
+        const migratedUrls = await Promise.all(m.mediaUrls.map(async med => {
+          if (med.url && med.url.startsWith("data:")) {
+            try {
+              const stored = await storeMedia(med.url, med.name || "photo");
+              return { mediaId: stored.mediaId, name: med.name || "photo" };
+            } catch(e) { return med; }
+          }
+          return med;
+        }));
+        m = { ...m, mediaUrls: migratedUrls };
+      }
       if (!isShared || !m.content || existingIds.has(m.id)) return m; // skip content-wrap if we already own this memory
       const existingPerspectives = m.perspectives || [];
       const alreadyHasSender = existingPerspectives.some(p=>p.author===senderName);
@@ -6808,7 +6821,7 @@ function handleEdit(m) {
       const existingPeople = m.people || [];
       const people = senderName && !existingPeople.includes(senderName) ? [...existingPeople, senderName] : existingPeople;
       return {...m, content:"", perspectives, sharedBy:senderName, sharedByEmail:senderEmail, sharedAt:d.sharedAt, people, visibility:"private"};
-    });
+    }));
     const toAdd = incomingMems.filter(m=>!existingIds.has(m.id));
     const merged = memories.map(m=>{
       const incoming = incomingMems.find(im=>im.id===m.id);
@@ -8886,13 +8899,35 @@ function handleEdit(m) {
               style:{width:"64px",height:"64px",borderRadius:"50%",objectFit:"cover",
                 border:"2px solid #d4c4a8",flexShrink:0}}),
             React.createElement("div",{style:{flex:1}},
-              React.createElement("label",{style:{...S.label,display:"block",marginBottom:"6px"}},"Profile image URL"),
-              React.createElement("input",{type:"url",value:profileImageUrl,
-                onChange:e=>persistTop({profileImageUrl:e.target.value}),
-                placeholder:"https://example.com/photo.jpg",
-                style:{...S.input,width:"100%"}}),
+              React.createElement("label",{style:{...S.label,display:"block",marginBottom:"6px"}},"Profile image"),
+              React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"6px"}},
+                React.createElement("button",{onClick:()=>{
+                  const input=document.createElement("input");input.type="file";input.accept="image/*";
+                  input.onchange=async e=>{
+                    const file=e.target.files[0];if(!file)return;
+                    const img=new Image();const url=URL.createObjectURL(file);
+                    img.onload=()=>{
+                      const size=200,canvas=document.createElement("canvas");canvas.width=size;canvas.height=size;
+                      const ctx=canvas.getContext("2d");
+                      const min=Math.min(img.width,img.height);
+                      ctx.drawImage(img,(img.width-min)/2,(img.height-min)/2,min,min,0,0,size,size);
+                      const dataUrl=canvas.toDataURL("image/jpeg",0.85);
+                      URL.revokeObjectURL(url);
+                      persistTop({profileImageUrl:dataUrl});
+                    };
+                    img.src=url;
+                  };
+                  input.click();
+                },style:{...S.btn,padding:"6px 14px",fontSize:"0.82rem"}},"Upload photo"),
+                profileImageUrl&&React.createElement("button",{onClick:()=>persistTop({profileImageUrl:""}),
+                  style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.82rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove")
+              ),
               React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"3px"}},
-                "Paste a link to any publicly accessible image. Shown as your avatar on your profile.")
+                "Upload a photo or paste a URL. Resized to 200x200 for your profile avatar."),
+              React.createElement("input",{type:"url",value:profileImageUrl&&!profileImageUrl.startsWith("data:")? profileImageUrl:"",
+                onChange:e=>persistTop({profileImageUrl:e.target.value}),
+                placeholder:"or paste a URL: https://example.com/photo.jpg",
+                style:{...S.input,width:"100%",marginTop:"4px",fontSize:"0.82rem"}})
             )
           )
         ),

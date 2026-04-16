@@ -1120,7 +1120,7 @@ export default {
           identifier,
           displayName: (body.displayName || body.ownerName || "Anonymous").slice(0, 80),
           about: (body.about || "").slice(0, 500),
-          imageUrl: (body.imageUrl || "").slice(0, 500),
+          imageUrl: (body.imageUrl || "").slice(0, 50000),
           ownerEmailHash,
           connectionEmailHashes,
           memories: body.memories,
