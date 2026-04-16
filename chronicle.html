@@ -369,6 +369,33 @@ async function storeMedia(dataUrl, name) {
   return { mediaId, name };
 }
 
+// Resize a blob image to max dimension, return data URL
+async function resizeImageBlob(blob, maxDim) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const w = img.width, h = img.height;
+      if (w <= maxDim && h <= maxDim) {
+        const reader = new FileReader();
+        reader.onload = () => { URL.revokeObjectURL(url); resolve(reader.result); };
+        reader.onerror = () => { URL.revokeObjectURL(url); reject(new Error("read failed")); };
+        reader.readAsDataURL(blob);
+        return;
+      }
+      const scale = maxDim / Math.max(w, h);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("load failed")); };
+    img.src = url;
+  });
+}
+
 // Resolve a mediaId (or legacy base64 url) to an object URL for display
 const _objUrlCache = {};
 async function resolveMediaUrl(med) {
@@ -2952,20 +2979,14 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, deliverTo
       // so the recipient doesn't see "My Chronicle" or similar as a tagged person.
       // Also resolve any mediaId blob references to embedded data: URLs so the
       // recipient receives the actual photo data, not just a local IDB key.
-      const sanitisedMemories = await Promise.all(memories.map(async m => {
-        const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async med => {
+      const photoQueue = [];
+      const sanitisedMemories = await Promise.all(memories.map(async (m, mi) => {
+        const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async (med, mdi) => {
           if (med.mediaId) {
             try {
               const blob = await idbGet(med.mediaId);
-              if (blob) {
-                return await new Promise(resolve => {
-                  const reader = new FileReader();
-                  reader.onload = () => resolve({ url: reader.result, name: med.name, mediaId: med.mediaId });
-                  reader.onerror = () => resolve(med); // fallback to bare ref
-                  reader.readAsDataURL(blob);
-                });
-              }
-            } catch(e) { /* blob not found, fall through */ }
+              if (blob) { photoQueue.push({blob, ref: mi+"_"+mdi}); return {name:med.name, _r2ref: mi+"_"+mdi}; }
+            } catch(e) {}
           }
           return med;
         }));
@@ -2978,18 +2999,25 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, deliverTo
         requestConnect: true,
         memories: sanitisedMemories
       };
-      const bodyStr = JSON.stringify(payload);
-      // KV values are capped at 25 MB; warn if photos push us close
-      if (bodyStr.length > 20 * 1024 * 1024) {
-        throw new Error("Share package is too large (>20 MB). Try sharing fewer memories or remove large photos.");
-      }
       const res = await fetch(WORKER_URL + "/share", {
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:bodyStr
+        body:JSON.stringify(payload)
       });
       if (!res.ok) throw new Error("Server error " + res.status);
       const data = await res.json();
+      // Upload photos to R2
+      if (photoQueue.length > 0 && data.code) {
+        for (const photo of photoQueue) {
+          try {
+            const resized = await resizeImageBlob(photo.blob, 1200);
+            const resizedBlob = await fetch(resized).then(r=>r.blob());
+            await fetch(WORKER_URL + "/share/media/" + data.code + "/" + encodeURIComponent(photo.ref), {
+              method:"PUT", headers:{"Content-Type":"image/jpeg"}, body:resizedBlob
+            });
+          } catch(e) {}
+        }
+      }
       setShareUrl(data.url);
       setShareCode(data.code || "");
       setStatus("done");
@@ -3160,31 +3188,48 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
     setSendError("");
     try {
       const toShare = allMems.filter(m => selectedMemIds.has(m.id));
-      // Sanitise: resolve mediaId blobs to data URLs, strip sender from people arrays
-      const sanitised = await Promise.all(toShare.map(async m => {
-        const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async med => {
+      // Collect photos to upload separately via R2
+      const photoQueue = []; // [{blob, memIdx, medIdx}]
+      // Sanitise: strip photo data from payload, keep refs for R2 upload
+      const sanitised = await Promise.all(toShare.map(async (m, mi) => {
+        const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async (med, mdi) => {
           if (med.mediaId) {
             try {
               const blob = await idbGet(med.mediaId);
-              if (blob) return await new Promise(resolve => {
-                const reader = new FileReader();
-                reader.onload = () => resolve({url:reader.result,name:med.name,mediaId:med.mediaId});
-                reader.onerror = () => resolve(med);
-                reader.readAsDataURL(blob);
-              });
+              if (blob) {
+                photoQueue.push({blob, ref: mi+"_"+mdi});
+                return {name:med.name, _r2ref: mi+"_"+mdi};
+              }
             } catch(e) {}
           }
           return med;
         }));
         return {...m, people:(m.people||[]).filter(p=>p!==senderName.trim()), mediaUrls};
       }));
-      if (JSON.stringify(sanitised).length > 20 * 1024 * 1024) throw new Error("Share package too large (>20 MB). Remove large photos and try again.");
-      await Promise.all(selectedPeople.filter(p=>effectiveEmailFor(p)).map(p =>
-        fetch(WORKER_URL + "/share/send", {
+      // Send metadata to each recipient
+      const sendResults = await Promise.all(selectedPeople.filter(p=>effectiveEmailFor(p)).map(async p => {
+        const r = await fetch(WORKER_URL + "/share/send", {
           method:"POST", headers:{"Content-Type":"application/json"},
           body:JSON.stringify({toEmail:effectiveEmailFor(p), fromName:senderName.trim(), fromEmail:effectiveEmail, message:personalMsg, memories:sanitised})
-        }).then(async r=>{ if(!r.ok){ const d=await r.json().catch(()=>({})); throw new Error(d.error||"Server error "+r.status); } })
-      ));
+        });
+        if(!r.ok){ const d=await r.json().catch(()=>({})); throw new Error(d.error||"Server error "+r.status); }
+        return r.json();
+      }));
+      // Upload photos to R2 for each share
+      if (photoQueue.length > 0) {
+        const shareIds = sendResults.map(r=>r.shareId).filter(Boolean);
+        for (const sid of shareIds) {
+          for (const photo of photoQueue) {
+            try {
+              const resized = await resizeImageBlob(photo.blob, 1200);
+              const resizedBlob = await fetch(resized).then(r=>r.blob());
+              await fetch(WORKER_URL + "/share/media/" + sid + "/" + encodeURIComponent(photo.ref), {
+                method:"PUT", headers:{"Content-Type":"image/jpeg"}, body:resizedBlob
+              });
+            } catch(e) { /* skip failed photo */ }
+          }
+        }
+      }
       if (onRecordShare && selectedPeople.length) onRecordShare(selectedPeople, selectedMemIds);
       setSendStatus("sent");
     } catch(e) {
@@ -6980,15 +7025,29 @@ function handleEdit(m) {
     // Compute existingIds early so incomingMems.map can skip content-wrapping for already-owned memories
     const existingIds = new Set(memories.map(m=>m.id));
     const senderEmail = d.sharedByEmail || null;
-    // Store received photos into IndexedDB
+    // Store received photos into IndexedDB — from data URLs or R2
+    const shareId = d._shareId || "";
     const incomingMems = await Promise.all(d.memories.map(async m => {
       if (m.mediaUrls && m.mediaUrls.length > 0) {
         const migratedUrls = await Promise.all(m.mediaUrls.map(async med => {
+          // Legacy: inline data URL
           if (med.url && med.url.startsWith("data:")) {
             try {
               const stored = await storeMedia(med.url, med.name || "photo");
               return { mediaId: stored.mediaId, name: med.name || "photo" };
             } catch(e) { return med; }
+          }
+          // R2: fetch photo from share media endpoint
+          if (med._r2ref && shareId) {
+            try {
+              const r = await fetch(WORKER_URL + "/share/media/" + shareId + "/" + encodeURIComponent(med._r2ref));
+              if (r.ok) {
+                const blob = await r.blob();
+                const dataUrl = await new Promise(res => { const reader = new FileReader(); reader.onload = () => res(reader.result); reader.readAsDataURL(blob); });
+                const stored = await storeMedia(dataUrl, med.name || "photo");
+                return { mediaId: stored.mediaId, name: med.name || "photo" };
+              }
+            } catch(e) {}
           }
           return med;
         }));
@@ -8727,6 +8786,9 @@ function handleEdit(m) {
               {label:"Tips",href:"https://remembory.net/tips.html",external:true},
               {divider:true},
               {label:"Contact",action:()=>setView("contact"),active:view==="contact"},
+              {divider:true},
+              {label:"Terms of Service",href:WORKER_URL+"/terms",external:true},
+              {label:"Privacy Policy",href:WORKER_URL+"/privacy",external:true},
             ]}),
           );
         })(),
@@ -8786,6 +8848,9 @@ function handleEdit(m) {
           {label:"Tips",href:"https://remembory.net/tips.html",external:true},
           {divider:true},
           {label:"Contact",action:()=>setView("contact"),active:view==="contact"},
+          {divider:true},
+          {label:"Terms of Service",href:WORKER_URL+"/terms",external:true},
+          {label:"Privacy Policy",href:WORKER_URL+"/privacy",external:true},
         ]})
       );
     })(),
