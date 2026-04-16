@@ -131,7 +131,9 @@ function NavDropdown({label, icon, items, isActive, badge, variant="desktop", di
         const locked=item.subOnly&&item.disabled;
         const iStyle={display:"flex",alignItems:"center",gap:"6px",width:"100%",padding:"9px 16px",border:"none",background:item.active?"rgba(44,36,22,0.07)":"transparent",textAlign:"left",cursor:locked?"default":"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.9rem",color:locked?"#b8a890":item.active?"#1a1208":"#2c2416",fontWeight:item.active?600:400,textDecoration:"none",boxSizing:"border-box"};
         const inner=React.createElement(React.Fragment,null,
-          React.createElement("span",{style:{flex:1}},item.label),
+          React.createElement("span",{style:{flex:1,display:"flex",alignItems:"center",gap:"6px"}},item.label,
+            item.badge>0&&React.createElement("span",{style:{background:"#4a7a5a",color:"#fff",borderRadius:"50%",minWidth:"16px",height:"16px",fontSize:"0.65rem",display:"inline-flex",alignItems:"center",justifyContent:"center",fontFamily:"Arial,sans-serif",fontWeight:600,lineHeight:1,padding:"0 3px"}},item.badge)
+          ),
           locked&&React.createElement("span",{style:{fontSize:"0.68rem",color:"#c8b89a",fontStyle:"italic"}},"🔒 sub")
         );
         if(item.href) return React.createElement("a",{key:i,href:item.href,target:item.external?"_blank":undefined,rel:item.external?"noopener":undefined,style:{...iStyle,display:"flex"},onClick:()=>setOpen(false)},inner);
@@ -3052,7 +3054,7 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
         fetch(WORKER_URL + "/share/send", {
           method:"POST", headers:{"Content-Type":"application/json"},
           body:JSON.stringify({toEmail:effectiveEmailFor(p), fromName:senderName.trim(), fromEmail:effectiveEmail, message:personalMsg, memories:sanitised})
-        }).then(r=>{ if(!r.ok) throw new Error("Server error "+r.status); })
+        }).then(async r=>{ if(!r.ok){ const d=await r.json().catch(()=>({})); throw new Error(d.error||"Server error "+r.status); } })
       ));
       if (onRecordShare && selectedPeople.length) onRecordShare(selectedPeople, selectedMemIds);
       setSendStatus("sent");
@@ -4155,6 +4157,11 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
   const activeInboxItems = inboxItems.filter(item => !serverDeclined.some(dc => dc.shareId === item._shareId));
   const activeInboxCount = activeInboxItems.length;
 
+  // Keep badge count in sync whenever items change (accept/decline/review)
+  React.useEffect(() => {
+    if (onShareBadgeCount) onShareBadgeCount(isLegacyMode ? pendingMemCount : activeInboxCount);
+  }, [pendingMemCount, activeInboxCount]);
+
   // Inbox helpers
   async function respondToShare(shareId, action) {
     try {
@@ -4355,6 +4362,7 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
         ["sent","Sent"],
         ["codes","Receive a Share"],
         isLegacyMode&&["links","Contribution Links"],
+        !isLegacyMode&&serverDeclined.length>0&&["declined","Declined"],
       ].filter(Boolean).map(([t,label])=>
         React.createElement("button",{key:t,onClick:()=>setTab(t),style:tab===t?tabActive:tabInactive},
           label,
@@ -4425,7 +4433,7 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
 
     // INBOX tab (personal mode — direct shares via /share/send)
     tab==="inbox"&&React.createElement("div",null,
-      activeInboxItems.length===0&&serverDeclined.length===0&&
+      activeInboxItems.length===0&&
         React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic"}},"Your inbox is empty."),
       activeInboxItems.map(item=>
         React.createElement("div",{key:item._shareId,style:{...cardStyle,borderColor:"#7a9e8a",background:"rgba(122,158,138,0.05)"}},
@@ -4474,23 +4482,6 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
           )
         )
       ),
-      serverDeclined.length>0&&React.createElement("div",{style:{marginTop:"24px"}},
-        React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"10px"}},"Declined"),
-        serverDeclined.map(dec=>{
-          const item=inboxItems.find(i=>i._shareId===dec.shareId);
-          if(!item)return null;
-          return React.createElement("div",{key:dec.shareId,style:{...cardStyle,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",opacity:0.7}},
-            React.createElement("div",null,
-              React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208"}},item.fromName||"Someone"),
-              React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",marginLeft:"8px"}},(item.memories||[]).length+" "+((item.memories||[]).length===1?"memory":"memories"))
-            ),
-            React.createElement("button",{
-              onClick:()=>reconsiderItem(dec.shareId),
-              style:{background:"none",border:"none",color:"#a8885a",cursor:"pointer",fontSize:"0.82rem",padding:0}
-            },"Reconsider")
-          );
-        }).filter(Boolean)
-      )
     ),
 
     // SENT tab
@@ -4572,6 +4563,27 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
     ),
 
     // RECEIVE A SHARE tab
+    // DECLINED tab (personal mode — declined shares)
+    tab==="declined"&&React.createElement("div",null,
+      serverDeclined.length===0
+        ? React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic"}},"No declined shares.")
+        : serverDeclined.map(dec=>{
+            const item=inboxItems.find(i=>i._shareId===dec.shareId);
+            if(!item)return null;
+            return React.createElement("div",{key:dec.shareId,style:{...cardStyle,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px"}},
+              React.createElement("div",null,
+                React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208"}},item.fromName||"Someone"),
+                React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",marginLeft:"8px"}},(item.memories||[]).length+" "+((item.memories||[]).length===1?"memory":"memories")),
+                dec.declinedAt&&React.createElement("span",{style:{fontSize:"0.72rem",color:"#b0a090",marginLeft:"8px"}},"declined "+new Date(dec.declinedAt).toLocaleDateString())
+              ),
+              React.createElement("button",{
+                onClick:()=>reconsiderItem(dec.shareId),
+                style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.82rem",color:"#a8885a",borderColor:"#d4c4a8"}
+              },"Reconsider")
+            );
+          }).filter(Boolean)
+    ),
+
     tab==="codes"&&React.createElement("div",null,
       React.createElement("div",{style:cardStyle},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Receive shared memories"),
@@ -6001,7 +6013,7 @@ function AddEditForm({
           : React.createElement("button",{onClick:canSave?handleSubmit:undefined,disabled:!canSave,style:{...S.btn,opacity:canSave?1:0.45,cursor:canSave?"pointer":"not-allowed"}},
               view==="edit"?"Save Changes":isCarerMode&&ownerName?`Save to ${ownerName}'s Chronicle`:"Save to Chronicle"),
         isHistoryMode&&!editingCandidateId&&view==="add"&&React.createElement("button",{onClick:canSave?handleSaveCandidateSubmit:undefined,disabled:!canSave,style:{...S.btnOutline,borderColor:"rgba(196,169,98,0.6)",color:"#7a5a20",opacity:canSave?1:0.45,cursor:canSave?"pointer":"not-allowed"}},"📥 Save as Candidate"),
-        React.createElement("button",{onClick:()=>{ setForm(newForm()); setEditingId(null); setEditingCandidateId&&setEditingCandidateId(null); setView(editingCandidateId?"life":view==="edit"?"detail":"life"); },style:S.btnOutline},"Cancel"),
+        React.createElement("button",{onClick:()=>{ setForm(newForm()); clearDraft(); setEditingId(null); setEditingCandidateId&&setEditingCandidateId(null); setView(editingCandidateId?"life":view==="edit"?"detail":"life"); },style:S.btnOutline},"Cancel"),
         !canSave&&React.createElement("span",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic"}},
           !form.title?.trim()?"Add a title to save":!form.year?"Add a date to save":"")
       )
@@ -6471,6 +6483,34 @@ function App() {
     persistSubject({knownLocations: merged});
   }
 
+  // ── Draft autosave ─────────────────────────────────────────
+  const DRAFT_KEY = "chronicle-draft";
+  const draftTimerRef = React.useRef(null);
+  React.useEffect(() => {
+    if (view !== "add" && view !== "edit") return;
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      try {
+        const hasContent = form.title || form.content || form.year;
+        if (hasContent) localStorage.setItem(DRAFT_KEY, JSON.stringify({form, editingId, view, savedAt: Date.now()}));
+      } catch(e) {}
+    }, 1000);
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
+  }, [form, view, editingId]);
+
+  function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch(e) {} }
+  function getSavedDraft() { try { const raw = localStorage.getItem(DRAFT_KEY); if (!raw) return null; const d = JSON.parse(raw); if (Date.now() - d.savedAt > 7 * 24 * 60 * 60 * 1000) { clearDraft(); return null; } return d; } catch(e) { return null; } }
+
+  // On entering add view, check for a saved draft
+  const [draftOffer, setDraftOffer] = React.useState(null);
+  React.useEffect(() => {
+    if (view === "add" && !editingId) {
+      const saved = getSavedDraft();
+      if (saved && saved.view === "add" && (saved.form.title || saved.form.content)) setDraftOffer(saved);
+      else setDraftOffer(null);
+    } else { setDraftOffer(null); }
+  }, [view, editingId]);
+
   // ── Memory ops ───────────────────────────────────────────────
   function updateForm(updates) { setForm(f=>({...f,...updates})); }
 
@@ -6563,7 +6603,7 @@ function App() {
         : primaryClean;
       const updated = memories.map(m=>m.id===editingId?editedPrimary:m).sort((a,b)=>sortKey(a)-sortKey(b));
       persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs});
-      setEditingId(null); setSelected(editingId); setForm(newForm()); setView("detail");
+      setEditingId(null); setSelected(editingId); setForm(newForm()); clearDraft(); setView("detail");
     } else {
       // Stamp addedBy / recalledBy on new memories in carer mode
       if (isCarerMode) {
@@ -6578,7 +6618,7 @@ function App() {
       const toAdd = secondary ? [primary, secondary] : [primary];
       const updated = [...memories,...toAdd].sort((a,b)=>sortKey(a)-sortKey(b));
       persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs});
-      setForm(newForm());
+      setForm(newForm()); clearDraft();
       setView("life");
     }
     setPendingEndMemory(null);
@@ -6599,7 +6639,7 @@ function App() {
     } else {
       persistSubject({candidates:[...candidates,primary],knownPeople:newPeople,knownOrgs:newOrgs,knownLocations:newLocs});
     }
-    setForm(newForm()); setView("life");
+    setForm(newForm()); clearDraft(); setView("life");
   }
 
   function acceptCandidate(id) {
@@ -6653,7 +6693,7 @@ function App() {
     const newOrgs   = [...new Set([...knownOrgs,...(memData.orgs||[])])].sort();
     const updated = [...memories, memData].sort((a,b)=>sortKey(a)-sortKey(b));
     persistSubject({memories:updated, candidates:candidates.filter(c=>c.id!==editingCandidateId), knownPeople:newPeople, knownOrgs:newOrgs});
-    setEditingCandidateId(null); setEditingId(null); setForm(newForm());
+    setEditingCandidateId(null); setEditingId(null); setForm(newForm()); clearDraft();
     setSelected(editingCandidateId); setView("detail");
   }
 
@@ -8441,7 +8481,7 @@ function handleEdit(m) {
               IS_STAGING&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
             ].filter(Boolean)}),
             React.createElement(NavDropdown,{label:"Social",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,items:[
-              {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing"},
+              {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing",badge:shareBadgeCount},
               IS_STAGING&&{label:"◎ Profile",action:()=>setView("public-profile"),active:view==="public-profile",subOnly:true,disabled:!isSubscriber},
               IS_STAGING&&{label:"Explore ↗",href:exploreUrl,external:true,subOnly:true,disabled:!isSubscriber},
               {divider:true},
@@ -8492,7 +8532,7 @@ function handleEdit(m) {
           IS_STAGING&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
         ].filter(Boolean)}),
         React.createElement(NavDropdown,{label:"Social",icon:"⇌",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,variant:"mobile",direction:"up",menuAlign:"left",items:[
-          {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing"},
+          {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing",badge:shareBadgeCount},
           IS_STAGING&&{label:"◎ Profile",action:()=>setView("public-profile"),active:view==="public-profile",subOnly:true,disabled:!isSubscriber},
           IS_STAGING&&{label:"Explore ↗",href:exploreUrl,external:true,subOnly:true,disabled:!isSubscriber},
           {divider:true},
@@ -9223,6 +9263,14 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         recordShare, removeShareRecord, toggleLegacy,
         isHistoryMode,
       }),
+      draftOffer&&view==="add"&&!editingId&&React.createElement("div",{style:{background:"rgba(122,158,138,0.1)",border:"1px solid #7a9e8a",borderRadius:"3px",padding:"12px 16px",marginBottom:"16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"8px"}},
+        React.createElement("span",{style:{fontSize:"0.88rem",color:"#2c2416"}},
+          "You have an unsaved draft"+(draftOffer.form.title?" — \""+draftOffer.form.title+"\"":"")),
+        React.createElement("div",{style:{display:"flex",gap:"8px"}},
+          React.createElement("button",{onClick:()=>{setForm(f=>({...newForm(),...draftOffer.form}));setDraftOffer(null);},style:{...S.btn,padding:"5px 14px",fontSize:"0.82rem"}},"Restore"),
+          React.createElement("button",{onClick:()=>{clearDraft();setDraftOffer(null);},style:{...S.btnOutline,padding:"5px 14px",fontSize:"0.82rem"}},"Discard")
+        )
+      ),
       (view==="add"||view==="edit")&&React.createElement(AddEditForm,{
         view, form, updateForm, editingId,
         handleSubmit, handleMedia, fileInputRef,

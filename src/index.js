@@ -1465,10 +1465,15 @@ export default {
         const email = (body.email || "").trim().toLowerCase();
         if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
         const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
-        const raw = await env.SHARES.get("deliveries:" + emailHash);
+        const [raw, declinedRaw] = await Promise.all([
+          env.SHARES.get("deliveries:" + emailHash),
+          env.SHARES.get("inbox:declined:" + emailHash),
+        ]);
         if (!raw) return json({ count: 0 });
         const arr = JSON.parse(raw);
-        return json({ count: arr.length });
+        const declined = declinedRaw ? JSON.parse(declinedRaw) : [];
+        const activeCount = arr.filter(d => !declined.some(dc => dc.shareId === d.shareId)).length;
+        return json({ count: activeCount });
       } catch (e) {
         return json({ error: "Server error: " + e.message }, 500);
       }
