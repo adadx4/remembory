@@ -2672,7 +2672,7 @@ async function geocode(name, cache) {
 }
 
 // ── MapView component ──────────────────────────────────────────
-function MapView({ memories, onSelectLocation, onSelectMemory, locationCoords, onSaveCoords, knownLocations }) {
+function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, locationCoords, onSaveCoords, knownLocations, filter, onFilterChange }) {
   // Build a map from label → structured address for better geocoding
   const knownLocMap = React.useMemo(() => {
     const m = {};
@@ -2687,11 +2687,22 @@ function MapView({ memories, onSelectLocation, onSelectMemory, locationCoords, o
   const [useEnglish, setUseEnglish] = useState(true);
   const tileLayers = React.useRef({});
 
+  // Apply filters
+  const filtered = React.useMemo(() => {
+    if (!filter || (!filter.tag && !filter.person && !filter.decade)) return memories;
+    return memories.filter(m => {
+      if (filter.tag && !(m.tags||[]).includes(filter.tag)) return false;
+      if (filter.person && !(m.people||[]).includes(filter.person)) return false;
+      if (filter.decade && (Math.floor(m.year/10)*10) !== filter.decade) return false;
+      return true;
+    });
+  }, [memories, filter]);
+
   // Collect all unique locations, tracking primary vs secondary
   const locationMemories = {};
   const locationIsPrimary = {};
   const locationIsContext = {}; // true if ALL memories at this location are gedcomContext
-  memories.forEach(m => {
+  filtered.forEach(m => {
     if (m.location) {
       if (!locationMemories[m.location]) { locationMemories[m.location] = []; locationIsPrimary[m.location] = false; locationIsContext[m.location] = true; }
       locationMemories[m.location].push(m);
@@ -2726,13 +2737,19 @@ function MapView({ memories, onSelectLocation, onSelectMemory, locationCoords, o
 
     // Seed cache with stored coords before geocoding
     const cache = loadGeocodeCache();
+    // Prefer manually set or structured coords from location objects
+    (knownLocations||[]).forEach(l => {
+      if (l && l.label && l.coords && l.coords.lat != null) {
+        cache[l.label] = { lat: l.coords.lat, lng: l.coords.lng, display: l.label, fromCoords: true };
+      }
+    });
     if (locationCoords) {
       Object.entries(locationCoords).forEach(([name, c]) => {
-        if (c && c.lat != null) cache[name] = { lat: c.lat, lng: c.lng, display: name };
+        if (c && c.lat != null && !cache[name]?.fromCoords) cache[name] = { lat: c.lat, lng: c.lng, display: name };
       });
     }
     const pending = uniqueLocations.filter(l => !cache[l]);
-    if (pending.length > 0) setStatus(`Locating ${pending.length} place${pending.length===1?"":"s"}…`);
+    if (pending.length > 0) setStatus(`Locating ${pending.length} place${pending.length===1?"":"s"}...`);
 
     const markers = [];
 
@@ -2740,14 +2757,16 @@ function MapView({ memories, onSelectLocation, onSelectMemory, locationCoords, o
       for (const loc of uniqueLocations) {
         // Rate limit: 1 req/sec for Nominatim
         if (!cache[loc]) await new Promise(r => setTimeout(r, 1100));
-        // Build a geocode query from structured address fields if available, fallback to label
-        let geocodeQuery = loc;
+        // Build geocode query from structured address fields; use town+state+country for accuracy
         const kl = knownLocMap[loc];
+        let geocodeQuery = loc;
         if (kl) {
-          const parts = [kl.street, kl.town, kl.state, kl.country].filter(Boolean);
-          if (parts.length > 0) geocodeQuery = parts.join(", ");
+          // Prefer town/state/country over label for geocoding — label can be a nickname
+          const fullParts = [kl.street, kl.town, kl.state, kl.country].filter(Boolean);
+          const townParts = [kl.town, kl.state, kl.country].filter(Boolean);
+          if (townParts.length >= 2) geocodeQuery = townParts.join(", ");
+          else if (fullParts.length > 0) geocodeQuery = fullParts.join(", ");
         }
-        // Use a separate cache key for the query so label→coords association stays correct
         let coords = cache[loc];
         if (!coords) {
           coords = await geocode(geocodeQuery, cache);
@@ -2807,8 +2826,30 @@ function MapView({ memories, onSelectLocation, onSelectMemory, locationCoords, o
     };
   }, []); // only run once on mount
 
+  // Build filter options from memories
+  const allTags = [...new Set(memories.flatMap(m=>m.tags||[]))].sort();
+  const allPeople = [...new Set(memories.flatMap(m=>m.people||[]))].sort();
+  const allDecades = [...new Set(memories.map(m=>Math.floor(m.year/10)*10))].sort();
+
   return React.createElement("div", null,
-    status && React.createElement("p", {style:{color:"#8a7460",fontStyle:"italic",fontSize:"0.88rem",marginBottom:"10px"}}, `🌍 ${status}`),
+    // Filter bar
+    onFilterChange&&React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"12px",flexWrap:"wrap",alignItems:"center"}},
+      React.createElement("select",{value:filter?.tag||"",onChange:e=>onFilterChange({...filter,tag:e.target.value||null}),style:{...S.select,fontSize:"0.88rem",padding:"6px 10px"}},
+        React.createElement("option",{value:""},"All tags"),
+        allTags.map(t=>React.createElement("option",{key:t,value:t},t))
+      ),
+      React.createElement("select",{value:filter?.person||"",onChange:e=>onFilterChange({...filter,person:e.target.value||null}),style:{...S.select,fontSize:"0.88rem",padding:"6px 10px"}},
+        React.createElement("option",{value:""},"All people"),
+        allPeople.map(p=>React.createElement("option",{key:p,value:p},p))
+      ),
+      React.createElement("select",{value:filter?.decade||"",onChange:e=>onFilterChange({...filter,decade:e.target.value?parseInt(e.target.value):null}),style:{...S.select,fontSize:"0.88rem",padding:"6px 10px"}},
+        React.createElement("option",{value:""},"All decades"),
+        allDecades.map(d=>React.createElement("option",{key:d,value:d},d+"s"))
+      ),
+      (filter?.tag||filter?.person||filter?.decade)&&React.createElement("button",{onClick:()=>onFilterChange({}),style:{background:"none",border:"none",color:"#a8885a",cursor:"pointer",fontSize:"0.84rem",fontFamily:"'Crimson Text',serif"}},"Clear filters"),
+      (filter?.tag||filter?.person||filter?.decade)&&React.createElement("span",{style:{fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic"}},filtered.length+" of "+memories.length+" memories shown")
+    ),
+    status && React.createElement("p", {style:{color:"#8a7460",fontStyle:"italic",fontSize:"0.88rem",marginBottom:"10px"}}, "🌍 "+status),
     uniqueLocations.length === 0
       ? React.createElement("div", {style:{textAlign:"center",padding:"60px 20px",color:"#8a7460",border:"1px solid #c8b89a",borderRadius:"4px",background:"rgba(255,252,245,0.5)"}},
           React.createElement("div", {style:{fontSize:"2.5rem",marginBottom:"12px",opacity:0.4}}, "🗺"),
@@ -2868,8 +2909,8 @@ function MapView({ memories, onSelectLocation, onSelectMemory, locationCoords, o
                     `+ ${(locationMemories[selectedLoc]).length-7} more`)
                 ),
             React.createElement("div",{style:{display:"flex",gap:"8px",marginTop:"12px",flexWrap:"wrap"}},
-              React.createElement("button",{onClick:()=>onSelectLocation(selectedLoc),style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem"}},"View all in Index →"),
-              React.createElement("button",{onClick:()=>onSelectLocation(selectedLoc),style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem"}},"Edit location →")
+              React.createElement("button",{onClick:()=>onSelectLocation(selectedLoc),style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem"}},"View memories →"),
+              onEditLocation&&React.createElement("button",{onClick:()=>onEditLocation(selectedLoc),style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem"}},"Edit location →")
             )
           )
         )
@@ -6359,6 +6400,7 @@ function App() {
   const [contactEmail, setContactEmail] = React.useState("");
   const [contactMsg, setContactMsg] = React.useState("");
   const [contactStatus, setContactStatus] = React.useState("");
+  const [mapFilter, setMapFilter] = React.useState({});
   const [settingsTab, setSettingsTab] = React.useState("account");
   const [syncFileHandle, setSyncFileHandle] = React.useState(null);
   const [syncStatus, setSyncStatus] = React.useState("");
@@ -8805,7 +8847,7 @@ function handleEdit(m) {
         React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"18px",fontSize:"0.92rem"}},
           `${[...new Set(memories.flatMap(m=>[m.location,...(m.locations||[])].filter(Boolean)))].length} locations across ${isCarerMode&&ownerName?`${ownerName}'s memories`:"your memories"} — click a pin to explore`
         ),
-        React.createElement(MapView,{
+        React.createElement(MapView,{key:"map-"+(mapFilter.tag||"")+(mapFilter.person||"")+(mapFilter.decade||""),
           memories,
           locationCoords,
           knownLocations,
@@ -8824,7 +8866,14 @@ function handleEdit(m) {
             setIndexTab("locations");
             setView("index");
           },
-          onSelectMemory: id => { setSelected(id); setView("detail"); }
+          onEditLocation: loc => {
+            setIndexTab("locations");
+            setIndexFilter(null);
+            setView("index");
+          },
+          onSelectMemory: id => { setSelected(id); setView("detail"); },
+          filter: mapFilter,
+          onFilterChange: setMapFilter,
         })
       ),
 
