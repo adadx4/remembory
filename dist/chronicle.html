@@ -1211,21 +1211,22 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, isMobile
   function buildPeriods(tag) {
     const tagged = memories
       .filter(m=>m.year&&(m.tags||[]).includes(tag)&&((m.orgs||[])[0]||m.location))
-      .map(m=>{const org=(m.orgs||[])[0];const hasMo=(m.fuzzy==="day"||m.fuzzy==="month")&&!!m.month;const hasEndMo=(m.endFuzzy==="day"||m.endFuzzy==="month")&&!!m.endMonth;return{frac:memFrac(m),eFrac:memEndFrac(m),ongoing:!!m.endOngoing,hasMo,hasEndMo,label:org||m.location,fType:org?"orgs":"locations"};})
+      .map(m=>{const org=(m.orgs||[])[0];const hasMo=!!m.month&&m.month>0;const hasEndMo=!!m.endMonth&&m.endMonth>0;return{frac:memFrac(m),eFrac:memEndFrac(m),ongoing:!!m.endOngoing,hasMo,hasEndMo,startMonth:m.month||0,startYear:m.year,endMonth:m.endMonth||0,endYear:m.endYear||0,label:org||m.location,fType:org?"orgs":"locations"};})
       .sort((a,b)=>a.frac-b.frac);
     const out=[];
     let i=0;
     while(i<tagged.length){
       const{label,fType}=tagged[i]; let j=i;
       while(j+1<tagged.length&&tagged[j+1].label===label) j++;
-      let groupEnd=tagged[j].frac, groupOngoing=false, endHasMo=tagged[j].hasMo;
+      let groupEnd=tagged[j].frac, groupOngoing=false, endHasMo=tagged[j].hasMo, endMonth=tagged[j].startMonth, endYear=tagged[j].startYear;
       for(let k=i;k<=j;k++){
         if(tagged[k].ongoing) groupOngoing=true;
-        if(tagged[k].eFrac>groupEnd){groupEnd=tagged[k].eFrac;endHasMo=tagged[k].hasEndMo;}
+        if(tagged[k].eFrac>groupEnd){groupEnd=tagged[k].eFrac;endHasMo=tagged[k].hasEndMo;endMonth=tagged[k].endMonth;endYear=tagged[k].endYear;}
+        if(tagged[k].frac>groupEnd&&!tagged[k].eFrac){groupEnd=tagged[k].frac;endHasMo=tagged[k].hasMo;endMonth=tagged[k].startMonth;endYear=tagged[k].startYear;}
       }
       if(groupOngoing) groupEnd=currentFrac;
       const hasEnd = i!==j || tagged[i].eFrac>0 || tagged[i].ongoing;
-      out.push({label,startFrac:tagged[i].frac,endFrac:groupEnd,isCurrent:groupOngoing,fType,noEnd:!hasEnd,startHasMo:tagged[i].hasMo,endHasMo:groupOngoing||endHasMo});
+      out.push({label,startFrac:tagged[i].frac,endFrac:groupEnd,isCurrent:groupOngoing,fType,noEnd:!hasEnd,startHasMo:tagged[i].hasMo,endHasMo:groupOngoing||endHasMo,startMonth:tagged[i].startMonth,startYear:tagged[i].startYear,endMonth,endYear});
       i=j+1;
     }
     return out;
@@ -1272,7 +1273,9 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, isMobile
         const isLast = i===active.periods.length-1;
         const col = active.colFn(r.label);
         const dy = r.endFrac-r.startFrac;
-        const endLabel = r.isCurrent?"present":fracLabel(r.endFrac,r.endHasMo);
+        function periodLabel(year, month, hasMo) { return hasMo && month > 0 ? MONTHS[month-1]+" "+year : String(year); }
+        const startLabel = periodLabel(r.startYear, r.startMonth, r.startHasMo);
+        const endLabel = r.isCurrent?"present":periodLabel(r.endYear||Math.floor(r.endFrac), r.endMonth, r.endHasMo);
         const showPrompt = !r.isCurrent && r.noEnd;
         return React.createElement("div",{key:i,style:{display:"flex",gap:"12px"}},
           // Spine
@@ -1289,7 +1292,7 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, isMobile
                 overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}
             },r.label),
             React.createElement("div",{style:{fontSize:"0.8rem",color:"#8a7460",marginTop:"1px"}},
-              fracLabel(r.startFrac,r.startHasMo)+(r.startFrac===r.endFrac&&!r.isCurrent?"":" \u2013 "+endLabel)+(dy>0.05?" \u00b7 "+durLabel(dy):"")
+              startLabel+(r.startFrac===r.endFrac&&!r.isCurrent?"":" \u2013 "+endLabel)+(dy>0.05?" \u00b7 "+durLabel(dy):"")
             ),
             showPrompt&&React.createElement("button",{
               onClick:()=>onMissingEnd&&onMissingEnd(r.label, active.tag),
@@ -4114,7 +4117,7 @@ function SettingsView({
             else if (days < 30) { statusMsg = "\u26a0 Last backup "+days+" days ago \u2014 save a fresh copy"; statusColor = "#b0804a"; }
             else { statusMsg = "\u26a0 Last backup was "+days+" days ago \u2014 please back up soon"; statusColor = "#c4858a"; }
           }
-          const importLine = subject.lastImport && (!subject.lastBackup || new Date(subject.lastImport) > new Date(subject.lastBackup)) ? (()=>{ const id2=Math.floor((Date.now()-new Date(subject.lastImport))/86400000); return "Last synced: "+(id2===0?"today":id2===1?"yesterday":id2+" days ago"); })() : null;
+          const importLine = subject.lastImport && subject.lastBackup && new Date(subject.lastImport) > new Date(subject.lastBackup) ? (()=>{ const id2=Math.floor((Date.now()-new Date(subject.lastImport))/86400000); return "Last synced: "+(id2===0?"today":id2===1?"yesterday":id2+" days ago"); })() : null;
           return React.createElement(React.Fragment, null,
             React.createElement("p",{style:{fontSize:"0.82rem",color:statusColor,fontStyle:"italic",margin:"0 0 4px"}}, statusMsg),
             importLine && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px"}}, importLine)
