@@ -3,8 +3,8 @@
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Chronicle-Client, X-LS-Key",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, X-Chronicle-Client, X-LS-Key, X-Admin-Secret",
 };
 
 function json(data, status = 200) {
@@ -2605,14 +2605,18 @@ async function refreshLicenses() {
 
 async function revokeKey(keyHash, btn) {
   if (!confirm('Revoke this licence? The subscriber will lose access on next key check.')) return;
-  btn.disabled = true; btn.textContent = '…';
+  btn.disabled = true; btn.textContent = 'Revoking...';
   try {
-    await api('POST','/admin/license/revoke',{keyHash});
-    var rec = allLicenses.find(function(l){return l.keyHash===keyHash;});
-    if (rec) rec.status = 'cancelled';
-    var el = document.getElementById('tab-content'); var filter = document.getElementById('lic-search');
-    renderLicenseTable(el, filter?filter.value:'');
-  } catch(e) { btn.disabled=false; btn.textContent='Revoke'; alert('Failed: '+e.message); }
+    var r = await fetch(API + '/admin/license/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': secret },
+      body: JSON.stringify({keyHash: keyHash})
+    });
+    var result = await r.json();
+    if (!r.ok || result.error) { throw new Error(result.error || 'HTTP ' + r.status); }
+    alert('Licence revoked successfully.');
+    await refreshLicenses();
+  } catch(e) { btn.disabled=false; btn.textContent='Revoke'; alert('Revoke failed: '+e.message); }
 }
 
 async function reinstateKey(keyHash, btn) {
