@@ -6355,6 +6355,10 @@ function App() {
   const [profileMsg, setProfileMsg] = React.useState("");
   const [profileConfirm, setProfileConfirm] = React.useState(false);
   const [showPubList, setShowPubList] = React.useState(false);
+  const [contactName, setContactName] = React.useState("");
+  const [contactEmail, setContactEmail] = React.useState("");
+  const [contactMsg, setContactMsg] = React.useState("");
+  const [contactStatus, setContactStatus] = React.useState("");
   const [settingsTab, setSettingsTab] = React.useState("account");
   const [syncFileHandle, setSyncFileHandle] = React.useState(null);
   const [syncStatus, setSyncStatus] = React.useState("");
@@ -8179,6 +8183,7 @@ function handleEdit(m) {
     if (view==="map") return "Map";
     if (view==="life-timeline") return "Life Timeline";
     if (view==="photos") return "Photos";
+    if (view==="contact") return "Contact Us";
     if (view==="settings") return "Account";
     if (view==="backup") return "Backup & Restore";
     if (view==="legacy") return "Legacy View";
@@ -8188,7 +8193,7 @@ function handleEdit(m) {
     return null;
   }
 
-  const showBack=["add","edit","detail","decade","year","timeline","life-timeline","shared-timeline","import","people","index","map","photos","print","prompt","settings","backup","legacy","public-profile","sharing"].includes(view);
+  const showBack=["add","edit","detail","decade","year","timeline","life-timeline","shared-timeline","import","people","index","map","photos","print","prompt","settings","backup","legacy","public-profile","sharing","contact"].includes(view);
   const showAdd=!["add","edit","print"].includes(view);
   const breadcrumb=bc();
 
@@ -8679,7 +8684,7 @@ function handleEdit(m) {
               {label:"Manual",href:"https://remembory.net/manual.html",external:true},
               {label:"Tips",href:"https://remembory.net/tips.html",external:true},
               {divider:true},
-              {label:"Contact",href:"mailto:admin@remembory.net"},
+              {label:"Contact",action:()=>setView("contact"),active:view==="contact"},
             ]}),
           );
         })(),
@@ -8738,7 +8743,7 @@ function handleEdit(m) {
           {label:"Manual",href:"https://remembory.net/manual.html",external:true},
           {label:"Tips",href:"https://remembory.net/tips.html",external:true},
           {divider:true},
-          {label:"Contact",href:"mailto:admin@remembory.net"},
+          {label:"Contact",action:()=>setView("contact"),active:view==="contact"},
         ]})
       );
     })(),
@@ -9279,6 +9284,41 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         );
       })(),
       view==="print"&&React.createElement(PrintView,{memories,ownerName,allDecades}),
+
+      // ── CONTACT FORM ──
+      view==="contact"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"600px"}},
+        React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Contact Us"),
+        React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"22px",fontSize:"0.92rem"}},
+          "Have a question, suggestion, or need help? Send us a message and we'll get back to you."),
+        contactStatus==="sent"
+          ? React.createElement("div",{style:{background:"rgba(74,122,90,0.08)",border:"1px solid rgba(74,122,90,0.3)",borderRadius:"4px",padding:"20px",textAlign:"center"}},
+              React.createElement("p",{style:{fontSize:"1.1rem",color:"#4a7a5a",margin:"0 0 8px"}},"\u2713 Message sent"),
+              React.createElement("p",{style:{fontSize:"0.88rem",color:"#6a5840",margin:0}},"We'll get back to you as soon as we can."),
+              React.createElement("button",{onClick:()=>{setContactStatus("");setContactMsg("");},style:{...S.btnOutline,marginTop:"16px"}},"Send another message")
+            )
+          : React.createElement("div",null,
+              React.createElement("label",{style:S.label},"Your name"),
+              React.createElement("input",{value:contactName||(ownerName||""),onChange:e=>setContactName(e.target.value),placeholder:"Name (optional)",style:{...S.input,marginBottom:"14px"}}),
+              React.createElement("label",{style:S.label},"Email address"),
+              React.createElement("input",{type:"email",value:contactEmail||(ownerEmail||carerEmail||""),onChange:e=>setContactEmail(e.target.value),placeholder:"So we can reply (optional)",style:{...S.input,marginBottom:"14px"}}),
+              React.createElement("label",{style:S.label},"Message"),
+              React.createElement("textarea",{value:contactMsg,onChange:e=>setContactMsg(e.target.value),placeholder:"What can we help with?",rows:6,style:{...S.input,resize:"vertical",lineHeight:"1.7",marginBottom:"14px"}}),
+              contactStatus.startsWith("error:")&&React.createElement("p",{style:{fontSize:"0.88rem",color:"#c4858a",marginBottom:"10px"}},contactStatus.slice(6)),
+              React.createElement("button",{onClick:async function(){
+                if(!contactMsg.trim())return;
+                setContactStatus("sending");
+                try{
+                  var r=await fetch(WORKER_URL+"/contact",{method:"POST",headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify({name:(contactName||ownerName||"").trim(),email:(contactEmail||ownerEmail||carerEmail||"").trim(),message:contactMsg.trim()})});
+                  var d=await r.json();
+                  if(!r.ok){setContactStatus("error:"+(d.error||"Failed"));return;}
+                  setContactStatus("sent");
+                }catch(e){setContactStatus("error:"+e.message);}
+              },disabled:!contactMsg.trim()||contactStatus==="sending",
+                style:{...S.btn,opacity:contactMsg.trim()&&contactStatus!=="sending"?1:0.5}},
+                contactStatus==="sending"?"Sending\u2026":"Send Message")
+            )
+      ),
 
       // ── PROMPTER ──
       view==="prompt"&&React.createElement(PrompterView,{

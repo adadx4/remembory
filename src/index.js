@@ -1761,6 +1761,33 @@ export default {
       return json(JSON.parse(raw));
     }
 
+    // ── Contact form ──────────────────────────────────────────────────────
+    if (request.method === "POST" && path === "/contact") {
+      if (!await checkRateLimit(env, clientIp, "contact", 3, 3600)) return json({ error: "Too many requests. Please try again later." }, 429);
+      try {
+        const body = await request.json();
+        const name = (body.name || "").trim().slice(0, 200);
+        const email = (body.email || "").trim().toLowerCase().slice(0, 200);
+        const message = (body.message || "").trim().slice(0, 5000);
+        if (!message) return json({ error: "Please enter a message." }, 400);
+        if (!env.RESEND_API_KEY) return json({ error: "Email not configured." }, 500);
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + env.RESEND_API_KEY },
+          body: JSON.stringify({
+            from: "Chronicle Support <noreply@remembory.net>",
+            to: ["admin@remembory.net"],
+            reply_to: email || undefined,
+            subject: "Support request from " + (name || "a Chronicle user"),
+            text: "From: " + (name || "Anonymous") + "\nEmail: " + (email || "not provided") + "\n\n" + message,
+          }),
+        });
+        return json({ ok: true });
+      } catch (e) {
+        return json({ error: "Failed to send. Please try again." }, 500);
+      }
+    }
+
     // ── Sync media (R2) ─────────────────────────────────────────────────────
 
     // PUT /sync/media/:keyHash/:mediaId — upload an encrypted photo blob
