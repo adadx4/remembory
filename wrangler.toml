@@ -23,6 +23,11 @@ zone_name = "remembory.net"
 binding = "MAILING_LIST"
 id = "e9a03844192b46828417a458140de7f6"
 
+# R2 bucket for syncing photos
+[[r2_buckets]]
+bucket_name = "remembory-media"
+binding = "MEDIA"
+
 # Secrets (set via wrangler secret put):
 # ADMIN_SECRET — protects GET /mailing/list
 
@@ -45,6 +50,10 @@ id = "bb346bcd219742ffb25b089cf90e58f6"
 [[env.staging.kv_namespaces]]
 binding = "MAILING_LIST"
 id = "8a3aef2b20cf4a13b76740237314b036"
+
+[[env.staging.r2_buckets]]
+bucket_name = "remembory-media"
+binding = "MEDIA"
 
 [[env.staging.routes]]
 pattern = "staging.remembory.net/*"

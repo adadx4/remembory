@@ -3768,20 +3768,43 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
     return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
   }
 
+  // Encrypt/decrypt binary blobs for photo sync
+  async function encryptBlob(password, blob) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(password, salt);
+    const buf = await blob.arrayBuffer();
+    const enc = await crypto.subtle.encrypt({name:"AES-GCM",iv}, key, buf);
+    // Pack: salt(16) + iv(12) + ciphertext
+    const out = new Uint8Array(16 + 12 + enc.byteLength);
+    out.set(salt, 0); out.set(iv, 16); out.set(new Uint8Array(enc), 28);
+    return out.buffer;
+  }
+  async function decryptBlob(password, packed) {
+    const arr = new Uint8Array(packed);
+    const salt = arr.slice(0, 16);
+    const iv = arr.slice(16, 28);
+    const ciphertext = arr.slice(28);
+    const key = await deriveKey(password, salt);
+    return await crypto.subtle.decrypt({name:"AES-GCM",iv}, key, ciphertext);
+  }
+
   async function buildSyncJson() {
-    // Like buildBackupJson but strips media blobs to keep size small
+    // Like buildBackupJson but strips media blobs — returns {json, mediaIds}
     const full = await buildBackupJson();
     const parsed = JSON.parse(full);
-    // Strip base64 data URLs from memories — keep mediaId references so they survive round-trip
+    const mediaIds = new Set();
     if (parsed.memories) parsed.memories = parsed.memories.map(m => ({
-      ...m, mediaUrls: (m.mediaUrls||[]).map(med => med.mediaId ? {mediaId:med.mediaId,name:med.name} : med)
+      ...m, mediaUrls: (m.mediaUrls||[]).map(med => {
+        if (med.mediaId) { mediaIds.add(med.mediaId); return {mediaId:med.mediaId,name:med.name}; }
+        return med;
+      })
     }));
-    // Strip entity photos data URLs
     if (parsed.entityPhotos) Object.keys(parsed.entityPhotos).forEach(k => {
       const ep = parsed.entityPhotos[k];
-      if (ep?.mediaId) parsed.entityPhotos[k] = {mediaId:ep.mediaId,name:ep.name};
+      if (ep?.mediaId) { mediaIds.add(ep.mediaId); parsed.entityPhotos[k] = {mediaId:ep.mediaId,name:ep.name}; }
     });
-    return JSON.stringify(parsed);
+    return { json: JSON.stringify(parsed), mediaIds: [...mediaIds] };
   }
 
   async function push() {
@@ -3789,18 +3812,39 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
     if (!licenceKey) { setStatus("error:A licence key is required for cloud sync."); return; }
     setStatus("pushing");
     try {
-      const json = await buildSyncJson();
+      const { json, mediaIds } = await buildSyncJson();
       const encrypted = await encryptData(passphrase, json);
       const hash = await keyHash(licenceKey);
+      // 1. Push metadata
       const res = await fetch(WORKER_URL + "/sync/push", {
         method: "POST",
         headers: {"Content-Type":"application/json","X-Chronicle-Client":"1"},
-        body: JSON.stringify({keyHash: hash, ...encrypted, ...(lastPushedAt ? {knownPushedAt: lastPushedAt} : {})}),
+        body: JSON.stringify({keyHash: hash, ...encrypted, mediaIds, ...(lastPushedAt ? {knownPushedAt: lastPushedAt} : {})}),
       });
       if (res.status === 409) { setStatus("error:Another device pushed more recently — pull first to avoid overwriting it, then push again."); return; }
       if (!res.ok) { const e=await res.json().catch(()=>({})); setStatus("error:"+(e.error||res.status)); return; }
       const pushResult = await res.json().catch(()=>({}));
       if (pushResult.pushedAt) savePushedAt(pushResult.pushedAt);
+      // 2. Upload photos to R2
+      if (mediaIds.length > 0) {
+        setStatus("pushing photos (0/"+mediaIds.length+")");
+        let uploaded = 0;
+        const allMedia = await idbGetAll();
+        for (const mediaId of mediaIds) {
+          const blob = allMedia[mediaId];
+          if (!blob) { uploaded++; continue; }
+          try {
+            const encBuf = await encryptBlob(passphrase, blob);
+            await fetch(WORKER_URL + "/sync/media/" + hash + "/" + encodeURIComponent(mediaId), {
+              method: "PUT",
+              headers: {"Content-Type":"application/octet-stream","X-Chronicle-Client":"1"},
+              body: encBuf,
+            });
+          } catch(e) { /* skip failed photo, continue with rest */ }
+          uploaded++;
+          setStatus("pushing photos ("+uploaded+"/"+mediaIds.length+")");
+        }
+      }
       setStatus("done");
       setTimeout(()=>setStatus(""),3000);
     } catch(e) { setStatus("error:"+e.message); }
@@ -3819,8 +3863,30 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
       const plain = await decryptData(passphrase, stored);
       if (!plain) { setStatus("error:Wrong passphrase — could not decrypt."); return; }
       if (stored.pushedAt) savePushedAt(stored.pushedAt);
+      // 1. Import metadata
       const fakeEvt = {target:{files:[new File([plain],"chronicle-sync.json",{type:"application/json"})]}};
       importBackup(fakeEvt);
+      // 2. Download photos from R2
+      const mediaIds = stored.mediaIds || [];
+      if (mediaIds.length > 0) {
+        setStatus("pulling photos (0/"+mediaIds.length+")");
+        let downloaded = 0;
+        for (const mediaId of mediaIds) {
+          try {
+            // Skip if already in IDB
+            const existing = await idbGet(mediaId);
+            if (existing) { downloaded++; setStatus("pulling photos ("+downloaded+"/"+mediaIds.length+")"); continue; }
+            const mr = await fetch(WORKER_URL + "/sync/media/" + hash + "/" + encodeURIComponent(mediaId), {headers:{"X-Chronicle-Client":"1"}});
+            if (mr.ok) {
+              const encBuf = await mr.arrayBuffer();
+              const decBuf = await decryptBlob(passphrase, encBuf);
+              await idbPut(mediaId, new Blob([decBuf]));
+            }
+          } catch(e) { /* skip failed photo */ }
+          downloaded++;
+          setStatus("pulling photos ("+downloaded+"/"+mediaIds.length+")");
+        }
+      }
       setStatus("done");
       setTimeout(()=>setStatus(""),3000);
     } catch(e) { setStatus("error:"+e.message); }

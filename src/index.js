@@ -1740,9 +1740,10 @@ export default {
           }
         }
         const pushedAt = new Date().toISOString();
+        const mediaIds = Array.isArray(body.mediaIds) ? body.mediaIds.slice(0, 5000) : [];
         const storedPayload = JSON.stringify({
           ciphertext: body.ciphertext, iv: body.iv, salt: body.salt,
-          checkIv: body.checkIv, check: body.check, pushedAt,
+          checkIv: body.checkIv, check: body.check, pushedAt, mediaIds,
         });
         await env.SHARES.put("sync:" + body.keyHash, storedPayload, { expirationTtl: 60 * 60 * 24 * 90 });
         return json({ ok: true, pushedAt });
@@ -1758,6 +1759,51 @@ export default {
       const raw = await env.SHARES.get("sync:" + keyHash);
       if (!raw) return json({ error: "no_data" }, 404);
       return json(JSON.parse(raw));
+    }
+
+    // ── Sync media (R2) ─────────────────────────────────────────────────────
+
+    // PUT /sync/media/:keyHash/:mediaId — upload an encrypted photo blob
+    if (request.method === "PUT" && path.startsWith("/sync/media/")) {
+      const parts = path.slice("/sync/media/".length).split("/");
+      if (parts.length !== 2) return json({ error: "Invalid path" }, 400);
+      const [keyHash, mediaId] = parts;
+      if (!/^[0-9a-f]{64}$/.test(keyHash)) return json({ error: "Invalid key" }, 400);
+      if (!mediaId || mediaId.length > 100) return json({ error: "Invalid mediaId" }, 400);
+      // Verify the caller owns this sync slot
+      const syncRaw = await env.SHARES.get("sync:" + keyHash);
+      if (!syncRaw) return json({ error: "Push metadata first" }, 403);
+      const body = await request.arrayBuffer();
+      if (body.byteLength > 10 * 1024 * 1024) return json({ error: "File too large (10MB max)" }, 413);
+      await env.MEDIA.put(`sync/${keyHash}/${mediaId}`, body, {
+        httpMetadata: { contentType: "application/octet-stream" },
+        customMetadata: { uploadedAt: new Date().toISOString() },
+      });
+      return json({ ok: true });
+    }
+
+    // GET /sync/media/:keyHash/:mediaId — download an encrypted photo blob
+    if (request.method === "GET" && path.startsWith("/sync/media/")) {
+      const parts = path.slice("/sync/media/".length).split("/");
+      if (parts.length !== 2) return json({ error: "Invalid path" }, 400);
+      const [keyHash, mediaId] = parts;
+      if (!/^[0-9a-f]{64}$/.test(keyHash)) return json({ error: "Invalid key" }, 400);
+      const obj = await env.MEDIA.get(`sync/${keyHash}/${mediaId}`);
+      if (!obj) return new Response(null, { status: 404 });
+      return new Response(obj.body, {
+        headers: { "Content-Type": "application/octet-stream", ...CORS },
+      });
+    }
+
+    // DELETE /sync/media/:keyHash — clean up all media for a sync slot
+    if (request.method === "DELETE" && path.startsWith("/sync/media/")) {
+      const keyHash = path.slice("/sync/media/".length);
+      if (!/^[0-9a-f]{64}$/.test(keyHash)) return json({ error: "Invalid key" }, 400);
+      const listed = await env.MEDIA.list({ prefix: `sync/${keyHash}/` });
+      if (listed.objects.length > 0) {
+        await Promise.all(listed.objects.map(o => env.MEDIA.delete(o.key)));
+      }
+      return json({ ok: true, deleted: listed.objects.length });
     }
 
     // ── Mailing list ──────────────────────────────────────────────────────────
