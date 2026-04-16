@@ -4082,20 +4082,12 @@ function SettingsView({
       React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"\ud83c\udf1f Legacy View"),
         React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.6}},
-          "Choose which memories to include in your Legacy View \u2014 a curated life story you can share or preserve as a memorial. Toggle individual memories from their detail view."),
+          "Your Legacy View is a curated life story you can share or preserve as a memorial. Toggle individual memories from their detail view, and write a personal message from the Legacy screen under Social."),
         React.createElement("p",{style:{fontSize:"0.82rem",color:memories.filter(m=>m.inLegacy).length>0?"#4a7a5a":"#b0804a",fontStyle:"italic",margin:"0 0 14px"}},
           memories.filter(m=>m.inLegacy).length>0
             ? "\u2713 "+memories.filter(m=>m.inLegacy).length+" "+(memories.filter(m=>m.inLegacy).length===1?"memory":"memories")+" included"
             : "No memories included yet \u2014 open any memory and tick \"Include in Legacy View\""),
-        React.createElement("label",{style:{...S.label,display:"block",marginBottom:"4px"}},"A message to leave with your Legacy"),
-        React.createElement("textarea",{
-          value:legacyMessage||"",
-          onChange:e=>setLegacyMessage(e.target.value),
-          placeholder:"Something you\u2019d like people to know, remember, or carry forward\u2026",
-          rows:4,
-          style:{...S.input,resize:"vertical",lineHeight:1.6,fontSize:"0.9rem",marginBottom:"12px"}
-        }),
-        React.createElement("button",{onClick:()=>setView("legacy"),style:{...S.btn,padding:"9px 16px",fontSize:"0.88rem"}},"\ud83c\udf1f Preview Legacy View")
+        React.createElement("button",{onClick:()=>setView("legacy"),style:{...S.btn,padding:"9px 16px",fontSize:"0.88rem"}},"\ud83c\udf1f Go to Legacy View")
       )
     ) // end legacy tab
     ,
@@ -5763,35 +5755,45 @@ function AddEditForm({
   isCarerMode, ownerName, carerName, subject,
   isHistoryMode, editingCandidateId, handleSaveCandidateSubmit, handleAcceptFromForm,
 }) {
-  // Auto-expand sections that already have content (important for edit mode)
+  // Auto-expand first populated section (accordion: only one open at a time)
   const [expanded, setExpanded] = React.useState(() => {
-    const s = new Set();
-    if (form.endFuzzy || form.endOngoing || form._expandEndDate) s.add("enddate");
-    if ((form.locationLabel||"").trim() || (form.locations||[]).length) s.add("location");
-    if ((form.tags||[]).length) s.add("tags");
-    if ((form.people||[]).length) s.add("people");
-    if ((form.orgs||[]).length) s.add("orgs");
-    if ((form.mediaUrls||[]).length) s.add("photos");
-    if (form.visibility && form.visibility !== "private") s.add("visibility");
-    if ((form.sourceIds||[]).length) s.add("sources");
-    if (form.researchNote || form.candidateConfidence) s.add("researchnote");
-    return s;
+    if (form._expandEndDate) return new Set(["enddate"]);
+    const checks = [
+      ["enddate",    form.endFuzzy || form.endOngoing],
+      ["location",   (form.locationLabel||"").trim() || (form.locations||[]).length],
+      ["tags",       (form.tags||[]).length],
+      ["people",     (form.people||[]).length],
+      ["orgs",       (form.orgs||[]).length],
+      ["photos",     (form.mediaUrls||[]).length],
+      ["visibility", form.visibility && form.visibility !== "private"],
+      ["sources",    (form.sourceIds||[]).length],
+      ["researchnote", form.researchNote || form.candidateConfidence],
+    ];
+    const first = checks.find(([,v])=>v);
+    return first ? new Set([first[0]]) : new Set();
   });
-  const toggle = k => setExpanded(s => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
+  const toggle = k => setExpanded(s => { if (s.has(k)) return new Set(); return new Set([k]); });
   const canSave = !!(form.title?.trim() && form.year);
   const sm = modeFor(subject);
   const addTitle = typeof sm.addMemory==="function" ? sm.addMemory(ownerName||subject?.name) : (sm.addMemory||"Record a Memory");
 
   // Pill button for optional sections
+  const secHasContent = {
+    location: (form.locationLabel||"").trim()||(form.locations||[]).length, tags: (form.tags||[]).length,
+    people: (form.people||[]).length, orgs: (form.orgs||[]).length, photos: (form.mediaUrls||[]).length,
+    visibility: form.visibility&&form.visibility!=="private", sources: (form.sourceIds||[]).length,
+    researchnote: form.researchNote||form.candidateConfidence, enddate: form.endFuzzy||form.endOngoing,
+  };
   function secToggle(k, label, icon) {
     const on = expanded.has(k);
+    const filled = !on && secHasContent[k];
     return React.createElement("button",{key:k,onClick:()=>toggle(k),style:{
       padding:"5px 13px",borderRadius:"20px",border:"1px solid",cursor:"pointer",
       fontSize:"0.8rem",fontFamily:"'Crimson Text',serif",transition:"all 0.15s",
-      background:on?"rgba(44,36,22,0.09)":"transparent",
-      color:on?"#2c2416":"#6a5840",
-      borderColor:on?"#c8b89a":"#d4c8b4"
-    }}, on ? ("× "+label) : (icon+" "+label));
+      background:on?"rgba(44,36,22,0.09)":filled?"rgba(74,122,90,0.08)":"transparent",
+      color:on?"#2c2416":filled?"#4a7a5a":"#6a5840",
+      borderColor:on?"#c8b89a":filled?"rgba(74,122,90,0.35)":"#d4c8b4"
+    }}, on ? ("\u00d7 "+label) : (icon+" "+label), filled&&React.createElement("span",{style:{display:"inline-block",width:"5px",height:"5px",borderRadius:"50%",background:"#4a7a5a",marginLeft:"4px",verticalAlign:"middle"}}));
   }
 
   // Section wrapper with consistent top margin
@@ -8989,18 +8991,32 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         ),
       ),
 
-      view==="legacy"&&(()=>{
+      view===”legacy”&&(()=>{
         const legMems = memories.filter(m=>m.inLegacy).sort((a,b)=>sortKey(a)-sortKey(b));
-        return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"680px"}},
-          React.createElement("div",{style:{textAlign:"center",marginBottom:"32px",paddingBottom:"24px",borderBottom:"1px solid #d4c4a8"}},
-            React.createElement("p",{style:{fontSize:"0.82rem",color:"#7a6040",letterSpacing:"0.1em",textTransform:"uppercase",margin:"0 0 8px",fontFamily:"'Crimson Text',serif"}},"🌟 Legacy View"),
-            React.createElement("h1",{style:{fontFamily:"'Playfair Display',serif",fontSize:isMobile?"1.8rem":"2.4rem",color:"#1a1208",margin:"0 0 6px",fontStyle:"italic"}},ownerName||"A Life"),
-            subject.dob&&React.createElement("p",{style:{fontSize:"0.9rem",color:"#8a7460",margin:"0 0 16px"}},subject.dob),
-            legacyMessage&&React.createElement("p",{style:{fontSize:"1rem",color:"#4a3a28",lineHeight:1.8,fontStyle:"italic",maxWidth:"520px",margin:"0 auto",fontFamily:"'Crimson Text',Georgia,serif"}},'“'+legacyMessage+'”')
+        return React.createElement(“div”,{style:{animation:”fadeIn 0.3s ease”,maxWidth:”680px”}},
+          React.createElement(“div”,{style:{background:”rgba(255,252,245,0.7)”,border:”1px solid #d4c4a8”,borderRadius:”3px”,padding:”16px 20px”,marginBottom:”24px”,fontSize:”0.84rem”,color:”#8a7460”,lineHeight:1.6}},
+            “Your Legacy View is a curated collection of your most meaningful memories \u2014 a life story to share with family or preserve as a memorial. To include a memory, open it and tick \u201cInclude in Legacy View\u201d. “,
+            React.createElement(“strong”,{style:{color:”#6a5840”}},legMems.length+” “+(legMems.length===1?”memory”:”memories”)+” included so far.”)
           ),
-          legMems.length===0&&React.createElement("div",{style:{textAlign:"center",padding:"40px 20px",color:"#8a7460"}},
-            React.createElement("p",{style:{fontSize:"1.1rem",fontStyle:"italic",marginBottom:"12px"}},"No memories included in Legacy View yet."),
-            React.createElement("p",{style:{fontSize:"0.86rem"}},"Open any memory and tick \"Include in Legacy View\" to add it here.")
+          React.createElement(“div”,{style:{marginBottom:”24px”}},
+            React.createElement(“label”,{style:{...S.label,display:”block”,marginBottom:”4px”}},”A message to leave with your Legacy”),
+            React.createElement(“textarea”,{
+              value:legacyMessage||””,
+              onChange:e=>setLegacyMessage(e.target.value),
+              placeholder:”Something you\u2019d like people to know, remember, or carry forward\u2026”,
+              rows:3,
+              style:{...S.input,resize:”vertical”,lineHeight:1.6,fontSize:”0.9rem”}
+            })
+          ),
+          React.createElement(“div”,{style:{textAlign:”center”,marginBottom:”32px”,paddingBottom:”24px”,borderBottom:”1px solid #d4c4a8”}},
+            React.createElement(“p”,{style:{fontSize:”0.82rem”,color:”#7a6040”,letterSpacing:”0.1em”,textTransform:”uppercase”,margin:”0 0 8px”,fontFamily:”'Crimson Text',serif”}},”🌟 Legacy View”),
+            React.createElement(“h1”,{style:{fontFamily:”'Playfair Display',serif”,fontSize:isMobile?”1.8rem”:”2.4rem”,color:”#1a1208”,margin:”0 0 6px”,fontStyle:”italic”}},ownerName||”A Life”),
+            subject.dob&&React.createElement(“p”,{style:{fontSize:”0.9rem”,color:”#8a7460”,margin:”0 0 16px”}},subject.dob),
+            legacyMessage&&React.createElement(“p”,{style:{fontSize:”1rem”,color:”#4a3a28”,lineHeight:1.8,fontStyle:”italic”,maxWidth:”520px”,margin:”0 auto”,fontFamily:”'Crimson Text',Georgia,serif”}},'”'+legacyMessage+'”')
+          ),
+          legMems.length===0&&React.createElement(“div”,{style:{textAlign:”center”,padding:”40px 20px”,color:”#8a7460”}},
+            React.createElement(“p”,{style:{fontSize:”1.1rem”,fontStyle:”italic”,marginBottom:”12px”}},”No memories included in Legacy View yet.”),
+            React.createElement(“p”,{style:{fontSize:”0.86rem”}},”Open any memory and tick \”Include in Legacy View\” to add it here.”)
           ),
           legMems.map((m,i)=>React.createElement("div",{key:m.id,style:{marginBottom:"32px",paddingBottom:"32px",borderBottom:i<legMems.length-1?"1px solid rgba(200,184,154,0.4)":"none"}},
             React.createElement("p",{style:{fontSize:"0.82rem",color:"#7a6040",margin:"0 0 4px",letterSpacing:"0.04em"}},fuzzyDateLabel(m)+(m.location?" · "+m.location:"")),
