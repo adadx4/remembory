@@ -1724,6 +1724,12 @@ export default {
         const body = await request.json();
         if (!body.keyHash || !body.ciphertext) return json({ error: "Invalid payload" }, 400);
         if (!/^[0-9a-f]{64}$/.test(body.keyHash)) return json({ error: "Invalid key" }, 400);
+        // Size check — KV value limit is 25MB
+        const payload = JSON.stringify({
+          ciphertext: body.ciphertext, iv: body.iv, salt: body.salt,
+          checkIv: body.checkIv, check: body.check,
+        });
+        if (payload.length > 24 * 1024 * 1024) return json({ error: "Sync data too large." }, 413);
         if (body.knownPushedAt) {
           const existing = await env.SHARES.get("sync:" + body.keyHash);
           if (existing) {
@@ -1734,10 +1740,11 @@ export default {
           }
         }
         const pushedAt = new Date().toISOString();
-        await env.SHARES.put("sync:" + body.keyHash, JSON.stringify({
+        const storedPayload = JSON.stringify({
           ciphertext: body.ciphertext, iv: body.iv, salt: body.salt,
           checkIv: body.checkIv, check: body.check, pushedAt,
-        }), { expirationTtl: 60 * 60 * 24 * 90 });
+        });
+        await env.SHARES.put("sync:" + body.keyHash, storedPayload, { expirationTtl: 60 * 60 * 24 * 90 });
         return json({ ok: true, pushedAt });
       } catch (e) {
         return json({ error: "Server error: " + e.message }, 500);

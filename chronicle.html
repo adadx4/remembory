@@ -3768,12 +3768,28 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
     return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
   }
 
+  async function buildSyncJson() {
+    // Like buildBackupJson but strips media blobs to keep size small
+    const full = await buildBackupJson();
+    const parsed = JSON.parse(full);
+    // Strip base64 data URLs from memories — keep mediaId references so they survive round-trip
+    if (parsed.memories) parsed.memories = parsed.memories.map(m => ({
+      ...m, mediaUrls: (m.mediaUrls||[]).map(med => med.mediaId ? {mediaId:med.mediaId,name:med.name} : med)
+    }));
+    // Strip entity photos data URLs
+    if (parsed.entityPhotos) Object.keys(parsed.entityPhotos).forEach(k => {
+      const ep = parsed.entityPhotos[k];
+      if (ep?.mediaId) parsed.entityPhotos[k] = {mediaId:ep.mediaId,name:ep.name};
+    });
+    return JSON.stringify(parsed);
+  }
+
   async function push() {
     if (!passphrase.trim()) { setStatus("error:Enter a sync passphrase first."); return; }
     if (!licenceKey) { setStatus("error:A licence key is required for cloud sync."); return; }
     setStatus("pushing");
     try {
-      const json = await buildBackupJson();
+      const json = await buildSyncJson();
       const encrypted = await encryptData(passphrase, json);
       const hash = await keyHash(licenceKey);
       const res = await fetch(WORKER_URL + "/sync/push", {
@@ -3863,25 +3879,13 @@ function SettingsView({
   saveBackupBusy, setSaveBackupBusy,
   syncInfo, syncStatus, chooseSyncFile, createSyncFile, doSync, clearSyncFile, buildBackupJson, isMobile,
   unpublishProfile,
+  settingsMode,
 }) {
 
- const [settingsTab, setSettingsTab] = React.useState("account");
+  const settingsTab = settingsMode || "account";
 
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"720px"}},
-    React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 16px",color:"#1a1208"}},"Settings"),
-
-    // ── Tab bar ──
-    React.createElement("div",{style:{display:"flex",gap:"0",marginBottom:"28px",borderBottom:"2px solid #e0d4be"}},
-        [["account","Account"],["backup","Backup & Restore"],["legacy","Legacy"],["print","Print"]].map(([tab,label])=>
-        React.createElement("button",{
-          key:tab,onClick:()=>setSettingsTab(tab),
-          style:{padding:"8px 20px",border:"none",background:"transparent",cursor:"pointer",
-            fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",marginBottom:"-2px",
-            borderBottom:settingsTab===tab?"2px solid #2c2416":"2px solid transparent",
-            color:settingsTab===tab?"#1a1208":"#8a7460",fontWeight:settingsTab===tab?600:400}
-        },label)
-      )
-    ),
+    React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 16px",color:"#1a1208"}},settingsTab==="backup"?"Backup & Restore":"Account"),
 
     // ══════════════ ACCOUNT TAB ══════════════
     settingsTab==="account"&&React.createElement(React.Fragment,null,
@@ -4076,30 +4080,6 @@ function SettingsView({
       )
     ), // end backup tab
 
-    // ══════════════ LEGACY TAB ══════════════
-    settingsTab==="legacy"&&React.createElement(React.Fragment,null,
-
-      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"\ud83c\udf1f Legacy View"),
-        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.6}},
-          "Your Legacy View is a curated life story you can share or preserve as a memorial. Toggle individual memories from their detail view, and write a personal message from the Legacy screen under Social."),
-        React.createElement("p",{style:{fontSize:"0.82rem",color:memories.filter(m=>m.inLegacy).length>0?"#4a7a5a":"#b0804a",fontStyle:"italic",margin:"0 0 14px"}},
-          memories.filter(m=>m.inLegacy).length>0
-            ? "\u2713 "+memories.filter(m=>m.inLegacy).length+" "+(memories.filter(m=>m.inLegacy).length===1?"memory":"memories")+" included"
-            : "No memories included yet \u2014 open any memory and tick \"Include in Legacy View\""),
-        React.createElement("button",{onClick:()=>setView("legacy"),style:{...S.btn,padding:"9px 16px",fontSize:"0.88rem"}},"\ud83c\udf1f Go to Legacy View")
-      )
-    ) // end legacy tab
-    ,
-    // ══════════════ PRINT TAB ══════════════
-    settingsTab==="print"&&React.createElement(React.Fragment,null,
-      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Print / Export"),
-        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.6}},
-          "Print your chronicle or save it as a PDF. Choose which memories to include, the level of detail, and whether to show photos and people."),
-        React.createElement("button",{onClick:()=>setView("print"),style:{...S.btn,padding:"9px 16px",fontSize:"0.88rem"}},"🖨 Open Print View")
-      )
-    )
   );
 }
 
@@ -5751,7 +5731,7 @@ function AddEditForm({
   peopleEmails, peopleRelationships, personGroups,
   customTags, addCustomTag, removeCustomTag,
   wantPublicProfile, persistSubject,
-  setForm, newForm, setEditingId, setView,
+  setForm, newForm, setEditingId, setView, onCancel,
   isCarerMode, ownerName, carerName, subject,
   isHistoryMode, editingCandidateId, handleSaveCandidateSubmit, handleAcceptFromForm,
 }) {
@@ -5786,7 +5766,7 @@ function AddEditForm({
   };
   function secToggle(k, label, icon) {
     const on = expanded.has(k);
-    const filled = !on && secHasContent[k];
+    const filled = !on && !!secHasContent[k];
     return React.createElement("button",{key:k,onClick:()=>toggle(k),style:{
       padding:"5px 13px",borderRadius:"20px",border:"1px solid",cursor:"pointer",
       fontSize:"0.8rem",fontFamily:"'Crimson Text',serif",transition:"all 0.15s",
@@ -5883,7 +5863,7 @@ function AddEditForm({
       secToggle("people",    "People",        "\ud83d\udc64"),
       secToggle("orgs",      "Organisation",  "\ud83c\udfdb"),
       secToggle("photos",    "Photos",        "\ud83d\uddbc"),
-      (isHistoryMode||(knownSources&&knownSources.length>0))&&secToggle("sources", "Sources", "\ud83d\udcda"),
+      isHistoryMode&&secToggle("sources", "Sources", "\ud83d\udcda"),
       isHistoryMode&&secToggle("researchnote","Research Note","\ud83d\udcdd"),
       wantPublicProfile&&secToggle("visibility","Visibility",  "\ud83d\udd12")
     ),
@@ -6039,7 +6019,7 @@ function AddEditForm({
           : React.createElement("button",{onClick:canSave?handleSubmit:undefined,disabled:!canSave,style:{...S.btn,opacity:canSave?1:0.45,cursor:canSave?"pointer":"not-allowed"}},
               view==="edit"?"Save Changes":isCarerMode&&ownerName?`Save to ${ownerName}'s Chronicle`:"Save to Chronicle"),
         isHistoryMode&&!editingCandidateId&&view==="add"&&React.createElement("button",{onClick:canSave?handleSaveCandidateSubmit:undefined,disabled:!canSave,style:{...S.btnOutline,borderColor:"rgba(196,169,98,0.6)",color:"#7a5a20",opacity:canSave?1:0.45,cursor:canSave?"pointer":"not-allowed"}},"📥 Save as Candidate"),
-        React.createElement("button",{onClick:()=>{ setForm(newForm()); clearDraft(); setEditingId(null); setEditingCandidateId&&setEditingCandidateId(null); setView(editingCandidateId?"life":view==="edit"?"detail":"life"); },style:S.btnOutline},"Cancel"),
+        React.createElement("button",{onClick:onCancel,style:S.btnOutline},"Cancel"),
         !canSave&&React.createElement("span",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic"}},
           !form.title?.trim()?"Add a title to save":!form.year?"Add a date to save":"")
       )
@@ -6237,6 +6217,7 @@ function App() {
   const [profilePublishing, setProfilePublishing] = React.useState(false);
   const [profileMsg, setProfileMsg] = React.useState("");
   const [profileConfirm, setProfileConfirm] = React.useState(false);
+  const [showPubList, setShowPubList] = React.useState(false);
   const [settingsTab, setSettingsTab] = React.useState("account");
   const [syncFileHandle, setSyncFileHandle] = React.useState(null);
   const [syncStatus, setSyncStatus] = React.useState("");
@@ -6293,6 +6274,13 @@ function App() {
   const iabOnLoad = React.useMemo(()=>isInAppBrowser(),[]);
   const [indexTab, setIndexTab] = useState("people");
   const [indexFilter, setIndexFilter] = useState(null); // {type, value}
+  // Sync index tab from filter type (when navigating from menu)
+  React.useEffect(() => {
+    if (indexFilter && indexFilter.type && !indexFilter.value && !indexFilter.people && !indexFilter.sourceId) {
+      setIndexTab(indexFilter.type);
+      setIndexFilter(null);
+    }
+  }, [indexFilter]);
   const [saveStatus, setSaveStatus] = useState(""); // "", "saved", "error"
 
   // Import state
@@ -8039,15 +8027,16 @@ function handleEdit(m) {
     if (view==="prompt") return "Prompter";
     if (view==="people") return "People & Organisations";
     if (view==="map") return "Map";
-    if (view==="settings") return "Settings";
+    if (view==="settings") return "Account";
+    if (view==="backup") return "Backup & Restore";
     if (view==="legacy") return "Legacy View";
-    if (view==="print") return "Print / Export";
-    if (view==="index") return indexFilter ? `${indexFilter.value}` : "Index";
+    if (view==="print") return "Print & Export";
+    if (view==="index") { if(!indexFilter) return "Index"; const labels={people:"People",locations:"Places",orgs:"Organisations",groups:"Groups",relationships:"Relationships",tags:"Tags",sources:"Sources"}; return indexFilter.value || labels[indexFilter.type] || "Index"; }
     if (view==="sharing") return "Sharing";
     return null;
   }
 
-  const showBack=["add","edit","detail","decade","year","timeline","shared-timeline","import","people","index","map","print","prompt","settings","legacy","public-profile","sharing"].includes(view);
+  const showBack=["add","edit","detail","decade","year","timeline","shared-timeline","import","people","index","map","print","prompt","settings","backup","legacy","public-profile","sharing"].includes(view);
   const showAdd=!["add","edit","print"].includes(view);
   const breadcrumb=bc();
 
@@ -8496,39 +8485,45 @@ function handleEdit(m) {
           const lifeActive=["life","timeline","shared-timeline","decade","year","index","map","tree"].includes(view);
           const socialActive=["sharing","public-profile","legacy"].includes(view);
           const addActive=["add","prompt","import"].includes(view);
-          const settingsActive=["settings","print"].includes(view);
+          const settingsActive=["settings","backup","print"].includes(view);
           return React.createElement(React.Fragment,null,
             React.createElement(NavDropdown,{label:"Life",isActive:lifeActive,items:[
               {label:"◉ Overview",action:()=>setView("life"),active:view==="life"},
-              {label:"≡ List",action:()=>setView("timeline"),active:view==="timeline"},
+              {label:"≡ Life Events",action:()=>setView("timeline"),active:view==="timeline"},
               memories.some(m=>m.gedcomContext)&&{label:"≈ Shared Timeline",action:()=>setView("shared-timeline"),active:view==="shared-timeline"},
-              {label:"☰ Index",action:()=>{setIndexFilter(null);setView("index");},active:view==="index"},
+              {divider:true},
+              {label:"👤 People",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
+              {label:"📍 Places",action:()=>{setIndexFilter({type:"locations"});setView("index");},active:view==="index"&&indexFilter?.type==="locations"},
+              {label:"🏛 Organisations",action:()=>{setIndexFilter({type:"orgs"});setView("index");},active:view==="index"&&indexFilter?.type==="orgs"},
+              {label:"👥 Groups",action:()=>{setIndexFilter({type:"groups"});setView("index");},active:view==="index"&&indexFilter?.type==="groups"},
+              {label:"🔗 Relationships",action:()=>{setIndexFilter({type:"relationships"});setView("index");},active:view==="index"&&indexFilter?.type==="relationships"},
+              {label:"🏷 Tags",action:()=>{setIndexFilter({type:"tags"});setView("index");},active:view==="index"&&indexFilter?.type==="tags"},
+              {divider:true},
               {label:"🗺 Map",action:()=>setView("map"),active:view==="map"},
-              IS_STAGING&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
+              IS_STAGING&&isHistoryMode&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
             ].filter(Boolean)}),
             React.createElement(NavDropdown,{label:"Social",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,items:[
               {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing",badge:shareBadgeCount},
-              IS_STAGING&&{label:"◎ Profile",action:()=>setView("public-profile"),active:view==="public-profile",subOnly:true,disabled:!isSubscriber},
+              IS_STAGING&&wantPublicProfile&&{label:"◎ Profile",action:()=>setView("public-profile"),active:view==="public-profile",subOnly:true,disabled:!isSubscriber},
               IS_STAGING&&{label:"Explore ↗",href:exploreUrl,external:true,subOnly:true,disabled:!isSubscriber},
               {divider:true},
               {label:"🌟 Legacy",action:()=>setView("legacy"),active:view==="legacy"},
             ].filter(Boolean)}),
             React.createElement(NavDropdown,{label:"Add",isActive:addActive,items:[
-              {label:"+ Add memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
-              {label:"✦ Prompt",action:()=>setView("prompt"),active:view==="prompt"},
-              {divider:true},
-              {label:"↑ Photos / Email",action:()=>setView("import"),active:view==="import"},
-              IS_STAGING&&{label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
+              {label:"+ From Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
+              {label:"📷 From Photo",action:()=>{setImportTab&&setImportTab("photos");setView("import");},active:view==="import"},
+              {label:"✦ Get Prompt",action:()=>setView("prompt"),active:view==="prompt"},
+              IS_STAGING&&isHistoryMode&&{label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
             ].filter(Boolean)}),
             React.createElement(NavDropdown,{label:"Settings",isActive:settingsActive,badge:notifications.length>0?notifications.length:0,items:[
               {label:"Account",action:()=>setView("settings"),active:view==="settings"},
-              {label:"Backup & Restore",action:()=>setView("settings")},
+              {label:"Backup & Restore",action:()=>setView("backup"),active:view==="backup"},
               {divider:true},
-              {label:"🖨 Print / Export",action:()=>setView("print"),active:view==="print"},
+              {label:"🖨 Print & Export",action:()=>setView("print"),active:view==="print"},
             ]}),
             React.createElement(NavDropdown,{label:"Help",isActive:false,items:[
               {label:"Manual",href:"https://remembory.net/manual.html",external:true},
-              {label:"Tips & Tricks",href:"https://remembory.net/tips.html",external:true},
+              {label:"Tips",href:"https://remembory.net/tips.html",external:true},
               {divider:true},
               {label:"Contact",href:"mailto:admin@remembory.net"},
             ]}),
@@ -8547,39 +8542,45 @@ function handleEdit(m) {
       const lifeActive=["life","timeline","decade","year","index","map","tree"].includes(view);
       const socialActive=["sharing","public-profile","legacy"].includes(view);
       const addActive=["add","prompt","import"].includes(view);
-      const settingsActive=["settings","print"].includes(view);
+      const settingsActive=["settings","backup","print"].includes(view);
       return React.createElement("nav",{style:{position:"fixed",bottom:0,left:0,right:0,zIndex:200,background:"rgba(245,240,232,0.97)",borderTop:"1px solid #c8b89a",display:"flex",backdropFilter:"blur(8px)",paddingBottom:"env(safe-area-inset-bottom, 0px)"}},
         React.createElement(NavDropdown,{label:"Life",icon:"◉",isActive:lifeActive,variant:"mobile",direction:"up",menuAlign:"left",items:[
           {label:"◉ Overview",action:()=>setView("life"),active:view==="life"},
-          {label:"≡ List",action:()=>setView("timeline"),active:view==="timeline"},
+          {label:"≡ Life Events",action:()=>setView("timeline"),active:view==="timeline"},
           memories.some(m=>m.gedcomContext)&&{label:"≈ Shared Timeline",action:()=>setView("shared-timeline"),active:view==="shared-timeline"},
-          {label:"☰ Index",action:()=>{setIndexFilter(null);setView("index");},active:view==="index"},
+          {divider:true},
+          {label:"👤 People",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
+          {label:"📍 Places",action:()=>{setIndexFilter({type:"locations"});setView("index");},active:view==="index"&&indexFilter?.type==="locations"},
+          {label:"🏛 Organisations",action:()=>{setIndexFilter({type:"orgs"});setView("index");},active:view==="index"&&indexFilter?.type==="orgs"},
+          {label:"👥 Groups",action:()=>{setIndexFilter({type:"groups"});setView("index");},active:view==="index"&&indexFilter?.type==="groups"},
+          {label:"🔗 Relationships",action:()=>{setIndexFilter({type:"relationships"});setView("index");},active:view==="index"&&indexFilter?.type==="relationships"},
+          {label:"🏷 Tags",action:()=>{setIndexFilter({type:"tags"});setView("index");},active:view==="index"&&indexFilter?.type==="tags"},
+          {divider:true},
           {label:"🗺 Map",action:()=>setView("map"),active:view==="map"},
-          IS_STAGING&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
+          IS_STAGING&&isHistoryMode&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
         ].filter(Boolean)}),
         React.createElement(NavDropdown,{label:"Social",icon:"⇌",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,variant:"mobile",direction:"up",menuAlign:"left",items:[
           {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing",badge:shareBadgeCount},
-          IS_STAGING&&{label:"◎ Profile",action:()=>setView("public-profile"),active:view==="public-profile",subOnly:true,disabled:!isSubscriber},
+          IS_STAGING&&wantPublicProfile&&{label:"◎ Profile",action:()=>setView("public-profile"),active:view==="public-profile",subOnly:true,disabled:!isSubscriber},
           IS_STAGING&&{label:"Explore ↗",href:exploreUrl,external:true,subOnly:true,disabled:!isSubscriber},
           {divider:true},
           {label:"🌟 Legacy",action:()=>setView("legacy"),active:view==="legacy"},
         ].filter(Boolean)}),
         React.createElement(NavDropdown,{label:"Add",icon:"＋",isActive:addActive,variant:"mobile",direction:"up",menuAlign:"center",items:[
-          {label:"+ Add memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
-          {label:"✦ Prompt",action:()=>setView("prompt"),active:view==="prompt"},
-          {divider:true},
-          {label:"↑ Photos / Email",action:()=>setView("import"),active:view==="import"},
-          IS_STAGING&&{label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
+          {label:"+ From Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
+          {label:"📷 From Photo",action:()=>{setImportTab&&setImportTab("photos");setView("import");},active:view==="import"},
+          {label:"✦ Get Prompt",action:()=>setView("prompt"),active:view==="prompt"},
+          IS_STAGING&&isHistoryMode&&{label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
         ].filter(Boolean)}),
         React.createElement(NavDropdown,{label:"Settings",icon:"⚙",isActive:settingsActive,badge:notifications.length>0?notifications.length:0,variant:"mobile",direction:"up",items:[
           {label:"Account",action:()=>setView("settings"),active:view==="settings"},
-          {label:"Backup & Restore",action:()=>setView("settings")},
+          {label:"Backup & Restore",action:()=>setView("backup"),active:view==="backup"},
           {divider:true},
-          {label:"🖨 Print / Export",action:()=>setView("print"),active:view==="print"},
+          {label:"🖨 Print & Export",action:()=>setView("print"),active:view==="print"},
         ]}),
         React.createElement(NavDropdown,{label:"Help",icon:"?",isActive:false,variant:"mobile",direction:"up",items:[
           {label:"Manual",href:"https://remembory.net/manual.html",external:true},
-          {label:"Tips & Tricks",href:"https://remembory.net/tips.html",external:true},
+          {label:"Tips",href:"https://remembory.net/tips.html",external:true},
           {divider:true},
           {label:"Contact",href:"mailto:admin@remembory.net"},
         ]})
@@ -8644,12 +8645,12 @@ function handleEdit(m) {
           {id:"relationships", label:"🔗 Relationships", items:[], getCount:()=>0},
           {id:"groups", label:"👥 Groups", items:[], getCount:()=>0},
           {id:"tags", label:"🏷 Tags", items:allTags, getCount:v=>memories.filter(m=>m.tags?.includes(v)).length},
-          {id:"sources", label:"📚 Sources", items:knownSources, getCount:()=>0},
-        ];
+          isHistoryMode&&{id:"sources", label:"📚 Sources", items:knownSources, getCount:()=>0},
+        ].filter(Boolean);
         const activeTab = tabs.find(t=>t.id===indexTab)||tabs[0];
 
-        // If a filter is active, show filtered memories
-        if (indexFilter) {
+        // If a filter is active with a specific value, show filtered memories
+        if (indexFilter && (indexFilter.value || indexFilter.people || indexFilter.sourceId)) {
           const filtered = memories.filter(m=>{
             if(indexFilter.type==="people") return m.people?.includes(indexFilter.value);
             if(indexFilter.type==="orgs") return m.orgs?.includes(indexFilter.value);
@@ -8674,8 +8675,9 @@ function handleEdit(m) {
         }
 
         // Index listing
+        const tabLabels={people:"People",orgs:"Organisations",locations:"Places",relationships:"Relationships",groups:"Groups",tags:"Tags",sources:"Sources"};
         return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
-          React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 20px",color:"#1a1208"}},"Index"),
+          React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 20px",color:"#1a1208"}},tabLabels[indexTab]||"Index"),
           // Tabs
           React.createElement("div",{style:{display:"flex",gap:"0",borderBottom:"1px solid #c8b89a",marginBottom:"22px",overflowX:"auto",WebkitOverflowScrolling:"touch"}},
             tabs.map(t=>React.createElement("button",{key:t.id,onClick:()=>setIndexTab(t.id),style:{
@@ -8748,7 +8750,7 @@ function handleEdit(m) {
         contributionLinks, persistSubject,
       }),
 
-      view==="settings"&&React.createElement(SettingsView,{
+      (view==="settings"||view==="backup")&&React.createElement(SettingsView,{
         subject, subjects, ownerName, ownerEmail, carerName, carerEmail,
         activePassword, data, memories,
         wantPublicProfile, isSubscriber, licenceKey, licenceStatus,
@@ -8760,6 +8762,7 @@ function handleEdit(m) {
         shareCodeStatus, importFromCode,
         saveBackupBusy, setSaveBackupBusy,
         syncInfo, syncStatus, chooseSyncFile, createSyncFile, doSync, clearSyncFile, buildBackupJson, isMobile,
+        settingsMode: view==="backup"?"backup":"account",
       }),
 
 
@@ -8968,9 +8971,22 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
                 React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,marginBottom:"12px"}},
                   "Publish selected memories to a public profile at remembory.net. Set the visibility on each memory in its edit form — private memories never leave your device."
                 ),
-                memories.filter(m=>m.visibility&&m.visibility!=="private").length>0
-                    ? React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"12px"}},memories.filter(m=>m.visibility&&m.visibility!=="private").length+" memories ready to publish.")
-                    : React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"No memories set to public yet. Edit any memory and change its visibility."),
+                (()=>{
+                  const pubMems = memories.filter(m=>m.visibility&&m.visibility!=="private");
+                  if (pubMems.length===0) return React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"No memories set to public yet. Edit any memory and change its visibility.");
+                  return React.createElement("div",{style:{marginBottom:"12px"}},
+                    React.createElement("button",{onClick:()=>setShowPubList(v=>!v),style:{background:"none",border:"none",padding:0,cursor:"pointer",fontSize:"0.82rem",color:"#4a7a5a",fontFamily:"'Crimson Text',serif",textDecoration:"underline",textDecorationColor:"rgba(74,122,90,0.4)",textUnderlineOffset:"2px"}},
+                      pubMems.length+" "+(pubMems.length===1?"memory":"memories")+" ready to publish"+(showPubList?" \u25b4":" \u25be")),
+                    showPubList&&React.createElement("div",{style:{marginTop:"8px",border:"1px solid #d4c4a8",borderRadius:"3px",background:"rgba(255,252,245,0.7)",maxHeight:"200px",overflow:"auto"}},
+                      pubMems.sort((a,b)=>sortKey(a)-sortKey(b)).map(m=>
+                        React.createElement("div",{key:m.id,style:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 12px",borderBottom:"1px solid #ede4d4",fontSize:"0.82rem"}},
+                          React.createElement("span",{style:{color:"#2c2416",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,marginRight:"8px"}},m.title||"Untitled"),
+                          React.createElement("span",{style:{fontSize:"0.72rem",color:"#8a7460",flexShrink:0,textTransform:"capitalize"}},m.visibility)
+                        )
+                      )
+                    )
+                  );
+                })(),
                 React.createElement("div",{style:{marginBottom:"12px"}},
                   React.createElement("label",{style:{...S.label,marginBottom:"4px",display:"block"}},"Public display name"),
                   React.createElement("input",{value:profileDisplayName,
@@ -8991,32 +9007,32 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         ),
       ),
 
-      view===”legacy”&&(()=>{
+      view==="legacy"&&(()=>{
         const legMems = memories.filter(m=>m.inLegacy).sort((a,b)=>sortKey(a)-sortKey(b));
-        return React.createElement(“div”,{style:{animation:”fadeIn 0.3s ease”,maxWidth:”680px”}},
-          React.createElement(“div”,{style:{background:”rgba(255,252,245,0.7)”,border:”1px solid #d4c4a8”,borderRadius:”3px”,padding:”16px 20px”,marginBottom:”24px”,fontSize:”0.84rem”,color:”#8a7460”,lineHeight:1.6}},
-            “Your Legacy View is a curated collection of your most meaningful memories \u2014 a life story to share with family or preserve as a memorial. To include a memory, open it and tick \u201cInclude in Legacy View\u201d. “,
-            React.createElement(“strong”,{style:{color:”#6a5840”}},legMems.length+” “+(legMems.length===1?”memory”:”memories”)+” included so far.”)
+        return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"680px"}},
+          React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"16px 20px",marginBottom:"24px",fontSize:"0.84rem",color:"#8a7460",lineHeight:1.6}},
+            "Your Legacy View is a curated collection of your most meaningful memories — a life story to share with family or preserve as a memorial. To include a memory, open it and tick \u201cInclude in Legacy View\u201d. ",
+            React.createElement("strong",{style:{color:"#6a5840"}},legMems.length+" "+(legMems.length===1?"memory":"memories")+" included so far.")
           ),
-          React.createElement(“div”,{style:{marginBottom:”24px”}},
-            React.createElement(“label”,{style:{...S.label,display:”block”,marginBottom:”4px”}},”A message to leave with your Legacy”),
-            React.createElement(“textarea”,{
-              value:legacyMessage||””,
-              onChange:e=>setLegacyMessage(e.target.value),
-              placeholder:”Something you\u2019d like people to know, remember, or carry forward\u2026”,
+          React.createElement("div",{style:{marginBottom:"24px"}},
+            React.createElement("label",{style:{...S.label,display:"block",marginBottom:"4px"}},"A message to leave with your Legacy"),
+            React.createElement("textarea",{
+              value:legacyMessage||"",
+              onChange:function(e){setLegacyMessage(e.target.value);},
+              placeholder:"Something you\u2019d like people to know, remember, or carry forward…",
               rows:3,
-              style:{...S.input,resize:”vertical”,lineHeight:1.6,fontSize:”0.9rem”}
+              style:{...S.input,resize:"vertical",lineHeight:1.6,fontSize:"0.9rem"}
             })
           ),
-          React.createElement(“div”,{style:{textAlign:”center”,marginBottom:”32px”,paddingBottom:”24px”,borderBottom:”1px solid #d4c4a8”}},
-            React.createElement(“p”,{style:{fontSize:”0.82rem”,color:”#7a6040”,letterSpacing:”0.1em”,textTransform:”uppercase”,margin:”0 0 8px”,fontFamily:”'Crimson Text',serif”}},”🌟 Legacy View”),
-            React.createElement(“h1”,{style:{fontFamily:”'Playfair Display',serif”,fontSize:isMobile?”1.8rem”:”2.4rem”,color:”#1a1208”,margin:”0 0 6px”,fontStyle:”italic”}},ownerName||”A Life”),
-            subject.dob&&React.createElement(“p”,{style:{fontSize:”0.9rem”,color:”#8a7460”,margin:”0 0 16px”}},subject.dob),
-            legacyMessage&&React.createElement(“p”,{style:{fontSize:”1rem”,color:”#4a3a28”,lineHeight:1.8,fontStyle:”italic”,maxWidth:”520px”,margin:”0 auto”,fontFamily:”'Crimson Text',Georgia,serif”}},'”'+legacyMessage+'”')
+          React.createElement("div",{style:{textAlign:"center",marginBottom:"32px",paddingBottom:"24px",borderBottom:"1px solid #d4c4a8"}},
+            React.createElement("p",{style:{fontSize:"0.82rem",color:"#7a6040",letterSpacing:"0.1em",textTransform:"uppercase",margin:"0 0 8px",fontFamily:"'Crimson Text',serif"}},"🌟 Legacy View"),
+            React.createElement("h1",{style:{fontFamily:"'Playfair Display',serif",fontSize:isMobile?"1.8rem":"2.4rem",color:"#1a1208",margin:"0 0 6px",fontStyle:"italic"}},ownerName||"A Life"),
+            subject.dob&&React.createElement("p",{style:{fontSize:"0.9rem",color:"#8a7460",margin:"0 0 16px"}},subject.dob),
+            legacyMessage&&React.createElement("p",{style:{fontSize:"1rem",color:"#4a3a28",lineHeight:1.8,fontStyle:"italic",maxWidth:"520px",margin:"0 auto",fontFamily:"'Crimson Text',Georgia,serif"}},'"'+legacyMessage+'"')
           ),
-          legMems.length===0&&React.createElement(“div”,{style:{textAlign:”center”,padding:”40px 20px”,color:”#8a7460”}},
-            React.createElement(“p”,{style:{fontSize:”1.1rem”,fontStyle:”italic”,marginBottom:”12px”}},”No memories included in Legacy View yet.”),
-            React.createElement(“p”,{style:{fontSize:”0.86rem”}},”Open any memory and tick \”Include in Legacy View\” to add it here.”)
+          legMems.length===0&&React.createElement("div",{style:{textAlign:"center",padding:"40px 20px",color:"#8a7460"}},
+            React.createElement("p",{style:{fontSize:"1.1rem",fontStyle:"italic",marginBottom:"12px"}},"No memories included in Legacy View yet."),
+            React.createElement("p",{style:{fontSize:"0.86rem"}},"Open any memory and tick \"Include in Legacy View\" to add it here.")
           ),
           legMems.map((m,i)=>React.createElement("div",{key:m.id,style:{marginBottom:"32px",paddingBottom:"32px",borderBottom:i<legMems.length-1?"1px solid rgba(200,184,154,0.4)":"none"}},
             React.createElement("p",{style:{fontSize:"0.82rem",color:"#7a6040",margin:"0 0 4px",letterSpacing:"0.04em"}},fuzzyDateLabel(m)+(m.location?" · "+m.location:"")),
@@ -9033,11 +9049,10 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
             )
           )),
           legMems.length>0&&React.createElement("div",{style:{textAlign:"center",paddingTop:"16px",fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic"}},
-            `${legMems.length} ${legMems.length===1?"memory":"memories"} · Chronicle by Remembory`
+            legMems.length+" "+(legMems.length===1?"memory":"memories")+" · Chronicle by Remembory"
           )
         );
       })(),
-
       view==="print"&&React.createElement(PrintView,{memories,ownerName,allDecades}),
 
       // ── PROMPTER ──
@@ -9318,6 +9333,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         customTags, addCustomTag, removeCustomTag,
         wantPublicProfile, persistSubject,
         setForm, newForm, setEditingId, setView,
+        onCancel:()=>{ setForm(newForm()); clearDraft(); setEditingId(null); if(editingCandidateId)setEditingCandidateId(null); goBack(); },
         isCarerMode, ownerName, carerName, subject,
         isHistoryMode, editingCandidateId, handleSaveCandidateSubmit, handleAcceptFromForm,
       }),
