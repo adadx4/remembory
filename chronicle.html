@@ -5929,7 +5929,14 @@ function AddEditForm({
     // ── Tags ──
     expanded.has("tags")&&sec(React.createElement("div",null,
       React.createElement("label",{style:S.label},"Tags"),
-      React.createElement(TagPicker,{tags:form.tags,onToggle:tag=>updateForm({tags:form.tags.includes(tag)?form.tags.filter(t=>t!==tag):[...form.tags,tag]}),customTags,onAddCustom:addCustomTag,onRemoveCustom:removeCustomTag})
+      React.createElement(TagPicker,{tags:form.tags,onToggle:tag=>updateForm({tags:form.tags.includes(tag)?form.tags.filter(t=>t!==tag):[...form.tags,tag]}),customTags,onAddCustom:addCustomTag,onRemoveCustom:removeCustomTag}),
+      (form.tags.includes("education")||form.tags.includes("work"))&&(()=>{
+        const hasEdu=form.tags.includes("education"), hasWork=form.tags.includes("work");
+        const label=hasEdu&&hasWork?"Education and Work":hasEdu?"Education":"Work";
+        const example=hasEdu?" (e.g. school or university)":hasWork?" (e.g. employer)":"";
+        return React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a9e8a",fontStyle:"italic",margin:"8px 0 0",lineHeight:1.5}},
+          label+" memories build your Life Timeline on the Overview. Add an organisation"+example+" or location, and an end date, for the timeline to show the full period.");
+      })()
     )),
 
     // ── People ──
