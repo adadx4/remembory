@@ -1049,6 +1049,14 @@ export default {
       return new Response(null, { status: 204, headers: CORS });
     }
 
+    // ── Well-known ──────────────────────────────────────────────────────────
+    if (request.method === "GET" && path === "/.well-known/security.txt") {
+      return new Response(
+        `Contact: mailto:admin@remembory.net\nExpires: 2027-04-16T00:00:00.000Z\nPreferred-Languages: en\n`,
+        { headers: { "Content-Type": "text/plain;charset=UTF-8", "Cache-Control": "public,max-age=86400" } }
+      );
+    }
+
     // ── Social / Explore site ──────────────────────────────────────────────────
 
     // Serve Explore page at root and /explore
@@ -1978,7 +1986,7 @@ export default {
   </script>
   ` : `
   <h1>Something went wrong</h1>
-  <p class="subtitle">We could not retrieve your license key. This link may have expired (valid for 10 minutes after purchase).<br><br>Please <a href="mailto:hello@remembory.net">contact us</a> with your order confirmation and we'll issue your key manually.</p>
+  <p class="subtitle">We could not retrieve your license key. This link may have expired (valid for 10 minutes after purchase).<br><br>Please <a href="mailto:admin@remembory.net">contact us</a> with your order confirmation and we'll issue your key manually.</p>
   `}
 </div>
 </body>
@@ -2134,7 +2142,7 @@ export default {
         .then(function(d){
           if (d.licenseKey) { window.location.reload(); }
           else if (++attempts < 20) { setTimeout(poll, 2000); }
-          else { document.querySelector('.subtitle').innerHTML = 'Your subscription was received but key generation is taking longer than expected. Please <a href="mailto:hello@remembory.net">contact us</a> with your PayPal subscription ID: <code>${esc(subscriptionId)}</code>'; }
+          else { document.querySelector('.subtitle').innerHTML = 'Your subscription was received but key generation is taking longer than expected. Please <a href="mailto:admin@remembory.net">contact us</a> with your PayPal subscription ID: <code>${esc(subscriptionId)}</code>'; }
         }).catch(function(){ if (++attempts < 20) setTimeout(poll, 3000); });
     }
     setTimeout(poll, 2000);

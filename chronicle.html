@@ -1196,17 +1196,34 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, isMobile
   });
 
   // Work / Education
+  function memEndFrac(m) {
+    if (m.endOngoing) return currentFrac;
+    if (!m.endYear) return 0;
+    if ((m.endFuzzy==="day"||m.endFuzzy==="month") && m.endMonth) {
+      const dayFrac = (m.endFuzzy==="day" && m.endDay) ? (m.endDay-1)/365 : 0;
+      return m.endYear + (m.endMonth-1)/12 + dayFrac;
+    }
+    if (m.endFuzzy==="season" && m.endSeason) return m.endYear + ({Early:1,Mid:6,Late:10}[m.endSeason]||0)/12;
+    return m.endYear;
+  }
   function buildPeriods(tag) {
     const tagged = memories
       .filter(m=>m.year&&(m.tags||[]).includes(tag)&&((m.orgs||[])[0]||m.location))
-      .map(m=>{const org=(m.orgs||[])[0];return{frac:memFrac(m),label:org||m.location,fType:org?"orgs":"locations"};})
+      .map(m=>{const org=(m.orgs||[])[0];return{frac:memFrac(m),eFrac:memEndFrac(m),ongoing:!!m.endOngoing,label:org||m.location,fType:org?"orgs":"locations"};})
       .sort((a,b)=>a.frac-b.frac);
     const out=[];
     let i=0;
     while(i<tagged.length){
       const{label,fType}=tagged[i]; let j=i;
       while(j+1<tagged.length&&tagged[j+1].label===label) j++;
-      out.push({label,startFrac:tagged[i].frac,endFrac:tagged[j].frac,isCurrent:false,fType,noEnd:i===j});
+      let groupEnd=tagged[j].frac, groupOngoing=false;
+      for(let k=i;k<=j;k++){
+        if(tagged[k].ongoing) groupOngoing=true;
+        if(tagged[k].eFrac>groupEnd) groupEnd=tagged[k].eFrac;
+      }
+      if(groupOngoing) groupEnd=currentFrac;
+      const hasEnd = i!==j || tagged[i].eFrac>0 || tagged[i].ongoing;
+      out.push({label,startFrac:tagged[i].frac,endFrac:groupEnd,isCurrent:groupOngoing,fType,noEnd:!hasEnd});
       i=j+1;
     }
     return out;
@@ -3953,7 +3970,7 @@ function SettingsView({
               ),
               React.createElement("div",{style:{marginTop:"4px"}},React.createElement(SubOptions,{mode:"buttons"})),
               React.createElement("p",{style:{fontSize:"0.78rem",color:"#a8a090",marginTop:"6px"}},
-                "Lost your key? Contact us at ",React.createElement("a",{href:"mailto:hello@remembory.net",style:{color:"#a8885a"}},"hello@remembory.net"))
+                "Lost your key? Contact us at ",React.createElement("a",{href:"mailto:admin@remembory.net",style:{color:"#a8885a"}},"admin@remembory.net"))
             )
       ),
 
@@ -5749,7 +5766,7 @@ function AddEditForm({
   // Auto-expand sections that already have content (important for edit mode)
   const [expanded, setExpanded] = React.useState(() => {
     const s = new Set();
-    if (form.endFuzzy || form.endOngoing) s.add("enddate");
+    if (form.endFuzzy || form.endOngoing || form._expandEndDate) s.add("enddate");
     if ((form.locationLabel||"").trim() || (form.locations||[]).length) s.add("location");
     if ((form.tags||[]).length) s.add("tags");
     if ((form.people||[]).length) s.add("people");
@@ -8504,7 +8521,7 @@ function handleEdit(m) {
               {label:"Manual",href:"https://remembory.net/manual.html",external:true},
               {label:"Tips & Tricks",href:"https://remembory.net/tips.html",external:true},
               {divider:true},
-              {label:"Contact",href:"mailto:hello@remembory.net"},
+              {label:"Contact",href:"mailto:admin@remembory.net"},
             ]}),
           );
         })(),
@@ -8555,7 +8572,7 @@ function handleEdit(m) {
           {label:"Manual",href:"https://remembory.net/manual.html",external:true},
           {label:"Tips & Tricks",href:"https://remembory.net/tips.html",external:true},
           {divider:true},
-          {label:"Contact",href:"mailto:hello@remembory.net"},
+          {label:"Contact",href:"mailto:admin@remembory.net"},
         ]})
       );
     })(),
@@ -9077,9 +9094,8 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         React.createElement(LifeTimeline,{
           memories, setView, setIndexFilter, isMobile,
           onMissingEnd:(label, tag)=>{
-            const hint = `When did "${label}" end? Add a memory tagged '${tag}' at the same place or organisation to record the end date.`;
-            setForm(f=>({...newForm(), _promptHint:hint}));
-            setView("add");
+            const m = memories.find(mem=>mem.year&&(mem.tags||[]).includes(tag)&&(((mem.orgs||[])[0]||mem.location)===label));
+            if(m){ handleEdit(m); setForm(f=>({...f, _expandEndDate:true})); }
           }
         }),
 
