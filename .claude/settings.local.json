@@ -5,7 +5,14 @@
       "Bash(npx wrangler *)",
       "Bash(npm --version)",
       "Bash(npm run *)",
-      "Bash(cmd.exe /c \"npm run deploy:staging\")"
+      "Bash(cmd.exe /c \"npm run deploy:staging\")",
+      "Bash(git -C /c/Remembory/remembory status)",
+      "Bash(wc -l c:\\\\\\\\Remembory\\\\\\\\remembory\\\\\\\\chronicle.html)",
+      "Bash(curl -s https://share.remembory.net/.well-known/security.txt)",
+      "Bash(git -C /c/Remembory/remembory diff --stat)",
+      "Bash(node -e \"eval\\('\\(' + require\\('fs'\\).readFileSync\\('c:/Remembory/remembory/chronicle.html','utf8'\\).match\\(/<script[^>]*>\\([\\\\s\\\\S]*?\\)<\\\\/script>/\\)[1].slice\\(0,500\\) + '\\)'\\)\")",
+      "Bash(curl -s https://staging.remembory.net/chronicle.html)",
+      "Bash(curl -s https://staging.remembory.net/)"
     ]
   }
 }

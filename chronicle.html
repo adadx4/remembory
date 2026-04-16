@@ -8106,6 +8106,7 @@ function handleEdit(m) {
     if (view==="prompt") return "Prompter";
     if (view==="people") return "People & Organisations";
     if (view==="map") return "Map";
+    if (view==="photos") return "Photos";
     if (view==="settings") return "Account";
     if (view==="backup") return "Backup & Restore";
     if (view==="legacy") return "Legacy View";
@@ -8115,7 +8116,7 @@ function handleEdit(m) {
     return null;
   }
 
-  const showBack=["add","edit","detail","decade","year","timeline","shared-timeline","import","people","index","map","print","prompt","settings","backup","legacy","public-profile","sharing"].includes(view);
+  const showBack=["add","edit","detail","decade","year","timeline","shared-timeline","import","people","index","map","photos","print","prompt","settings","backup","legacy","public-profile","sharing"].includes(view);
   const showAdd=!["add","edit","print"].includes(view);
   const breadcrumb=bc();
 
@@ -8561,7 +8562,7 @@ function handleEdit(m) {
         // ── Desktop nav ──
         !isMobile&&!["add","edit"].includes(view)&&(()=>{
           const exploreUrl=(()=>{const base=WORKER_URL+"/";const p=[];if(socialKey)p.push("key="+encodeURIComponent(socialKey));if(profileState?.identifier)p.push("id="+profileState.identifier);return p.length?base+"?"+p.join("&"):base;})();
-          const lifeActive=["life","timeline","shared-timeline","decade","year","index","map","tree"].includes(view);
+          const lifeActive=["life","timeline","shared-timeline","decade","year","index","map","photos","tree"].includes(view);
           const socialActive=["sharing","public-profile","legacy"].includes(view);
           const addActive=["add","prompt","import"].includes(view);
           const settingsActive=["settings","backup","print"].includes(view);
@@ -8578,6 +8579,7 @@ function handleEdit(m) {
               {label:"🔗 Relationships",action:()=>{setIndexFilter({type:"relationships"});setView("index");},active:view==="index"&&indexFilter?.type==="relationships"},
               {label:"🏷 Tags",action:()=>{setIndexFilter({type:"tags"});setView("index");},active:view==="index"&&indexFilter?.type==="tags"},
               {divider:true},
+              {label:"🖼 Photos",action:()=>setView("photos"),active:view==="photos"},
               {label:"🗺 Map",action:()=>setView("map"),active:view==="map"},
               IS_STAGING&&isHistoryMode&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
             ].filter(Boolean)}),
@@ -8635,6 +8637,7 @@ function handleEdit(m) {
           {label:"🔗 Relationships",action:()=>{setIndexFilter({type:"relationships"});setView("index");},active:view==="index"&&indexFilter?.type==="relationships"},
           {label:"🏷 Tags",action:()=>{setIndexFilter({type:"tags"});setView("index");},active:view==="index"&&indexFilter?.type==="tags"},
           {divider:true},
+          {label:"🖼 Photos",action:()=>setView("photos"),active:view==="photos"},
           {label:"🗺 Map",action:()=>setView("map"),active:view==="map"},
           IS_STAGING&&isHistoryMode&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
         ].filter(Boolean)}),
@@ -8671,6 +8674,40 @@ function handleEdit(m) {
     React.createElement("div",{style:{maxWidth:"900px",margin:"0 auto",padding:isMobile?"20px 16px calc(90px + env(safe-area-inset-bottom, 0px))":"28px 20px"}},
 
       // ── MAP VIEW ──
+      // ── PHOTOS VIEW ──
+      view==="photos"&&(()=>{
+        const photosFlat = memories
+          .filter(m=>m.mediaUrls&&m.mediaUrls.length>0)
+          .flatMap(m=>m.mediaUrls.map(med=>({med, memory:m})))
+          .sort((a,b)=>sortKey(a.memory)-sortKey(b.memory));
+        return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"800px"}},
+          React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Photos"),
+          React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"22px",fontSize:"0.92rem"}},
+            photosFlat.length+" "+(photosFlat.length===1?"photo":"photos")+" across your memories"),
+          photosFlat.length===0
+            ? React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",padding:"20px 0"}},"No photos yet. Add photos to your memories from the edit screen.")
+            : React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))",gap:"16px"}},
+                photosFlat.map((item,i)=>{
+                  const m = item.memory;
+                  return React.createElement("div",{key:i,
+                    onClick:()=>{setSelected(m.id);setView("detail");},
+                    style:{cursor:"pointer",background:"rgba(255,252,245,0.85)",border:"1px solid #d4c4a8",borderRadius:"4px",overflow:"hidden",transition:"all 0.15s"}},
+                    React.createElement(MediaImg,{med:item.med,alt:m.title||"",style:{width:"100%",height:"180px",objectFit:"cover",display:"block"}}),
+                    React.createElement("div",{style:{padding:"10px 12px"}},
+                      React.createElement("p",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.92rem",color:"#1a1208",margin:"0 0 3px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},m.title||"Untitled"),
+                      React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",margin:0}},
+                        [fuzzyDateLabel(m), m.location].filter(Boolean).join(" \u00b7 ")
+                      ),
+                      (m.tags||[]).length>0&&React.createElement("div",{style:{display:"flex",gap:"4px",flexWrap:"wrap",marginTop:"5px"}},
+                        m.tags.slice(0,3).map(t=>React.createElement("span",{key:t,style:{fontSize:"0.65rem",padding:"1px 6px",borderRadius:"10px",background:(TAG_COLORS[t]||"#9a8a7a")+"22",color:TAG_COLORS[t]||"#9a8a7a",border:"1px solid "+(TAG_COLORS[t]||"#9a8a7a")+"44"}},t))
+                      )
+                    )
+                  );
+                })
+              )
+        );
+      })(),
+
       view==="map"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Map"),
         React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"18px",fontSize:"0.92rem"}},
