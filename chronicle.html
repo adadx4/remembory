@@ -1169,9 +1169,11 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, isMobile
     if (m.fuzzy==="season" && m.season) return m.year + ({Early:1,Mid:6,Late:10}[m.season]||0)/12;
     return m.year;
   }
-  function fracLabel(f) {
+  function fracLabel(f, hasMonth) {
     const yr=Math.floor(f), mo=Math.round((f-yr)*12);
-    return mo>0 ? MONTHS[Math.min(mo,11)]+" "+yr : String(yr);
+    if (mo>0) return MONTHS[Math.min(mo,11)]+" "+yr;
+    if (hasMonth) return "January "+yr;
+    return String(yr);
   }
   function durLabel(dy) {
     const tm=Math.round(dy*12);
@@ -1209,21 +1211,21 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, isMobile
   function buildPeriods(tag) {
     const tagged = memories
       .filter(m=>m.year&&(m.tags||[]).includes(tag)&&((m.orgs||[])[0]||m.location))
-      .map(m=>{const org=(m.orgs||[])[0];return{frac:memFrac(m),eFrac:memEndFrac(m),ongoing:!!m.endOngoing,label:org||m.location,fType:org?"orgs":"locations"};})
+      .map(m=>{const org=(m.orgs||[])[0];const hasMo=(m.fuzzy==="day"||m.fuzzy==="month")&&!!m.month;const hasEndMo=(m.endFuzzy==="day"||m.endFuzzy==="month")&&!!m.endMonth;return{frac:memFrac(m),eFrac:memEndFrac(m),ongoing:!!m.endOngoing,hasMo,hasEndMo,label:org||m.location,fType:org?"orgs":"locations"};})
       .sort((a,b)=>a.frac-b.frac);
     const out=[];
     let i=0;
     while(i<tagged.length){
       const{label,fType}=tagged[i]; let j=i;
       while(j+1<tagged.length&&tagged[j+1].label===label) j++;
-      let groupEnd=tagged[j].frac, groupOngoing=false;
+      let groupEnd=tagged[j].frac, groupOngoing=false, endHasMo=tagged[j].hasMo;
       for(let k=i;k<=j;k++){
         if(tagged[k].ongoing) groupOngoing=true;
-        if(tagged[k].eFrac>groupEnd) groupEnd=tagged[k].eFrac;
+        if(tagged[k].eFrac>groupEnd){groupEnd=tagged[k].eFrac;endHasMo=tagged[k].hasEndMo;}
       }
       if(groupOngoing) groupEnd=currentFrac;
       const hasEnd = i!==j || tagged[i].eFrac>0 || tagged[i].ongoing;
-      out.push({label,startFrac:tagged[i].frac,endFrac:groupEnd,isCurrent:groupOngoing,fType,noEnd:!hasEnd});
+      out.push({label,startFrac:tagged[i].frac,endFrac:groupEnd,isCurrent:groupOngoing,fType,noEnd:!hasEnd,startHasMo:tagged[i].hasMo,endHasMo:groupOngoing||endHasMo});
       i=j+1;
     }
     return out;
@@ -1270,7 +1272,7 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, isMobile
         const isLast = i===active.periods.length-1;
         const col = active.colFn(r.label);
         const dy = r.endFrac-r.startFrac;
-        const endLabel = r.isCurrent?"present":fracLabel(r.endFrac);
+        const endLabel = r.isCurrent?"present":fracLabel(r.endFrac,r.endHasMo);
         const showPrompt = !r.isCurrent && r.noEnd;
         return React.createElement("div",{key:i,style:{display:"flex",gap:"12px"}},
           // Spine
@@ -1287,7 +1289,7 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, isMobile
                 overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}
             },r.label),
             React.createElement("div",{style:{fontSize:"0.8rem",color:"#8a7460",marginTop:"1px"}},
-              fracLabel(r.startFrac)+(r.startFrac===r.endFrac&&!r.isCurrent?"":" – "+endLabel)+(dy>0.05?" · "+durLabel(dy):"")
+              fracLabel(r.startFrac,r.startHasMo)+(r.startFrac===r.endFrac&&!r.isCurrent?"":" \u2013 "+endLabel)+(dy>0.05?" \u00b7 "+durLabel(dy):"")
             ),
             showPrompt&&React.createElement("button",{
               onClick:()=>onMissingEnd&&onMissingEnd(r.label, active.tag),
@@ -3311,7 +3313,7 @@ function PerspectivesPanel({memory, onSave, peopleEmails, senderName, ownerName=
     onSave({...memory, perspectives:updatedPerspectives, dominantAuthor: wasDominant ? null : dominantAuthor});
   }
 
-  const others = showAll ? otherPerspectives : [];
+  const others = showAll ? otherPerspectives.filter(p=>p.author!==dominantAuthor) : [];
 
   const [editingAuthor, setEditingAuthor] = useState(null);
   const [editDraft, setEditDraft] = useState("");
@@ -3423,7 +3425,7 @@ function PerspectivesPanel({memory, onSave, peopleEmails, senderName, ownerName=
     React.createElement("div", {style:{padding:"14px 16px",display:"flex",flexDirection:"column",gap:"16px"}},
       !showAll && React.createElement("p", {style:{color:"#7a6a58",fontStyle:"italic",fontSize:"0.88rem",margin:0}}, "Showing your perspective only"),
       ...others.map((p,i)=> React.createElement(PerspectiveBlock, {key:i,p,isMine:false})),
-      myPerspective && React.createElement(PerspectiveBlock, {p:myPerspective,isMine:true}),
+      myPerspective && myPerspective.author!==dominantAuthor && React.createElement(PerspectiveBlock, {p:myPerspective,isMine:true}),
       !myPerspective && !addingMine && React.createElement("button", {
         onClick:()=>setAddingMine(true),
         style:{alignSelf:"flex-start",...S.btnOutline,color:"#7a9e8a",borderColor:"#7a9e8a",fontSize:"0.88rem"}
@@ -4112,7 +4114,7 @@ function SettingsView({
             else if (days < 30) { statusMsg = "\u26a0 Last backup "+days+" days ago \u2014 save a fresh copy"; statusColor = "#b0804a"; }
             else { statusMsg = "\u26a0 Last backup was "+days+" days ago \u2014 please back up soon"; statusColor = "#c4858a"; }
           }
-          const importLine = subject.lastImport ? (()=>{ const id2=Math.floor((Date.now()-new Date(subject.lastImport))/86400000); return "Last synced: "+(id2===0?"today":id2===1?"yesterday":id2+" days ago"); })() : null;
+          const importLine = subject.lastImport && (!subject.lastBackup || new Date(subject.lastImport) > new Date(subject.lastBackup)) ? (()=>{ const id2=Math.floor((Date.now()-new Date(subject.lastImport))/86400000); return "Last synced: "+(id2===0?"today":id2===1?"yesterday":id2+" days ago"); })() : null;
           return React.createElement(React.Fragment, null,
             React.createElement("p",{style:{fontSize:"0.82rem",color:statusColor,fontStyle:"italic",margin:"0 0 4px"}}, statusMsg),
             importLine && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px"}}, importLine)
