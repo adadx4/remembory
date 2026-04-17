@@ -2981,7 +2981,7 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, deliverTo
       // recipient receives the actual photo data, not just a local IDB key.
       const photoQueue = [];
       const sanitisedMemories = await Promise.all(memories.map(async (m, mi) => {
-        const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async (med, mdi) => {
+        const mediaUrls = await Promise.all((m.mediaUrls||[]).slice(0,1).map(async (med, mdi) => {
           if (med.mediaId) {
             try {
               const blob = await idbGet(med.mediaId);
@@ -3192,7 +3192,7 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
       const photoQueue = []; // [{blob, memIdx, medIdx}]
       // Sanitise: strip photo data from payload, keep refs for R2 upload
       const sanitised = await Promise.all(toShare.map(async (m, mi) => {
-        const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async (med, mdi) => {
+        const mediaUrls = await Promise.all((m.mediaUrls||[]).slice(0,1).map(async (med, mdi) => {
           if (med.mediaId) {
             try {
               const blob = await idbGet(med.mediaId);
@@ -4385,7 +4385,7 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
   }
   function acceptInboxItem(item) {
     (item.memories||[]).forEach(mem => {
-      acceptShare({sharedBy:item.fromName||"Someone", sharedAt:item.sentAt||new Date().toISOString(), memories:[mem]});
+      acceptShare({sharedBy:item.fromName||"Someone", sharedAt:item.sentAt||new Date().toISOString(), memories:[mem], _shareId:item._shareId});
     });
     respondToShare(item._shareId, "accept");
     setInboxItems(prev => prev.filter(i => i._shareId !== item._shareId));
@@ -4680,7 +4680,7 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
               ),
               React.createElement("button",{
                 onClick:()=>{
-                  acceptShare({sharedBy:item.fromName||"Someone",sharedAt:item.sentAt||new Date().toISOString(),memories:[mem]});
+                  acceptShare({sharedBy:item.fromName||"Someone",sharedAt:item.sentAt||new Date().toISOString(),memories:[mem],_shareId:item._shareId});
                   setInboxItems(prev=>{
                     const updated=prev.map(it=>it._shareId!==item._shareId?it:{...it,memories:(it.memories||[]).filter((_,j)=>j!==mi)});
                     const remaining=updated.find(it=>it._shareId===item._shareId);
