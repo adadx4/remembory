@@ -699,9 +699,14 @@ function parseExifSegment(view, tiff) {
         }
         function readGPSCoord(tag) {
           const t = gpsTags[tag];
-          if (!t || t.cnt !== 3) return null;
-          const d = readRational(t.val); const m = readRational(t.val + 8); const s = readRational(t.val + 16);
-          return d + m / 60 + s / 3600;
+          if (!t) return null;
+          if (t.cnt === 3) {
+            const d = readRational(t.val); const m = readRational(t.val + 8); const s = readRational(t.val + 16);
+            return d + m / 60 + s / 3600;
+          }
+          // Some cameras store as a single rational
+          if (t.cnt === 1) return readRational(t.val);
+          return null;
         }
         const lat = readGPSCoord(0x0002);
         const lng = readGPSCoord(0x0004);
@@ -3418,10 +3423,8 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
       React.createElement("p",{style:{fontSize:"0.84rem",color:"#8a7460",margin:"0 0 16px"}},
         selectedPeople.filter(p=>effectiveEmailFor(p)).join(" and ")+" will see it in their Chronicle inbox."
       ),
-      React.createElement("div",{style:{display:"flex",gap:"10px",justifyContent:"center"}},
-        React.createElement("button",{onClick:handleClose,style:{...S.btn,padding:"7px 24px"}},"Done"),
-        React.createElement("button",{onClick:()=>setSendStatus("idle"),style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",padding:"7px 10px"}},"Resend")
-      )
+      React.createElement("button",{onClick:handleClose,style:{...S.btn,padding:"10px 32px",fontSize:"0.95rem"}},"Done"),
+      React.createElement("button",{onClick:()=>setSendStatus("idle"),style:{background:"none",border:"none",color:"#b0a090",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"4px",marginTop:"14px"}},"Didn\u2019t work? Resend")
     ),
 
     step==="link" && (()=>{
