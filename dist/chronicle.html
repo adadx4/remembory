@@ -4652,8 +4652,9 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
           ),
           item.message&&React.createElement("p",{style:{fontSize:"0.88rem",color:"#5a4838",fontStyle:"italic",borderLeft:"3px solid #c8b89a",paddingLeft:"10px",margin:"0 0 10px",lineHeight:1.6}},'"'+item.message+'"'),
           (()=>{
+            const existingPeople = [...new Set(memories.flatMap(m=>m.people||[]))];
             const incomingPeople = [...new Set((item.memories||[]).flatMap(m=>m.people||[]))];
-            const newPeople = incomingPeople.filter(p=>!knownPeople.includes(p));
+            const newPeople = incomingPeople.filter(p=>!existingPeople.includes(p));
             if (!newPeople.length) return null;
             return React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px",lineHeight:1.5}},
               "New people in this share: "+newPeople.join(", ")+". If you know them by a different name, you can rename them in People after accepting.");
