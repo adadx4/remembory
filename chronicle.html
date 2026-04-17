@@ -4367,9 +4367,7 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
     } catch(e) {}
   }
   function acceptInboxItem(item) {
-    (item.memories||[]).forEach(mem => {
-      acceptShare({sharedBy:item.sharedBy||item.fromName||"Someone", sharedAt:item.sentAt||new Date().toISOString(), memories:[mem], _shareId:item._shareId});
-    });
+    acceptShare({sharedBy:item.sharedBy||item.fromName||"Someone", sharedAt:item.sentAt||new Date().toISOString(), memories:item.memories||[], _shareId:item._shareId});
     respondToShare(item._shareId, "accept");
     setInboxItems(prev => prev.filter(i => i._shareId !== item._shareId));
     if (onShareBadgeCount) onShareBadgeCount(Math.max(0, activeInboxCount - 1));
