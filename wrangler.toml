@@ -13,7 +13,7 @@ id = "24f7cd3fa472486dbbf4283831d8790c"
 pattern = "share.remembory.net/*"
 zone_name = "remembory.net"
 
-# New social domain
+# Social domain
 [[routes]]
 pattern = "social.remembory.net/*"
 zone_name = "remembory.net"
