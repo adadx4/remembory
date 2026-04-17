@@ -4,7 +4,7 @@
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Chronicle-Client, X-LS-Key, X-Admin-Secret",
+  "Access-Control-Allow-Headers": "Content-Type, X-Chronicle-Client, X-LS-Key",
 };
 
 function json(data, status = 200) {
@@ -1165,7 +1165,7 @@ export default {
 
         return json({ ok: true, identifier, url: `${socialBase}/p/${identifier}` });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1181,7 +1181,7 @@ export default {
         await env.SHARES.delete("profile_compact:" + identifier);
         return json({ ok: true });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1400,7 +1400,7 @@ export default {
         await env.SHARES.put(totalsKey, JSON.stringify(totals), { expirationTtl: 60 * 60 * 24 * 365 });
         return json({ ok: true, count });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1423,7 +1423,7 @@ export default {
         });
         return json({ ok: true });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1446,21 +1446,25 @@ export default {
         if (!body.memories || !Array.isArray(body.memories)) {
           return json({ error: "Invalid payload" }, 400);
         }
-        const code = crypto.randomUUID().slice(0, 8);
+        const code = crypto.randomUUID().replace(/-/g,"").slice(0, 16);
         const payload = { ...body, sharedAt: new Date().toISOString(), collected: false };
         await env.SHARES.put(code, JSON.stringify(payload), { expirationTtl: 60 * 60 * 24 * 30 });
         return json({ url: `${shareBase}/s/${code}`, code });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
     // POST /share/deliver — push a share directly to a recipient's delivery queue
     if (request.method === "POST" && path === "/share/deliver") {
+      if (!await checkRateLimit(env, clientIp, "share_deliver", 20, 60)) return json({ error: "Too many requests" }, 429);
       try {
         const body = await request.json();
         const { shareId, toEmail, fromName, fromEmail } = body;
         if (!shareId || !toEmail) return json({ error: "Missing shareId or toEmail" }, 400);
+        // Verify the share actually exists before allowing delivery
+        const shareRaw = await env.SHARES.get(shareId);
+        if (!shareRaw) return json({ error: "Share not found" }, 404);
         const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, toEmail.trim().toLowerCase());
         const existing = await env.SHARES.get("deliveries:" + emailHash);
         const arr = existing ? JSON.parse(existing) : [];
@@ -1471,7 +1475,7 @@ export default {
         await env.SHARES.put("deliveries:" + emailHash, JSON.stringify(arr), { expirationTtl: 60 * 60 * 24 * 365 });
         return json({ ok: true });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1492,7 +1496,7 @@ export default {
         const activeCount = arr.filter(d => !declined.some(dc => dc.shareId === d.shareId)).length;
         return json({ count: activeCount });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1517,7 +1521,7 @@ export default {
         await env.SHARES.delete("deliveries:" + emailHash);
         return json({ deliveries: full.filter(Boolean) });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1535,7 +1539,7 @@ export default {
         const toEmailHash = await hmacHex(env.EMAIL_HASH_SECRET, toEmailNorm);
         const fromEmailHash = fromEmailNorm ? await hmacHex(env.EMAIL_HASH_SECRET, fromEmailNorm) : "";
         if (fromEmailHash && fromEmailHash === toEmailHash) return json({ error: "Cannot send to yourself" }, 400);
-        const shareId = crypto.randomUUID().slice(0, 8);
+        const shareId = crypto.randomUUID().replace(/-/g,"").slice(0, 16);
         const now = new Date().toISOString();
         const payload = {
           sharedBy: fromName.trim(), sharedByEmail: fromEmailNorm,
@@ -1559,7 +1563,7 @@ export default {
         ctx.waitUntil(sendNotificationEmail(env, { toEmail: toEmailNorm, fromName: fromName.trim(), memCount: memories.length }).catch(() => {}));
         return json({ ok: true, shareId });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1584,7 +1588,7 @@ export default {
         }));
         return json({ inbox: payloads.filter(Boolean), declined });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1622,7 +1626,7 @@ export default {
         }
         return json({ ok: true });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1639,7 +1643,7 @@ export default {
         await env.SHARES.put("contrib:" + code, JSON.stringify(payload), { expirationTtl: 60 * 60 * 24 * 365 });
         return json({ code, url: `${shareBase}/contribute/${code}` });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1668,7 +1672,7 @@ export default {
         }
         // Sanitise: keep only safe fields from guest submission
         const safe = memories.map(m => ({
-          id: "gc_" + crypto.randomUUID().slice(0, 8),
+          id: "gc_" + crypto.randomUUID().replace(/-/g,"").slice(0, 16),
           title: String(m.title || "").slice(0, 200),
           content: String(m.content || "").slice(0, 4000),
           year: parseInt(m.year) || 0,
@@ -1682,7 +1686,7 @@ export default {
           _contributedAt: new Date().toISOString(),
         }));
         // Push to owner's delivery queue under a share-style payload
-        const shareCode = "gc_sub_" + crypto.randomUUID().slice(0, 8);
+        const shareCode = "gc_sub_" + crypto.randomUUID().replace(/-/g,"").slice(0, 16);
         const sharePayload = {
           memories: safe,
           sharedBy: String(contributorName || "Anonymous").slice(0, 100),
@@ -1700,7 +1704,7 @@ export default {
           { expirationTtl: 60 * 60 * 24 * 365 });
         return json({ ok: true });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1757,7 +1761,7 @@ export default {
         await env.SHARES.put("sync:" + body.keyHash, storedPayload, { expirationTtl: 60 * 60 * 24 * 90 });
         return json({ ok: true, pushedAt });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1774,6 +1778,7 @@ export default {
 
     // PUT /share/media/:shareId/:index — upload a photo for a share
     if (request.method === "PUT" && path.startsWith("/share/media/")) {
+      if (!await checkRateLimit(env, clientIp, "share_media_put", 30, 60)) return json({ error: "Too many requests" }, 429);
       const parts = path.slice("/share/media/".length).split("/");
       if (parts.length !== 2) return json({ error: "Invalid path" }, 400);
       const [shareId, idx] = parts;
@@ -1792,13 +1797,17 @@ export default {
 
     // GET /share/media/:shareId/:index — download a photo from a share
     if (request.method === "GET" && path.startsWith("/share/media/")) {
+      if (!await checkRateLimit(env, clientIp, "share_media_get", 60, 60)) return json({ error: "Too many requests" }, 429);
       const parts = path.slice("/share/media/".length).split("/");
       if (parts.length !== 2) return json({ error: "Invalid path" }, 400);
       const [shareId, idx] = parts;
+      // Verify the share exists before serving media
+      const shareRaw = await env.SHARES.get(shareId);
+      if (!shareRaw) return json({ error: "Not found" }, 404);
       const obj = await env.MEDIA.get(`share/${shareId}/${idx}`);
       if (!obj) return new Response(null, { status: 404 });
       return new Response(obj.body, {
-        headers: { "Content-Type": obj.httpMetadata?.contentType || "image/jpeg", ...CORS, "Cache-Control": "public,max-age=86400" },
+        headers: { "Content-Type": obj.httpMetadata?.contentType || "image/jpeg", ...CORS, "Cache-Control": "private,max-age=3600" },
       });
     }
 
@@ -1833,12 +1842,15 @@ export default {
 
     // PUT /sync/media/:keyHash/:mediaId — upload an encrypted photo blob
     if (request.method === "PUT" && path.startsWith("/sync/media/")) {
+      if (!await checkRateLimit(env, clientIp, "sync_media_put", 60, 60)) return json({ error: "Too many requests" }, 429);
       const parts = path.slice("/sync/media/".length).split("/");
       if (parts.length !== 2) return json({ error: "Invalid path" }, 400);
       const [keyHash, mediaId] = parts;
       if (!/^[0-9a-f]{64}$/.test(keyHash)) return json({ error: "Invalid key" }, 400);
       if (!mediaId || mediaId.length > 100) return json({ error: "Invalid mediaId" }, 400);
-      // Verify the caller owns this sync slot
+      // Verify caller owns this sync slot via licence key
+      const callerKey = getViewerKey(request, url);
+      if (callerKey) { const callerHash = await sha256hex(callerKey.trim().toUpperCase()); if (callerHash !== keyHash) return json({ error: "Forbidden" }, 403); }
       const syncRaw = await env.SHARES.get("sync:" + keyHash);
       if (!syncRaw) return json({ error: "Push metadata first" }, 403);
       const body = await request.arrayBuffer();
@@ -1852,10 +1864,14 @@ export default {
 
     // GET /sync/media/:keyHash/:mediaId — download an encrypted photo blob
     if (request.method === "GET" && path.startsWith("/sync/media/")) {
+      if (!await checkRateLimit(env, clientIp, "sync_media_get", 60, 60)) return json({ error: "Too many requests" }, 429);
       const parts = path.slice("/sync/media/".length).split("/");
       if (parts.length !== 2) return json({ error: "Invalid path" }, 400);
       const [keyHash, mediaId] = parts;
       if (!/^[0-9a-f]{64}$/.test(keyHash)) return json({ error: "Invalid key" }, 400);
+      // Verify sync slot exists (prevents enumeration of arbitrary keyHashes)
+      const syncRaw = await env.SHARES.get("sync:" + keyHash);
+      if (!syncRaw) return json({ error: "Not found" }, 404);
       const obj = await env.MEDIA.get(`sync/${keyHash}/${mediaId}`);
       if (!obj) return new Response(null, { status: 404 });
       return new Response(obj.body, {
@@ -1863,10 +1879,15 @@ export default {
       });
     }
 
-    // DELETE /sync/media/:keyHash — clean up all media for a sync slot
+    // DELETE /sync/media/:keyHash — clean up all media for a sync slot (requires licence key)
     if (request.method === "DELETE" && path.startsWith("/sync/media/")) {
       const keyHash = path.slice("/sync/media/".length);
       if (!/^[0-9a-f]{64}$/.test(keyHash)) return json({ error: "Invalid key" }, 400);
+      // Require licence key that matches the keyHash
+      const callerKey = getViewerKey(request, url);
+      if (!callerKey) return json({ error: "Forbidden" }, 403);
+      const callerHash = await sha256hex(callerKey.trim().toUpperCase());
+      if (callerHash !== keyHash) return json({ error: "Forbidden" }, 403);
       const listed = await env.MEDIA.list({ prefix: `sync/${keyHash}/` });
       if (listed.objects.length > 0) {
         await Promise.all(listed.objects.map(o => env.MEDIA.delete(o.key)));
@@ -1888,7 +1909,7 @@ export default {
         await env.MAILING_LIST.put("sub:" + email, JSON.stringify({ email, subscribedAt: new Date().toISOString() }));
         return json({ ok: true });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -1901,7 +1922,7 @@ export default {
         await env.MAILING_LIST.delete("sub:" + email);
         return json({ ok: true });
       } catch (e) {
-        return json({ error: "Server error: " + e.message }, 500);
+        return json({ error: "Server error" }, 500);
       }
     }
 
@@ -2284,8 +2305,8 @@ export default {
       return json({ ready: true, licenseKey: pendingKey });
     }
 
-    // GET /license/check?key=…
-    if (request.method === "GET" && path === "/license/check") {
+    // GET or POST /license/check
+    if ((request.method === "GET" || request.method === "POST") && path === "/license/check") {
       if (!await checkRateLimit(env, clientIp, "liccheck", 20, 60)) return json({ error: "Too many requests" }, 429);
       const key = getViewerKey(request, url);
       if (!key) return json({ valid: false });

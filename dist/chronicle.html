@@ -167,7 +167,7 @@ async function validateLicenceKey(key) {
   // then recheck in the background so the cache stays fresh for next time.
   if (cached && cached.key === clean && cached.status === "active") {
     // Background refresh — don't await, never blocks the user
-    fetch("https://social.remembory.net/license/check?key=" + encodeURIComponent(clean))
+    fetch(WORKER_URL + "/license/check", {method:"POST",headers:{"Content-Type":"application/json","X-LS-Key":clean},body:JSON.stringify({key:clean})})
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) saveLicenceCache({key: clean, checked: Date.now(), status: d.status, renewedAt: d.renewedAt}); })
       .catch(() => {});
@@ -175,7 +175,7 @@ async function validateLicenceKey(key) {
   }
   // No valid cache — must go online to activate
   try {
-    const r = await fetch("https://social.remembory.net/license/check?key=" + encodeURIComponent(clean));
+    const r = await fetch(WORKER_URL + "/license/check", {method:"POST",headers:{"Content-Type":"application/json","X-LS-Key":clean},body:JSON.stringify({key:clean})});
     if (!r.ok) throw new Error("server");
     const d = await r.json();
     saveLicenceCache({key: clean, checked: Date.now(), status: d.status, renewedAt: d.renewedAt});
@@ -6396,9 +6396,7 @@ function App() {
     }catch(e){return "";}
   },[licenceKey]);
   const [licenceStatus, setLicenceStatus] = useState(null);
-  // Dev override: localStorage.setItem("chronicle-dev-mode","1") in console to bypass subscription
-  const isDevMode = (()=>{try{return localStorage.getItem("chronicle-dev-mode")==="1";}catch(e){return false;}})();
-  const isSubscriber = isDevMode || licenceStatus?.valid===true;
+  const isSubscriber = licenceStatus?.valid===true;
   React.useEffect(()=>{
     if(licenceKey){validateLicenceKey(licenceKey).then(s=>{
       setLicenceStatus(s);
