@@ -3348,16 +3348,23 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
         const recipsNoEmail = selectedPeople.filter(p=>!effectiveEmailFor(p));
         const canSend = canShare && recipsWithEmail.length > 0 && sendStatus !== "sending";
         const memLabel = selectedMemIds.size===1 ? "this memory" : selectedMemIds.size+" memories";
+        // Check for previously shared memories
+        const alreadySharedCount = [...selectedMemIds].filter(id =>
+          selectedPeople.some(p => (shareHistory||[]).some(h => h.memIds.includes(id) && h.people.includes(p)))
+        ).length;
         if (sendStatus==="error") return React.createElement("div",null,
           React.createElement("p",{style:{color:"#c4858a",fontSize:"0.84rem",marginBottom:"8px"}},"\u26a0 "+sendError),
           React.createElement("button",{onClick:()=>setSendStatus("idle"),style:{...S.btnOutline,fontSize:"0.84rem",padding:"6px 14px"}},"Try again")
         );
         return React.createElement("div",null,
+          alreadySharedCount>0&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#b0804a",fontStyle:"italic",marginBottom:"8px"}},
+            alreadySharedCount===1?"This memory was previously shared with "+(selectedPeople.length===1?"this person":"one or more of these people")+". Send again if the first share didn\u2019t work."
+            :alreadySharedCount+" of these memories were previously shared. Send again if needed."),
           recipsWithEmail.length > 0 && React.createElement("button",{
             onClick:handleSend,
             disabled:!canSend,
             style:{...S.btn,width:"100%",opacity:canSend?1:0.45,cursor:canSend?"pointer":"not-allowed",marginBottom:"8px"}
-          }, sendStatus==="sending" ? "Sending\u2026" : (recipsNoEmail.length>0 ? "Send to "+recipsWithEmail.join(", ") : "Send "+memLabel)),
+          }, sendStatus==="sending" ? "Sending\u2026" : alreadySharedCount>0?"Resend "+memLabel:(recipsNoEmail.length>0 ? "Send to "+recipsWithEmail.join(", ") : "Send "+memLabel)),
           React.createElement("button",{
             onClick:handleGetLink,
             disabled:!canShare,
@@ -4644,6 +4651,13 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
             )
           ),
           item.message&&React.createElement("p",{style:{fontSize:"0.88rem",color:"#5a4838",fontStyle:"italic",borderLeft:"3px solid #c8b89a",paddingLeft:"10px",margin:"0 0 10px",lineHeight:1.6}},'"'+item.message+'"'),
+          (()=>{
+            const incomingPeople = [...new Set((item.memories||[]).flatMap(m=>m.people||[]))];
+            const newPeople = incomingPeople.filter(p=>!knownPeople.includes(p));
+            if (!newPeople.length) return null;
+            return React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px",lineHeight:1.5}},
+              "New people in this share: "+newPeople.join(", ")+". If you know them by a different name, you can rename them in People after accepting.");
+          })(),
           (item.memories||[]).map((mem,mi)=>
             React.createElement("div",{key:mi,style:{borderTop:"1px solid #ede4d4",paddingTop:"8px",marginTop:"4px",display:"flex",alignItems:"flex-start",gap:"8px"}},
               React.createElement("div",{style:{flex:1}},
@@ -5851,8 +5865,8 @@ function DetailView({
     // ── Content ──
     m.content&&React.createElement("div",{style:{lineHeight:"1.85",fontSize:"1.1rem",whiteSpace:"pre-wrap",borderLeft:"3px solid #c8b89a",paddingLeft:"20px",color:"#2c2416",marginBottom:"28px"}},linkify(m.content)),
  
-    // ── Sources ──
-    (()=>{
+    // ── Sources (History mode only) ──
+    isHistoryMode&&(()=>{
       const mSources = (m.sourceIds||[]).map(id=>(knownSources||[]).find(s=>s.id===id)).filter(Boolean);
       if (!mSources.length) return null;
       return React.createElement("div",{style:{marginBottom:"22px"}},
@@ -5870,8 +5884,8 @@ function DetailView({
       );
     })(),
 
-    // ── Research provenance (History entries) ──
-    (m.researchNote||m.candidateConfidence||m._guestContributor)&&React.createElement("div",{style:{background:"rgba(196,169,98,0.06)",border:"1px solid rgba(196,169,98,0.25)",borderRadius:"4px",padding:"12px 14px",marginBottom:"22px"}},
+    // ── Research provenance (History mode only) ──
+    isHistoryMode&&(m.researchNote||m.candidateConfidence||m._guestContributor)&&React.createElement("div",{style:{background:"rgba(196,169,98,0.06)",border:"1px solid rgba(196,169,98,0.25)",borderRadius:"4px",padding:"12px 14px",marginBottom:"22px"}},
       React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap",marginBottom:m.researchNote?"8px":"0"}},
         React.createElement("span",{style:{fontSize:"0.78rem",textTransform:"uppercase",letterSpacing:"0.08em",color:"#a89060",fontFamily:"Arial,sans-serif"}},
           "Research"
@@ -7059,12 +7073,22 @@ function handleEdit(m) {
       peopleEmails:updatedEmails
     });
     setPendingShare(null);
-    // Upgrade pre-connection if sender email matches
-    if (senderEmail) {
+    // Upgrade pre-connection if sender email or name matches
+    if (senderEmail || senderName) {
       try {
         const conns = JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
-        const preIdx = conns.findIndex(c=>c.email===senderEmail&&c.preConnected);
-        if (preIdx>=0) { conns[preIdx]={...conns[preIdx],preConnected:false,connectedAt:new Date().toISOString()}; localStorage.setItem("chronicle-connections",JSON.stringify(conns)); setLocalConnections([...conns]); }
+        let updated = false;
+        // Try email match first
+        let idx = senderEmail ? conns.findIndex(c=>c.email===senderEmail&&c.preConnected) : -1;
+        // Fallback: try name match (sender might have a different email than expected)
+        if (idx < 0 && senderName) idx = conns.findIndex(c=>c.name===senderName&&c.preConnected);
+        if (idx >= 0) {
+          conns[idx] = {...conns[idx], preConnected:false, connectedAt:new Date().toISOString()};
+          // Update email if the sender used a different one than we had on file
+          if (senderEmail && conns[idx].email !== senderEmail) conns[idx].email = senderEmail;
+          updated = true;
+        }
+        if (updated) { localStorage.setItem("chronicle-connections",JSON.stringify(conns)); setLocalConnections([...conns]); }
       } catch(e) {}
     }
     // Navigate to the first imported memory
