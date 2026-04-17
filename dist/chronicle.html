@@ -687,7 +687,32 @@ function parseExifSegment(view, tiff) {
       const mx = ds.match(/^(\d{4}):(\d{2}):(\d{2})/);
       if (mx) dateResult = { year:+mx[1], month:+mx[2], day:+mx[3] };
     }
-    return { ...dateResult };
+    // GPS extraction
+    let gps = null;
+    const gpsIFDPtr = ifd0Tags[0x8825];
+    if (gpsIFDPtr) {
+      try {
+        const gpsTags = scanIFD(gpsIFDPtr.val);
+        function readRational(offset) {
+          const num = g32(offset); const den = g32(offset + 4);
+          return den ? num / den : 0;
+        }
+        function readGPSCoord(tag) {
+          const t = gpsTags[tag];
+          if (!t || t.cnt !== 3) return null;
+          const d = readRational(t.val); const m = readRational(t.val + 8); const s = readRational(t.val + 16);
+          return d + m / 60 + s / 3600;
+        }
+        const lat = readGPSCoord(0x0002);
+        const lng = readGPSCoord(0x0004);
+        if (lat !== null && lng !== null) {
+          const latRef = gpsTags[0x0001] ? readASCII(gpsTags[0x0001].cnt <= 4 ? (gpsTags[0x0001].val >> 24 ? gpsTags[0x0001].val : 0) : gpsTags[0x0001].val, 1) : "N";
+          const lngRef = gpsTags[0x0003] ? readASCII(gpsTags[0x0003].cnt <= 4 ? (gpsTags[0x0003].val >> 24 ? gpsTags[0x0003].val : 0) : gpsTags[0x0003].val, 1) : "E";
+          gps = { lat: lat * (latRef === "S" ? -1 : 1), lng: lng * (lngRef === "W" ? -1 : 1) };
+        }
+      } catch(e) {}
+    }
+    return { ...dateResult, ...(gps ? {gps} : {}) };
   } catch(e) {}
   return {};
 }
@@ -3382,7 +3407,10 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
       React.createElement("p",{style:{fontSize:"0.84rem",color:"#8a7460",margin:"0 0 16px"}},
         selectedPeople.filter(p=>effectiveEmailFor(p)).join(" and ")+" will see it in their Chronicle inbox."
       ),
-      React.createElement("button",{onClick:handleClose,style:{...S.btnOutline,padding:"7px 20px"}},"Done")
+      React.createElement("div",{style:{display:"flex",gap:"10px",justifyContent:"center"}},
+        React.createElement("button",{onClick:handleClose,style:{...S.btn,padding:"7px 24px"}},"Done"),
+        React.createElement("button",{onClick:()=>setSendStatus("idle"),style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",padding:"7px 10px"}},"Resend")
+      )
     ),
 
     step==="link" && (()=>{
@@ -4065,7 +4093,22 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
         style:{...S.btnOutline,flex:1,opacity:(status==="pushing"||status==="pulling")?0.6:1}
       },status==="pulling"?"Pulling\u2026":"Pull from cloud")
     ),
-    status==="done"&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontStyle:"italic"}},"✓ Done"),
+    // Progress indicator
+    (status.startsWith("pushing")||status.startsWith("pulling"))&&(()=>{
+      const match=status.match(/\((\d+)\/(\d+)\)/);
+      const label=status.startsWith("pushing")?"Pushing":"Pulling";
+      if(match){
+        const cur=parseInt(match[1]),tot=parseInt(match[2]),pct=Math.round((cur/tot)*100);
+        return React.createElement("div",{style:{marginBottom:"8px"}},
+          React.createElement("div",{style:{display:"flex",justifyContent:"space-between",fontSize:"0.82rem",color:"#8a7460",marginBottom:"4px"}},
+            React.createElement("span",null,label+" photos\u2026"),React.createElement("span",null,cur+"/"+tot)),
+          React.createElement("div",{style:{height:"6px",background:"#e0d4be",borderRadius:"3px",overflow:"hidden"}},
+            React.createElement("div",{style:{height:"100%",width:pct+"%",background:"#4a7a5a",borderRadius:"3px",transition:"width 0.3s"}}))
+        );
+      }
+      return React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic"}},label+"\u2026");
+    })(),
+    status==="done"&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontStyle:"italic"}},"\u2713 Done"),
     isErr&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#c4858a",marginTop:"4px"}},errMsg)
   );
 }
@@ -4851,6 +4894,7 @@ function ImportView({
           ),
           React.createElement("div",{style:{flex:1,display:"grid",gap:"8px"}},
             React.createElement("div",null,React.createElement("label",{style:S.label},"Title"),React.createElement("input",{value:item.title,onChange:e=>updatePhoto(item.id,{title:e.target.value}),style:{...S.input,padding:"7px 10px"}})),
+            React.createElement("div",null,React.createElement("label",{style:S.label},"Memory"),React.createElement("textarea",{value:item.content||"",onChange:e=>updatePhoto(item.id,{content:e.target.value}),placeholder:"What do you remember about this?",rows:2,style:{...S.input,resize:"vertical",lineHeight:"1.6",padding:"7px 10px"}})),
             React.createElement(DateFields,{form:item,setForm:u=>updatePhoto(item.id,u)}),
             React.createElement("div",null,React.createElement("label",{style:S.label},"Location"),React.createElement(LocationAutocomplete,{value:item.location||"",onChange:v=>updatePhoto(item.id,{location:v}),knownLocations,placeholder:"optional"})),
             React.createElement("div",null,React.createElement("label",{style:S.label},"Tags"),React.createElement(TagPicker,{tags:item.tags,onToggle:tag=>updatePhoto(item.id,{tags:item.tags.includes(tag)?item.tags.filter(t=>t!==tag):[...item.tags,tag]})})),
@@ -4858,7 +4902,12 @@ function ImportView({
               React.createElement("label",{style:S.label},"People"),
               React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:item.people||[],allValues:knownPeople,onChange:v=>updatePhoto(item.id,{people:v}),placeholder:"Add a person\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
             ),
-            React.createElement("p",{style:{margin:0,fontSize:"0.8rem",color:item.exifDate?"#89b08a":"#c4858a",fontStyle:"italic"}},item.exifDate?"\u2713 Date from EXIF":"\u26a0 No EXIF date \u2014 set manually")
+            React.createElement("div",null,
+              React.createElement("label",{style:S.label},"Organisations"),
+              React.createElement(PeopleOrgField,{icon:"\ud83c\udfdb",values:item.orgs||[],allValues:knownOrgs,onChange:v=>updatePhoto(item.id,{orgs:v}),placeholder:"Add an organisation\u2026"})
+            ),
+            React.createElement("p",{style:{margin:0,fontSize:"0.8rem",color:item.exifDate?"#89b08a":"#c4858a",fontStyle:"italic"}},
+              (item.exifDate?"\u2713 Date from EXIF":"\u26a0 No EXIF date")+(item.exifGps?" \u00b7 \u2713 GPS location":""))
           )
         ))
       )
@@ -8154,19 +8203,28 @@ function handleEdit(m) {
           const dataUrl = await new Promise(res=>{ const ur=new FileReader(); ur.onload=ev=>res(ev.target.result); ur.readAsDataURL(file); });
           const med = await storeMedia(dataUrl, file.name);
           const nb=file.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," ");
+          // Reverse geocode GPS if available
+          let gpsLocation = "";
+          if (exif.gps) {
+            try {
+              const gr = await fetch("https://nominatim.openstreetmap.org/reverse?lat="+exif.gps.lat+"&lon="+exif.gps.lng+"&format=json&zoom=14", {headers:{"User-Agent":"Chronicle-Journal-App"}});
+              if (gr.ok) { const gd = await gr.json(); gpsLocation = gd.address ? [gd.address.suburb||gd.address.village||gd.address.town||gd.address.city, gd.address.state, gd.address.country].filter(Boolean).join(", ") : (gd.display_name||"").split(",").slice(0,3).join(",").trim(); }
+            } catch(e) {}
+          }
           items.push({
             id: Date.now().toString()+Math.random(),
             med,                                    // {mediaId, name} for IDB
             url: dataUrl,                           // temp preview only, not persisted
             name: file.name,
             exifDate: hasDate ? exif : null,
+            exifGps: exif.gps || null,
             year:  hasDate ? exif.year  : new Date().getFullYear(),
             month: hasDate ? exif.month : 1,
             day:   hasDate ? exif.day   : 1,
             fuzzy: hasDate ? "day" : "year",
             season: "Early",
             title: nb.length>2 ? nb : "Photo",
-            tags: [], people: [], location: "", keep: true
+            tags: [], people: [], orgs: [], location: gpsLocation, keep: true
           });
           resolve();
         }; br.readAsArrayBuffer(file);
@@ -8181,14 +8239,17 @@ function handleEdit(m) {
     const toSave = photoQueue.filter(p=>p.keep&&p.title.trim());
     const newMems = toSave.map(p=>({
       id: Date.now().toString()+Math.random().toString(36).slice(2),
-      title: p.title, content: "", year: p.year, month: p.month, day: p.day,
+      title: p.title, content: p.content||"", year: p.year, month: p.month, day: p.day,
       fuzzy: p.fuzzy, season: p.season, location: p.location,
-      tags: p.tags, people: p.people||[], orgs: [], mediaUrls: [p.med]
+      tags: p.tags, people: p.people||[], orgs: p.orgs||[], mediaUrls: [p.med],
+      modifiedAt: new Date().toISOString()
     }));
     const allPeople = [...new Set(newMems.flatMap(m=>m.people))];
+    const allOrgs = [...new Set(newMems.flatMap(m=>m.orgs))];
     const newKnownPeople = allPeople.length ? [...new Set([...knownPeople,...allPeople])].sort() : knownPeople;
+    const newKnownOrgs = allOrgs.length ? [...new Set([...knownOrgs,...allOrgs])].sort() : knownOrgs;
     const newAllMems = [...memories,...newMems].sort((a,b)=>sortKey(a)-sortKey(b));
-    persistSubject({memories:newAllMems, knownPeople:newKnownPeople});
+    persistSubject({memories:newAllMems, knownPeople:newKnownPeople, knownOrgs:newKnownOrgs});
     setImportSaved(newMems.length); setPhotoQueue([]);
     setTimeout(()=>setImportSaved(0),3000);
   }
