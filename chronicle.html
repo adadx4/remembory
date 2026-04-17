@@ -2980,19 +2980,27 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, deliverTo
       // Also resolve any mediaId blob references to embedded data: URLs so the
       // recipient receives the actual photo data, not just a local IDB key.
       const sanitisedMemories = await Promise.all(memories.map(async (m, mi) => {
-        const mediaUrls = await Promise.all((m.mediaUrls||[]).slice(0,1).map(async (med) => {
+        const rawMedia = (m.mediaUrls||[]).slice(0,1);
+        const mediaUrls = await Promise.all(rawMedia.map(async (med) => {
           if (med.mediaId) {
             try {
               const blob = await idbGet(med.mediaId);
               if (blob) {
                 const dataUrl = await resizeImageBlob(blob, 1200);
+                console.log("[ShareLink] Resized photo for", m.title, ":", dataUrl.length, "chars");
                 return {url:dataUrl, name:med.name};
               }
-            } catch(e) {}
+              console.warn("[ShareLink] No blob in IDB for", med.mediaId);
+            } catch(e) { console.error("[ShareLink] Error resolving photo:", e); }
           }
-          return med;
+          if (med.url && med.url.startsWith("data:")) {
+            console.log("[ShareLink] Using existing data URL for", m.title);
+            return {url:med.url, name:med.name};
+          }
+          console.warn("[ShareLink] No photo data available for", m.title, "med:", JSON.stringify({mediaId:med.mediaId,hasUrl:!!med.url}));
+          return null;
         }));
-        return { ...m, people: (m.people||[]).filter(p => p !== senderName.trim()), mediaUrls };
+        return { ...m, people: (m.people||[]).filter(p => p !== senderName.trim()), mediaUrls: mediaUrls.filter(Boolean) };
       }));
       const payload = {
         sharedBy: senderName.trim(),
