@@ -6432,6 +6432,7 @@ function App() {
   const [contactEmail, setContactEmail] = React.useState("");
   const [contactMsg, setContactMsg] = React.useState("");
   const [contactStatus, setContactStatus] = React.useState("");
+  const [syncConflicts, setSyncConflicts] = React.useState(null); // [{local, incoming}] or null
   const [mapFilter, setMapFilter] = React.useState({});
   const [settingsTab, setSettingsTab] = React.useState("account");
   const [syncFileHandle, setSyncFileHandle] = React.useState(null);
@@ -6751,7 +6752,7 @@ function App() {
     const formWithLoc = {...form, location: locationLabel};
 
     const primaryId = editingId || (Date.now().toString()+Math.random().toString(36).slice(2));
-    const primary = {...formWithLoc, id:primaryId};
+    const primary = {...formWithLoc, id:primaryId, modifiedAt:new Date().toISOString()};
 
     // Compute updated knownLocations with structured address data (no separate persistSubject call —
     // commitMemory will include this in its single batch save to avoid stale-closure stomping)
@@ -8035,19 +8036,32 @@ function handleEdit(m) {
         return { ...m, content: "", perspectives, sharedBy: senderName, sharedAt: d.sharedAt, people, visibility: "private" };
       });
 
-      // Merge: if a memory with same id exists, merge perspectives into it; otherwise add new
+      // Merge strategy: new memories auto-add; for existing memories, detect changes
       const toAdd = incomingMems.filter(m=>!existingIds.has(m.id));
       let mergedPerspectivesCount = 0;
+      const conflicts = [];
       const merged = memories.map(m=>{
         const incoming = incomingMems.find(im=>im.id===m.id);
         if (!incoming) return m;
-        // Merge perspectives
-        const existing = m.perspectives||[];
-        const newP = (incoming.perspectives||[]).filter(p=>!existing.some(e=>e.author===p.author));
-        if (newP.length) mergedPerspectivesCount++;
-        return {...m, perspectives:[...existing,...newP], sharedBy:incoming.sharedBy||m.sharedBy};
+        if (isShared) {
+          // Share import: only merge perspectives
+          const existing = m.perspectives||[];
+          const newP = (incoming.perspectives||[]).filter(p=>!existing.some(e=>e.author===p.author));
+          if (newP.length) mergedPerspectivesCount++;
+          return {...m, perspectives:[...existing,...newP], sharedBy:incoming.sharedBy||m.sharedBy};
+        }
+        // Sync import: check if the memory has actually changed
+        const changed = m.title!==incoming.title || m.content!==incoming.content || m.year!==incoming.year
+          || m.month!==incoming.month || m.day!==incoming.day || m.location!==incoming.location
+          || JSON.stringify(m.tags||[])!==JSON.stringify(incoming.tags||[])
+          || JSON.stringify(m.people||[])!==JSON.stringify(incoming.people||[])
+          || m.endYear!==incoming.endYear || m.endMonth!==incoming.endMonth;
+        if (!changed) return m; // identical — skip
+        // Both sides have this memory and it differs — flag as conflict
+        conflicts.push({local:m, incoming});
+        return m; // keep local for now; conflicts resolved separately
       });
-      const skippedCount = incomingMems.filter(m=>existingIds.has(m.id)).length - mergedPerspectivesCount;
+      const skippedCount = isShared ? incomingMems.filter(m=>existingIds.has(m.id)).length - mergedPerspectivesCount : 0;
       const finalMems = [...merged, ...toAdd].sort((a,b)=>sortKey(a)-sortKey(b));
 
       const backupPeople=d.knownPeople||[...new Set(d.memories.flatMap(m=>m.people||[]))];
@@ -8116,8 +8130,12 @@ function handleEdit(m) {
         const parts = [];
         if (addedCount > 0) parts.push(`${addedCount} new ${addedCount===1?"memory":"memories"} added`);
         if (mergedPerspectivesCount > 0) parts.push(`${mergedPerspectivesCount} updated with new perspectives`);
-        if (skippedCount > 0) parts.push(`${skippedCount} already present — skipped`);
-        alert("Done" + (parts.length ? " — " + parts.join(", ") : "") + ".");
+        if (skippedCount > 0) parts.push(`${skippedCount} already present`);
+        if (conflicts.length > 0) {
+          parts.push(`${conflicts.length} ${conflicts.length===1?"memory has":"memories have"} changes to review`);
+          setSyncConflicts(conflicts);
+        }
+        alert("Sync complete" + (parts.length ? " \u2014 " + parts.join(", ") : "") + ".");
       }
     } catch(err) { alert("Import failed: " + err.message); } };
     r.readAsText(file);
@@ -8711,6 +8729,86 @@ function handleEdit(m) {
         )
       );
     })(),
+
+    // ── Sync conflict resolution modal ──
+    syncConflicts&&syncConflicts.length>0&&React.createElement("div",{style:{position:"fixed",inset:0,zIndex:600,background:"rgba(26,18,8,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}},
+      React.createElement("div",{style:{background:"#f5f0e8",borderRadius:"6px",border:"1px solid #c8b89a",maxWidth:"720px",width:"100%",maxHeight:"80vh",overflow:"auto",padding:"24px",boxShadow:"0 8px 40px rgba(26,18,8,0.3)"}},
+        React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.4rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Sync Conflicts"),
+        React.createElement("p",{style:{fontSize:"0.88rem",color:"#8a7460",marginBottom:"20px"}},
+          syncConflicts.length+" "+(syncConflicts.length===1?"memory has":"memories have")+" been edited on both devices. Choose how to resolve each:"),
+        syncConflicts.map((c,ci)=>{
+          const l=c.local, r=c.incoming;
+          const diffs=[];
+          if(l.title!==r.title) diffs.push({field:"Title",local:l.title,cloud:r.title});
+          if(l.content!==r.content) diffs.push({field:"Content",local:(l.content||"").slice(0,200),cloud:(r.content||"").slice(0,200)});
+          if(l.year!==r.year||l.month!==r.month||l.day!==r.day) diffs.push({field:"Date",local:fuzzyDateLabel(l),cloud:fuzzyDateLabel(r)});
+          if(l.location!==r.location) diffs.push({field:"Location",local:l.location||"none",cloud:r.location||"none"});
+          if(JSON.stringify(l.tags||[])!==JSON.stringify(r.tags||[])) diffs.push({field:"Tags",local:(l.tags||[]).join(", ")||"none",cloud:(r.tags||[]).join(", ")||"none"});
+          if(JSON.stringify(l.people||[])!==JSON.stringify(r.people||[])) diffs.push({field:"People",local:(l.people||[]).join(", ")||"none",cloud:(r.people||[]).join(", ")||"none"});
+          return React.createElement("div",{key:ci,style:{border:"1px solid #d4c4a8",borderRadius:"4px",marginBottom:"14px",overflow:"hidden"}},
+            React.createElement("div",{style:{background:"rgba(200,184,154,0.15)",padding:"10px 14px",borderBottom:"1px solid #d4c4a8"}},
+              React.createElement("strong",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208"}},l.title||r.title||"Untitled"),
+              React.createElement("span",{style:{fontSize:"0.82rem",color:"#8a7460",marginLeft:"8px"}},fuzzyDateLabel(l))
+            ),
+            React.createElement("div",{style:{padding:"10px 14px"}},
+              diffs.map((d,di)=>React.createElement("div",{key:di,style:{display:"grid",gridTemplateColumns:"80px 1fr 1fr",gap:"8px",marginBottom:"6px",fontSize:"0.84rem"}},
+                React.createElement("span",{style:{color:"#8a7460",fontWeight:600}},d.field),
+                React.createElement("span",{style:{color:"#2c2416",background:"rgba(196,133,90,0.08)",padding:"3px 6px",borderRadius:"2px",wordBreak:"break-word"}},d.local||"\u2014"),
+                React.createElement("span",{style:{color:"#2c2416",background:"rgba(74,122,90,0.08)",padding:"3px 6px",borderRadius:"2px",wordBreak:"break-word"}},d.cloud||"\u2014")
+              )),
+              React.createElement("div",{style:{display:"grid",gridTemplateColumns:"80px 1fr 1fr",gap:"8px",fontSize:"0.78rem",color:"#8a7460",marginBottom:"8px"}},
+                React.createElement("span",null,""),
+                React.createElement("span",null,"This device"),
+                React.createElement("span",null,"Cloud")
+              ),
+              React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
+                React.createElement("button",{onClick:()=>{setSyncConflicts(prev=>prev.filter((_,i)=>i!==ci));},style:{...S.btnOutline,padding:"5px 14px",fontSize:"0.82rem"}},"Keep local"),
+                React.createElement("button",{onClick:()=>{
+                  const incoming=c.incoming;
+                  const localP=c.local.perspectives||[];
+                  const incomingP=incoming.perspectives||[];
+                  const mergedP=[...incomingP,...localP.filter(lp=>!incomingP.some(ip=>ip.author===lp.author))];
+                  const resolved={...incoming,perspectives:mergedP.length?mergedP:undefined,modifiedAt:new Date().toISOString()};
+                  persistSubject({memories:memories.map(m=>m.id===resolved.id?resolved:m)});
+                  setSyncConflicts(prev=>prev.filter((_,i)=>i!==ci));
+                },style:{...S.btn,padding:"5px 14px",fontSize:"0.82rem"}},"Use cloud version"),
+                React.createElement("button",{onClick:()=>{
+                  const l2=c.local,r2=c.incoming;
+                  const merged={...l2,
+                    content:r2.content||l2.content, title:r2.title||l2.title,
+                    location:r2.location||l2.location,
+                    tags:[...new Set([...(l2.tags||[]),...(r2.tags||[])])],
+                    people:[...new Set([...(l2.people||[]),...(r2.people||[])])],
+                    orgs:[...new Set([...(l2.orgs||[]),...(r2.orgs||[])])],
+                    endYear:r2.endYear||l2.endYear, endMonth:r2.endMonth||l2.endMonth,
+                    endFuzzy:r2.endFuzzy||l2.endFuzzy, endOngoing:r2.endOngoing||l2.endOngoing,
+                    modifiedAt:new Date().toISOString()};
+                  const localP=l2.perspectives||[]; const incomingP=r2.perspectives||[];
+                  merged.perspectives=[...incomingP,...localP.filter(lp=>!incomingP.some(ip=>ip.author===lp.author))];
+                  if(!merged.perspectives.length) delete merged.perspectives;
+                  persistSubject({memories:memories.map(m=>m.id===merged.id?merged:m)});
+                  setSyncConflicts(prev=>prev.filter((_,i)=>i!==ci));
+                },style:{...S.btnOutline,padding:"5px 14px",fontSize:"0.82rem",color:"#4a7a5a",borderColor:"rgba(74,122,90,0.4)"}},"Merge both")
+              )
+            )
+          );
+        }),
+        syncConflicts.length>0&&React.createElement("div",{style:{display:"flex",gap:"8px",justifyContent:"flex-end",marginTop:"8px"}},
+          React.createElement("button",{onClick:()=>setSyncConflicts(null),style:{...S.btnOutline,padding:"7px 18px"}},"Keep all local"),
+          React.createElement("button",{onClick:()=>{
+            syncConflicts.forEach(c=>{
+              const incoming=c.incoming;
+              const localP=c.local.perspectives||[];
+              const incomingP=incoming.perspectives||[];
+              const mergedP=[...incomingP,...localP.filter(lp=>!incomingP.some(ip=>ip.author===lp.author))];
+              const resolved={...incoming,perspectives:mergedP.length?mergedP:undefined,modifiedAt:new Date().toISOString()};
+              persistSubject({memories:memories.map(m=>m.id===resolved.id?resolved:m)});
+            });
+            setSyncConflicts(null);
+          },style:{...S.btn,padding:"7px 18px"}},"Use all cloud versions")
+        )
+      )
+    ),
 
     React.createElement("header",{style:{borderBottom:"1px solid #c8b89a",padding:isMobile?"12px 16px":"15px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(245,240,232,0.96)",position:"sticky",top:0,zIndex:100,backdropFilter:"blur(8px)"}},
       React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",minWidth:0,flex:1}},
