@@ -706,8 +706,19 @@ function parseExifSegment(view, tiff) {
         const lat = readGPSCoord(0x0002);
         const lng = readGPSCoord(0x0004);
         if (lat !== null && lng !== null) {
-          const latRef = gpsTags[0x0001] ? readASCII(gpsTags[0x0001].cnt <= 4 ? (gpsTags[0x0001].val >> 24 ? gpsTags[0x0001].val : 0) : gpsTags[0x0001].val, 1) : "N";
-          const lngRef = gpsTags[0x0003] ? readASCII(gpsTags[0x0003].cnt <= 4 ? (gpsTags[0x0003].val >> 24 ? gpsTags[0x0003].val : 0) : gpsTags[0x0003].val, 1) : "E";
+          function readRef(tag, fallback) {
+            const t = gpsTags[tag]; if (!t) return fallback;
+            try {
+              if (t.cnt <= 4) {
+                // Inline: val contains the bytes directly; extract first byte as char
+                const b = le ? (t.val & 0xFF) : ((t.val >> 24) & 0xFF);
+                return b ? String.fromCharCode(b) : fallback;
+              }
+              return readASCII(t.val, 1) || fallback;
+            } catch(e) { return fallback; }
+          }
+          const latRef = readRef(0x0001, "N");
+          const lngRef = readRef(0x0003, "E");
           gps = { lat: lat * (latRef === "S" ? -1 : 1), lng: lng * (lngRef === "W" ? -1 : 1) };
         }
       } catch(e) {}
@@ -4860,7 +4871,7 @@ function ImportView({
   handleGedFile, handleGedPick, commitGedImport, commitGedTreeImport,
   isHistoryMode,
   // Shared data
-  knownPeople, knownLocations, peopleEmails, peopleRelationships, persistSubject,
+  knownPeople, knownOrgs, knownLocations, peopleEmails, peopleRelationships, persistSubject,
 }) {
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
     React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Import"),
@@ -9628,7 +9639,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         gedContextSel, setGedContextSel,
         handleGedFile, handleGedPick, commitGedImport, commitGedTreeImport,
         isHistoryMode,
-        knownPeople, knownLocations, peopleEmails, peopleRelationships, persistSubject,
+        knownPeople, knownOrgs, knownLocations, peopleEmails, peopleRelationships, persistSubject,
       }),
                         
       // ── LIFE VIEW ──
