@@ -4135,6 +4135,7 @@ function SettingsView({
   wantPublicProfile, isSubscriber, licenceKey, licenceStatus,
   legacyMessage, setLegacyMessage,
   profileState,
+  emailVerified, verifyingEmail, setVerifyingEmail, sendVerifyCode, confirmVerifyCode, verifyCode, setVerifyCode, verifyStatus,
   persistSubject, persistTop, setActivePassword, setLocked, setData,
   saveLicenceKey, setView, setShowSubjectMgr, exportBackup,
   importBackup, shareCodeInput, setShareCodeInput,
@@ -4163,7 +4164,25 @@ function SettingsView({
         React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 12px"}},
           subject.isSelf ? "Your name is shown when you share memories with others." : "The person whose story is being recorded."),
         React.createElement("input",{value:ownerName,onChange:e=>persistSubject({name:e.target.value}),placeholder:subject.isSelf?"Your name":"Their name",style:{...S.input,marginBottom:subject.isSelf?"10px":"16px"}}),
-        subject.isSelf&&React.createElement("input",{type:"email",value:carerEmail,onChange:e=>persistTop({carerEmail:e.target.value}),placeholder:"your@email.com (used for sharing)",style:{...S.input,marginBottom:"16px"}}),
+        subject.isSelf&&React.createElement("div",{style:{marginBottom:"16px"}},
+          React.createElement("input",{type:"email",value:carerEmail,onChange:e=>{persistTop({carerEmail:e.target.value});},placeholder:"your@email.com (used for sharing)",style:{...S.input,marginBottom:"6px"}}),
+          carerEmail&&carerEmail.includes("@")&&(emailVerified
+            ? React.createElement("span",{style:{fontSize:"0.82rem",color:"#4a7a5a"}},"\u2713 Email verified")
+            : verifyingEmail
+              ? React.createElement("div",{style:{display:"flex",gap:"6px",alignItems:"center"}},
+                  React.createElement("input",{value:verifyCode,onChange:e=>setVerifyCode(e.target.value.replace(/\D/g,"").slice(0,6)),
+                    onKeyDown:e=>{if(e.key==="Enter"&&verifyCode.length===6)confirmVerifyCode();},
+                    placeholder:"6-digit code",maxLength:6,inputMode:"numeric",
+                    style:{...S.input,width:"100px",padding:"6px 10px",fontSize:"0.95rem",letterSpacing:"0.15em",textAlign:"center"}}),
+                  React.createElement("button",{onClick:confirmVerifyCode,disabled:verifyCode.length!==6||verifyStatus==="confirming",
+                    style:{...S.btn,padding:"6px 14px",fontSize:"0.82rem"}},verifyStatus==="confirming"?"Checking\u2026":"Verify"),
+                  verifyStatus.startsWith("error:")&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#c4858a"}},verifyStatus.slice(6))
+                )
+              : React.createElement("button",{onClick:()=>{setVerifyingEmail(true);sendVerifyCode();},disabled:verifyStatus==="sending",
+                  style:{background:"none",border:"none",color:"#a8885a",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline",padding:0}},
+                  verifyStatus==="sending"?"Sending code\u2026":"Verify this email")
+          )
+        ),
         React.createElement("p",{style:{fontSize:"0.8rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#a8885a",fontWeight:600,margin:"0 0 8px"}},"Chronicle type"),
         React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
           Object.values(MODES).filter(m=>IS_STAGING||m.id!=="history").map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:subject.mode===m.id,onSelect:v=>persistSubject({mode:v,isSelf:MODES[v]?.isSelf||false})}))
@@ -4348,7 +4367,7 @@ function SettingsView({
 
 // ── SharingView ───────────────────────────────────────────────
 function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShareCodeInput,
-  shareCodeStatus, importFromCode, setView, setSelected, ownerEmail, licenceKey,
+  shareCodeStatus, importFromCode, setView, setSelected, ownerEmail, licenceKey, emailVerifyToken,
   subject, isCarerMode, acceptShare, setPendingConnectRequest, onShareBadgeCount,
   contributionLinks, persistSubject}) {
 
@@ -4384,20 +4403,28 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
         })
         .catch(()=>{});
     } else {
-      fetch(WORKER_URL + "/share/inbox/fetch", {
-        method:"POST",
-        headers:{"Content-Type":"application/json",...(licenceKey?{"X-LS-Key":licenceKey}:{})},
-        body:JSON.stringify({email:ownerEmail})
-      }).then(r=>r.ok?r.json():{inbox:[],declined:[]})
-        .then(d=>{
-          const items = d.inbox || [];
-          const dec = d.declined || [];
-          const activeCount = items.filter(item=>!dec.some(dc=>dc.shareId===item._shareId)).length;
-          setInboxItems(items);
-          setServerDeclined(dec);
-          if (onShareBadgeCount) onShareBadgeCount(activeCount);
-        })
-        .catch(()=>{});
+      (async()=>{
+        let d = {inbox:[],declined:[]};
+        try {
+          // Build auth: licence key header + verification token in body
+          const headers = {"Content-Type":"application/json"};
+          if (licenceKey) headers["X-LS-Key"] = licenceKey;
+          const bodyObj = {email:ownerEmail};
+          if (emailVerifyToken) bodyObj.verifyToken = emailVerifyToken;
+          // Also try inbox token from notification email link
+          try { const it = sessionStorage.getItem("chronicle-inbox-token"); if (it) bodyObj.inboxToken = it; } catch(e) {}
+          const r = await fetch(WORKER_URL + "/share/inbox/fetch", {
+            method:"POST", headers, body:JSON.stringify(bodyObj)
+          });
+          if (r.ok) d = await r.json();
+        } catch(e) {}
+        const items = d.inbox || [];
+        const dec = d.declined || [];
+        const activeCount = items.filter(item=>!dec.some(dc=>dc.shareId===item._shareId)).length;
+        setInboxItems(items);
+        setServerDeclined(dec);
+        if (onShareBadgeCount) onShareBadgeCount(activeCount);
+      })();
     }
   }, [ownerEmail]);
 
@@ -6495,6 +6522,48 @@ function App() {
   const [contactEmail, setContactEmail] = React.useState("");
   const [contactMsg, setContactMsg] = React.useState("");
   const [contactStatus, setContactStatus] = React.useState("");
+  const [emailVerifyToken, setEmailVerifyToken] = React.useState(()=>{ try { return localStorage.getItem("chronicle-email-verify-token")||""; } catch(e) { return ""; } });
+  const [emailVerified, setEmailVerified] = React.useState(!!emailVerifyToken);
+  const [verifyingEmail, setVerifyingEmail] = React.useState(false);
+  const [verifyCode, setVerifyCode] = React.useState("");
+  const [verifyStatus, setVerifyStatus] = React.useState(""); // "", "sending", "sent", "error:..."
+
+  function saveVerifyToken(token) {
+    setEmailVerifyToken(token);
+    setEmailVerified(!!token);
+    try { if (token) localStorage.setItem("chronicle-email-verify-token", token); else localStorage.removeItem("chronicle-email-verify-token"); } catch(e) {}
+  }
+  async function sendVerifyCode() {
+    const email = ownerEmail || carerEmail;
+    if (!email) return;
+    setVerifyStatus("sending");
+    try {
+      const r = await fetch(WORKER_URL + "/email/verify/send", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email:email.trim().toLowerCase()}) });
+      const d = await r.json();
+      if (!r.ok) { setVerifyStatus("error:"+(d.error||"Failed")); return; }
+      setVerifyStatus("sent");
+    } catch(e) { setVerifyStatus("error:Check your connection"); }
+  }
+  async function confirmVerifyCode() {
+    const email = ownerEmail || carerEmail;
+    if (!email || !verifyCode.trim()) return;
+    setVerifyStatus("confirming");
+    try {
+      const r = await fetch(WORKER_URL + "/email/verify/confirm", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email:email.trim().toLowerCase(), code:verifyCode.trim()}) });
+      const d = await r.json();
+      if (!r.ok) { setVerifyStatus("error:"+(d.error||"Failed")); return; }
+      saveVerifyToken(d.token);
+      setVerifyStatus("");
+      setVerifyingEmail(false);
+      setVerifyCode("");
+    } catch(e) { setVerifyStatus("error:Check your connection"); }
+  }
+  // Clear verification when email changes
+  React.useEffect(() => {
+    if (emailVerifyToken && (ownerEmail||carerEmail)) {
+      // Token might be for a different email — we'll let the server reject if mismatched
+    }
+  }, [ownerEmail, carerEmail]);
   const [syncConflicts, setSyncConflicts] = React.useState(null); // [{local, incoming}] or null
   const [mapFilter, setMapFilter] = React.useState({});
   const [settingsTab, setSettingsTab] = React.useState("account");
@@ -7070,35 +7139,72 @@ function handleEdit(m) {
     }
   }
 
-  // Auto-fetch share from URL parameter (?share=CODE)
+  // Auto-fetch share from URL parameters (?share=CODE and/or ?inbox=TOKEN)
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const inboxToken = params.get("inbox");
     const code = params.get("share");
-    if (!code) return;
+    if (!code && !inboxToken) return;
     // Clean the URL so refreshing doesn't re-trigger
     window.history.replaceState({}, "", window.location.pathname);
-    // Fetch the share
+
     (async () => {
-      try {
-        const res = await fetch(WORKER_URL + "/s/" + encodeURIComponent(code.trim()), {headers:{"X-Chronicle-Client":"1"}});
-        if (!res.ok) return;
-        const dRaw = await res.json();
-        if (!dRaw.memories) return;
-        // Restore any embedded media back into IDB
-        const restoredMems = await Promise.all(dRaw.memories.map(async m => {
-          const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async med => {
-            if (med.url && med.url.startsWith("data:")) {
-              const id = med.mediaId || ("media_" + Date.now() + "_" + Math.random().toString(36).slice(2));
-              try { const r2 = await fetch(med.url); const blob = await r2.blob(); await idbPut(id, blob); return { mediaId: id, name: med.name }; } catch(e) { return med; }
+      // If we have an inbox token, fetch the full inbox via token endpoint
+      if (inboxToken) {
+        try {
+          const res = await fetch(WORKER_URL + "/share/inbox/by-token/" + encodeURIComponent(inboxToken.trim()), {headers:{"X-Chronicle-Client":"1"}});
+          if (res.ok) {
+            const d = await res.json();
+            const items = (d.inbox || []).filter(item => !(d.declined||[]).some(dc => dc.shareId === item._shareId));
+            if (items.length > 0) {
+              // Show the first pending share as the accept modal
+              const item = items[0];
+              // Restore embedded media
+              const restoredMems = await Promise.all((item.memories||[]).map(async m => {
+                const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async med => {
+                  if (med.url && med.url.startsWith("data:")) {
+                    const id = med.mediaId || ("media_" + Date.now() + "_" + Math.random().toString(36).slice(2));
+                    try { const r2 = await fetch(med.url); const blob = await r2.blob(); await idbPut(id, blob); return { mediaId: id, name: med.name }; } catch(e) { return med; }
+                  }
+                  return med;
+                }));
+                return {...m, mediaUrls};
+              }));
+              setPendingShare({...item, memories: restoredMems, _shareId: item._shareId});
+              setPendingShareSelected(new Set(restoredMems.map(m=>m.id)));
+              setPendingShareWantConnect(true);
+              if (items.length > 1) {
+                // Store token so the Sharing view can fetch remaining items
+                try { sessionStorage.setItem("chronicle-inbox-token", inboxToken); } catch(e) {}
+              }
+              return;
             }
-            return med;
+          }
+        } catch(e) {}
+      }
+
+      // Fallback: fetch a single share by code
+      if (code) {
+        try {
+          const res = await fetch(WORKER_URL + "/s/" + encodeURIComponent(code.trim()), {headers:{"X-Chronicle-Client":"1"}});
+          if (!res.ok) return;
+          const dRaw = await res.json();
+          if (!dRaw.memories) return;
+          const restoredMems = await Promise.all(dRaw.memories.map(async m => {
+            const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async med => {
+              if (med.url && med.url.startsWith("data:")) {
+                const id = med.mediaId || ("media_" + Date.now() + "_" + Math.random().toString(36).slice(2));
+                try { const r2 = await fetch(med.url); const blob = await r2.blob(); await idbPut(id, blob); return { mediaId: id, name: med.name }; } catch(e) { return med; }
+              }
+              return med;
+            }));
+            return {...m, mediaUrls};
           }));
-          return {...m, mediaUrls};
-        }));
-        setPendingShare({...dRaw, memories: restoredMems, _shareId: code});
-        setPendingShareSelected(new Set(restoredMems.map(m=>m.id)));
-        setPendingShareWantConnect(true);
-      } catch(e) {}
+          setPendingShare({...dRaw, memories: restoredMems, _shareId: code});
+          setPendingShareSelected(new Set(restoredMems.map(m=>m.id)));
+          setPendingShareWantConnect(true);
+        } catch(e) {}
+      }
     })();
   }, []);
 
@@ -8688,12 +8794,31 @@ function handleEdit(m) {
               )
             ),
 
-            // Email prompt for users who haven't set one
-            !(ownerEmail||carerEmail)&&React.createElement("div",{style:{background:"rgba(196,169,98,0.1)",border:"1px solid rgba(196,169,98,0.3)",borderRadius:"3px",padding:"10px 14px",marginBottom:"14px"}},
-              React.createElement("p",{style:{fontSize:"0.84rem",color:"#7a5a20",margin:"0 0 6px"}},"Enter your email so future shares arrive automatically:"),
-              React.createElement("input",{type:"email",placeholder:"your@email.com",
-                onChange:e=>{ if(e.target.value.includes("@")) persistTop({carerEmail:e.target.value.trim().toLowerCase()}); },
-                style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",width:"100%"}})
+            // Email + verify prompt for users who haven't verified
+            !emailVerified&&React.createElement("div",{style:{background:"rgba(196,169,98,0.1)",border:"1px solid rgba(196,169,98,0.3)",borderRadius:"3px",padding:"10px 14px",marginBottom:"14px"}},
+              !(ownerEmail||carerEmail)
+                ? React.createElement(React.Fragment,null,
+                    React.createElement("p",{style:{fontSize:"0.84rem",color:"#7a5a20",margin:"0 0 6px"}},"Enter your email so future shares arrive automatically:"),
+                    React.createElement("input",{type:"email",placeholder:"your@email.com",
+                      onChange:e=>{ if(e.target.value.includes("@")) persistTop({carerEmail:e.target.value.trim().toLowerCase()}); },
+                      style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",width:"100%"}}))
+                : !verifyingEmail
+                  ? React.createElement(React.Fragment,null,
+                      React.createElement("p",{style:{fontSize:"0.84rem",color:"#7a5a20",margin:"0 0 6px"}},"Verify your email to receive future shares directly:"),
+                      React.createElement("div",{style:{display:"flex",gap:"8px",alignItems:"center"}},
+                        React.createElement("span",{style:{fontSize:"0.88rem",color:"#5a4830"}},(ownerEmail||carerEmail)),
+                        React.createElement("button",{onClick:()=>{setVerifyingEmail(true);sendVerifyCode();},disabled:verifyStatus==="sending",
+                          style:{...S.btn,padding:"5px 12px",fontSize:"0.82rem"}},verifyStatus==="sending"?"Sending\u2026":"Verify")))
+                  : React.createElement(React.Fragment,null,
+                      React.createElement("p",{style:{fontSize:"0.84rem",color:"#7a5a20",margin:"0 0 6px"}},"Enter the 6-digit code sent to "+(ownerEmail||carerEmail)+":"),
+                      React.createElement("div",{style:{display:"flex",gap:"6px",alignItems:"center"}},
+                        React.createElement("input",{value:verifyCode,onChange:e=>setVerifyCode(e.target.value.replace(/\D/g,"").slice(0,6)),
+                          onKeyDown:e=>{if(e.key==="Enter"&&verifyCode.length===6)confirmVerifyCode();},
+                          placeholder:"000000",maxLength:6,inputMode:"numeric",
+                          style:{...S.input,width:"100px",padding:"6px 10px",fontSize:"0.95rem",letterSpacing:"0.15em",textAlign:"center"}}),
+                        React.createElement("button",{onClick:confirmVerifyCode,disabled:verifyCode.length!==6||verifyStatus==="confirming",
+                          style:{...S.btn,padding:"5px 12px",fontSize:"0.82rem"}},verifyStatus==="confirming"?"Checking\u2026":"Confirm"),
+                        verifyStatus.startsWith("error:")&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#c4858a"}},verifyStatus.slice(6))))
             ),
 
             React.createElement("div",{style:{display:"flex",gap:"10px"}},
@@ -9276,7 +9401,7 @@ function handleEdit(m) {
         memories, shareHistory, ownerName,
         shareCodeInput, setShareCodeInput, shareCodeStatus, importFromCode,
         setView, setSelected,
-        ownerEmail, licenceKey, subject, isCarerMode,
+        ownerEmail, licenceKey, emailVerifyToken, subject, isCarerMode,
         acceptShare, setPendingConnectRequest,
         onShareBadgeCount: n => setShareBadgeCount(n),
         contributionLinks, persistSubject,
@@ -9294,6 +9419,7 @@ function handleEdit(m) {
         shareCodeStatus, importFromCode,
         saveBackupBusy, setSaveBackupBusy,
         syncInfo, syncStatus, chooseSyncFile, createSyncFile, doSync, clearSyncFile, buildBackupJson, isMobile,
+        emailVerified, verifyingEmail, setVerifyingEmail, sendVerifyCode, confirmVerifyCode, verifyCode, setVerifyCode, verifyStatus,
         settingsMode: view==="backup"?"backup":"account",
       }),
 

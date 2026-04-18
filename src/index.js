@@ -48,19 +48,21 @@ async function checkRateLimit(env, ip, action, limit, windowSecs) {
   return true;
 }
 
-async function sendNotificationEmail(env, { toEmail, fromName, memCount, shareId }) {
+async function sendNotificationEmail(env, { toEmail, fromName, memCount, shareId, inboxToken }) {
   if (!env.RESEND_API_KEY) return;
   const subject = fromName + " shared " + (memCount === 1 ? "a memory" : memCount + " memories") + " with you on Chronicle";
-  const shareUrl = shareId
-    ? "https://remembory.net/chronicle.html?share=" + shareId
-    : "https://remembory.net/chronicle.html";
+  // Build URL: prefer inbox token (shows full inbox), fallback to share code (shows single share)
+  const params = [];
+  if (inboxToken) params.push("inbox=" + inboxToken);
+  if (shareId) params.push("share=" + shareId);
+  const shareUrl = "https://remembory.net/chronicle.html" + (params.length ? "?" + params.join("&") : "");
   const text = [
     fromName + " has shared " + (memCount === 1 ? "a memory" : memCount + " memories") + " with you on Chronicle by Remembory.",
     "",
     "Open this link to review and accept " + (memCount === 1 ? "it" : "them") + ":",
     shareUrl,
     "",
-    shareId ? "Or in Chronicle, go to Sharing \u2192 Receive a Share and enter code: " + shareId : "In Chronicle, go to Sharing \u2192 Inbox.",
+    "This link is personal to you and expires in 7 days.",
     "",
     "---",
     "You received this because someone sent memories to this email address using Remembory.",
@@ -1558,12 +1560,15 @@ export default {
         if (!arr.find(d => d.shareId === shareId)) {
           arr.push({ shareId, fromName: fromName.trim(), fromEmail: fromEmailNorm, sentAt: now, _type: "direct_send" });
         }
+        // Generate a temporary inbox access token for this recipient
+        const inboxToken = crypto.randomUUID().replace(/-/g,"").slice(0, 24);
         await Promise.all([
           env.SHARES.put(shareId, bodyStr, { expirationTtl: 60 * 60 * 24 * 30 }),
           env.SHARES.put("deliveries:" + toEmailHash, JSON.stringify(arr), { expirationTtl: 60 * 60 * 24 * 365 }),
+          env.SHARES.put("inbox_token:" + inboxToken, toEmailHash, { expirationTtl: 60 * 60 * 24 * 7 }),
         ]);
         // Fire notification email — non-blocking, share succeeds regardless
-        ctx.waitUntil(sendNotificationEmail(env, { toEmail: toEmailNorm, fromName: fromName.trim(), memCount: memories.length, shareId }).catch(() => {}));
+        ctx.waitUntil(sendNotificationEmail(env, { toEmail: toEmailNorm, fromName: fromName.trim(), memCount: memories.length, shareId, inboxToken }).catch(() => {}));
         return json({ ok: true, shareId });
       } catch (e) {
         return json({ error: "Server error" }, 500);
@@ -1577,15 +1582,56 @@ export default {
         const body = await request.json();
         const email = (body.email || "").trim().toLowerCase();
         if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
-        // Verify caller owns this email — require licence key whose email matches
-        const callerKey = getViewerKey(request, url);
-        if (!callerKey) return json({ error: "Licence key required for inbox access. Use the share link from your email instead." }, 403);
-        const callerHash = await sha256hex(callerKey.trim().toUpperCase());
-        const licRaw = await env.SHARES.get("license:" + callerHash);
-        if (!licRaw) return json({ error: "Invalid licence key" }, 403);
-        const lic = JSON.parse(licRaw);
-        if (lic.email && lic.email !== email) return json({ error: "Email does not match licence" }, 403);
+        // Verify caller owns this email — via licence key OR verified email token
         const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
+        let authorized = false;
+        // Method 1: licence key whose email matches
+        const callerKey = getViewerKey(request, url);
+        if (callerKey) {
+          const callerHash = await sha256hex(callerKey.trim().toUpperCase());
+          const licRaw = await env.SHARES.get("license:" + callerHash);
+          if (licRaw) {
+            const lic = JSON.parse(licRaw);
+            if (!lic.email || lic.email === email) authorized = true;
+            else return json({ error: "Email does not match licence" }, 403);
+          }
+        }
+        // Method 2: email verification token
+        if (!authorized && body.verifyToken) {
+          const storedHash = await env.SHARES.get("email_verified:" + body.verifyToken);
+          if (storedHash === emailHash) authorized = true;
+        }
+        // Method 3: inbox token from notification email (legacy, still valid)
+        if (!authorized && body.inboxToken) {
+          const storedHash = await env.SHARES.get("inbox_token:" + body.inboxToken);
+          if (storedHash === emailHash) authorized = true;
+        }
+        if (!authorized) return json({ error: "Verify your email to access your inbox." }, 403);
+        const [deliveriesRaw, declinedRaw] = await Promise.all([
+          env.SHARES.get("deliveries:" + emailHash),
+          env.SHARES.get("inbox:declined:" + emailHash),
+        ]);
+        const stubs = deliveriesRaw ? JSON.parse(deliveriesRaw) : [];
+        const declined = declinedRaw ? JSON.parse(declinedRaw) : [];
+        const payloads = await Promise.all(stubs.map(async stub => {
+          const raw = await env.SHARES.get(stub.shareId);
+          if (!raw) return null;
+          return { ...JSON.parse(raw), _shareId: stub.shareId, _deliveredAt: stub.sentAt, _type: stub._type || "direct_send" };
+        }));
+        return json({ inbox: payloads.filter(Boolean), declined });
+      } catch (e) {
+        return json({ error: "Server error" }, 500);
+      }
+    }
+
+    // GET /share/inbox/by-token/:token — fetch inbox using a temporary token (from notification email)
+    if (request.method === "GET" && path.startsWith("/share/inbox/by-token/")) {
+      if (!await checkRateLimit(env, clientIp, "inbox_token", 15, 60)) return json({ error: "Too many requests" }, 429);
+      const token = path.slice("/share/inbox/by-token/".length);
+      if (!token || token.length > 30) return json({ error: "Invalid token" }, 400);
+      const emailHash = await env.SHARES.get("inbox_token:" + token);
+      if (!emailHash) return json({ error: "Token expired or invalid" }, 404);
+      try {
         const [deliveriesRaw, declinedRaw] = await Promise.all([
           env.SHARES.get("deliveries:" + emailHash),
           env.SHARES.get("inbox:declined:" + emailHash),
@@ -1820,6 +1866,60 @@ export default {
       return new Response(obj.body, {
         headers: { "Content-Type": obj.httpMetadata?.contentType || "image/jpeg", ...CORS, "Cache-Control": "private,max-age=3600" },
       });
+    }
+
+    // ── Email verification ────────────────────────────────────────────────
+
+    // POST /email/verify/send — send a 6-digit code to an email address
+    if (request.method === "POST" && path === "/email/verify/send") {
+      if (!await checkRateLimit(env, clientIp, "email_verify", 3, 300)) return json({ error: "Too many attempts. Try again in a few minutes." }, 429);
+      try {
+        const body = await request.json();
+        const email = (body.email || "").trim().toLowerCase();
+        if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
+        if (!env.RESEND_API_KEY) return json({ error: "Email not configured" }, 500);
+        const code = String(Math.floor(100000 + Math.random() * 900000));
+        const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
+        await env.SHARES.put("verify:" + emailHash, JSON.stringify({ code, email, createdAt: new Date().toISOString() }), { expirationTtl: 600 });
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + env.RESEND_API_KEY },
+          body: JSON.stringify({
+            from: "Chronicle by Remembory <noreply@remembory.net>",
+            to: [email],
+            subject: "Your Chronicle verification code: " + code,
+            text: "Your verification code is: " + code + "\n\nEnter this in Chronicle to verify your email address.\n\nThis code expires in 10 minutes.\n\nIf you didn't request this, you can safely ignore this email.",
+          }),
+        });
+        return json({ ok: true });
+      } catch (e) {
+        return json({ error: "Server error" }, 500);
+      }
+    }
+
+    // POST /email/verify/confirm — check the code, return a verification token
+    if (request.method === "POST" && path === "/email/verify/confirm") {
+      if (!await checkRateLimit(env, clientIp, "email_confirm", 10, 300)) return json({ error: "Too many attempts" }, 429);
+      try {
+        const body = await request.json();
+        const email = (body.email || "").trim().toLowerCase();
+        const code = (body.code || "").trim();
+        if (!email || !code) return json({ error: "Missing email or code" }, 400);
+        const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
+        const raw = await env.SHARES.get("verify:" + emailHash);
+        if (!raw) return json({ error: "Code expired or not found. Request a new one." }, 404);
+        const stored = JSON.parse(raw);
+        if (stored.code !== code) return json({ error: "Incorrect code" }, 403);
+        // Generate a long-lived verification token
+        const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+        await Promise.all([
+          env.SHARES.put("email_verified:" + token, emailHash, { expirationTtl: 60 * 60 * 24 * 365 }),
+          env.SHARES.delete("verify:" + emailHash),
+        ]);
+        return json({ ok: true, token });
+      } catch (e) {
+        return json({ error: "Server error" }, 500);
+      }
     }
 
     // ── Contact form ──────────────────────────────────────────────────────
