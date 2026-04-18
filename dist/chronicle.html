@@ -618,6 +618,7 @@ function migrateData(raw) {
     shareHistory: raw.shareHistory || [],
     senderNameMaps: raw.senderNameMaps || {},
     lastImport: raw.lastImport || null,
+    lastCloudSync: raw.lastCloudSync || null,
     legacyMessage: raw.legacyMessage || "",
   };
   return {
@@ -3933,7 +3934,7 @@ function isInAppBrowser() {
   return null;
 }
  
-function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
+function CloudSyncPanel({buildBackupJson, importBackup, licenceKey, onSyncComplete}) {
   const [passphrase, setPassphrase] = React.useState("");
   const [showPass, setShowPass] = React.useState(false);
   const [status, setStatus] = React.useState(""); // "", "pushing", "pulling", "done", "error:..."
@@ -4008,24 +4009,39 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
       if (!res.ok) { const e=await res.json().catch(()=>({})); setStatus("error:"+(e.error||res.status)); return; }
       const pushResult = await res.json().catch(()=>({}));
       if (pushResult.pushedAt) savePushedAt(pushResult.pushedAt);
-      // 2. Upload photos to R2
+      if (onSyncComplete) onSyncComplete("push");
+      // 2. Upload photos to R2 (skip ones already there)
       if (mediaIds.length > 0) {
-        setStatus("pushing photos (0/"+mediaIds.length+")");
-        let uploaded = 0;
-        const allMedia = await idbGetAll();
-        for (const mediaId of mediaIds) {
-          const blob = allMedia[mediaId];
-          if (!blob) { uploaded++; continue; }
-          try {
-            const encBuf = await encryptBlob(passphrase, blob);
-            await fetch(WORKER_URL + "/sync/media/" + hash + "/" + encodeURIComponent(mediaId), {
-              method: "PUT",
-              headers: {"Content-Type":"application/octet-stream","X-Chronicle-Client":"1"},
-              body: encBuf,
-            });
-          } catch(e) { /* skip failed photo, continue with rest */ }
-          uploaded++;
-          setStatus("pushing photos ("+uploaded+"/"+mediaIds.length+")");
+        setStatus("checking photos...");
+        let toUpload = mediaIds;
+        try {
+          const checkRes = await fetch(WORKER_URL + "/sync/media/check/" + hash, {
+            method:"POST", headers:{"Content-Type":"application/json","X-LS-Key":licenceKey},
+            body:JSON.stringify({mediaIds})
+          });
+          if (checkRes.ok) {
+            const {existing} = await checkRes.json();
+            toUpload = mediaIds.filter(id => !existing.includes(id));
+          }
+        } catch(e) {}
+        if (toUpload.length > 0) {
+          setStatus("pushing photos (0/"+toUpload.length+")");
+          let uploaded = 0;
+          const allMedia = await idbGetAll();
+          for (const mediaId of toUpload) {
+            const blob = allMedia[mediaId];
+            if (!blob) { uploaded++; continue; }
+            try {
+              const encBuf = await encryptBlob(passphrase, blob);
+              await fetch(WORKER_URL + "/sync/media/" + hash + "/" + encodeURIComponent(mediaId), {
+                method: "PUT",
+                headers: {"Content-Type":"application/octet-stream","X-Chronicle-Client":"1","X-LS-Key":licenceKey},
+                body: encBuf,
+              });
+            } catch(e) {}
+            uploaded++;
+            setStatus("pushing photos ("+uploaded+"/"+toUpload.length+")");
+          }
         }
       }
       setStatus("done");
@@ -4070,6 +4086,7 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey}) {
           setStatus("pulling photos ("+downloaded+"/"+mediaIds.length+")");
         }
       }
+      if (onSyncComplete) onSyncComplete("pull");
       setStatus("done");
       setTimeout(()=>setStatus(""),3000);
     } catch(e) { setStatus("error:"+e.message); }
@@ -4290,7 +4307,7 @@ function SettingsView({
       // ── Cloud Sync ──
       React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 12px"}},"Cloud Sync"),
-        React.createElement(CloudSyncPanel,{buildBackupJson,importBackup,licenceKey}),
+        React.createElement(CloudSyncPanel,{buildBackupJson,importBackup,licenceKey,onSyncComplete:()=>{persistSubject({lastCloudSync:new Date().toISOString(),lastBackup:new Date().toISOString()});}}),
         !isMobile&&React.createElement("div",{style:{marginTop:"16px",paddingTop:"16px",borderTop:"1px solid #ede4d4"}},
           React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",margin:"0 0 8px",fontStyle:"italic"}},"Or sync via a local cloud storage folder (desktop only):"),
           syncInfo
@@ -4329,10 +4346,10 @@ function SettingsView({
             else if (days < 30) { statusMsg = "\u26a0 Last backup "+days+" days ago \u2014 save a fresh copy"; statusColor = "#b0804a"; }
             else { statusMsg = "\u26a0 Last backup was "+days+" days ago \u2014 please back up soon"; statusColor = "#c4858a"; }
           }
-          const importLine = subject.lastImport && subject.lastBackup && new Date(subject.lastImport) > new Date(subject.lastBackup) ? (()=>{ const id2=Math.floor((Date.now()-new Date(subject.lastImport))/86400000); return "Last synced: "+(id2===0?"today":id2===1?"yesterday":id2+" days ago"); })() : null;
+          const syncLine = subject.lastCloudSync ? (()=>{ const id2=Math.floor((Date.now()-new Date(subject.lastCloudSync))/86400000); return "Last cloud sync: "+(id2===0?"today":id2===1?"yesterday":id2+" days ago"); })() : null;
           return React.createElement(React.Fragment, null,
             React.createElement("p",{style:{fontSize:"0.82rem",color:statusColor,fontStyle:"italic",margin:"0 0 4px"}}, statusMsg),
-            importLine && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px"}}, importLine)
+            syncLine && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px"}}, syncLine)
           );
         })(),
         React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.5}},
@@ -7511,7 +7528,7 @@ function handleEdit(m) {
         entityPhotosWithMedia[key] = med;
       }
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, candidates, treePersons, treeFamilies, knownPeople, knownOrgs, knownLocations, knownSources, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, orgLocations, orgPeriods, entityPhotos:entityPhotosWithMedia, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, senderNameMaps, // Top-level profile & settings fields
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, candidates, treePersons, treeFamilies, gedFocalPersonId:subject.gedFocalPersonId||null, knownPeople, knownOrgs, knownLocations, knownSources, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, orgLocations, orgPeriods, entityPhotos:entityPhotosWithMedia, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, senderNameMaps, legacyMessage, contributionLinks, // Top-level profile & settings fields
     wantPublicProfile:data.wantPublicProfile||false, profileAbout:data.profileAbout||"", profileImageUrl:data.profileImageUrl||"", allowFollowers:data.allowFollowers!==false, profilePrivacy:data.profilePrivacy||"open", profileDisplayName:data.profileDisplayName||"", carerMode:data.carerMode||false, carerName:data.carerName||"", carerEmail:data.carerEmail||"", suppressConnectRequests:data.suppressConnectRequests||[], _connections:(()=>{try{return JSON.parse(localStorage.getItem("chronicle-connections")||"[]");}catch(e){return[];}})()}, null, 2);
   }
 
@@ -8352,7 +8369,7 @@ function handleEdit(m) {
         }
       }));
       // Use functional setData to avoid stale closure — importBackup runs inside async FileReader callback
-      const subjectPatch = {memories:finalMems,candidates:mergedCandidates,treePersons:mergedTreePersons,treeFamilies:mergedTreeFamilies,knownPeople:mergedPeople,knownOrgs:mergedOrgs,knownSources:mergedSources,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,orgLocations:mergedOrgLocations,orgPeriods:mergedOrgPeriods,entityPhotos:mergedEntityPhotos,locationNotes:mergedLocationNotes,locationCoords:mergedLocationCoords,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,shareHistory:mergedShareHistory,senderNameMaps:mergedSenderNameMaps,lastImport:new Date().toISOString()};
+      const subjectPatch = {memories:finalMems,candidates:mergedCandidates,treePersons:mergedTreePersons,treeFamilies:mergedTreeFamilies,gedFocalPersonId:d.gedFocalPersonId||subject.gedFocalPersonId||null,knownPeople:mergedPeople,knownOrgs:mergedOrgs,knownSources:mergedSources,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,orgLocations:mergedOrgLocations,orgPeriods:mergedOrgPeriods,entityPhotos:mergedEntityPhotos,locationNotes:mergedLocationNotes,locationCoords:mergedLocationCoords,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,shareHistory:mergedShareHistory,senderNameMaps:mergedSenderNameMaps,legacyMessage:d.legacyMessage||subject.legacyMessage||"",contributionLinks:[...(subject.contributionLinks||[]),...(d.contributionLinks||[]).filter(l=>!(subject.contributionLinks||[]).some(e=>e.code===l.code))],lastImport:new Date().toISOString()};
       setData(prev => {
         const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
         const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
@@ -9074,23 +9091,23 @@ function handleEdit(m) {
             React.createElement("button",{
               onClick:()=>{
                 const myEmail = ownerEmail || carerEmail;
-                if (myEmail && pendingConnectRequest.email && socialKey) {
-                  fetch(WORKER_URL+"/connect",{
-                    method:"POST",
-                    headers:{"Content-Type":"application/json","X-LS-Key":socialKey},
-                    body:JSON.stringify({myEmail,theirEmail:pendingConnectRequest.email})
-                  }).then(()=>{
-                    // Store connection locally for People index filter
-                    const name = pendingConnectRequest.name;
-                    const email = pendingConnectRequest.email;
-                    if (name && email) {
-                      const conns = JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
-                      if (!conns.find(c=>c.email===email)) {
-                        conns.push({name, email, connectedAt: new Date().toISOString()});
-                        localStorage.setItem("chronicle-connections", JSON.stringify(conns));
-                        setLocalConnections([...conns]);
-                      }
-                    }
+                const name = pendingConnectRequest.name;
+                const email = pendingConnectRequest.email;
+                // Store connection locally
+                if (name && email) {
+                  const conns = JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
+                  if (!conns.find(c=>c.email===email)) {
+                    conns.push({name, email, connectedAt: new Date().toISOString()});
+                    localStorage.setItem("chronicle-connections", JSON.stringify(conns));
+                    setLocalConnections([...conns]);
+                  }
+                  persistSubject({peopleEmails:{...peopleEmails,[name]:email}});
+                }
+                // Notify the sender
+                if (myEmail && email) {
+                  fetch(WORKER_URL+"/connect/accept",{
+                    method:"POST",headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify({senderEmail:email,recipientName:ownerName||"Someone",recipientEmail:myEmail})
                   }).catch(()=>{});
                 }
                 setPendingConnectRequest(null);

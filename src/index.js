@@ -2057,6 +2057,24 @@ export default {
       });
     }
 
+    // POST /sync/media/check/:keyHash — check which mediaIds already exist in R2
+    if (request.method === "POST" && path.startsWith("/sync/media/check/")) {
+      const keyHash = path.slice("/sync/media/check/".length);
+      if (!/^[0-9a-f]{64}$/.test(keyHash)) return json({ error: "Invalid key" }, 400);
+      try {
+        const body = await request.json();
+        const mediaIds = Array.isArray(body.mediaIds) ? body.mediaIds.slice(0, 5000) : [];
+        const existing = [];
+        await Promise.all(mediaIds.map(async id => {
+          const obj = await env.MEDIA.head(`sync/${keyHash}/${id}`);
+          if (obj) existing.push(id);
+        }));
+        return json({ existing });
+      } catch (e) {
+        return json({ error: "Server error" }, 500);
+      }
+    }
+
     // DELETE /sync/media/:keyHash — clean up all media for a sync slot (requires licence key)
     if (request.method === "DELETE" && path.startsWith("/sync/media/")) {
       const keyHash = path.slice("/sync/media/".length);
