@@ -6355,7 +6355,9 @@ function App() {
     incomingPeople.forEach(name => {
       if (stored[name]) {
         const targetName = stored[name];
-        if (targetName === name) {
+        if (targetName === ownerName) {
+          prefilled[name] = {action:"me", newName:ownerName};
+        } else if (targetName === name) {
           prefilled[name] = {action:"keep", newName:""};
         } else if (knownPeople.includes(targetName)) {
           prefilled[name] = {action:"map", newName:targetName};
@@ -8853,6 +8855,17 @@ function handleEdit(m) {
                       !action&&React.createElement("span",{style:{fontSize:"0.75rem",color:"#b0804a",fontStyle:"italic"}},"needs your input")
                     ),
                     React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"5px",paddingLeft:"4px"}},
+                      // Option 0: This is me
+                      ownerName&&React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
+                        React.createElement("input",{type:"radio",name:"namemap_"+name,checked:action==="me",
+                          onChange:()=>{
+                            // Clear any other "me" selection first
+                            const cleared={};
+                            Object.entries(pendingShareNameMap).forEach(([k,v])=>{if(v.action==="me")cleared[k]={action:null,newName:""};});
+                            setPendingShareNameMap(prev=>({...prev,...cleared,[name]:{action:"me",newName:ownerName}}));
+                          },id:"me_"+name}),
+                        React.createElement("label",{htmlFor:"me_"+name,style:{fontSize:"0.82rem",color:"#4a7a5a",cursor:"pointer",fontWeight:600}},"This is me"+(ownerName?" ("+ownerName+")":""))
+                      ),
                       // Option 1: Map to an existing person in your Chronicle
                       knownPeople.length>0&&React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}},
                         React.createElement("input",{type:"radio",name:"namemap_"+name,checked:action==="map",
@@ -8934,7 +8947,10 @@ function handleEdit(m) {
                   const mappedMems = pendingShare.memories.filter(m=>pendingShareSelected.has(m.id)).map(m=>{
                     let people = [...(m.people||[])];
                     Object.entries(nameMap).forEach(([oldName, mapping])=>{
-                      if (mapping.action==="map" && mapping.newName) {
+                      if (mapping.action==="me" && ownerName) {
+                        // This person is me — replace with my name
+                        people = people.map(p=>p===oldName?ownerName:p);
+                      } else if (mapping.action==="map" && mapping.newName) {
                         // Map to existing person — replace with their name
                         people = people.map(p=>p===oldName?mapping.newName:p);
                       } else if (mapping.action==="rename" && mapping.newName.trim()) {
@@ -8952,9 +8968,9 @@ function handleEdit(m) {
                   if (senderEmail) {
                     const maps = {};
                     Object.entries(nameMap).forEach(([oldName, mapping])=>{
-                      if (mapping.action==="map" && mapping.newName) maps[oldName] = mapping.newName;
+                      if (mapping.action==="me" && ownerName) maps[oldName] = ownerName;
+                      else if (mapping.action==="map" && mapping.newName) maps[oldName] = mapping.newName;
                       else if (mapping.action==="rename" && mapping.newName.trim()) maps[oldName] = mapping.newName.trim();
-                      // "keep" means sender's name = our name, save that too
                       else if (mapping.action==="keep") maps[oldName] = oldName;
                     });
                     if (Object.keys(maps).length) {
