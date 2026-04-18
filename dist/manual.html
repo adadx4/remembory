@@ -491,7 +491,7 @@
       <div class="sidebar-chapter">Import</div>
       <a href="#import">Importing Memories</a>
       <a href="#photo-import" class="section-link">From photos</a>
-      <a href="#email-import" class="section-link">From email</a>
+      <a href="#cloud-sync" class="section-link">Cloud sync</a>
       <div class="sidebar-chapter">Sharing</div>
       <a href="#sharing">Sharing Memories</a>
       <a href="#share-link" class="section-link">Sharing by link</a>
@@ -695,7 +695,7 @@
           <tr><td>Family</td><td>Memories involving family</td></tr>
           <tr><td>Travel</td><td>Trips, journeys, and adventures away from home</td></tr>
           <tr><td>Education</td><td>School, university, courses, and learning</td></tr>
-          <tr><td>Work</td><td>Career, jobs, and professional life</td></tr>
+          <tr><td>Employment</td><td>Career, jobs, and professional life</td></tr>
           <tr><td>Love</td><td>Relationships and romance</td></tr>
           <tr><td>Health</td><td>Medical events, illness, recovery, fitness milestones</td></tr>
           <tr><td>Milestone</td><td>Significant life events and achievements</td></tr>
@@ -875,17 +875,17 @@
       <div class="tip">You can import many photos at once. Chronicle processes them all and lets you review each before saving.</div>
       <div class="note">If a photo has no EXIF date (common with scanned prints or screenshots), a warning will show and you can enter the date manually.</div>
 
-      <h2 id="email-import">Importing from Email</h2>
-      <p>Chronicle can parse raw email files (.eml format) or pasted email text and convert them into memories — useful for preserving old correspondence as part of your life story.</p>
+      <h2 id="cloud-sync">Cloud Sync</h2>
+      <p>Subscribers can sync their Chronicle across devices using cloud sync. Your data is encrypted on your device before upload — we cannot read it.</p>
       <ol class="steps">
-        <li>Click <strong>Import</strong> in the navigation</li>
-        <li>Select the <strong>Email</strong> tab</li>
-        <li>Either drag an .eml file onto the drop zone, click to browse for it, or paste raw email text into the text area</li>
-        <li>Chronicle will parse the email and populate the memory fields with the subject, date, sender, and body text</li>
-        <li>Review and edit the extracted details</li>
-        <li>Click <strong>Save to Chronicle</strong></li>
+        <li>Go to <strong>Settings &rarr; Backup &amp; Restore</strong></li>
+        <li>Under Cloud Sync, enter a <strong>sync passphrase</strong> (used to encrypt your data)</li>
+        <li>Click <strong>Push to cloud</strong> to upload your Chronicle</li>
+        <li>On another device, enter the same licence key and passphrase, then click <strong>Pull from cloud</strong></li>
       </ol>
-      <div class="tip">Most email clients can export messages as .eml files. In Apple Mail, select a message and use File → Save As. In Gmail, open the message, click the three-dot menu, and choose Download message.</div>
+      <p>If a memory has been edited on both devices, Chronicle shows a conflict resolution dialog where you can choose to keep your local version, use the cloud version, or merge both together.</p>
+      <p>Photos are synced separately and encrypted with the same passphrase. A progress bar shows upload and download progress.</p>
+      <div class="note">Your sync passphrase is not the same as your Chronicle lock password. If you forget it, your cloud data cannot be recovered.</div>
     </section>
 
     <div class="divider"></div>

@@ -967,7 +967,7 @@
   <div class="hero-actions">
     <a href="https://remembory.net/chronicle.html" target="_blank" rel="noopener" class="btn-primary">Your Private Chronicle</a>
   </div>
-  <p class="hero-note">Chronicle is a single HTML file — no account, no cloud, completely private. Share memories with the people who were there — auto-delivered to connected recipients, no link-hunting required.</p>
+  <p class="hero-note">Chronicle runs in your browser — no account required, encrypted when you set a password. Share memories with the people who were there. Sync across devices with cloud backup.</p>
   <p class="hero-note" style="margin-top:10px; animation-delay:0.9s;">Unlock sharing &amp; social features —
     <span id="hero-sub-toggle">
       <a href="#" onclick="event.preventDefault();document.getElementById('hero-sub-toggle').style.display='none';document.getElementById('hero-sub-options').style.display='inline-flex';" style="color:var(--gold-dark); text-decoration:none; border-bottom:1px solid rgba(168,136,90,0.35);">✨ Subscribe for $20 AUD/year</a>
@@ -986,8 +986,8 @@
     <div class="product-intro-text reveal">
       <span class="section-label">Our first tool</span>
       <h2>Chronicle —<br>your private <em>life journal</em></h2>
-      <p>Chronicle is a personal life journal that lets you record memories across the entire timeline of your life. Browse by decade, year, or month. Tag people, places, and themes. Share memories with the people who were there.</p>
-      <p>It lives entirely on your device as a single file. No login. No subscription. No data leaving your hands.</p>
+      <p>Chronicle is a personal life journal that lets you record memories across the entire timeline of your life. Browse by decade, year, or month. Tag people, places, and themes. Attach photos. Share memories with the people who were there.</p>
+      <p>Your data lives on your device. Set a password and it's encrypted. Use cloud sync to back up and access from other devices. Free to use as a personal journal — a subscription unlocks sharing and social features.</p>
     </div>
     <!-- App mockup -->
     <div class="app-mockup reveal">
@@ -1092,13 +1092,13 @@
       <div class="feature">
         <span class="feature-icon">📷</span>
         <h3>Photo import</h3>
-        <p>Drop in photos and Chronicle reads the EXIF date automatically, placing them on your timeline without any manual date entry.</p>
+        <p>Drop in photos and Chronicle reads the date and GPS location from EXIF data automatically, placing them on your timeline with the right date and place.</p>
       </div>
 
       <div class="feature">
-        <span class="feature-icon">📨</span>
-        <h3>Email import</h3>
-        <p>Turn old emails into memories. Drop in a .eml file and Chronicle extracts the date, sender, and message to save as part of your story.</p>
+        <span class="feature-icon">📊</span>
+        <h3>Life Timeline</h3>
+        <p>See your residence, education, and employment history as a visual chart. Tag memories with home, education, or work and Chronicle builds a graphical timeline of your life.</p>
       </div>
 
       <div class="feature">
@@ -1134,15 +1134,15 @@
 <!-- Privacy strip -->
 <div class="privacy-strip">
   <h3>Privacy isn't a feature. It's the foundation.</h3>
-  <p>Chronicle runs entirely in your browser. Nothing is sent anywhere. No analytics, no tracking, no server. Your memories are just a file on your device.</p>
+  <p>Chronicle runs entirely in your browser. No analytics, no tracking. When you set a password, your data is encrypted on your device before it goes anywhere. If you use cloud sync, we store only an encrypted blob we cannot read.</p>
   <div class="privacy-pillars">
     <div class="pillar">
       <span class="pillar-icon">🔒</span>
-      <span>No account</span>
+      <span>Encrypted</span>
     </div>
     <div class="pillar">
-      <span class="pillar-icon">📵</span>
-      <span>No cloud</span>
+      <span class="pillar-icon">👁</span>
+      <span>Zero-knowledge</span>
     </div>
     <div class="pillar">
       <span class="pillar-icon">🚫</span>
@@ -1150,7 +1150,7 @@
     </div>
     <div class="pillar">
       <span class="pillar-icon">💾</span>
-      <span>Your device only</span>
+      <span>Your data, your device</span>
     </div>
     <div class="pillar">
       <span class="pillar-icon">∞</span>
@@ -1184,11 +1184,11 @@
         <div class="sub-card-label">Subscriber</div>
         <div class="sub-card-price">$20 AUD <span>/ year</span></div>
         <ul class="sub-features">
-          <li>✓ <strong>Public profile</strong> — Share your story</li>
+          <li>✓ <strong>Share memories</strong> — Send memories with photos to anyone</li>
+          <li>✓ <strong>Cloud sync</strong> — Back up and sync across devices, including photos</li>
           <li>✓ <strong>Connections</strong> — Link with family &amp; friends</li>
-          <li>✓ <strong>Subscriber feeds</strong> — Access others' subscriber memories</li>
-          <li>✓ <strong>Cloud Sync</strong> — Back up across devices</li>
-          <li>✓ <strong>Guest contributions</strong> — invite others to submit memories to your Chronicle</li>
+          <li>✓ <strong>Guest contributions</strong> — Invite others to submit memories to your Chronicle</li>
+          <li>✓ <strong>Legacy View</strong> — Curate a life story to share or preserve</li>
         </ul>
         <button class="btn-subscribe" onclick="this.style.display='none';document.getElementById('sub-options').style.display='flex';">Subscribe now →</button>
         <div id="sub-options" style="display:none;flex-direction:column;gap:8px;">
@@ -1246,7 +1246,7 @@
   <span class="footer-brand">Remem<span>bory</span></span>
   <p>Chronicle · Free personal life journal</p>
   <p><a href="manual.html" style="color:var(--gold-dark); text-decoration:none; font-family:'Crimson Text',serif;">User Manual</a></p>
-  <p style="font-style:italic; color:var(--ink-faint);">Built with care. Yours to keep.</p>
+  <p><a href="https://staging.remembory.net/terms" style="color:var(--ink-faint); text-decoration:none; font-size:0.82rem;">Terms</a> &middot; <a href="https://staging.remembory.net/privacy" style="color:var(--ink-faint); text-decoration:none; font-size:0.82rem;">Privacy</a> &middot; <a href="mailto:admin@remembory.net" style="color:var(--ink-faint); text-decoration:none; font-size:0.82rem;">Contact</a></p>
   <p style="margin-top:12px;">
     <span id="footer-sub-toggle">
       <a href="#" onclick="event.preventDefault();document.getElementById('footer-sub-toggle').style.display='none';document.getElementById('footer-sub-options').style.display='inline-flex';" style="color:var(--gold-dark);text-decoration:none;font-family:'Crimson Text',serif;font-size:0.9rem;border-bottom:1px solid rgba(168,136,90,0.35);">✨ Subscribe to Remembory Social</a>
