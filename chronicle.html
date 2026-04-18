@@ -1373,7 +1373,7 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, isMobile
         lanes.map(function(lane,li){
           var laneW = isMobile ? 40 : Math.max(40, Math.min(80, Math.floor((600 - labelW) / lanes.length)));
           return React.createElement("div",{key:lane.id,style:{position:"relative",width:laneW+"px",flexShrink:0}},
-            React.createElement("div",{style:{position:"absolute",top:"-16px",left:0,width:"100%",textAlign:"center",fontSize:"0.58rem",color:"#8a7460",fontFamily:"Arial,sans-serif",letterSpacing:"0.04em",textTransform:"uppercase",whiteSpace:"nowrap",overflow:"hidden"}},lane.label),
+            React.createElement("div",{style:{position:"absolute",top:"-16px",left:0,width:"100%",textAlign:"center",fontSize:"0.7rem",color:"#8a7460",fontFamily:"Arial,sans-serif",letterSpacing:"0.04em",textTransform:"uppercase",whiteSpace:"nowrap",overflow:"hidden"}},lane.label),
             lane.periods.map(function(r,ri){
               var top = (r.startFrac - graphStartYear) * rowH;
               var h = Math.max(4, (r.endFrac - r.startFrac) * rowH);
@@ -1892,7 +1892,7 @@ function MediaImg({med, style, alt=""}) {
   const [src, setSrc] = React.useState(med.url && med.url.startsWith("data:") ? med.url : null);
   React.useEffect(() => {
     let cancelled = false;
-    resolveMediaUrl(med).then(url => { if (!cancelled && url) setSrc(url); });
+    resolveMediaUrl(med).then(url => { if (!cancelled && url) setSrc(url); }).catch(()=>{});
     return () => { cancelled = true; };
   }, [med.mediaId, med.url]);
   if (!src) return React.createElement("div", {style:{...style, background:"#e8dfd0", display:"flex", alignItems:"center", justifyContent:"center"}},
@@ -5271,7 +5271,7 @@ function SharedTimelineView({ memories, subjectName, setSelected, setView }) {
                   style:{display:"flex",alignItems:"flex-start",gap:"8px",marginBottom:"6px"}},
                   // Year + dot
                   React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"5px",width:"52px",flexShrink:0,paddingTop:"3px"}},
-                    React.createElement("span",{style:{fontSize:"0.66rem",color:"#8a7460",fontFamily:"'Playfair Display',serif",fontWeight:700,minWidth:"32px",textAlign:"right"}},m.year||""),
+                    React.createElement("span",{style:{fontSize:"0.75rem",color:"#8a7460",fontFamily:"'Playfair Display',serif",fontWeight:700,minWidth:"32px",textAlign:"right"}},m.year||""),
                     React.createElement("span",{style:{width:"9px",height:"9px",borderRadius:"50%",background:color,flexShrink:0,display:"inline-block"}})
                   ),
                   // Event
@@ -5284,7 +5284,7 @@ function SharedTimelineView({ memories, subjectName, setSelected, setView }) {
                             textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px"}
                         }, displayTitle)
                       : React.createElement("span",{style:{fontFamily:"'Crimson Text',Georgia,serif",fontSize:"0.9rem",color:"#3a3028",lineHeight:1.4}},displayTitle),
-                    !isOwn&&React.createElement("span",{style:{fontSize:"0.66rem",color:color,fontStyle:"italic",marginLeft:"6px",fontFamily:"'Crimson Text',serif"}},
+                    !isOwn&&React.createElement("span",{style:{fontSize:"0.75rem",color:color,fontStyle:"italic",marginLeft:"6px",fontFamily:"'Crimson Text',serif"}},
                       m._person+(relMap[m._person]?" · "+relMap[m._person]:"")
                     )
                   )
@@ -5689,7 +5689,7 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
                 [tp.dob&&"b."+tp.dob, tp.dod&&"d."+tp.dod].filter(Boolean).join("  ")||"\u00a0"
               ),
               tp.birthPlace&&React.createElement("div",{style:{fontSize:"0.64rem",color:isFocal?"rgba(245,240,232,0.5)":"#a89a7a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:"2px"}},tp.birthPlace.split(",")[0]),
-              hasSubject&&!isFocal&&React.createElement("div",{style:{position:"absolute",bottom:"5px",right:"7px",fontSize:"0.58rem",color:"#9a7830",fontFamily:"'Crimson Text',serif",letterSpacing:"0.03em",fontStyle:"italic"}},"chronicle")
+              hasSubject&&!isFocal&&React.createElement("div",{style:{position:"absolute",bottom:"5px",right:"7px",fontSize:"0.7rem",color:"#9a7830",fontFamily:"'Crimson Text',serif",letterSpacing:"0.03em",fontStyle:"italic"}},"chronicle")
             );
           })
         ),

@@ -1880,17 +1880,17 @@ export default {
         if (!env.RESEND_API_KEY) return json({ error: "Email not configured" }, 500);
         const code = String(Math.floor(100000 + Math.random() * 900000));
         const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
-        await env.SHARES.put("verify:" + emailHash, JSON.stringify({ code, email, createdAt: new Date().toISOString() }), { expirationTtl: 600 });
+        await env.SHARES.put("verify:" + emailHash, JSON.stringify({ code, createdAt: new Date().toISOString() }), { expirationTtl: 600 });
         await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": "Bearer " + env.RESEND_API_KEY },
           body: JSON.stringify({
             from: "Chronicle by Remembory <noreply@remembory.net>",
             to: [email],
-            subject: "Your Chronicle verification code: " + code,
+            subject: "Your Chronicle verification code",
             text: "Your verification code is: " + code + "\n\nEnter this in Chronicle to verify your email address.\n\nThis code expires in 10 minutes.\n\nIf you didn't request this, you can safely ignore this email.",
           }),
-        });
+        }).catch(() => {});
         return json({ ok: true });
       } catch (e) {
         return json({ error: "Server error" }, 500);
@@ -1942,7 +1942,7 @@ export default {
             subject: "Support request from " + (name || "a Chronicle user"),
             text: "From: " + (name || "Anonymous") + "\nEmail: " + (email || "not provided") + "\n\n" + message,
           }),
-        });
+        }).catch(() => {});
         return json({ ok: true });
       } catch (e) {
         return json({ error: "Failed to send. Please try again." }, 500);
@@ -1961,7 +1961,9 @@ export default {
       if (!mediaId || mediaId.length > 100) return json({ error: "Invalid mediaId" }, 400);
       // Verify caller owns this sync slot via licence key
       const callerKey = getViewerKey(request, url);
-      if (callerKey) { const callerHash = await sha256hex(callerKey.trim().toUpperCase()); if (callerHash !== keyHash) return json({ error: "Forbidden" }, 403); }
+      if (!callerKey) return json({ error: "Unauthorized" }, 401);
+      const callerHash = await sha256hex(callerKey.trim().toUpperCase());
+      if (callerHash !== keyHash) return json({ error: "Forbidden" }, 403);
       const syncRaw = await env.SHARES.get("sync:" + keyHash);
       if (!syncRaw) return json({ error: "Push metadata first" }, 403);
       const body = await request.arrayBuffer();
