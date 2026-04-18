@@ -7484,7 +7484,7 @@ function handleEdit(m) {
       }
     }));
     return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, candidates, treePersons, treeFamilies, knownPeople, knownOrgs, knownLocations, knownSources, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, orgLocations, orgPeriods, entityPhotos:entityPhotosWithMedia, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, // Top-level profile & settings fields
-    wantPublicProfile:data.wantPublicProfile||false, profileAbout:data.profileAbout||"", profileImageUrl:data.profileImageUrl||"", allowFollowers:data.allowFollowers!==false, profilePrivacy:data.profilePrivacy||"open", profileDisplayName:data.profileDisplayName||"", carerMode:data.carerMode||false, carerName:data.carerName||"", carerEmail:data.carerEmail||"", suppressConnectRequests:data.suppressConnectRequests||[]}, null, 2);
+    wantPublicProfile:data.wantPublicProfile||false, profileAbout:data.profileAbout||"", profileImageUrl:data.profileImageUrl||"", allowFollowers:data.allowFollowers!==false, profilePrivacy:data.profilePrivacy||"open", profileDisplayName:data.profileDisplayName||"", carerMode:data.carerMode||false, carerName:data.carerName||"", carerEmail:data.carerEmail||"", suppressConnectRequests:data.suppressConnectRequests||[], _connections:(()=>{try{return JSON.parse(localStorage.getItem("chronicle-connections")||"[]");}catch(e){return[];}})()}, null, 2);
   }
 
   async function buildBackupBlob(backupPassword) {
@@ -8278,9 +8278,28 @@ function handleEdit(m) {
       const backupCandidates=d.candidates||[];
       const existingCandIds=new Set(candidates.map(c=>c.id));
       const mergedCandidates=[...candidates,...backupCandidates.filter(c=>!existingCandIds.has(c.id))];
-      const updatedPeopleEmails = {...(peopleEmails||{})};
+      const updatedPeopleEmails = {...(d.peopleEmails||{}), ...(peopleEmails||{})};
       if (senderName && senderEmail) updatedPeopleEmails[senderName] = senderEmail;
       const mergedRelationships = {...(d.peopleRelationships||{}), ...(data.peopleRelationships||{})};
+      // Merge shareHistory (deduplicate by date+memIds)
+      const existingShareDates = new Set((shareHistory||[]).map(h=>h.date));
+      const mergedShareHistory = [...(shareHistory||[]), ...(d.shareHistory||[]).filter(h=>!existingShareDates.has(h.date))];
+      // Merge tree data
+      const mergedTreePersons = d.treePersons && d.treePersons.length > (treePersons||[]).length ? d.treePersons : (treePersons||[]);
+      const mergedTreeFamilies = d.treeFamilies && d.treeFamilies.length > (treeFamilies||[]).length ? d.treeFamilies : (treeFamilies||[]);
+      // Merge connections (localStorage-based, but sync via backup)
+      if (d._connections) {
+        try {
+          const localConns = JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
+          const localEmails = new Set(localConns.map(c=>c.email));
+          const newConns = (d._connections||[]).filter(c=>c.email&&!localEmails.has(c.email));
+          if (newConns.length) {
+            const merged = [...localConns,...newConns];
+            localStorage.setItem("chronicle-connections",JSON.stringify(merged));
+            setLocalConnections(merged);
+          }
+        } catch(e) {}
+      }
       const mergedPeopleNotes={...(d.peopleNotes||{}),...peopleNotes}; const mergedOrgNotes={...(d.orgNotes||{}),...orgNotes};
       const mergedOrgLocations={...(d.orgLocations||{}), ...(data.orgLocations||{})};
       const mergedOrgPeriods={...(d.orgPeriods||{}), ...(data.orgPeriods||{})};
@@ -8300,7 +8319,7 @@ function handleEdit(m) {
         }
       }));
       // Use functional setData to avoid stale closure — importBackup runs inside async FileReader callback
-      const subjectPatch = {memories:finalMems,candidates:mergedCandidates,knownPeople:mergedPeople,knownOrgs:mergedOrgs,knownSources:mergedSources,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,orgLocations:mergedOrgLocations,orgPeriods:mergedOrgPeriods,entityPhotos:mergedEntityPhotos,locationNotes:mergedLocationNotes,locationCoords:mergedLocationCoords,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,lastImport:new Date().toISOString()};
+      const subjectPatch = {memories:finalMems,candidates:mergedCandidates,treePersons:mergedTreePersons,treeFamilies:mergedTreeFamilies,knownPeople:mergedPeople,knownOrgs:mergedOrgs,knownSources:mergedSources,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,orgLocations:mergedOrgLocations,orgPeriods:mergedOrgPeriods,entityPhotos:mergedEntityPhotos,locationNotes:mergedLocationNotes,locationCoords:mergedLocationCoords,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,shareHistory:mergedShareHistory,lastImport:new Date().toISOString()};
       setData(prev => {
         const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
         const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
