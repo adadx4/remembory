@@ -4348,7 +4348,7 @@ function SettingsView({
 
 // ── SharingView ───────────────────────────────────────────────
 function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShareCodeInput,
-  shareCodeStatus, importFromCode, setView, setSelected, ownerEmail,
+  shareCodeStatus, importFromCode, setView, setSelected, ownerEmail, licenceKey,
   subject, isCarerMode, acceptShare, setPendingConnectRequest, onShareBadgeCount,
   contributionLinks, persistSubject}) {
 
@@ -4386,7 +4386,7 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
     } else {
       fetch(WORKER_URL + "/share/inbox/fetch", {
         method:"POST",
-        headers:{"Content-Type":"application/json"},
+        headers:{"Content-Type":"application/json",...(licenceKey?{"X-LS-Key":licenceKey}:{})},
         body:JSON.stringify({email:ownerEmail})
       }).then(r=>r.ok?r.json():{inbox:[],declined:[]})
         .then(d=>{
@@ -7070,6 +7070,38 @@ function handleEdit(m) {
     }
   }
 
+  // Auto-fetch share from URL parameter (?share=CODE)
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("share");
+    if (!code) return;
+    // Clean the URL so refreshing doesn't re-trigger
+    window.history.replaceState({}, "", window.location.pathname);
+    // Fetch the share
+    (async () => {
+      try {
+        const res = await fetch(WORKER_URL + "/s/" + encodeURIComponent(code.trim()), {headers:{"X-Chronicle-Client":"1"}});
+        if (!res.ok) return;
+        const dRaw = await res.json();
+        if (!dRaw.memories) return;
+        // Restore any embedded media back into IDB
+        const restoredMems = await Promise.all(dRaw.memories.map(async m => {
+          const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async med => {
+            if (med.url && med.url.startsWith("data:")) {
+              const id = med.mediaId || ("media_" + Date.now() + "_" + Math.random().toString(36).slice(2));
+              try { const r2 = await fetch(med.url); const blob = await r2.blob(); await idbPut(id, blob); return { mediaId: id, name: med.name }; } catch(e) { return med; }
+            }
+            return med;
+          }));
+          return {...m, mediaUrls};
+        }));
+        setPendingShare({...dRaw, memories: restoredMems, _shareId: code});
+        setPendingShareSelected(new Set(restoredMems.map(m=>m.id)));
+        setPendingShareWantConnect(true);
+      } catch(e) {}
+    })();
+  }, []);
+
   async function acceptShare(d) {
     const isShared = !!d.sharedBy;
     const senderName = d.sharedBy || null;
@@ -8656,6 +8688,14 @@ function handleEdit(m) {
               )
             ),
 
+            // Email prompt for users who haven't set one
+            !(ownerEmail||carerEmail)&&React.createElement("div",{style:{background:"rgba(196,169,98,0.1)",border:"1px solid rgba(196,169,98,0.3)",borderRadius:"3px",padding:"10px 14px",marginBottom:"14px"}},
+              React.createElement("p",{style:{fontSize:"0.84rem",color:"#7a5a20",margin:"0 0 6px"}},"Enter your email so future shares arrive automatically:"),
+              React.createElement("input",{type:"email",placeholder:"your@email.com",
+                onChange:e=>{ if(e.target.value.includes("@")) persistTop({carerEmail:e.target.value.trim().toLowerCase()}); },
+                style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",width:"100%"}})
+            ),
+
             React.createElement("div",{style:{display:"flex",gap:"10px"}},
               React.createElement("button",{
                 onClick:()=>{
@@ -9236,7 +9276,7 @@ function handleEdit(m) {
         memories, shareHistory, ownerName,
         shareCodeInput, setShareCodeInput, shareCodeStatus, importFromCode,
         setView, setSelected,
-        ownerEmail, subject, isCarerMode,
+        ownerEmail, licenceKey, subject, isCarerMode,
         acceptShare, setPendingConnectRequest,
         onShareBadgeCount: n => setShareBadgeCount(n),
         contributionLinks, persistSubject,

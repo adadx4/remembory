@@ -48,16 +48,19 @@ async function checkRateLimit(env, ip, action, limit, windowSecs) {
   return true;
 }
 
-async function sendNotificationEmail(env, { toEmail, fromName, memCount }) {
+async function sendNotificationEmail(env, { toEmail, fromName, memCount, shareId }) {
   if (!env.RESEND_API_KEY) return;
   const subject = fromName + " shared " + (memCount === 1 ? "a memory" : memCount + " memories") + " with you on Chronicle";
+  const shareUrl = shareId
+    ? "https://remembory.net/chronicle.html?share=" + shareId
+    : "https://remembory.net/chronicle.html";
   const text = [
     fromName + " has shared " + (memCount === 1 ? "a memory" : memCount + " memories") + " with you on Chronicle by Remembory.",
     "",
-    "Open Chronicle to review and accept " + (memCount === 1 ? "it" : "them") + ":",
-    "https://remembory.net/chronicle.html",
+    "Open this link to review and accept " + (memCount === 1 ? "it" : "them") + ":",
+    shareUrl,
     "",
-    "In Chronicle, go to Sharing \u2192 Inbox.",
+    shareId ? "Or in Chronicle, go to Sharing \u2192 Receive a Share and enter code: " + shareId : "In Chronicle, go to Sharing \u2192 Inbox.",
     "",
     "---",
     "You received this because someone sent memories to this email address using Remembory.",
@@ -1560,7 +1563,7 @@ export default {
           env.SHARES.put("deliveries:" + toEmailHash, JSON.stringify(arr), { expirationTtl: 60 * 60 * 24 * 365 }),
         ]);
         // Fire notification email — non-blocking, share succeeds regardless
-        ctx.waitUntil(sendNotificationEmail(env, { toEmail: toEmailNorm, fromName: fromName.trim(), memCount: memories.length }).catch(() => {}));
+        ctx.waitUntil(sendNotificationEmail(env, { toEmail: toEmailNorm, fromName: fromName.trim(), memCount: memories.length, shareId }).catch(() => {}));
         return json({ ok: true, shareId });
       } catch (e) {
         return json({ error: "Server error" }, 500);
@@ -1574,6 +1577,14 @@ export default {
         const body = await request.json();
         const email = (body.email || "").trim().toLowerCase();
         if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
+        // Verify caller owns this email — require licence key whose email matches
+        const callerKey = getViewerKey(request, url);
+        if (!callerKey) return json({ error: "Licence key required for inbox access. Use the share link from your email instead." }, 403);
+        const callerHash = await sha256hex(callerKey.trim().toUpperCase());
+        const licRaw = await env.SHARES.get("license:" + callerHash);
+        if (!licRaw) return json({ error: "Invalid licence key" }, 403);
+        const lic = JSON.parse(licRaw);
+        if (lic.email && lic.email !== email) return json({ error: "Email does not match licence" }, 403);
         const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
         const [deliveriesRaw, declinedRaw] = await Promise.all([
           env.SHARES.get("deliveries:" + emailHash),
