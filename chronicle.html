@@ -8517,7 +8517,7 @@ function handleEdit(m) {
   }, [view, scrollToDecade]);
 
   // ── Delivery polling ─────────────────────────────────────────
-  // Check for pending deliveries every 5 minutes without clearing the queue.
+  // Check for pending deliveries and connection acceptances every 5 minutes.
   React.useEffect(() => {
     if (!ownerEmail) return;
     async function poll() {
@@ -8530,6 +8530,36 @@ function handleEdit(m) {
         if (!r.ok) return;
         const d = await r.json();
         if (typeof d.count === "number") setShareBadgeCount(d.count);
+      } catch {}
+      // Check for connection acceptances
+      try {
+        const r2 = await fetch(WORKER_URL + "/connect/accepted?email=" + encodeURIComponent(ownerEmail.trim().toLowerCase()));
+        if (r2.ok) {
+          const d2 = await r2.json();
+          if (d2.accepted && d2.accepted.length > 0) {
+            const conns = JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
+            let added = false;
+            d2.accepted.forEach(a => {
+              if (!conns.find(c=>c.email===a.email)) {
+                conns.push({name:a.name, email:a.email, connectedAt:a.acceptedAt});
+                added = true;
+              }
+            });
+            if (added) {
+              localStorage.setItem("chronicle-connections", JSON.stringify(conns));
+              setLocalConnections([...conns]);
+              // Also store their emails in peopleEmails
+              const emailUpdates = {};
+              d2.accepted.forEach(a => { if(a.name && a.email) emailUpdates[a.name] = a.email; });
+              if (Object.keys(emailUpdates).length) persistSubject({peopleEmails:{...peopleEmails,...emailUpdates}});
+            }
+            // Clear the notifications after processing
+            fetch(WORKER_URL + "/connect/accepted/clear", {
+              method:"POST", headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({email:ownerEmail.trim().toLowerCase()})
+            }).catch(()=>{});
+          }
+        }
       } catch {}
     }
     poll(); // immediate check on mount / email change
@@ -8783,8 +8813,8 @@ function handleEdit(m) {
       const isKnown = senderEmail && Object.values(peopleEmails||{}).includes(senderEmail);
       const darkBg = isKnown ? "#2c2416" : "#3a2c1a";
 
-      return React.createElement("div",{style:{position:"fixed",inset:0,background:"rgba(28,18,8,0.75)",zIndex:500,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center",padding:isMobile?0:"20px",backdropFilter:"blur(4px)"}},
-        React.createElement("div",{style:{background:"#f5f0e8",borderRadius:isMobile?"12px 12px 0 0":"6px",maxWidth:"520px",width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.4)",overflow:"hidden",animation:"fadeIn 0.3s ease",maxHeight:isMobile?"92vh":"auto",overflowY:"auto"}},
+      return React.createElement("div",{style:{position:"fixed",inset:0,background:"rgba(28,18,8,0.75)",zIndex:500,display:"flex",alignItems:isMobile?"flex-end":"center",justifyContent:"center",padding:isMobile?"0":"20px",backdropFilter:"blur(4px)",overflowY:"auto"}},
+        React.createElement("div",{style:{background:"#f5f0e8",borderRadius:isMobile?"12px 12px 0 0":"6px",maxWidth:"520px",width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.4)",overflow:"hidden",animation:"fadeIn 0.3s ease",maxHeight:isMobile?"92vh":"85vh",overflowY:"auto"}},
           // Header
           React.createElement("div",{style:{background:darkBg,padding:"20px 28px"}},
             React.createElement("h2",{style:{margin:0,fontFamily:"'Playfair Display',serif",fontSize:"1.4rem",color:"#f5f0e8",fontStyle:"italic"}},
@@ -8963,7 +8993,26 @@ function handleEdit(m) {
                   });
                   const filtered={...pendingShare, memories:mappedMems};
                   if(filtered.memories.length>0) acceptShare(filtered);
-                  if(pendingShareWantConnect && senderEmail && pendingShare.sharedBy) setPendingConnectRequest({name:pendingShare.sharedBy,email:senderEmail});
+                  // Auto-connect if checkbox was checked — no second prompt
+                  if(pendingShareWantConnect && senderEmail && pendingShare.sharedBy) {
+                    const name=pendingShare.sharedBy, email=senderEmail;
+                    const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
+                    if(!conns.find(c=>c.email===email)){
+                      conns.push({name,email,connectedAt:new Date().toISOString()});
+                      localStorage.setItem("chronicle-connections",JSON.stringify(conns));
+                      setLocalConnections([...conns]);
+                    }
+                    // Store their email in peopleEmails for sharing
+                    if(name) persistSubject({peopleEmails:{...peopleEmails,[name]:email}});
+                    // Notify the sender that the connection was accepted
+                    const myEmail = ownerEmail || carerEmail;
+                    if(myEmail) {
+                      fetch(WORKER_URL+"/connect/accept",{
+                        method:"POST",headers:{"Content-Type":"application/json"},
+                        body:JSON.stringify({senderEmail:email,recipientName:ownerName||"Someone",recipientEmail:myEmail})
+                      }).catch(()=>{});
+                    }
+                  }
                   // Save name mappings for this sender so future shares auto-map
                   if (senderEmail) {
                     const maps = {};

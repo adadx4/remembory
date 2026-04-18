@@ -1344,6 +1344,71 @@ export default {
       return json({ entries });
     }
 
+    // POST /connect/accept — notify the sender that a connection was accepted
+    if (request.method === "POST" && path === "/connect/accept") {
+      if (!await checkRateLimit(env, clientIp, "connect_accept", 10, 60)) return json({ error: "Too many requests" }, 429);
+      try {
+        const body = await request.json();
+        const senderEmail = (body.senderEmail || "").trim().toLowerCase();
+        const recipientName = (body.recipientName || "").trim();
+        const recipientEmail = (body.recipientEmail || "").trim().toLowerCase();
+        if (!senderEmail || !senderEmail.includes("@")) return json({ error: "Invalid sender email" }, 400);
+        if (!recipientName) return json({ error: "Missing recipient name" }, 400);
+        const senderEmailHash = await hmacHex(env.EMAIL_HASH_SECRET, senderEmail);
+        // Store acceptance notification for the sender to pick up
+        const key = "connect_accepted:" + senderEmailHash;
+        const existing = await env.SHARES.get(key);
+        const arr = existing ? JSON.parse(existing) : [];
+        if (!arr.find(a => a.email === recipientEmail)) {
+          arr.push({ name: recipientName, email: recipientEmail, acceptedAt: new Date().toISOString() });
+        }
+        await env.SHARES.put(key, JSON.stringify(arr), { expirationTtl: 60 * 60 * 24 * 90 });
+        // Send notification email to the sender
+        if (env.RESEND_API_KEY) {
+          ctx.waitUntil(fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + env.RESEND_API_KEY },
+            body: JSON.stringify({
+              from: "Chronicle by Remembory <noreply@remembory.net>",
+              to: [senderEmail],
+              subject: recipientName + " connected with you on Chronicle",
+              text: recipientName + " accepted your connection on Chronicle by Remembory.\n\nYou can now share memories with each other directly.\n\nOpen Chronicle:\nhttps://remembory.net/chronicle.html",
+            }),
+          }).catch(() => {}));
+        }
+        return json({ ok: true });
+      } catch (e) {
+        return json({ error: "Server error" }, 500);
+      }
+    }
+
+    // GET /connect/accepted — check for pending connection acceptances
+    if (request.method === "GET" && path === "/connect/accepted") {
+      try {
+        const email = (url.searchParams.get("email") || "").trim().toLowerCase();
+        if (!email || !email.includes("@")) return json({ accepted: [] });
+        const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
+        const raw = await env.SHARES.get("connect_accepted:" + emailHash);
+        return json({ accepted: raw ? JSON.parse(raw) : [] });
+      } catch (e) {
+        return json({ accepted: [] });
+      }
+    }
+
+    // POST /connect/accepted/clear — clear connection notifications after viewing
+    if (request.method === "POST" && path === "/connect/accepted/clear") {
+      try {
+        const body = await request.json();
+        const email = (body.email || "").trim().toLowerCase();
+        if (!email) return json({ ok: true });
+        const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
+        await env.SHARES.delete("connect_accepted:" + emailHash);
+        return json({ ok: true });
+      } catch (e) {
+        return json({ error: "Server error" }, 500);
+      }
+    }
+
     // GET /connections — profiles connected to the viewer (mutual or one-way)
     if (request.method === "GET" && path === "/connections") {
       const viewerKey = getViewerKey(request, url);
