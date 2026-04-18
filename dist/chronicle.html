@@ -616,6 +616,7 @@ function migrateData(raw) {
     lastBackup: raw.lastBackup || null,
     backupPassword: raw.backupPassword || "",
     shareHistory: raw.shareHistory || [],
+    senderNameMaps: raw.senderNameMaps || {},
     lastImport: raw.lastImport || null,
     legacyMessage: raw.legacyMessage || "",
   };
@@ -6341,6 +6342,30 @@ function App() {
   const [pendingConnectRequest, setPendingConnectRequest] = useState(null); // {name, email}
   const [pendingShareSelected, setPendingShareSelected] = useState(new Set());
   const [pendingShareWantConnect, setPendingShareWantConnect] = useState(true);
+  const [pendingShareNameMap, setPendingShareNameMap] = useState({}); // {incomingName: {action:"map"|"keep"|"rename", newName:""}}
+  // Pre-fill name mappings from stored sender data when a share arrives
+  React.useEffect(() => {
+    if (!pendingShare) return;
+    const email = pendingShare.sharedByEmail || "";
+    const stored = email && senderNameMaps[email];
+    if (!stored) return;
+    const selectedMems = pendingShare.memories;
+    const incomingPeople = [...new Set(selectedMems.flatMap(m=>m.people||[]))].filter(Boolean);
+    const prefilled = {};
+    incomingPeople.forEach(name => {
+      if (stored[name]) {
+        const targetName = stored[name];
+        if (targetName === name) {
+          prefilled[name] = {action:"keep", newName:""};
+        } else if (knownPeople.includes(targetName)) {
+          prefilled[name] = {action:"map", newName:targetName};
+        } else {
+          prefilled[name] = {action:"rename", newName:targetName};
+        }
+      }
+    });
+    if (Object.keys(prefilled).length) setPendingShareNameMap(prefilled);
+  }, [pendingShare]);
   const [inAppShareCode, setInAppShareCode] = useState(null);
   const [inAppBrowser, setInAppBrowser] = useState(null);
   const [pendingEndMemory, setPendingEndMemory] = useState(null);
@@ -6402,6 +6427,7 @@ function App() {
   const peopleRelationships = subject.peopleRelationships || {};
   const peopleNotes         = subject.peopleNotes || {};
   const shareHistory          = subject.shareHistory || [];
+  const senderNameMaps        = subject.senderNameMaps || {};
   const contributionLinks     = subject.contributionLinks || [];
   const legacyMessage         = subject.legacyMessage || "";
   const orgNotes            = subject.orgNotes || {};
@@ -6673,7 +6699,7 @@ function App() {
   // persist: legacy-compatible — detects if patch is subject-level or top-level
   function persist(patch) {
     // If patch contains subject-level keys, route to persistSubject
-    const subjectKeys = new Set(["memories","candidates","treePersons","treeFamilies","gedFocalPersonId","customTags","knownPeople","knownOrgs","knownLocations","knownSources","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","contributionLinks","locationNotes","locationCoords","orgLocations","orgPeriods","orgNotes","entityPhotos","personOrgs","personLocations","personGroups"]);
+    const subjectKeys = new Set(["memories","candidates","treePersons","treeFamilies","gedFocalPersonId","customTags","knownPeople","knownOrgs","knownLocations","knownSources","peopleEmails","peopleRelationships","lastBackup","lastImport","backupPassword","legacyMessage","contributionLinks","locationNotes","locationCoords","orgLocations","orgPeriods","orgNotes","entityPhotos","personOrgs","personLocations","personGroups","shareHistory","senderNameMaps"]);
     const isSubjectPatch = Object.keys(patch).some(k => subjectKeys.has(k));
     if (isSubjectPatch) {
       // strip any top-level only keys before passing to persistSubject
@@ -7483,7 +7509,7 @@ function handleEdit(m) {
         entityPhotosWithMedia[key] = med;
       }
     }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, candidates, treePersons, treeFamilies, knownPeople, knownOrgs, knownLocations, knownSources, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, orgLocations, orgPeriods, entityPhotos:entityPhotosWithMedia, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, // Top-level profile & settings fields
+    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, candidates, treePersons, treeFamilies, knownPeople, knownOrgs, knownLocations, knownSources, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, orgLocations, orgPeriods, entityPhotos:entityPhotosWithMedia, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, senderNameMaps, // Top-level profile & settings fields
     wantPublicProfile:data.wantPublicProfile||false, profileAbout:data.profileAbout||"", profileImageUrl:data.profileImageUrl||"", allowFollowers:data.allowFollowers!==false, profilePrivacy:data.profilePrivacy||"open", profileDisplayName:data.profileDisplayName||"", carerMode:data.carerMode||false, carerName:data.carerName||"", carerEmail:data.carerEmail||"", suppressConnectRequests:data.suppressConnectRequests||[], _connections:(()=>{try{return JSON.parse(localStorage.getItem("chronicle-connections")||"[]");}catch(e){return[];}})()}, null, 2);
   }
 
@@ -8287,6 +8313,11 @@ function handleEdit(m) {
       // Merge tree data
       const mergedTreePersons = d.treePersons && d.treePersons.length > (treePersons||[]).length ? d.treePersons : (treePersons||[]);
       const mergedTreeFamilies = d.treeFamilies && d.treeFamilies.length > (treeFamilies||[]).length ? d.treeFamilies : (treeFamilies||[]);
+      // Merge sender name maps (deep merge per sender)
+      const mergedSenderNameMaps = {...(senderNameMaps||{})};
+      Object.entries(d.senderNameMaps||{}).forEach(([email, maps])=>{
+        mergedSenderNameMaps[email] = {...(mergedSenderNameMaps[email]||{}), ...maps};
+      });
       // Merge connections (localStorage-based, but sync via backup)
       if (d._connections) {
         try {
@@ -8319,7 +8350,7 @@ function handleEdit(m) {
         }
       }));
       // Use functional setData to avoid stale closure — importBackup runs inside async FileReader callback
-      const subjectPatch = {memories:finalMems,candidates:mergedCandidates,treePersons:mergedTreePersons,treeFamilies:mergedTreeFamilies,knownPeople:mergedPeople,knownOrgs:mergedOrgs,knownSources:mergedSources,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,orgLocations:mergedOrgLocations,orgPeriods:mergedOrgPeriods,entityPhotos:mergedEntityPhotos,locationNotes:mergedLocationNotes,locationCoords:mergedLocationCoords,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,shareHistory:mergedShareHistory,lastImport:new Date().toISOString()};
+      const subjectPatch = {memories:finalMems,candidates:mergedCandidates,treePersons:mergedTreePersons,treeFamilies:mergedTreeFamilies,knownPeople:mergedPeople,knownOrgs:mergedOrgs,knownSources:mergedSources,customTags:mergedTags,knownLocations:mergedLocs,peopleEmails:updatedPeopleEmails,peopleRelationships:mergedRelationships,peopleNotes:mergedPeopleNotes,orgNotes:mergedOrgNotes,orgLocations:mergedOrgLocations,orgPeriods:mergedOrgPeriods,entityPhotos:mergedEntityPhotos,locationNotes:mergedLocationNotes,locationCoords:mergedLocationCoords,personOrgs:mergedPersonOrgs,personLocations:mergedPersonLocations,personGroups:mergedPersonGroups,shareHistory:mergedShareHistory,senderNameMaps:mergedSenderNameMaps,lastImport:new Date().toISOString()};
       setData(prev => {
         const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
         const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
@@ -8801,6 +8832,61 @@ function handleEdit(m) {
               )
             ),
 
+            // Person name mapping — every incoming person must be explicitly handled
+            (()=>{
+              const selectedMems = pendingShare.memories.filter(m=>pendingShareSelected.has(m.id));
+              const incomingPeople = [...new Set(selectedMems.flatMap(m=>m.people||[]))].filter(Boolean);
+              if (!incomingPeople.length) return null;
+              const allResolved = incomingPeople.every(name=>pendingShareNameMap[name]?.action);
+              return React.createElement("div",{style:{background:"rgba(196,169,98,0.08)",border:"1px solid rgba(196,169,98,0.3)",borderRadius:"3px",padding:"12px 14px",marginBottom:"14px"}},
+                React.createElement("p",{style:{fontSize:"0.84rem",color:"#7a5a20",fontWeight:600,margin:"0 0 4px"}},"People in these memories"),
+                React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 10px",lineHeight:1.5}},
+                  "Choose how each person should be saved in your Chronicle:"),
+                incomingPeople.map(name=>{
+                  const mapping = pendingShareNameMap[name];
+                  const action = mapping ? mapping.action : null;
+                  const newName = mapping ? mapping.newName : "";
+                  return React.createElement("div",{key:name,style:{padding:"8px 0",borderTop:"1px solid #ede4d4",background:action?undefined:"rgba(196,169,98,0.06)"}},
+                    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"6px",marginBottom:"6px"}},
+                      React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208",fontWeight:600}},
+                        "\ud83d\udc64 "+name),
+                      !action&&React.createElement("span",{style:{fontSize:"0.75rem",color:"#b0804a",fontStyle:"italic"}},"needs your input")
+                    ),
+                    React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"5px",paddingLeft:"4px"}},
+                      // Option 1: Map to an existing person in your Chronicle
+                      knownPeople.length>0&&React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}},
+                        React.createElement("input",{type:"radio",name:"namemap_"+name,checked:action==="map",
+                          onChange:()=>setPendingShareNameMap(prev=>({...prev,[name]:{action:"map",newName:""}})),id:"map_"+name}),
+                        React.createElement("label",{htmlFor:"map_"+name,style:{fontSize:"0.82rem",color:"#2c2416",cursor:"pointer"}},"I know this person as "),
+                        action==="map"&&React.createElement("select",{value:newName,onChange:e=>setPendingShareNameMap(prev=>({...prev,[name]:{action:"map",newName:e.target.value}})),
+                            style:{...S.select,padding:"3px 8px",fontSize:"0.82rem"}},
+                            React.createElement("option",{value:""},"choose\u2026"),
+                            knownPeople.map(p=>React.createElement("option",{key:p,value:p},p)))
+                      ),
+                      // Option 2: Add as a new person with this name
+                      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"6px"}},
+                        React.createElement("input",{type:"radio",name:"namemap_"+name,checked:action==="keep",
+                          onChange:()=>setPendingShareNameMap(prev=>({...prev,[name]:{action:"keep",newName:""}})),id:"keep_"+name}),
+                        React.createElement("label",{htmlFor:"keep_"+name,style:{fontSize:"0.82rem",color:"#2c2416",cursor:"pointer"}},"Add as new person \""+name+"\"")
+                      ),
+                      // Option 3: Add as new person with a different name
+                      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}},
+                        React.createElement("input",{type:"radio",name:"namemap_"+name,checked:action==="rename",
+                          onChange:()=>setPendingShareNameMap(prev=>({...prev,[name]:{action:"rename",newName:""}})),id:"rename_"+name}),
+                        React.createElement("label",{htmlFor:"rename_"+name,style:{fontSize:"0.82rem",color:"#2c2416",cursor:"pointer"}},"Add as new person called "),
+                        action==="rename"&&React.createElement("input",{value:newName,autoFocus:true,
+                          onChange:e=>setPendingShareNameMap(prev=>({...prev,[name]:{action:"rename",newName:e.target.value}})),
+                          placeholder:"e.g. "+name+" ("+pendingShare.sharedBy+")",
+                          style:{...S.input,padding:"3px 8px",fontSize:"0.82rem",width:"200px"}})
+                      )
+                    )
+                  );
+                }),
+                !allResolved&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#b0804a",fontStyle:"italic",margin:"10px 0 0"}},
+                  "Please resolve all people above before accepting.")
+              );
+            })(),
+
             React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"16px"}},
               "You can add your own perspective to any saved memory afterwards."
             ),
@@ -8843,12 +8929,54 @@ function handleEdit(m) {
             React.createElement("div",{style:{display:"flex",gap:"10px"}},
               React.createElement("button",{
                 onClick:()=>{
-                  const filtered={...pendingShare,memories:pendingShare.memories.filter(m=>pendingShareSelected.has(m.id))};
+                  // Apply name mappings to incoming memories
+                  const nameMap = pendingShareNameMap;
+                  const mappedMems = pendingShare.memories.filter(m=>pendingShareSelected.has(m.id)).map(m=>{
+                    let people = [...(m.people||[])];
+                    Object.entries(nameMap).forEach(([oldName, mapping])=>{
+                      if (mapping.action==="map" && mapping.newName) {
+                        // Map to existing person — replace with their name
+                        people = people.map(p=>p===oldName?mapping.newName:p);
+                      } else if (mapping.action==="rename" && mapping.newName.trim()) {
+                        // Add as new person with different name
+                        people = people.map(p=>p===oldName?mapping.newName.trim():p);
+                      }
+                      // "keep" — no change needed
+                    });
+                    return {...m, people:[...new Set(people)]};
+                  });
+                  const filtered={...pendingShare, memories:mappedMems};
                   if(filtered.memories.length>0) acceptShare(filtered);
                   if(pendingShareWantConnect && senderEmail && pendingShare.sharedBy) setPendingConnectRequest({name:pendingShare.sharedBy,email:senderEmail});
+                  // Save name mappings for this sender so future shares auto-map
+                  if (senderEmail) {
+                    const maps = {};
+                    Object.entries(nameMap).forEach(([oldName, mapping])=>{
+                      if (mapping.action==="map" && mapping.newName) maps[oldName] = mapping.newName;
+                      else if (mapping.action==="rename" && mapping.newName.trim()) maps[oldName] = mapping.newName.trim();
+                      // "keep" means sender's name = our name, save that too
+                      else if (mapping.action==="keep") maps[oldName] = oldName;
+                    });
+                    if (Object.keys(maps).length) {
+                      persistSubject({senderNameMaps:{...senderNameMaps, [senderEmail]:{...(senderNameMaps[senderEmail]||{}), ...maps}}});
+                    }
+                  }
                   setPendingShare(null);
+                  setPendingShareNameMap({});
                 },
-                disabled:pendingShareSelected.size===0,
+                disabled:(()=>{
+                  if(pendingShareSelected.size===0) return true;
+                  const selectedMems = pendingShare.memories.filter(m=>pendingShareSelected.has(m.id));
+                  const incomingPeople = [...new Set(selectedMems.flatMap(m=>m.people||[]))].filter(Boolean);
+                  if(!incomingPeople.length) return false;
+                  const allResolved = incomingPeople.every(name=>pendingShareNameMap[name]?.action);
+                  if(!allResolved) return true;
+                  // Check that "map" and "rename" have valid names
+                  return incomingPeople.some(name=>{
+                    const m=pendingShareNameMap[name];
+                    return (m.action==="map"&&!m.newName)||(m.action==="rename"&&!m.newName.trim());
+                  });
+                })(),
                 style:{...S.btn,flex:1,background:isKnown?"#2c2416":"#5a3820",opacity:pendingShareSelected.size===0?0.4:1,cursor:pendingShareSelected.size===0?"not-allowed":"pointer"}},
                 pendingShareSelected.size===0 ? "Select at least one memory"
                   : isKnown ? `Save ${pendingShareSelected.size} ${pendingShareSelected.size===1?"memory":"memories"} to my Chronicle`
