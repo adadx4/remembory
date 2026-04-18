@@ -471,10 +471,10 @@
       <div class="sidebar-chapter">Views</div>
       <a href="#navigating">Navigating Chronicle</a>
       <a href="#life-view">The Life View</a>
-      <a href="#list-view">The List View</a>
+      <a href="#list-view">Life Events</a>
 
       <div class="sidebar-chapter">Memories</div>
-      <a href="#adding">Adding a Memory</a>
+      <a href="#adding">Adding Memories</a>
       <a href="#date-fields" class="section-link">Fuzzy dates</a>
       <a href="#visibility" class="section-link">Visibility</a>
       <a href="#tags" class="section-link">Tags</a>
@@ -484,8 +484,7 @@
       <a href="#editing">Editing & Deleting</a>
 
       <div class="sidebar-chapter">Browsing</div>
-      <a href="#index-view">The Index View</a>
-      <a href="#people-manager">People & Orgs Manager</a>
+      <a href="#index-view">People, Places, Tags &amp; more</a>
       <a href="#map-view">The Map View</a>
 
       <div class="sidebar-chapter">Import</div>
@@ -517,34 +516,50 @@
     <!-- Cover -->
     <div class="cover" id="intro">
       <h1 class="first-h1">Chronicle</h1>
-    <div class="callout" style="background:rgba(200,168,122,0.08);border:1px solid rgba(200,168,122,0.3);border-radius:4px;padding:16px 20px;margin-bottom:28px">
-      <strong style="font-family:'Playfair Display',serif;font-size:1rem;color:#1a1208">What's new</strong>
-      <ul style="margin:8px 0 0 18px;font-size:.95rem;color:#6a5c48;line-height:1.8">
-        <li><strong>Auto-delivery for connected recipients</strong> — when you share with someone whose email is in your Connections, Chronicle delivers the memory directly to their inbox — no link to copy and send. See <a href="#sharing" style="color:var(--gold-dark)">Sharing Memories</a>.</li>
-        <li><strong>Guest contribution links</strong> — generate a permanent link that lets anyone submit memories and documents directly into your Chronicle inbox. Perfect for collaborative research. See <a href="#contribution-links" style="color:var(--gold-dark)">Contribution Links</a>.</li>
-        <li><strong>Accept all</strong> — in the Sharing inbox, accept an entire batch of incoming memories with one click rather than one at a time.</li>
-      </ul>
-    </div>
-      <div class="subtitle">User Manual</div>
+<div class="subtitle">User Manual</div>
       <div class="byline">by Remembory</div>
       <p class="tagline">A personal life journal for your whole story.</p>
     </div>
 
     <!-- Introduction -->
     <section class="section">
-      <p class="chapter-intro">Chronicle is a personal life journal that lives entirely on your computer as a single HTML file. Open it in any web browser and your memories are stored locally — nothing leaves your device unless you choose to share.</p>
+      <p class="chapter-intro">Chronicle is a personal life journal that runs in your web browser. Your memories are stored locally on your device and encrypted when you set a password. A subscription unlocks sharing and cloud sync.</p>
 
       <p>This manual covers every feature in Chronicle. Whether you are just getting started or looking to make the most of a specific capability, you will find step-by-step instructions throughout.</p>
 
       <h2 id="getting-started">Getting Started</h2>
       <ol class="steps">
-        <li>Visit <a href="https://adadx4.github.io/remembory/chronicle.html" style="color:var(--gold-dark)">Chronicle on Remembory</a> in your browser</li>
+        <li>Visit <a href="https://remembory.net/chronicle.html" style="color:var(--gold-dark)">remembory.net/chronicle.html</a> in your browser</li>
         <li>Chronicle opens and you are ready to record your first memory</li>
-        <li>Bookmark the page for quick access — your memories will always be there when you return</li>
+        <li>Bookmark the page for quick access</li>
       </ol>
 
-      <div class="tip">Chronicle works offline after your first visit. A service worker caches everything so you can use it anywhere, even without an internet connection. Updates happen silently in the background — you always have the latest version without doing anything.</div>
-      <div class="note">Your memories are stored in your browser on your device — they never leave it. If you use multiple browsers (e.g. Chrome and Safari), your memories will be separate in each. Pick one browser and stick to it, or use the backup feature to keep them in sync.</div>
+      <div class="tip">Chronicle works offline after your first visit. A service worker caches everything so you can use it anywhere, even without an internet connection. Updates happen silently in the background.</div>
+
+      <h2 id="your-data">Where Your Data Lives</h2>
+      <p>Chronicle stores your memories in your browser's local storage. This means:</p>
+      <ul>
+        <li><strong>Each browser keeps its own data.</strong> Chrome, Safari, Firefox, and Edge each have their own storage. If you use Chrome on your laptop, your memories are only in Chrome on that laptop.</li>
+        <li><strong>Each browser profile is separate.</strong> If you use multiple Chrome profiles (e.g. personal and work), each one has its own Chronicle data.</li>
+        <li><strong>Pick one browser and stick to it.</strong> Choose the browser you use most and always open Chronicle there.</li>
+        <li><strong>Clearing browser data deletes your memories.</strong> Be careful with "Clear browsing data" settings &#8212; they can erase your Chronicle. Download a backup regularly.</li>
+      </ul>
+
+      <h2 id="protecting-data">Protecting Your Memories</h2>
+      <p>Because your data lives in browser storage, it is important to protect it:</p>
+      <ul>
+        <li><strong>Set a password.</strong> Go to Settings &#8594; Account and set a Chronicle lock password. This encrypts your data so only you can read it.</li>
+        <li><strong>Download regular backups.</strong> Go to Settings &#8594; Backup &amp; Restore and click Download backup. Save the file to a cloud drive, external disk, or both.</li>
+        <li><strong>Use Cloud Sync (subscribers).</strong> Cloud Sync backs up your Chronicle to the cloud, encrypted with a passphrase you choose. You can then pull it onto another device. Go to Settings &#8594; Backup &amp; Restore &#8594; Cloud Sync.</li>
+      </ul>
+
+      <h2 id="multiple-devices">Using Chronicle on Multiple Devices</h2>
+      <p>Chronicle data does not automatically sync between devices. To access your Chronicle on a second device:</p>
+      <ol class="steps">
+        <li><strong>Cloud Sync (recommended):</strong> Push from your primary device, then pull on the second device using the same licence key and passphrase</li>
+        <li><strong>Manual backup:</strong> Download a backup file on one device, then import it on the other via Settings &#8594; Backup &amp; Restore</li>
+      </ol>
+      <div class="note">If you edit memories on two devices and then sync, Chronicle will show a conflict resolution dialog where you can choose which version to keep for each changed memory, or merge them together.</div>
 
       <h2 id="settings">Your Name & Email</h2>
       <p>Before sharing memories with others, set your name and email address so recipients know who sent them.</p>
@@ -569,12 +584,12 @@
       <table class="ftable">
         <thead><tr><th>View</th><th>What it does</th></tr></thead>
         <tbody>
-          <tr><td>◉ Life</td><td>Your home view — memories as a grid of decade cards showing activity across your whole life</td></tr>
-          <tr><td>≡ List</td><td>A scrollable chronological list of all memories with search and tag filtering</td></tr>
-          <tr><td>☰ Index</td><td>Browse memories by tag, person, organisation, or location</td></tr>
-          <tr><td>🗺 Map</td><td>A world map showing where memories took place, with clickable pins</td></tr>
-          <tr><td>🖨 Print</td><td>Generate a formatted document of your life story to print or save as PDF</td></tr>
-          <tr><td>↑ Import</td><td>Bring in new memories from photos or email files</td></tr>
+          <tr><td>&#9673; Overview</td><td>Your home view &#8212; memories as a grid of decade cards showing activity across your whole life</td></tr>
+          <tr><td>&#8801; Life Events</td><td>A scrollable chronological list of all memories with search and tag filtering</td></tr>
+          <tr><td>&#128202; Life Timeline</td><td>A graphical chart showing your residence, education, and employment history</td></tr>
+          <tr><td>&#128100; People, &#128205; Places, etc.</td><td>Browse memories by person, place, organisation, relationship, group, or tag</td></tr>
+          <tr><td>&#128444; Photos</td><td>All photos across your memories in a chronological gallery</td></tr>
+          <tr><td>&#128506; Map</td><td>A world map showing where memories took place, with filters by tag, person, and decade</td></tr>
         </tbody>
       </table>
 
@@ -623,7 +638,7 @@
 
     <!-- List View -->
     <section class="section">
-      <h1 id="list-view">The List View</h1>
+      <h1 id="list-view">Life Events</h1>
       <p>The List view shows all memories in a single scrollable chronological timeline, grouped into decades. This is the best view for searching across your whole archive.</p>
 
       <h2>Searching</h2>
@@ -637,8 +652,15 @@
 
     <!-- Adding -->
     <section class="section">
-      <h1 id="adding">Adding a Memory</h1>
-      <p class="chapter-intro">Click the <strong>+ Add</strong> button in the header to open the memory form. Only the title is required — fill in everything else at whatever level of detail feels right.</p>
+      <h1 id="adding">Adding Memories</h1>
+      <p class="chapter-intro">There are several ways to get memories into Chronicle:</p>
+      <ul>
+        <li><strong>From Memory</strong> &#8212; Write a memory directly using the Add menu. Only a title and date are required.</li>
+        <li><strong>From Photo</strong> &#8212; Import photos and Chronicle reads the date and GPS location from the image metadata automatically.</li>
+        <li><strong>Get Prompt</strong> &#8212; Chronicle's Prompter asks questions based on the people, places, and themes already in your Chronicle, helping you recall memories you might not have thought to record.</li>
+        <li><strong>Build your index first</strong> &#8212; Add people, places, and organisations via the Life menu before writing memories. The Prompter uses these to generate targeted questions, and they appear as suggestions when you fill in the memory form.</li>
+      </ul>
+      <p>To add a memory directly, go to <strong>Add &#8594; From Memory</strong>. Only the title and date are required &#8212; fill in everything else at whatever level of detail feels right. Optional fields (location, tags, people, organisations, photos) open one at a time to keep the form clean.</p>
 
       <h2>Title</h2>
       <p>Give the memory a name that will mean something to you later. The title appears in all views and is the primary way you will find the memory again.</p>
@@ -751,32 +773,33 @@
 
     <!-- Index View -->
     <section class="section">
-      <h1 id="index-view">The Index View</h1>
-      <p class="chapter-intro">The Index view lets you browse memories by category rather than by time. Access it from the navigation — it has four tabs.</p>
+      <h1 id="index-view">Browsing by Category</h1>
+      <p class="chapter-intro">The Life menu gives you direct access to browse memories by category. Each one opens its own view.</p>
 
-      <h2>Tags Tab</h2>
-      <p>Shows all tags used across your memories, with a count of how many memories carry each tag. Click any tag to see all matching memories displayed as cards.</p>
+      <h2>People</h2>
+      <p>Shows everyone in your Chronicle with a count of memories. People with no memories yet are sorted to the top. You can add relationships, email addresses, notes, and link people to organisations and locations. Click any person to see all their memories. Use <strong>+ add person</strong> to record someone before writing any memories about them.</p>
 
-      <h2>People Tab</h2>
-      <p>Shows everyone in your index with a count of memories. People with no memories yet are sorted to the top. Use the filter chips to narrow by relationship, linked organisation, or linked location. Click <strong>+ add person</strong> to record someone before writing any memories about them.</p>
+      <h2>Places</h2>
+      <p>Shows all locations in your Chronicle. Add address details (town, state, country) to improve map accuracy. Locations without coordinates won't appear on the map &#8212; click <strong>Set coords</strong> to enter them manually, or add address fields and let the map geocode them automatically.</p>
 
-      <h2>Organisations Tab</h2>
-      <p>The same as the People tab, but for organisations. Use <strong>+ add org</strong> to record an organisation independently.</p>
+      <h2>Organisations</h2>
+      <p>Shows all organisations. Link them to locations and time periods. Use <strong>+ add org</strong> to record an organisation before writing memories about it.</p>
 
-      <h2>Locations Tab</h2>
-      <p>Shows all locations in your index. Locations without coordinates show a ⚠️ indicator — they won't appear on the map until coordinates are set. Click <strong>⚠ Set coords</strong> to enter them manually. Use <strong>+ add location</strong> to record a place before writing any memories about it.</p>
+      <h2>Groups</h2>
+      <p>Create named groups of people &#8212; family, school friends, work colleagues. When adding a memory, a pill button for each group appears above the People field. One tap adds everyone in the group.</p>
+
+      <h2>Relationships</h2>
+      <p>Groups people by their relationship type &#8212; family, friend, colleague, and so on. Click any relationship to see all the people in it and their memories.</p>
+
+      <h2>Tags</h2>
+      <p>Shows all tags used across your memories with counts. Click any tag to see all matching memories. Tags like <em>home</em>, <em>education</em>, and <em>employment</em> also feed the Life Timeline chart.</p>
+
+      <h2>Photos</h2>
+      <p>A chronological gallery of all photos across your memories. Click any photo to open the memory it belongs to.</p>
     </section>
 
     <div class="divider"></div>
 
-    <!-- People Manager -->
-    <section class="section">
-      <h2>Relationships Tab</h2>
-      <p>Groups people by their relationship type — family, friend, colleague, and so on. Click any relationship to see all the people in it.</p>
-
-      <h2>Groups Tab</h2>
-      <p>Shows named groups of people. See <a href="#groups">Groups</a> below for full details.</p>
-    </section>
 
     <div class="divider"></div>
 
