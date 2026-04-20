@@ -4025,23 +4025,27 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey, onSyncComple
           }
         } catch(e) {}
         if (toUpload.length > 0) {
-          setStatus("pushing photos (0/"+toUpload.length+")");
-          let uploaded = 0;
+          setStatus("pushing "+toUpload.length+" photo"+(toUpload.length===1?"":"s")+"...");
+          let uploaded = 0, failed = 0;
           const allMedia = await idbGetAll();
           for (const mediaId of toUpload) {
             const blob = allMedia[mediaId];
-            if (!blob) { uploaded++; continue; }
+            if (!blob) { uploaded++; failed++; continue; }
             try {
               const encBuf = await encryptBlob(passphrase, blob);
-              await fetch(WORKER_URL + "/sync/media/" + hash + "/" + encodeURIComponent(mediaId), {
+              const pr = await fetch(WORKER_URL + "/sync/media/" + hash + "/" + encodeURIComponent(mediaId), {
                 method: "PUT",
                 headers: {"Content-Type":"application/octet-stream","X-Chronicle-Client":"1","X-LS-Key":licenceKey},
                 body: encBuf,
               });
-            } catch(e) {}
+              if (!pr.ok) failed++;
+            } catch(e) { failed++; }
             uploaded++;
-            setStatus("pushing photos ("+uploaded+"/"+toUpload.length+")");
+            setStatus("pushing photos ("+uploaded+"/"+toUpload.length+(failed?" \u00b7 "+failed+" failed":"") +")");
           }
+        } else if (mediaIds.length > 0) {
+          setStatus("photos up to date");
+          await new Promise(r=>setTimeout(r,1000));
         }
       }
       setStatus("done");
@@ -4068,22 +4072,29 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey, onSyncComple
       // 2. Download photos from R2
       const mediaIds = stored.mediaIds || [];
       if (mediaIds.length > 0) {
-        setStatus("pulling photos (0/"+mediaIds.length+")");
-        let downloaded = 0;
-        for (const mediaId of mediaIds) {
-          try {
-            // Skip if already in IDB
-            const existing = await idbGet(mediaId);
-            if (existing) { downloaded++; setStatus("pulling photos ("+downloaded+"/"+mediaIds.length+")"); continue; }
-            const mr = await fetch(WORKER_URL + "/sync/media/" + hash + "/" + encodeURIComponent(mediaId), {headers:{"X-Chronicle-Client":"1"}});
-            if (mr.ok) {
-              const encBuf = await mr.arrayBuffer();
-              const decBuf = await decryptBlob(passphrase, encBuf);
-              await idbPut(mediaId, new Blob([decBuf]));
-            }
-          } catch(e) { /* skip failed photo */ }
-          downloaded++;
-          setStatus("pulling photos ("+downloaded+"/"+mediaIds.length+")");
+        let toDownload = mediaIds.filter(async id => !(await idbGet(id)));
+        // Check which ones we already have
+        const haveLocally = [];
+        for (const id of mediaIds) {
+          const ex = await idbGet(id);
+          if (ex) haveLocally.push(id);
+        }
+        toDownload = mediaIds.filter(id => !haveLocally.includes(id));
+        if (toDownload.length > 0) {
+          setStatus("pulling "+toDownload.length+" photo"+(toDownload.length===1?"":"s")+"...");
+          let downloaded = 0, failed = 0;
+          for (const mediaId of toDownload) {
+            try {
+              const mr = await fetch(WORKER_URL + "/sync/media/" + hash + "/" + encodeURIComponent(mediaId), {headers:{"X-Chronicle-Client":"1"}});
+              if (mr.ok) {
+                const encBuf = await mr.arrayBuffer();
+                const decBuf = await decryptBlob(passphrase, encBuf);
+                await idbPut(mediaId, new Blob([decBuf]));
+              } else { failed++; }
+            } catch(e) { failed++; }
+            downloaded++;
+            setStatus("pulling photos ("+downloaded+"/"+toDownload.length+(failed?" \u00b7 "+failed+" failed":"")+")");
+          }
         }
       }
       if (onSyncComplete) onSyncComplete("pull");
