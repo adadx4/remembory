@@ -48,21 +48,18 @@ async function checkRateLimit(env, ip, action, limit, windowSecs) {
   return true;
 }
 
-async function sendNotificationEmail(env, { toEmail, fromName, memCount, shareId, inboxToken }) {
+async function sendNotificationEmail(env, { toEmail, fromName, memCount }) {
   if (!env.RESEND_API_KEY) return;
   const subject = fromName + " shared " + (memCount === 1 ? "a memory" : memCount + " memories") + " with you on Chronicle";
-  // Build URL: prefer inbox token (shows full inbox), fallback to share code (shows single share)
-  const params = [];
-  if (inboxToken) params.push("inbox=" + inboxToken);
-  if (shareId) params.push("share=" + shareId);
-  const shareUrl = "https://remembory.net/chronicle.html" + (params.length ? "?" + params.join("&") : "");
   const text = [
     fromName + " has shared " + (memCount === 1 ? "a memory" : memCount + " memories") + " with you on Chronicle by Remembory.",
     "",
-    "Open this link to review and accept " + (memCount === 1 ? "it" : "them") + ":",
-    shareUrl,
+    "Open Chronicle to review and accept " + (memCount === 1 ? "it" : "them") + ":",
+    "https://remembory.net/chronicle.html",
     "",
-    "This link is personal to you and expires in 7 days.",
+    "Go to Social \u2192 Sharing to see your inbox.",
+    "",
+    "Important: Use this email address (" + toEmail + ") when setting up your Chronicle so shared memories arrive automatically.",
     "",
     "---",
     "You received this because someone sent memories to this email address using Remembory.",
@@ -1625,15 +1622,12 @@ export default {
         if (!arr.find(d => d.shareId === shareId)) {
           arr.push({ shareId, fromName: fromName.trim(), fromEmail: fromEmailNorm, sentAt: now, _type: "direct_send" });
         }
-        // Generate a temporary inbox access token for this recipient
-        const inboxToken = crypto.randomUUID().replace(/-/g,"").slice(0, 24);
         await Promise.all([
           env.SHARES.put(shareId, bodyStr, { expirationTtl: 60 * 60 * 24 * 30 }),
           env.SHARES.put("deliveries:" + toEmailHash, JSON.stringify(arr), { expirationTtl: 60 * 60 * 24 * 365 }),
-          env.SHARES.put("inbox_token:" + inboxToken, toEmailHash, { expirationTtl: 60 * 60 * 24 * 7 }),
         ]);
         // Fire notification email — non-blocking, share succeeds regardless
-        ctx.waitUntil(sendNotificationEmail(env, { toEmail: toEmailNorm, fromName: fromName.trim(), memCount: memories.length, shareId, inboxToken }).catch(() => {}));
+        ctx.waitUntil(sendNotificationEmail(env, { toEmail: toEmailNorm, fromName: fromName.trim(), memCount: memories.length }).catch(() => {}));
         return json({ ok: true, shareId });
       } catch (e) {
         return json({ error: "Server error" }, 500);
@@ -1647,29 +1641,22 @@ export default {
         const body = await request.json();
         const email = (body.email || "").trim().toLowerCase();
         if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
-        // Verify caller owns this email — via licence key OR verified email token
+        // Verify caller owns this email via verified email token
         const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
         let authorized = false;
-        // Method 1: licence key whose email matches
-        const callerKey = getViewerKey(request, url);
-        if (callerKey) {
-          const callerHash = await sha256hex(callerKey.trim().toUpperCase());
-          const licRaw = await env.SHARES.get("license:" + callerHash);
-          if (licRaw) {
-            const lic = JSON.parse(licRaw);
-            if (!lic.email || lic.email === email) authorized = true;
-            else return json({ error: "Email does not match licence" }, 403);
-          }
-        }
-        // Method 2: email verification token
-        if (!authorized && body.verifyToken) {
+        // Method 1: email verification token (primary)
+        if (body.verifyToken) {
           const storedHash = await env.SHARES.get("email_verified:" + body.verifyToken);
           if (storedHash === emailHash) authorized = true;
         }
-        // Method 3: inbox token from notification email (legacy, still valid)
-        if (!authorized && body.inboxToken) {
-          const storedHash = await env.SHARES.get("inbox_token:" + body.inboxToken);
-          if (storedHash === emailHash) authorized = true;
+        // Method 2: licence key whose email matches (fallback for subscribers)
+        if (!authorized) {
+          const callerKey = getViewerKey(request, url);
+          if (callerKey) {
+            const callerHash = await sha256hex(callerKey.trim().toUpperCase());
+            const licRaw = await env.SHARES.get("license:" + callerHash);
+            if (licRaw) { const lic = JSON.parse(licRaw); if (!lic.email || lic.email === email) authorized = true; }
+          }
         }
         if (!authorized) return json({ error: "Verify your email to access your inbox." }, 403);
         const [deliveriesRaw, declinedRaw] = await Promise.all([

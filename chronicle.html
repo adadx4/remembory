@@ -3407,12 +3407,8 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
             onClick:handleSend,
             disabled:!canSend,
             style:{...S.btn,width:"100%",opacity:canSend?1:0.45,cursor:canSend?"pointer":"not-allowed",marginBottom:"8px"}
-          }, sendStatus==="sending" ? "Sending\u2026" : alreadySharedCount>0?"Resend "+memLabel:(recipsNoEmail.length>0 ? "Send to "+recipsWithEmail.join(", ") : "Send "+memLabel)),
-          React.createElement("button",{
-            onClick:handleGetLink,
-            disabled:!canShare,
-            style:{...S.btnOutline,width:"100%",opacity:canShare?1:0.45,cursor:canShare?"pointer":"not-allowed",fontSize:"0.84rem"}
-          }, recipsWithEmail.length > 0 ? "Share as link instead" : (selectedMemIds.size===1?"Share this memory":"Share "+selectedMemIds.size+" memories"))
+          }, sendStatus==="sending" ? "Sending\u2026" : alreadySharedCount>0?"Resend "+memLabel:"Send "+memLabel),
+          !recipsWithEmail.length&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginTop:"6px"}},"Add an email address to at least one recipient to send.")
         );
       })()
     ),
@@ -4435,13 +4431,10 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
       (async()=>{
         let d = {inbox:[],declined:[]};
         try {
-          // Build auth: licence key header + verification token in body
           const headers = {"Content-Type":"application/json"};
           if (licenceKey) headers["X-LS-Key"] = licenceKey;
           const bodyObj = {email:ownerEmail};
           if (emailVerifyToken) bodyObj.verifyToken = emailVerifyToken;
-          // Also try inbox token from notification email link
-          try { const it = sessionStorage.getItem("chronicle-inbox-token"); if (it) bodyObj.inboxToken = it; } catch(e) {}
           const r = await fetch(WORKER_URL + "/share/inbox/fetch", {
             method:"POST", headers, body:JSON.stringify(bodyObj)
           });
@@ -4666,7 +4659,6 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
         !isLegacyMode&&["inbox","Inbox"],
         ["received","Received"],
         ["sent","Sent"],
-        ["codes","Receive a Share"],
         isLegacyMode&&["links","Contribution Links"],
         !isLegacyMode&&serverDeclined.length>0&&["declined","Declined"],
       ].filter(Boolean).map(([t,label])=>
@@ -6612,6 +6604,8 @@ function App() {
       setVerifyStatus("");
       setVerifyingEmail(false);
       setVerifyCode("");
+      // After verification, check if there are pending shares and navigate to inbox
+      if (shareBadgeCount > 0) setView("sharing");
     } catch(e) { setVerifyStatus("error:Check your connection"); }
   }
   // Clear verification when email changes
@@ -7195,74 +7189,6 @@ function handleEdit(m) {
     }
   }
 
-  // Auto-fetch share from URL parameters (?share=CODE and/or ?inbox=TOKEN)
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const inboxToken = params.get("inbox");
-    const code = params.get("share");
-    if (!code && !inboxToken) return;
-    // Clean the URL so refreshing doesn't re-trigger
-    window.history.replaceState({}, "", window.location.pathname);
-
-    (async () => {
-      // If we have an inbox token, fetch the full inbox via token endpoint
-      if (inboxToken) {
-        try {
-          const res = await fetch(WORKER_URL + "/share/inbox/by-token/" + encodeURIComponent(inboxToken.trim()), {headers:{"X-Chronicle-Client":"1"}});
-          if (res.ok) {
-            const d = await res.json();
-            const items = (d.inbox || []).filter(item => !(d.declined||[]).some(dc => dc.shareId === item._shareId));
-            if (items.length > 0) {
-              // Show the first pending share as the accept modal
-              const item = items[0];
-              // Restore embedded media
-              const restoredMems = await Promise.all((item.memories||[]).map(async m => {
-                const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async med => {
-                  if (med.url && med.url.startsWith("data:")) {
-                    const id = med.mediaId || ("media_" + Date.now() + "_" + Math.random().toString(36).slice(2));
-                    try { const r2 = await fetch(med.url); const blob = await r2.blob(); await idbPut(id, blob); return { mediaId: id, name: med.name }; } catch(e) { return med; }
-                  }
-                  return med;
-                }));
-                return {...m, mediaUrls};
-              }));
-              setPendingShare({...item, memories: restoredMems, _shareId: item._shareId});
-              setPendingShareSelected(new Set(restoredMems.map(m=>m.id)));
-              setPendingShareWantConnect(true);
-              if (items.length > 1) {
-                // Store token so the Sharing view can fetch remaining items
-                try { sessionStorage.setItem("chronicle-inbox-token", inboxToken); } catch(e) {}
-              }
-              return;
-            }
-          }
-        } catch(e) {}
-      }
-
-      // Fallback: fetch a single share by code
-      if (code) {
-        try {
-          const res = await fetch(WORKER_URL + "/s/" + encodeURIComponent(code.trim()), {headers:{"X-Chronicle-Client":"1"}});
-          if (!res.ok) return;
-          const dRaw = await res.json();
-          if (!dRaw.memories) return;
-          const restoredMems = await Promise.all(dRaw.memories.map(async m => {
-            const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async med => {
-              if (med.url && med.url.startsWith("data:")) {
-                const id = med.mediaId || ("media_" + Date.now() + "_" + Math.random().toString(36).slice(2));
-                try { const r2 = await fetch(med.url); const blob = await r2.blob(); await idbPut(id, blob); return { mediaId: id, name: med.name }; } catch(e) { return med; }
-              }
-              return med;
-            }));
-            return {...m, mediaUrls};
-          }));
-          setPendingShare({...dRaw, memories: restoredMems, _shareId: code});
-          setPendingShareSelected(new Set(restoredMems.map(m=>m.id)));
-          setPendingShareWantConnect(true);
-        } catch(e) {}
-      }
-    })();
-  }, []);
 
   async function acceptShare(d) {
     const isShared = !!d.sharedBy;
