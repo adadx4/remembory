@@ -6707,20 +6707,18 @@ function App() {
   // ── Persist ──────────────────────────────────────────────────
   // persistSubject: update the active subject's fields, then save
   function persistSubject(subjectPatch) {
-    const seeded = seedSubject({...subject, ...subjectPatch});
-    const newSubjects = data.subjects.map(s => s.id===activeSubjectId ? seeded : s);
-    const newData = {...data, subjects: newSubjects};
-    setData(newData);
-    if (activePassword) {
-      saveEncrypted(activePassword, newData).then(ok => {
-        setSaveStatus(ok?"saved":"error");
-        setTimeout(()=>setSaveStatus(""),2000);
-      });
-    } else {
-      const ok = saveData(newData);
-      setSaveStatus(ok?"saved":"error");
-      setTimeout(()=>setSaveStatus(""),2000);
-    }
+    setData(prev => {
+      const currentSubject = prev.subjects.find(s=>s.id===activeSubjectId) || subject;
+      const seeded = seedSubject({...currentSubject, ...subjectPatch});
+      const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
+      const newData = {...prev, subjects: newSubjects};
+      if (activePassword) {
+        saveEncrypted(activePassword, newData).then(ok => { setSaveStatus(ok?"saved":"error"); setTimeout(()=>setSaveStatus(""),2000); });
+      } else {
+        const ok = saveData(newData); setSaveStatus(ok?"saved":"error"); setTimeout(()=>setSaveStatus(""),2000);
+      }
+      return newData;
+    });
   }
   // persist: legacy-compatible — detects if patch is subject-level or top-level
   function persist(patch) {
