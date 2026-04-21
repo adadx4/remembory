@@ -3147,7 +3147,7 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, deliverTo
 }
 
 // ── ShareButton component ──────────────────────────────────────
-function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, shareHistory, localConnections, onRecordShare, onSaveEmails, persistTop}) {
+function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, shareHistory, localConnections, onRecordShare, onSaveEmails, onSetSenderEmail}) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState("compose");
   const [senderName, setSenderName] = useState(ownerName||"");
@@ -3411,7 +3411,7 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
           needsSenderEmail&&React.createElement("div",{style:{background:"rgba(196,133,90,0.1)",border:"1px solid rgba(196,133,90,0.3)",borderRadius:"3px",padding:"10px 14px",marginBottom:"10px"}},
             React.createElement("p",{style:{fontSize:"0.84rem",color:"#7a4a18",margin:"0 0 6px"}},"Enter your email to enable sharing:"),
             React.createElement("input",{type:"email",placeholder:"your@email.com",
-              onChange:e=>{const v=e.target.value.trim();if(v.includes("@"))persistTop({carerEmail:v.toLowerCase()});},
+              onChange:e=>{const v=e.target.value.trim();if(v.includes("@")&&onSetSenderEmail)onSetSenderEmail(v.toLowerCase());},
               style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",width:"100%"}})
           ),
           alreadySharedCount>0&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#b0804a",fontStyle:"italic",marginBottom:"8px"}},
@@ -5939,7 +5939,7 @@ function DetailView({
   isSubscriber, ownerName, ownerEmail, localConnections,
   handleEdit, handleDelete, handleSavePerspectives,
   recordShare, removeShareRecord, toggleLegacy,
-  isHistoryMode,
+  isHistoryMode, onSaveEmails, onSetSenderEmail,
 }) {
   const m = memories.find(x => x.id === selected);
   if (!m) return null;
@@ -6041,7 +6041,7 @@ function DetailView({
       React.createElement("button",{onClick:()=>handleEdit(m),style:S.btn},"Edit"),
       React.createElement("button",{onClick:()=>handleDelete(m.id),style:{...S.btnOutline,color:"#c4858a",borderColor:"#c4858a"}},"Delete"),
       isSubscriber
-        ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,localConnections:localConnections,onRecordShare:recordShare,onSaveEmails:emails=>persistSubject({peopleEmails:{...peopleEmails,...emails}}),persistTop})
+        ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,localConnections:localConnections,onRecordShare:recordShare,onSaveEmails:onSaveEmails,onSetSenderEmail:onSetSenderEmail})
         : React.createElement("div",{style:{position:"relative",display:"inline-block"}},
             React.createElement("button",{disabled:true,style:{...S.btnOutline,opacity:0.4,cursor:"not-allowed",fontSize:"0.86rem",padding:"7px 14px"}},"\u2709 Share"),
             React.createElement("div",{style:{position:"absolute",bottom:"calc(100% + 6px)",left:"50%",transform:"translateX(-50%)",background:"#2c2416",color:"#f5f0e8",fontSize:"0.78rem",padding:"5px 9px",borderRadius:"3px",whiteSpace:"nowrap",zIndex:10,lineHeight:1.4,pointerEvents:"none"}},
@@ -10208,6 +10208,8 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         handleEdit, handleDelete, handleSavePerspectives,
         recordShare, removeShareRecord, toggleLegacy,
         isHistoryMode,
+        onSaveEmails: emails => persistSubject({peopleEmails:{...peopleEmails,...emails}}),
+        onSetSenderEmail: email => persistTop({carerEmail:email}),
       }),
       draftOffer&&view==="add"&&!editingId&&React.createElement("div",{style:{background:"rgba(122,158,138,0.1)",border:"1px solid #7a9e8a",borderRadius:"3px",padding:"12px 16px",marginBottom:"16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"8px"}},
         React.createElement("span",{style:{fontSize:"0.88rem",color:"#2c2416"}},
