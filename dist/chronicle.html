@@ -3147,7 +3147,7 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, deliverTo
 }
 
 // ── ShareButton component ──────────────────────────────────────
-function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, shareHistory, localConnections, onRecordShare}) {
+function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, shareHistory, localConnections, onRecordShare, onSaveEmails, persistTop}) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState("compose");
   const [senderName, setSenderName] = useState(ownerName||"");
@@ -3250,6 +3250,13 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
         if(!r.ok){ const d=await r.json().catch(()=>({})); throw new Error(d.error||"Server error "+r.status); }
       }));
       if (onRecordShare && selectedPeople.length) onRecordShare(selectedPeople, selectedMemIds);
+      // Persist any ad-hoc emails entered during this share
+      const newEmails = {};
+      Object.entries(emailInputs).forEach(([name, email]) => {
+        const trimmed = email.trim();
+        if (trimmed && trimmed.includes("@") && !(peopleEmails||{})[name]) newEmails[name] = trimmed.toLowerCase();
+      });
+      if (Object.keys(newEmails).length && onSaveEmails) onSaveEmails(newEmails);
       setSendStatus("sent");
     } catch(e) {
       setSendError(e.message || String(e));
@@ -3399,14 +3406,21 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
           React.createElement("p",{style:{color:"#c4858a",fontSize:"0.84rem",marginBottom:"8px"}},"\u26a0 "+sendError),
           React.createElement("button",{onClick:()=>setSendStatus("idle"),style:{...S.btnOutline,fontSize:"0.84rem",padding:"6px 14px"}},"Try again")
         );
+        const needsSenderEmail = !effectiveEmail;
         return React.createElement("div",null,
+          needsSenderEmail&&React.createElement("div",{style:{background:"rgba(196,133,90,0.1)",border:"1px solid rgba(196,133,90,0.3)",borderRadius:"3px",padding:"10px 14px",marginBottom:"10px"}},
+            React.createElement("p",{style:{fontSize:"0.84rem",color:"#7a4a18",margin:"0 0 6px"}},"Enter your email to enable sharing:"),
+            React.createElement("input",{type:"email",placeholder:"your@email.com",
+              onChange:e=>{const v=e.target.value.trim();if(v.includes("@"))persistTop({carerEmail:v.toLowerCase()});},
+              style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",width:"100%"}})
+          ),
           alreadySharedCount>0&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#b0804a",fontStyle:"italic",marginBottom:"8px"}},
             alreadySharedCount===1?"This memory was previously shared with "+(selectedPeople.length===1?"this person":"one or more of these people")+". Send again if the first share didn\u2019t work."
             :alreadySharedCount+" of these memories were previously shared. Send again if needed."),
           recipsWithEmail.length > 0 && React.createElement("button",{
             onClick:handleSend,
-            disabled:!canSend,
-            style:{...S.btn,width:"100%",opacity:canSend?1:0.45,cursor:canSend?"pointer":"not-allowed",marginBottom:"8px"}
+            disabled:!canSend||needsSenderEmail,
+            style:{...S.btn,width:"100%",opacity:canSend&&!needsSenderEmail?1:0.45,cursor:canSend&&!needsSenderEmail?"pointer":"not-allowed",marginBottom:"8px"}
           }, sendStatus==="sending" ? "Sending\u2026" : alreadySharedCount>0?"Resend "+memLabel:"Send "+memLabel),
           !recipsWithEmail.length&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginTop:"6px"}},"Add an email address to at least one recipient to send.")
         );
@@ -6027,7 +6041,7 @@ function DetailView({
       React.createElement("button",{onClick:()=>handleEdit(m),style:S.btn},"Edit"),
       React.createElement("button",{onClick:()=>handleDelete(m.id),style:{...S.btnOutline,color:"#c4858a",borderColor:"#c4858a"}},"Delete"),
       isSubscriber
-        ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,localConnections:localConnections,onRecordShare:recordShare})
+        ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,localConnections:localConnections,onRecordShare:recordShare,onSaveEmails:emails=>persistSubject({peopleEmails:{...peopleEmails,...emails}}),persistTop})
         : React.createElement("div",{style:{position:"relative",display:"inline-block"}},
             React.createElement("button",{disabled:true,style:{...S.btnOutline,opacity:0.4,cursor:"not-allowed",fontSize:"0.86rem",padding:"7px 14px"}},"\u2709 Share"),
             React.createElement("div",{style:{position:"absolute",bottom:"calc(100% + 6px)",left:"50%",transform:"translateX(-50%)",background:"#2c2416",color:"#f5f0e8",fontSize:"0.78rem",padding:"5px 9px",borderRadius:"3px",whiteSpace:"nowrap",zIndex:10,lineHeight:1.4,pointerEvents:"none"}},
