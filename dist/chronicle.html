@@ -619,6 +619,8 @@ function migrateData(raw) {
     senderNameMaps: raw.senderNameMaps || {},
     lastImport: raw.lastImport || null,
     lastCloudSync: raw.lastCloudSync || null,
+    memCountAtBackup: raw.memCountAtBackup || 0,
+    memCountAtSync: raw.memCountAtSync || 0,
     legacyMessage: raw.legacyMessage || "",
   };
   return {
@@ -4329,7 +4331,7 @@ function SettingsView({
       React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 12px"}},"Cloud Sync"),
         isSubscriber
-          ? React.createElement(CloudSyncPanel,{buildBackupJson,importBackup,licenceKey,onSyncComplete:()=>{persistSubject({lastCloudSync:new Date().toISOString(),lastBackup:new Date().toISOString()});}})
+          ? React.createElement(CloudSyncPanel,{buildBackupJson,importBackup,licenceKey,onSyncComplete:()=>{persistSubject({lastCloudSync:new Date().toISOString(),lastBackup:new Date().toISOString(),memCountAtSync:memoriesRef.current.length,memCountAtBackup:memoriesRef.current.length});}})
           : React.createElement("p",{style:{fontSize:"0.88rem",color:"#8a7460",fontStyle:"italic",margin:0}},"Cloud Sync is a subscriber feature. Sync your Chronicle across devices, including photos, with encrypted cloud backup."),
         isSubscriber&&!isMobile&&React.createElement("div",{style:{marginTop:"16px",paddingTop:"16px",borderTop:"1px solid #ede4d4"}},
           React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",margin:"0 0 8px",fontStyle:"italic"}},"Or sync via a local cloud storage folder (desktop only):"),
@@ -4357,22 +4359,24 @@ function SettingsView({
       React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 4px"}},"Backup"),
         (()=>{
-          const photoCount = memories.reduce((n,m)=>n+(m.mediaUrls||[]).length,0);
-          const photoNote = photoCount > 0 ? " \u00b7 "+photoCount+" photo"+(photoCount===1?"":"s")+" included" : "";
-          let statusMsg, statusColor;
-          if (!subject.lastBackup) { statusMsg = "Not yet backed up \u2014 your backup includes all memories and photos"; statusColor = "#b0804a"; }
-          else {
+          const total = memories.length;
+          const newSinceBackup = Math.max(0, total - (subject.memCountAtBackup||0));
+          const newSinceSync = Math.max(0, total - (subject.memCountAtSync||0));
+          const backupLines = [];
+          if (!subject.lastBackup) {
+            backupLines.push({text:total+" "+(total===1?"memory":"memories")+" not yet backed up", color:"#b0804a"});
+          } else {
             const days = Math.floor((Date.now() - new Date(subject.lastBackup)) / 86400000);
-            if (days === 0) { statusMsg = "\u2713 Backed up today"+photoNote; statusColor = "#4a7a5a"; }
-            else if (days === 1) { statusMsg = "\u2713 Backed up yesterday"+photoNote; statusColor = "#6a5c48"; }
-            else if (days < 7)  { statusMsg = "Backed up "+days+" days ago"+photoNote; statusColor = "#6a5c48"; }
-            else if (days < 30) { statusMsg = "\u26a0 Last backup "+days+" days ago \u2014 save a fresh copy"; statusColor = "#b0804a"; }
-            else { statusMsg = "\u26a0 Last backup was "+days+" days ago \u2014 please back up soon"; statusColor = "#c4858a"; }
+            const when = days===0?"today":days===1?"yesterday":days+" days ago";
+            backupLines.push({text:"\u2713 Last backup: "+when+(newSinceBackup>0?" \u00b7 "+newSinceBackup+" new "+(newSinceBackup===1?"memory":"memories")+" since":""), color:newSinceBackup>0?"#b0804a":"#4a7a5a"});
           }
-          const syncLine = subject.lastCloudSync ? (()=>{ const id2=Math.floor((Date.now()-new Date(subject.lastCloudSync))/86400000); return "Last cloud sync: "+(id2===0?"today":id2===1?"yesterday":id2+" days ago"); })() : null;
+          if (subject.lastCloudSync) {
+            const days2 = Math.floor((Date.now() - new Date(subject.lastCloudSync)) / 86400000);
+            const when2 = days2===0?"today":days2===1?"yesterday":days2+" days ago";
+            backupLines.push({text:"\u2713 Last cloud sync: "+when2+(newSinceSync>0?" \u00b7 "+newSinceSync+" new "+(newSinceSync===1?"memory":"memories")+" since":""), color:newSinceSync>0?"#b0804a":"#4a7a5a"});
+          }
           return React.createElement(React.Fragment, null,
-            React.createElement("p",{style:{fontSize:"0.82rem",color:statusColor,fontStyle:"italic",margin:"0 0 4px"}}, statusMsg),
-            syncLine && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px"}}, syncLine)
+            backupLines.map((l,i)=>React.createElement("p",{key:i,style:{fontSize:"0.82rem",color:l.color,fontStyle:"italic",margin:"0 0 4px"}},l.text))
           );
         })(),
         React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px",lineHeight:1.5}},
@@ -7507,7 +7511,7 @@ function handleEdit(m) {
     a.download = `chronicle-${safeName}-${new Date().toISOString().slice(0,10)}${suffix}.json`;
     a.click();
     // Record last backup time
-    persistSubject({lastBackup: new Date().toISOString()});
+    persistSubject({lastBackup: new Date().toISOString(), memCountAtBackup: memoriesRef.current.length});
   }
 
 
@@ -8257,6 +8261,7 @@ function handleEdit(m) {
           || m.month!==incoming.month || m.day!==incoming.day || m.location!==incoming.location
           || JSON.stringify(m.tags||[])!==JSON.stringify(incoming.tags||[])
           || JSON.stringify(m.people||[])!==JSON.stringify(incoming.people||[])
+          || JSON.stringify((m.mediaUrls||[]).map(u=>u.mediaId))!==JSON.stringify((incoming.mediaUrls||[]).map(u=>u.mediaId))
           || m.endYear!==incoming.endYear || m.endMonth!==incoming.endMonth;
         if (!changed) return m; // identical — skip
         // Both sides have this memory and it differs — flag as conflict
@@ -8638,11 +8643,17 @@ function handleEdit(m) {
     })()),
 
     (!backupNagDismissed && ownerName && memories.length > 0 && (()=>{
+      const newSinceBackup = Math.max(0, memories.length - (subject.memCountAtBackup||0));
+      const newSinceSync = Math.max(0, memories.length - (subject.memCountAtSync||0));
+      const unbackedAnywhere = Math.min(newSinceBackup, newSinceSync);
+      // Show if there are memories not backed up anywhere, or if it's been over 7 days
       const daysSince = subject.lastBackup ? Math.floor((Date.now()-new Date(subject.lastBackup))/86400000) : 999;
-      if (daysSince < 7) return null;
-      const nagMsg = subject.lastBackup
-        ? `Your last backup was ${daysSince} days ago.`
-        : "You have no backup yet.";
+      if (unbackedAnywhere === 0 && daysSince < 7) return null;
+      const nagMsg = !subject.lastBackup
+        ? memories.length+" "+(memories.length===1?"memory":"memories")+" not yet backed up."
+        : unbackedAnywhere > 0
+          ? unbackedAnywhere+" "+(unbackedAnywhere===1?"memory":"memories")+" not backed up anywhere."
+          : "Your last backup was "+daysSince+" days ago.";
       return React.createElement("div",{style:{background:"rgba(196,133,138,0.12)",borderBottom:"1px solid rgba(196,133,138,0.35)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
         React.createElement("p",{style:{margin:0,fontSize:"0.85rem",color:"#8a3030",lineHeight:1.4}},
           "⚠️ "+nagMsg+"Download a backup to keep your memories safe."
