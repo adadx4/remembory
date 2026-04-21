@@ -6419,6 +6419,8 @@ function App() {
   const subject = subjects.find(s=>s.id===activeSubjectId) || subjects[0] || emptySubject("default","",true);
 
   const memories            = subject.memories || [];
+  const memoriesRef         = React.useRef(memories);
+  memoriesRef.current       = memories;
   const candidates          = subject.candidates || [];
   // Tree data lives on whichever subject it was imported into — find it across all subjects
   const treeHost            = subjects.find(s=>(s.treePersons||[]).length>0) || subject;
@@ -7443,8 +7445,10 @@ function handleEdit(m) {
 
   async function buildBackupJson() {
     // Re-embed media blobs as base64 so the backup is self-contained
+    // Use ref to get latest memories (avoids stale closure in async contexts)
+    const currentMems = memoriesRef.current;
     const allMedia = await idbGetAll();
-    const memoriesWithMedia = await Promise.all(memories.map(async m => {
+    const memoriesWithMedia = await Promise.all(currentMems.map(async m => {
       const urls = await Promise.all((m.mediaUrls||[]).map(async med => {
         if (med.mediaId && allMedia[med.mediaId]) {
           const blob = allMedia[med.mediaId];
@@ -8199,8 +8203,9 @@ function handleEdit(m) {
       d = {...d, memories: restoredMems};
       const isShared = !!d.sharedBy;
       const senderName = d.sharedBy || null;
-      // Compute existingIds early so incomingMems.map can skip content-wrapping for already-owned memories
-      const existingIds = new Set(memories.map(m=>m.id));
+      // Use ref to get latest memories (avoids stale closure in async callbacks)
+      const currentMemories = memoriesRef.current;
+      const existingIds = new Set(currentMemories.map(m=>m.id));
       const senderEmail = d.sharedByEmail || null;
 
       // For shared memories
@@ -8223,7 +8228,7 @@ function handleEdit(m) {
       const toAdd = incomingMems.filter(m=>!existingIds.has(m.id));
       let mergedPerspectivesCount = 0;
       const conflicts = [];
-      const merged = memories.map(m=>{
+      const merged = currentMemories.map(m=>{
         const incoming = incomingMems.find(im=>im.id===m.id);
         if (!incoming) return m;
         if (isShared) {
