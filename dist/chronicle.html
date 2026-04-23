@@ -52,7 +52,16 @@ const PAYPAL_URL  = "https://www.paypal.com/webapps/billing/plans/subscribe?plan
 
 // ── Subscribe buttons helper ────────────────────────────────────
 // Renders Stripe + PayPal options. mode: "buttons"|"links"|"full"
+// Subscriptions temporarily paused
+const SUBS_PAUSED = true;
+
 function SubOptions({mode="buttons"}) {
+  if (SUBS_PAUSED) {
+    const style = mode==="links"
+      ? {color:"#8a7460",fontSize:"inherit",fontStyle:"italic"}
+      : {padding:mode==="full"?"12px":"6px 14px",fontSize:mode==="full"?"0.95rem":"0.84rem",color:"#8a7460",fontStyle:"italic"};
+    return React.createElement("span",{style},"Subscriptions available soon");
+  }
   const stripeStyle = mode==="full"
     ? {...S.btn,display:"flex",alignItems:"center",justifyContent:"center",gap:"6px",textDecoration:"none",width:"100%",marginBottom:"8px",padding:"12px"}
     : mode==="links"
@@ -79,6 +88,7 @@ function SubOptions({mode="buttons"}) {
 
 // ── Subscribe pill (header) ───────────────────────────────────
 function SubscribePill() {
+  if (SUBS_PAUSED) return React.createElement("span",{style:{display:"inline-flex",alignItems:"center",padding:"4px 10px",border:"1px solid rgba(138,116,96,0.3)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",color:"#8a7460"}},"Subscriptions coming soon");
   const [open, setOpen] = React.useState(false);
   const pill = {display:"inline-flex",alignItems:"center",gap:"6px",padding:"4px 10px",border:"1px solid rgba(168,136,90,0.45)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",whiteSpace:"nowrap",flexShrink:0};
   if (open) return React.createElement("div",{style:{...pill,background:"transparent"}},
