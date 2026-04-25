@@ -59,11 +59,13 @@ const TIER_PAYPAL = {
   social_monthly: "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-5ME91618BL673874NNHWDLJY&return_url=https://staging.remembory.net/paypal/success&cancel_url=https://remembory.net",
   social_annual:  "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-0VE52677U6814661SNHWDLVA&return_url=https://staging.remembory.net/paypal/success&cancel_url=https://remembory.net",
 };
-// Stripe payment links — TODO: replace with actual Stripe payment link URLs when created
 const TIER_STRIPE = {
-  basic_monthly:  "", basic_annual:  "",
-  premium_monthly:"", premium_annual:"",
-  social_monthly: "", social_annual: "",
+  basic_monthly:  "https://buy.stripe.com/8x228q33I9T06z95dr8IU03",
+  basic_annual:   "https://buy.stripe.com/5kQ14m33IaX4g9J21f8IU04",
+  premium_monthly:"https://buy.stripe.com/6oU9AS0VAghoaPpbBP8IU05",
+  premium_annual: "https://buy.stripe.com/4gMbJ06fU8OW4r149n8IU06",
+  social_monthly: "https://buy.stripe.com/9B66oG7jY0iq5v5axL8IU07",
+  social_annual:  "https://buy.stripe.com/28E3cu47M1mu8HhcFT8IU08",
 };
 
 // ── Subscribe buttons helper ────────────────────────────────────
@@ -81,8 +83,8 @@ function SubOptions({mode="buttons"}) {
   // Show tier selection
   const tiers = [
     {id:"basic",label:"Share Basic",price:"$20/yr",monthly:"$5/mo"},
-    {id:"premium",label:"Share Premium",price:"$30/yr",monthly:"$7/mo"},
-    {id:"social",label:"Social",price:"$40/yr",monthly:"$9/mo"},
+    {id:"premium",label:"Share Premium",price:"$30/yr",monthly:"$8/mo"},
+    {id:"social",label:"Social",price:"$40/yr",monthly:"$10/mo"},
   ];
   if (mode==="links") return React.createElement("span",{style:{color:"#a8885a",fontSize:"inherit"}},
     tiers.map((t,i)=>React.createElement(React.Fragment,{key:t.id},

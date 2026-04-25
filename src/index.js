@@ -2624,6 +2624,21 @@ export default {
       return json({ ok: true });
     }
 
+    // POST /admin/license/set-tier
+    if (request.method === "POST" && path === "/admin/license/set-tier") {
+      const secret = request.headers.get("X-Admin-Secret") || "";
+      if (!secret || secret !== (env.ADMIN_SECRET || "")) return json({ error: "Forbidden" }, 403);
+      const body = await request.json().catch(() => ({}));
+      if (!body.keyHash || !body.tier) return json({ error: "Missing keyHash or tier" }, 400);
+      if (!["basic","premium","social"].includes(body.tier)) return json({ error: "Invalid tier" }, 400);
+      const raw = await env.SHARES.get("license:" + body.keyHash);
+      if (!raw) return json({ error: "Not found" }, 404);
+      const rec = JSON.parse(raw);
+      rec.tier = body.tier;
+      await env.SHARES.put("license:" + body.keyHash, JSON.stringify(rec));
+      return json({ ok: true });
+    }
+
     // POST /admin/license/reinstate
     if (request.method === "POST" && path === "/admin/license/reinstate") {
       const secret = request.headers.get("X-Admin-Secret") || "";
@@ -3108,6 +3123,12 @@ function renderLicenseTable(el, filter) {
     if (action === 'revoke') revokeKey(key, actionEl);
     else if (action === 'reinstate') reinstateKey(key, actionEl);
   });
+  el.addEventListener('change', function(e) {
+    var sel = e.target.closest('[data-action="set-tier"]');
+    if (!sel) return;
+    var keyHash = sel.getAttribute('data-key'), tier = sel.value;
+    setTier(keyHash, tier, sel);
+  });
 }
 
 function licenseTable(licenses) {
@@ -3129,6 +3150,11 @@ function licenseTable(licenses) {
         '<td>'+fmt(l.createdAt)+'</td>'+
         '<td>'+fmt(l.renewedAt)+'</td>'+
         '<td style="white-space:nowrap">'+
+          '<select data-action="set-tier" data-key="'+esc(l.keyHash)+'" style="padding:3px 6px;font-size:0.78rem;margin-right:6px;border:1px solid #d4c4a8;border-radius:2px">'+
+            '<option value="basic"'+(l.tier==='basic'?' selected':'')+'>Basic</option>'+
+            '<option value="premium"'+(!l.tier||l.tier==='premium'?' selected':'')+'>Premium</option>'+
+            '<option value="social"'+(l.tier==='social'?' selected':'')+'>Social</option>'+
+          '</select>'+
           (l.status==='active'
             ? '<button class="btn btn-sm btn-danger" data-action="revoke" data-key="'+esc(l.keyHash)+'">Revoke</button>'
             : '<button class="btn btn-sm btn-success" data-action="reinstate" data-key="'+esc(l.keyHash)+'">Reinstate</button>')+
@@ -3171,6 +3197,15 @@ async function reinstateKey(keyHash, btn) {
     var el = document.getElementById('tab-content'); var filter = document.getElementById('lic-search');
     renderLicenseTable(el, filter?filter.value:'');
   } catch(e) { btn.disabled=false; btn.textContent='Reinstate'; alert('Failed: '+e.message); }
+}
+
+async function setTier(keyHash, tier, sel) {
+  try {
+    var result = await api('POST','/admin/license/set-tier',{keyHash,tier});
+    if (result.error) throw new Error(result.error);
+    var rec = allLicenses.find(function(l){return l.keyHash===keyHash;});
+    if (rec) rec.tier = tier;
+  } catch(e) { alert('Failed: '+e.message); await refreshLicenses(); }
 }
 
 // ── Generate ──────────────────────────────────────────────────────────────────
