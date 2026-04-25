@@ -3055,7 +3055,7 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, deliverTo
       // Also resolve any mediaId blob references to embedded data: URLs so the
       // recipient receives the actual photo data, not just a local IDB key.
       const sanitisedMemories = await Promise.all(memories.map(async (m, mi) => {
-        const mediaUrls = await Promise.all((m.mediaUrls||[]).slice(0,1).map(async (med) => {
+        const mediaUrls = await Promise.all((m.mediaUrls||[]).slice(0,3).map(async (med) => {
           if (med.mediaId) {
             try {
               const blob = await idbGet(med.mediaId);
@@ -3263,7 +3263,7 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
       // Collect photos to upload separately via R2
       // Sanitise: resize first photo to data URL, strip sender from people
       const sanitised = await Promise.all(toShare.map(async (m) => {
-        const rawMedia = (m.mediaUrls||[]).slice(0,1);
+        const rawMedia = (m.mediaUrls||[]).slice(0,3);
         const mediaUrls = await Promise.all(rawMedia.map(async (med) => {
           if (med.mediaId) {
             try {
@@ -6689,6 +6689,7 @@ function App() {
   }, [ownerEmail, carerEmail]);
   const [syncConflicts, setSyncConflicts] = React.useState(null); // [{local, incoming}] or null
   const [mapFilter, setMapFilter] = React.useState({});
+  const [lastShareSentAt, setLastShareSentAt] = React.useState(0);
   const [settingsTab, setSettingsTab] = React.useState("account");
   const [syncFileHandle, setSyncFileHandle] = React.useState(null);
   const [syncStatus, setSyncStatus] = React.useState("");
@@ -6923,6 +6924,7 @@ function App() {
   function recordShare(people, memIds) {
     const entry = { people, memIds:[...memIds], date:new Date().toISOString() };
     persistSubject({shareHistory:[...shareHistory, entry]});
+    setLastShareSentAt(Date.now());
   }
   function removeShareRecord(memId, person) {
     // Remove person from all shareHistory entries that include this memory.
@@ -8603,6 +8605,27 @@ function handleEdit(m) {
     const id = setInterval(poll, 5 * 60 * 1000);
     return () => clearInterval(id);
   }, [ownerEmail]);
+  // Burst polling after a share is sent — poll every 30s for 3 min
+  React.useEffect(() => {
+    if (!lastShareSentAt || !ownerEmail) return;
+    const burstEnd = lastShareSentAt + 3 * 60 * 1000;
+    if (Date.now() > burstEnd) return;
+    const id = setInterval(() => {
+      if (Date.now() > burstEnd) { clearInterval(id); return; }
+      // Quick poll for connection acceptances only
+      fetch(WORKER_URL + "/connect/accepted?email=" + encodeURIComponent(ownerEmail.trim().toLowerCase()), {headers:licenceKey?{"X-LS-Key":licenceKey}:{}})
+        .then(r=>r.ok?r.json():{accepted:[]}).then(d2=>{
+          if (d2.accepted && d2.accepted.length > 0) {
+            const conns = JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
+            let added = false;
+            d2.accepted.forEach(a => { if (!conns.find(c=>c.email===a.email)) { conns.push({name:a.name,email:a.email,connectedAt:a.acceptedAt}); added=true; } });
+            if (added) { localStorage.setItem("chronicle-connections",JSON.stringify(conns)); setLocalConnections([...conns]); }
+            fetch(WORKER_URL+"/connect/accepted/clear",{method:"POST",headers:{"Content-Type":"application/json",...(licenceKey?{"X-LS-Key":licenceKey}:{})},body:JSON.stringify({email:ownerEmail.trim().toLowerCase()})}).catch(()=>{});
+          }
+        }).catch(()=>{});
+    }, 30 * 1000);
+    return () => clearInterval(id);
+  }, [lastShareSentAt]);
 
   // ── Navigation ───────────────────────────────────────────────
   function goBack() {
@@ -10331,6 +10354,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(
 </script>
 <script>
   if ("serviceWorker" in navigator) {
+    // Listen for update notifications from the SW
+    navigator.serviceWorker.addEventListener("message", event => {
+      if (event.data && event.data.type === "UPDATE_AVAILABLE") {
+        const banner = document.createElement("div");
+        banner.style.cssText = "position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2c2416;color:#f5f0e8;padding:10px 20px;border-radius:4px;font-family:'Crimson Text',serif;font-size:0.92rem;z-index:1000;box-shadow:0 4px 16px rgba(0,0,0,0.3);display:flex;align-items:center;gap:12px;";
+        banner.innerHTML = 'Chronicle has been updated <button onclick="location.reload()" style="background:#4a7a5a;color:#fff;border:none;padding:5px 14px;border-radius:2px;cursor:pointer;font-family:inherit;font-size:0.88rem">Reload</button>';
+        document.body.appendChild(banner);
+      }
+    });
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("/sw.js").then(reg => {
         console.log("[Chronicle] Service worker registered:", reg.scope);

@@ -1,5 +1,5 @@
-// Chronicle Service Worker v5
-const CACHE_VERSION = "chronicle-v5";
+// Chronicle Service Worker v6
+const CACHE_VERSION = "chronicle-v6";
 const SHELL_CACHE   = `${CACHE_VERSION}-shell`;
 const TILES_CACHE   = `${CACHE_VERSION}-tiles`;
 const MAX_TILES     = 500;
@@ -82,7 +82,21 @@ async function cacheFirst(request) {
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
-    if (response.ok) { const c = await caches.open(SHELL_CACHE); c.put(request, response.clone()); }
+    if (response.ok) {
+      const c = await caches.open(SHELL_CACHE);
+      // Check if the content has changed
+      const cached = await c.match(request);
+      const newBody = await response.clone().text();
+      if (cached) {
+        const oldBody = await cached.text();
+        if (oldBody !== newBody) {
+          // Notify all clients that a new version is available
+          const clients = await self.clients.matchAll({type: "window"});
+          clients.forEach(client => client.postMessage({type: "UPDATE_AVAILABLE"}));
+        }
+      }
+      c.put(request, response.clone());
+    }
     return response;
   } catch {
     const cached = await caches.match(request);
