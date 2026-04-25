@@ -81,8 +81,8 @@ function SubOptions({mode="buttons"}) {
   // Show tier selection
   const tiers = [
     {id:"basic",label:"Share Basic",price:"$20/yr",monthly:"$5/mo"},
-    {id:"premium",label:"Share Premium",price:"$30/yr",monthly:"$7/mo"},
-    {id:"social",label:"Social",price:"$40/yr",monthly:"$9/mo"},
+    {id:"premium",label:"Share Premium",price:"$30/yr",monthly:"$8/mo"},
+    {id:"social",label:"Social",price:"$40/yr",monthly:"$10/mo"},
   ];
   if (mode==="links") return React.createElement("span",{style:{color:"#a8885a",fontSize:"inherit"}},
     tiers.map((t,i)=>React.createElement(React.Fragment,{key:t.id},
