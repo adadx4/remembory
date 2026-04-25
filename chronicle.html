@@ -8570,7 +8570,7 @@ function handleEdit(m) {
       } catch {}
       // Check for connection acceptances
       try {
-        const r2 = await fetch(WORKER_URL + "/connect/accepted?email=" + encodeURIComponent(ownerEmail.trim().toLowerCase()));
+        const r2 = await fetch(WORKER_URL + "/connect/accepted?email=" + encodeURIComponent(ownerEmail.trim().toLowerCase()), {headers:licenceKey?{"X-LS-Key":licenceKey}:{}});
         if (r2.ok) {
           const d2 = await r2.json();
           if (d2.accepted && d2.accepted.length > 0) {
@@ -8592,7 +8592,7 @@ function handleEdit(m) {
             }
             // Clear the notifications after processing
             fetch(WORKER_URL + "/connect/accepted/clear", {
-              method:"POST", headers:{"Content-Type":"application/json"},
+              method:"POST", headers:{"Content-Type":"application/json",...(licenceKey?{"X-LS-Key":licenceKey}:{})},
               body:JSON.stringify({email:ownerEmail.trim().toLowerCase()})
             }).catch(()=>{});
           }

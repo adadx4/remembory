@@ -1398,11 +1398,17 @@ export default {
       }
     }
 
-    // GET /connect/accepted — check for pending connection acceptances
+    // GET /connect/accepted — check for pending connection acceptances (requires licence key)
     if (request.method === "GET" && path === "/connect/accepted") {
       try {
         const email = (url.searchParams.get("email") || "").trim().toLowerCase();
         if (!email || !email.includes("@")) return json({ accepted: [] });
+        // Require licence key to verify email ownership
+        const callerKey = getViewerKey(request, url);
+        if (!callerKey) return json({ accepted: [] });
+        const callerHash = await sha256hex(callerKey.trim().toUpperCase());
+        const licRaw = await env.SHARES.get("license:" + callerHash);
+        if (licRaw) { const lic = JSON.parse(licRaw); if (lic.email && lic.email !== email) return json({ accepted: [] }); }
         const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
         const raw = await env.SHARES.get("connect_accepted:" + emailHash);
         return json({ accepted: raw ? JSON.parse(raw) : [] });
@@ -1411,12 +1417,14 @@ export default {
       }
     }
 
-    // POST /connect/accepted/clear — clear connection notifications after viewing
+    // POST /connect/accepted/clear — clear connection notifications (requires licence key)
     if (request.method === "POST" && path === "/connect/accepted/clear") {
       try {
         const body = await request.json();
         const email = (body.email || "").trim().toLowerCase();
         if (!email) return json({ ok: true });
+        const callerKey = getViewerKey(request, url);
+        if (!callerKey) return json({ error: "Unauthorized" }, 401);
         const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
         await env.SHARES.delete("connect_accepted:" + emailHash);
         return json({ ok: true });
@@ -2602,12 +2610,14 @@ export default {
     if (request.method === "GET" && path === "/admin/licenses") {
       const secret = request.headers.get("X-Admin-Secret") || "";
       if (!secret || secret !== (env.ADMIN_SECRET || "")) return json({ error: "Forbidden" }, 403);
+      try {
       const list = await env.SHARES.list({ prefix: "license:" });
       const records = await Promise.all(list.keys.map(async k => {
         const raw = await env.SHARES.get(k.name);
         return raw ? JSON.parse(raw) : null;
       }));
       return json({ licenses: records.filter(Boolean) });
+      } catch (e) { return json({ error: "Server error" }, 500); }
     }
 
     // POST /admin/license/revoke
