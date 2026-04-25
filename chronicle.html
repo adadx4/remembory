@@ -3188,6 +3188,7 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
   const [personalMsg, setPersonalMsg] = useState("");
   const [msgError, setMsgError] = useState("");
   const [emailInputs, setEmailInputs] = useState({}); // {personName: emailString} for ad-hoc emails
+  const [selectedPhotos, setSelectedPhotos] = useState({}); // {memId: Set of mediaId indices to include}
   const [sendStatus, setSendStatus] = useState("idle"); // idle | sending | sent | error
   const [sendError, setSendError] = useState("");
 
@@ -3263,7 +3264,9 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
       // Collect photos to upload separately via R2
       // Sanitise: resize first photo to data URL, strip sender from people
       const sanitised = await Promise.all(toShare.map(async (m) => {
-        const rawMedia = (m.mediaUrls||[]).slice(0,3);
+        const photos = m.mediaUrls||[];
+        const picked = selectedPhotos[m.id];
+        const rawMedia = picked ? photos.filter((_,i)=>picked.has(i)).slice(0,3) : photos.slice(0,3);
         const mediaUrls = await Promise.all(rawMedia.map(async (med) => {
           if (med.mediaId) {
             try {
@@ -3407,11 +3410,34 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
                   const alreadySent = selectedPeople.length > 0 && (shareHistory||[]).some(h=>
                     h.memIds.includes(m.id) && selectedPeople.every(p=>h.people.includes(p))
                   );
-                  return React.createElement("label",{key:m.id,style:{display:"flex",alignItems:"baseline",gap:"10px",padding:"5px 6px",cursor:"pointer",background:selectedMemIds.has(m.id)?"rgba(122,158,138,0.07)":"transparent",borderRadius:"2px"}},
-                    React.createElement("input",{type:"checkbox",checked:selectedMemIds.has(m.id),onChange:()=>toggleMem(m.id),style:{marginTop:"2px",flexShrink:0}}),
-                    React.createElement("span",{style:{fontSize:"0.88rem",color:"#2c2416",fontFamily:"'Playfair Display',serif"}},m.title),
-                    React.createElement("span",{style:{fontSize:"0.8rem",color:"#8a7460",marginLeft:"4px"}},m.year||""),
-                    alreadySent && React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a9e8a",marginLeft:"auto",whiteSpace:"nowrap",fontStyle:"italic"}},"✓ sent")
+                  const photos = m.mediaUrls||[];
+                  const needsPicker = photos.length > 3 && selectedMemIds.has(m.id);
+                  const pickedForMem = selectedPhotos[m.id] || new Set(photos.slice(0,3).map((_,i)=>i));
+                  return React.createElement("div",{key:m.id},
+                    React.createElement("label",{style:{display:"flex",alignItems:"baseline",gap:"10px",padding:"5px 6px",cursor:"pointer",background:selectedMemIds.has(m.id)?"rgba(122,158,138,0.07)":"transparent",borderRadius:"2px"}},
+                      React.createElement("input",{type:"checkbox",checked:selectedMemIds.has(m.id),onChange:()=>toggleMem(m.id),style:{marginTop:"2px",flexShrink:0}}),
+                      React.createElement("span",{style:{fontSize:"0.88rem",color:"#2c2416",fontFamily:"'Playfair Display',serif"}},m.title),
+                      React.createElement("span",{style:{fontSize:"0.8rem",color:"#8a7460",marginLeft:"4px"}},m.year||""),
+                      photos.length>0&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",marginLeft:"4px"}},photos.length+" photo"+(photos.length===1?"":"s")),
+                      alreadySent && React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a9e8a",marginLeft:"auto",whiteSpace:"nowrap",fontStyle:"italic"}},"✓ sent")
+                    ),
+                    needsPicker&&React.createElement("div",{style:{paddingLeft:"28px",paddingBottom:"6px"}},
+                      React.createElement("p",{style:{fontSize:"0.78rem",color:"#b0804a",fontStyle:"italic",margin:"2px 0 4px"}},"Up to 3 photos can be shared. Choose which to include:"),
+                      React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap"}},
+                        photos.map((med,pi)=>React.createElement("div",{key:pi,
+                          onClick:()=>{
+                            setSelectedPhotos(prev=>{
+                              const s=new Set(prev[m.id]||new Set(photos.slice(0,3).map((_,i)=>i)));
+                              if(s.has(pi)) s.delete(pi); else if(s.size<3) s.add(pi);
+                              return {...prev,[m.id]:s};
+                            });
+                          },
+                          style:{position:"relative",cursor:"pointer",opacity:pickedForMem.has(pi)?1:0.4,border:pickedForMem.has(pi)?"2px solid #4a7a5a":"2px solid transparent",borderRadius:"4px"}},
+                          React.createElement(MediaImg,{med,alt:"",style:{width:"48px",height:"48px",objectFit:"cover",borderRadius:"2px",display:"block"}}),
+                          pickedForMem.has(pi)&&React.createElement("div",{style:{position:"absolute",top:"-4px",right:"-4px",width:"14px",height:"14px",background:"#4a7a5a",color:"#fff",borderRadius:"50%",fontSize:"0.6rem",display:"flex",alignItems:"center",justifyContent:"center"}},"\u2713")
+                        ))
+                      )
+                    )
                   );
                 })
               ),
