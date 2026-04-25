@@ -804,16 +804,19 @@
 }
 .subscription-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
   align-items: start;
+}
+@media (max-width: 900px) {
+  .subscription-cards { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 640px) {
   .subscription-cards { grid-template-columns: 1fr; }
 }
 .sub-card {
   border-radius: 6px;
-  padding: 32px 28px;
+  padding: 24px 20px;
 }
 .sub-card--free {
   background: rgba(245,240,232,0.07);
@@ -1147,34 +1150,58 @@
   <div class="subscription-inner">
     <div class="subscription-header reveal">
       <span class="section-label">Plans</span>
-      <h2>Chronicle is free. Social is live.</h2>
-      <p>The core Chronicle app is always free. A subscription unlocks social features — public profiles, connections, and subscriber-level memories across the community.</p>
+      <h2>Free forever. Upgrade when you're ready.</h2>
+      <p>The core Chronicle app is always free. Subscriptions unlock sharing, sync, and social features.</p>
     </div>
     <div class="subscription-cards reveal">
       <div class="sub-card sub-card--free">
-        <div class="sub-card-label">Always Free</div>
-        <div class="sub-card-price">Free <span>forever</span></div>
+        <div class="sub-card-label">Free</div>
+        <div class="sub-card-price">$0 <span>forever</span></div>
         <ul class="sub-features">
-          <li>✓ Complete life timeline journal</li>
-          <li>✓ Photos, people, places &amp; tags</li>
-          <li>✓ Map view &amp; print export</li>
-          <li>✓ Works offline, always</li>
-          <li>✓ No account required</li>
+          <li>✓ Full life timeline journal</li>
+          <li>✓ People, places, tags &amp; orgs</li>
+          <li>✓ 3 photo imports per day</li>
+          <li>✓ Print &amp; export</li>
+          <li>✓ Works offline</li>
+          <li>✓ Download backups</li>
         </ul>
         <a href="https://remembory.net/chronicle.html" class="btn-subscribe" style="background:var(--parchment); color:var(--ink-mid);">Open Chronicle</a>
       </div>
       <div class="sub-card sub-card--subscriber">
-        <div class="sub-card-label">Subscriber</div>
-        <div class="sub-card-price">$20 AUD <span>/ year</span></div>
+        <div class="sub-card-label">Share Basic</div>
+        <div class="sub-card-price">$20 <span>/ year</span></div>
         <ul class="sub-features">
-          <li>✓ <strong>Share memories</strong> — Send memories with photos to anyone</li>
-          <li>✓ <strong>Cloud sync</strong> — Back up and sync across devices, including photos</li>
-          <li>✓ <strong>Connections</strong> — Link with family &amp; friends</li>
-          <li>✓ <strong>Guest contributions</strong> — Invite others to submit memories to your Chronicle</li>
-          <li>✓ <strong>Legacy View</strong> — Curate a life story to share or preserve</li>
+          <li>✓ Everything in Free</li>
+          <li>✓ <strong>Unlimited photo imports</strong></li>
+          <li>✓ <strong>Map view</strong> &amp; <strong>Life Timeline</strong></li>
+          <li>✓ <strong>Share 3 memories/day</strong></li>
         </ul>
-        <div class="btn-subscribe" style="opacity:0.5;cursor:default;text-align:center;">Subscriptions available soon</div>
-        <p class="sub-note">Join the mailing list below to be notified when subscriptions open.</p>
+        <div class="btn-subscribe" style="opacity:0.5;cursor:default;text-align:center;">Coming soon</div>
+        <p class="sub-note">$5/month if paid monthly</p>
+      </div>
+      <div class="sub-card sub-card--subscriber">
+        <div class="sub-card-label">Share Premium</div>
+        <div class="sub-card-price">$30 <span>/ year</span></div>
+        <ul class="sub-features">
+          <li>✓ Everything in Basic</li>
+          <li>✓ <strong>Unlimited sharing</strong></li>
+          <li>✓ <strong>Cloud sync</strong> across devices</li>
+          <li>✓ Photo sync included</li>
+        </ul>
+        <div class="btn-subscribe" style="opacity:0.5;cursor:default;text-align:center;">Coming soon</div>
+        <p class="sub-note">$7/month if paid monthly</p>
+      </div>
+      <div class="sub-card sub-card--subscriber" style="border:2px solid var(--gold-dark);">
+        <div class="sub-card-label">Social</div>
+        <div class="sub-card-price">$40 <span>/ year</span></div>
+        <ul class="sub-features">
+          <li>✓ Everything in Premium</li>
+          <li>✓ <strong>Public profile</strong></li>
+          <li>✓ Publish memories online</li>
+          <li>✓ Connections &amp; visibility</li>
+        </ul>
+        <div class="btn-subscribe" style="opacity:0.5;cursor:default;text-align:center;">Coming soon</div>
+        <p class="sub-note">$9/month if paid monthly</p>
       </div>
     </div>
   </div>

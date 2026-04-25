@@ -1,6 +1,25 @@
 // Chronicle Worker — share.remembory.net + social.remembory.net
 // KV bindings: SHARES, MAILING_LIST
 
+// Subscription tier mapping: Stripe product IDs and PayPal plan IDs → tier
+const TIER_MAP = {
+  // Stripe product IDs
+  "prod_UOiDYqArjnfcpL": "basic",   // Share Basic monthly
+  "prod_UOiEbiujJ4R5jb": "basic",   // Share Basic annual
+  "prod_UOiGCbf2YTd0BH": "premium", // Share Premium monthly
+  "prod_UOiGa0C09HoU73": "premium", // Share Premium annual
+  "prod_UOiJqr3bsjUKVo": "social",  // Social monthly
+  "prod_UOiJCY3Egw3Qvt": "social",  // Social annual
+  // PayPal plan IDs
+  "P-8A039115JW5963309NHWDKFY": "basic",   // Share Basic monthly
+  "P-8EM5053771319903FNHWDKRA": "basic",   // Share Basic annual
+  "P-5YW95489AS5523114NHWDIYA": "premium", // Share Premium monthly
+  "P-36836414R6412833CNHWDJYY": "premium", // Share Premium annual
+  "P-5ME91618BL673874NNHWDLJY": "social",  // Social monthly
+  "P-0VE52677U6814661SNHWDLVA": "social",  // Social annual
+};
+const TIER_ORDER = { "basic": 1, "premium": 2, "social": 3 };
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -2139,10 +2158,22 @@ export default {
         const email = (session.customer_details?.email || "").toLowerCase();
         const customerId = session.customer || "";
         const subscriptionId = session.subscription || "";
+        // Resolve tier from product ID in line items or metadata
+        let tier = "basic"; // default
+        try {
+          // Stripe includes the product in the session's line_items if available
+          const items = session.line_items?.data || [];
+          for (const item of items) {
+            const prodId = item.price?.product || "";
+            if (TIER_MAP[prodId]) { tier = TIER_MAP[prodId]; break; }
+          }
+          // Fallback: check session metadata
+          if (session.metadata?.tier) tier = session.metadata.tier;
+        } catch(e) {}
         const licenseKey = generateLicenseKey();
         const keyHash = await sha256hex(licenseKey.trim().toUpperCase());
         const now = new Date().toISOString();
-        const record = { licenseKey, keyHash, email, customerId, subscriptionId, status: "active", createdAt: now, renewedAt: now };
+        const record = { licenseKey, keyHash, email, customerId, subscriptionId, tier, status: "active", createdAt: now, renewedAt: now };
         await env.SHARES.put("license:" + keyHash, JSON.stringify(record));
         // Index by customerId and subscriptionId for webhook lookups
         await env.SHARES.put("license_by_customer:" + customerId, keyHash);
@@ -2150,6 +2181,26 @@ export default {
         if (email) await env.SHARES.put("license_by_email:" + email, keyHash);
         // Store pending key for success page retrieval (expires after 10 min)
         await env.SHARES.put("license_pending:" + session.id, licenseKey, { expirationTtl: 600 });
+      }
+
+      // Also handle customer.subscription.created/updated to resolve tier from plan
+      if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated") {
+        const sub = event.data.object;
+        const subId = sub.id || "";
+        const keyHash = await env.SHARES.get("license_by_sub:" + subId);
+        if (keyHash) {
+          const raw = await env.SHARES.get("license:" + keyHash);
+          if (raw) {
+            const rec = JSON.parse(raw);
+            // Resolve tier from subscription items
+            const items = sub.items?.data || [];
+            for (const item of items) {
+              const prodId = typeof item.price?.product === "string" ? item.price.product : item.plan?.product || "";
+              if (TIER_MAP[prodId]) { rec.tier = TIER_MAP[prodId]; break; }
+            }
+            await env.SHARES.put("license:" + keyHash, JSON.stringify(rec));
+          }
+        }
       }
 
       if (event.type === "customer.subscription.deleted") {
@@ -2338,15 +2389,17 @@ export default {
 
         if (type === "BILLING.SUBSCRIPTION.ACTIVATED") {
           const subscriptionId = res.id || "";
+          const planId = res.plan_id || "";
           const email = (res.subscriber?.email_address || "").toLowerCase();
           if (!subscriptionId) return new Response("OK", { status: 200 });
+          const tier = TIER_MAP[planId] || "basic";
           // Idempotent: skip if already issued
           const existing = await env.SHARES.get("license_by_paypal_sub:" + subscriptionId);
           if (!existing) {
             const licenseKey = generateLicenseKey();
             const keyHash = await sha256hex(licenseKey.trim().toUpperCase());
             const now = new Date().toISOString();
-            const record = { licenseKey, keyHash, email, subscriptionId, source: "paypal", status: "active", createdAt: now, renewedAt: now };
+            const record = { licenseKey, keyHash, email, subscriptionId, tier, source: "paypal", status: "active", createdAt: now, renewedAt: now };
             await env.SHARES.put("license:" + keyHash, JSON.stringify(record));
             await env.SHARES.put("license_by_paypal_sub:" + subscriptionId, keyHash);
             if (email) await env.SHARES.put("license_by_email:" + email, keyHash);
@@ -2497,7 +2550,7 @@ export default {
       const raw = await env.SHARES.get("license:" + keyHash);
       if (!raw) return json({ valid: false });
       const rec = JSON.parse(raw);
-      return json({ valid: rec.status === "active", status: rec.status, renewedAt: rec.renewedAt });
+      return json({ valid: rec.status === "active", status: rec.status, tier: rec.tier || "premium", renewedAt: rec.renewedAt });
     }
 
     // POST /license/generate  (admin — manual key issuance)
@@ -2513,6 +2566,7 @@ export default {
         email: (body.email || "").toLowerCase(),
         customerId: body.customerId || "",
         subscriptionId: body.subscriptionId || "",
+        tier: body.tier || "premium",
         status: "active",
         createdAt: now, renewedAt: now,
         note: body.note || "manually issued",
@@ -2672,8 +2726,10 @@ function termsPage() {
 
 <h2>5. Subscriptions and Payment</h2>
 <ul>
+<li>Chronicle offers three subscription tiers: Share Basic, Share Premium, and Social. Each unlocks progressively more features.</li>
 <li>Subscriptions are billed monthly or annually through Stripe or PayPal.</li>
 <li>You may cancel at any time. Access continues until the end of your current billing period.</li>
+<li>You can upgrade or downgrade your plan at any time. Changes take effect at the next billing cycle.</li>
 <li>Refunds are available within 30 days of purchase if you have not used subscriber features. Contact us at <a href="mailto:admin@remembory.net">admin@remembory.net</a>.</li>
 <li>Under Australian Consumer Law, you have additional rights that cannot be excluded by these terms.</li>
 </ul>
@@ -3056,14 +3112,17 @@ function renderLicenseTable(el, filter) {
 
 function licenseTable(licenses) {
   if (!licenses.length) return '<p style="color:#8a7460;font-style:italic;padding:10px 0">None found.</p>';
-  return '<table><thead><tr><th>Email</th><th>Key</th><th>Status</th><th>Created</th><th>Renewed</th><th>Actions</th></tr></thead><tbody>'+
+  return '<table><thead><tr><th>Email</th><th>Key</th><th>Tier</th><th>Status</th><th>Created</th><th>Renewed</th><th>Actions</th></tr></thead><tbody>'+
     licenses.map(function(l){
       var bc = l.status==='active'?'badge-active':l.status==='suspended'?'badge-suspended':'badge-cancelled';
+      var tierLabel = l.tier ? l.tier.charAt(0).toUpperCase()+l.tier.slice(1) : 'Legacy';
+      var tierColor = l.tier==='social'?'#4a7a5a':l.tier==='premium'?'#a8885a':l.tier==='basic'?'#7a9e9f':'#8a7460';
       return '<tr>'+
         '<td>'+esc(l.email||'—')+'</td>'+
         '<td><span class="key-mono">'+esc(l.licenseKey||'—')+'</span>'+
           (l.licenseKey?'<span class="copy-link" data-copy="'+esc(l.licenseKey)+'">copy</span>':'')+
         '</td>'+
+        '<td><span style="color:'+tierColor+';font-weight:600;font-size:0.82rem">'+tierLabel+'</span></td>'+
         '<td><span class="badge '+bc+'">'+esc(l.status)+'</span>'+
           (l.note?' <span style="font-size:0.74rem;color:#a8a090;font-style:italic">'+esc(l.note)+'</span>':'')+
         '</td>'+
@@ -3120,6 +3179,7 @@ function renderGenerate() {
     '<div class="card" style="max-width:480px">'+
       '<div class="card-title">Issue a free licence key</div>'+
       '<div class="form-row"><input id="gen-email" type="email" placeholder="Recipient email (optional)…"></div>'+
+      '<div class="form-row"><select id="gen-tier" style="padding:8px;border:1px solid #d4c4a8;border-radius:3px;font-family:inherit;font-size:0.9rem"><option value="basic">Basic</option><option value="premium" selected>Premium</option><option value="social">Social</option></select></div>'+
       '<div class="form-row"><input id="gen-note" type="text" placeholder="Note, e.g. "complimentary" or "beta tester"…"></div>'+
       '<button class="btn" onclick="generateKey()">Generate key</button>'+
       '<div id="gen-result"></div>'+
@@ -3128,11 +3188,12 @@ function renderGenerate() {
 
 async function generateKey() {
   var email = (document.getElementById('gen-email').value||'').trim();
+  var tier = (document.getElementById('gen-tier').value||'premium');
   var note = (document.getElementById('gen-note').value||'').trim()||'manually issued';
   var res = document.getElementById('gen-result');
   res.innerHTML = '<p style="color:#8a7460;font-style:italic;margin-top:10px">Generating…</p>';
   try {
-    var data = await api('POST','/license/generate',{email,note});
+    var data = await api('POST','/license/generate',{email,tier,note});
     res.innerHTML = '<div class="msg ok" style="margin-top:10px">Key issued: <span class="key-mono">'+esc(data.licenseKey)+'</span> <span class="copy-link" data-copy="'+esc(data.licenseKey)+'">copy</span></div>';
     var c = res.querySelector('[data-copy]'); if (c) c.addEventListener('click', function(){ copyText(this.getAttribute('data-copy'),this); });
     allLicenses = []; // invalidate cache so next visit to Subscriptions tab refreshes

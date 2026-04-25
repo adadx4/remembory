@@ -47,8 +47,24 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 const TAGS = ["childhood","family","travel","education","work","love","health","milestone","home","friendship","adventure","loss"];
 const WORKER_URL = "https://social.remembory.net";
 const IS_STAGING = WORKER_URL.includes('staging');
+// Legacy single-plan URLs (kept for backwards compat)
 const STRIPE_URL  = "https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02";
 const PAYPAL_URL  = "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-05R23708A75872801NHNR24Q&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net";
+// Tier-specific PayPal subscribe URLs
+const TIER_PAYPAL = {
+  basic_monthly:  "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-8A039115JW5963309NHWDKFY&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
+  basic_annual:   "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-8EM5053771319903FNHWDKRA&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
+  premium_monthly:"https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-5YW95489AS5523114NHWDIYA&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
+  premium_annual: "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-36836414R6412833CNHWDJYY&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
+  social_monthly: "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-5ME91618BL673874NNHWDLJY&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
+  social_annual:  "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-0VE52677U6814661SNHWDLVA&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
+};
+// Stripe payment links — TODO: replace with actual Stripe payment link URLs when created
+const TIER_STRIPE = {
+  basic_monthly:  "", basic_annual:  "",
+  premium_monthly:"", premium_annual:"",
+  social_monthly: "", social_annual: "",
+};
 
 // ── Subscribe buttons helper ────────────────────────────────────
 // Renders Stripe + PayPal options. mode: "buttons"|"links"|"full"
@@ -62,27 +78,29 @@ function SubOptions({mode="buttons"}) {
       : {padding:mode==="full"?"12px":"6px 14px",fontSize:mode==="full"?"0.95rem":"0.84rem",color:"#8a7460",fontStyle:"italic"};
     return React.createElement("span",{style},"Subscriptions available soon");
   }
-  const stripeStyle = mode==="full"
-    ? {...S.btn,display:"flex",alignItems:"center",justifyContent:"center",gap:"6px",textDecoration:"none",width:"100%",marginBottom:"8px",padding:"12px"}
-    : mode==="links"
-    ? {color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)",fontSize:"inherit"}
-    : {...S.btn,padding:"6px 14px",fontSize:"0.84rem",textDecoration:"none",display:"inline-block"};
-  const paypalStyle = mode==="full"
-    ? {...S.btnOutline,display:"flex",alignItems:"center",justifyContent:"center",gap:"6px",textDecoration:"none",width:"100%",padding:"12px",borderColor:"#1a9dd9",color:"#003087"}
-    : mode==="links"
-    ? {color:"#1a9dd9",textDecoration:"none",borderBottom:"1px solid rgba(26,157,217,0.4)",fontSize:"inherit"}
-    : {...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem",textDecoration:"none",display:"inline-block",borderColor:"#1a9dd9",color:"#003087"};
-  const wrap = mode==="links"
-    ? {display:"inline",gap:"12px"}
-    : {display:"flex",flexDirection:mode==="full"?"column":"row",gap:"6px",alignItems:"center",flexWrap:"wrap"};
-  return React.createElement("div",{style:wrap},
-    React.createElement("a",{href:STRIPE_URL,target:"_blank",rel:"noopener",style:stripeStyle},
-      mode==="links" ? "subscribe with card" : "💳 Card"
-    ),
-    mode==="links" && React.createElement("span",{style:{color:"#c8b89a",margin:"0 4px"}}," or "),
-    React.createElement("a",{href:PAYPAL_URL,target:"_blank",rel:"noopener",style:paypalStyle},
-      mode==="links" ? "PayPal" : "🅿 PayPal"
-    )
+  // Show tier selection
+  const tiers = [
+    {id:"basic",label:"Share Basic",price:"$20/yr",monthly:"$5/mo"},
+    {id:"premium",label:"Share Premium",price:"$30/yr",monthly:"$7/mo"},
+    {id:"social",label:"Social",price:"$40/yr",monthly:"$9/mo"},
+  ];
+  if (mode==="links") return React.createElement("span",{style:{color:"#a8885a",fontSize:"inherit"}},
+    tiers.map((t,i)=>React.createElement(React.Fragment,{key:t.id},
+      i>0&&React.createElement("span",{style:{color:"#c8b89a",margin:"0 4px"}}," \u00b7 "),
+      React.createElement("a",{href:TIER_PAYPAL[t.id+"_annual"]||"#",target:"_blank",rel:"noopener",
+        style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},t.label+" "+t.price)
+    )));
+  return React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"8px",width:"100%"}},
+    tiers.map(t=>React.createElement("div",{key:t.id,style:{border:"1px solid #d4c4a8",borderRadius:"3px",padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}},
+      React.createElement("div",null,
+        React.createElement("div",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208"}},t.label),
+        React.createElement("div",{style:{fontSize:"0.78rem",color:"#8a7460"}},t.price+" or "+t.monthly)
+      ),
+      React.createElement("div",{style:{display:"flex",gap:"6px"}},
+        TIER_STRIPE[t.id+"_annual"]&&React.createElement("a",{href:TIER_STRIPE[t.id+"_annual"],target:"_blank",rel:"noopener",style:{...S.btn,padding:"5px 12px",fontSize:"0.82rem",textDecoration:"none"}},"Card"),
+        React.createElement("a",{href:TIER_PAYPAL[t.id+"_annual"],target:"_blank",rel:"noopener",style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.82rem",textDecoration:"none",color:"#003087",borderColor:"#1a9dd9"}},"PayPal")
+      )
+    ))
   );
 }
 
@@ -179,17 +197,17 @@ async function validateLicenceKey(key) {
     // Background refresh — don't await, never blocks the user
     fetch(WORKER_URL + "/license/check", {method:"POST",headers:{"Content-Type":"application/json","X-LS-Key":clean},body:JSON.stringify({key:clean})})
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) saveLicenceCache({key: clean, checked: Date.now(), status: d.status, renewedAt: d.renewedAt}); })
+      .then(d => { if (d) saveLicenceCache({key: clean, checked: Date.now(), status: d.status, tier: d.tier||"premium", renewedAt: d.renewedAt}); })
       .catch(() => {});
-    return {valid: true, tier: "subscriber", status: cached.status, renewedAt: cached.renewedAt};
+    return {valid: true, tier: cached.tier||"premium", status: cached.status, renewedAt: cached.renewedAt};
   }
   // No valid cache — must go online to activate
   try {
     const r = await fetch(WORKER_URL + "/license/check", {method:"POST",headers:{"Content-Type":"application/json","X-LS-Key":clean},body:JSON.stringify({key:clean})});
     if (!r.ok) throw new Error("server");
     const d = await r.json();
-    saveLicenceCache({key: clean, checked: Date.now(), status: d.status, renewedAt: d.renewedAt});
-    if (d.valid) return {valid: true, tier: "subscriber", status: d.status, renewedAt: d.renewedAt};
+    saveLicenceCache({key: clean, checked: Date.now(), status: d.status, tier: d.tier||"premium", renewedAt: d.renewedAt});
+    if (d.valid) return {valid: true, tier: d.tier||"premium", status: d.status, renewedAt: d.renewedAt};
     return {valid: false, reason: d.status === "cancelled" || d.status === "suspended" ? "expired" : "invalid"};
   } catch(e) {
     return {valid: false, reason: "unavailable"};
@@ -3159,7 +3177,7 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, deliverTo
 }
 
 // ── ShareButton component ──────────────────────────────────────
-function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, shareHistory, localConnections, onRecordShare, onSaveEmails, onSetSenderEmail}) {
+function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, shareHistory, localConnections, onRecordShare, onSaveEmails, onSetSenderEmail, userTier, onShareUsed}) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState("compose");
   const [senderName, setSenderName] = useState(ownerName||"");
@@ -3230,6 +3248,12 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
 
   async function handleSend() {
     if (!senderName.trim()) { alert("Please enter your name first."); return; }
+    // Free tier cannot share
+    if (!userTier || userTier === "free") { setSendError("Sharing requires a subscription."); setSendStatus("error"); return; }
+    // Basic tier: 3 shares per day
+    if (userTier === "basic") {
+      try { const d=JSON.parse(localStorage.getItem("chronicle-daily-shares")||"{}"); const today=new Date().toISOString().slice(0,10); const count=d.date===today?d.count:0; if(count>=3){setSendError("Basic plan allows 3 shares per day. Upgrade to Premium for unlimited sharing.");setSendStatus("error");return;} } catch(e){}
+    }
     setSendStatus("sending");
     setSendError("");
     try {
@@ -3262,6 +3286,10 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
         if(!r.ok){ const d=await r.json().catch(()=>({})); throw new Error(d.error||"Server error "+r.status); }
       }));
       if (onRecordShare && selectedPeople.length) onRecordShare(selectedPeople, selectedMemIds);
+      // Increment daily share counter for basic tier
+      if (userTier === "basic") {
+        try { const today=new Date().toISOString().slice(0,10); const d=JSON.parse(localStorage.getItem("chronicle-daily-shares")||"{}"); const count=(d.date===today?d.count:0)+1; localStorage.setItem("chronicle-daily-shares",JSON.stringify({date:today,count})); } catch(e){}
+      }
       // Persist any ad-hoc emails entered during this share
       const newEmails = {};
       Object.entries(emailInputs).forEach(([name, email]) => {
@@ -4186,7 +4214,7 @@ function SettingsView({
   wantPublicProfile, isSubscriber, licenceKey, licenceStatus,
   legacyMessage, setLegacyMessage,
   profileState,
-  emailVerified, verifyingEmail, setVerifyingEmail, sendVerifyCode, confirmVerifyCode, verifyCode, setVerifyCode, verifyStatus,
+  emailVerified, verifyingEmail, setVerifyingEmail, sendVerifyCode, confirmVerifyCode, verifyCode, setVerifyCode, verifyStatus, userTier, hasTier,
   persistSubject, persistTop, setActivePassword, setLocked, setData,
   saveLicenceKey, setView, setShowSubjectMgr, exportBackup,
   importBackup, shareCodeInput, setShareCodeInput,
@@ -4257,14 +4285,14 @@ function SettingsView({
               persistTop({wantPublicProfile:e.target.checked});
               if (!e.target.checked && profileState) unpublishProfile();
             },
-            disabled:!isSubscriber,
-            style:{marginTop:"3px",flexShrink:0,cursor:isSubscriber?"pointer":"not-allowed"}}),
+            disabled:!hasTier("social"),
+            style:{marginTop:"3px",flexShrink:0,cursor:hasTier("social")?"pointer":"not-allowed"}}),
           React.createElement("div",null,
             React.createElement("label",{htmlFor:"want-public",
-              style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",cursor:isSubscriber?"pointer":"default",display:"block",marginBottom:"4px"}},
+              style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",cursor:hasTier("social")?"pointer":"default",display:"block",marginBottom:"4px"}},
               "Enable public profile"),
             React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,margin:0}},
-              isSubscriber ? "Enables visibility controls on memories and your public profile page."
+              hasTier("social") ? "Enables visibility controls on memories and your public profile page."
                 : React.createElement(React.Fragment,null,
                     React.createElement("span",null,"Requires a subscription. "),
                     React.createElement(SubOptions,{mode:"links"})))
@@ -4340,10 +4368,10 @@ function SettingsView({
       // ── Cloud Sync (subscriber only) ──
       React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 12px"}},"Cloud Sync"),
-        isSubscriber
+        hasTier("premium")
           ? React.createElement(CloudSyncPanel,{buildBackupJson,importBackup,licenceKey,onSyncComplete:()=>{persistSubject({lastCloudSync:new Date().toISOString(),lastBackup:new Date().toISOString(),memCountAtSync:memoriesRef.current.length,memCountAtBackup:memoriesRef.current.length});}})
-          : React.createElement("p",{style:{fontSize:"0.88rem",color:"#8a7460",fontStyle:"italic",margin:0}},"Cloud Sync is a subscriber feature. Sync your Chronicle across devices, including photos, with encrypted cloud backup."),
-        isSubscriber&&!isMobile&&React.createElement("div",{style:{marginTop:"16px",paddingTop:"16px",borderTop:"1px solid #ede4d4"}},
+          : React.createElement("p",{style:{fontSize:"0.88rem",color:"#8a7460",fontStyle:"italic",margin:0}},"Cloud Sync is available on the Share Premium plan and above."),
+        hasTier("premium")&&!isMobile&&React.createElement("div",{style:{marginTop:"16px",paddingTop:"16px",borderTop:"1px solid #ede4d4"}},
           React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",margin:"0 0 8px",fontStyle:"italic"}},"Or sync via a local cloud storage folder (desktop only):"),
           syncInfo
             ? React.createElement("div",null,
@@ -5953,7 +5981,7 @@ function DetailView({
   isSubscriber, ownerName, ownerEmail, localConnections,
   handleEdit, handleDelete, handleSavePerspectives,
   recordShare, removeShareRecord, toggleLegacy,
-  isHistoryMode, onSaveEmails, onSetSenderEmail,
+  isHistoryMode, onSaveEmails, onSetSenderEmail, userTier,
 }) {
   const m = memories.find(x => x.id === selected);
   if (!m) return null;
@@ -6055,7 +6083,7 @@ function DetailView({
       React.createElement("button",{onClick:()=>handleEdit(m),style:S.btn},"Edit"),
       React.createElement("button",{onClick:()=>handleDelete(m.id),style:{...S.btnOutline,color:"#c4858a",borderColor:"#c4858a"}},"Delete"),
       isSubscriber
-        ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,localConnections:localConnections,onRecordShare:recordShare,onSaveEmails:onSaveEmails,onSetSenderEmail:onSetSenderEmail})
+        ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,localConnections:localConnections,onRecordShare:recordShare,onSaveEmails:onSaveEmails,onSetSenderEmail:onSetSenderEmail,userTier})
         : React.createElement("div",{style:{position:"relative",display:"inline-block"}},
             React.createElement("button",{disabled:true,style:{...S.btnOutline,opacity:0.4,cursor:"not-allowed",fontSize:"0.86rem",padding:"7px 14px"}},"\u2709 Share"),
             React.createElement("div",{style:{position:"absolute",bottom:"calc(100% + 6px)",left:"50%",transform:"translateX(-50%)",background:"#2c2416",color:"#f5f0e8",fontSize:"0.78rem",padding:"5px 9px",borderRadius:"3px",whiteSpace:"nowrap",zIndex:10,lineHeight:1.4,pointerEvents:"none"}},
@@ -6564,7 +6592,18 @@ function App() {
     }catch(e){return "";}
   },[licenceKey]);
   const [licenceStatus, setLicenceStatus] = useState(null);
-  const isSubscriber = licenceStatus?.valid===true;
+  const userTier = licenceStatus?.valid ? (licenceStatus.tier || "premium") : "free";
+  const TIERS = {free:0, basic:1, premium:2, social:3};
+  const hasTier = (required) => (TIERS[userTier]||0) >= (TIERS[required]||0);
+  const isSubscriber = userTier !== "free";
+  // Daily usage counters (reset each day)
+  function getDailyCount(key) {
+    try { const d=JSON.parse(localStorage.getItem("chronicle-daily-"+key)||"{}"); return d.date===new Date().toISOString().slice(0,10)?d.count:0; } catch(e){return 0;}
+  }
+  function incDailyCount(key) {
+    const date=new Date().toISOString().slice(0,10);
+    try { const d=JSON.parse(localStorage.getItem("chronicle-daily-"+key)||"{}"); const count=(d.date===date?d.count:0)+1; localStorage.setItem("chronicle-daily-"+key,JSON.stringify({date,count})); return count; } catch(e){return 1;}
+  }
   React.useEffect(()=>{
     if(licenceKey){validateLicenceKey(licenceKey).then(s=>{
       setLicenceStatus(s);
@@ -8428,7 +8467,14 @@ function handleEdit(m) {
   function updatePhoto(id,u) { setPhotoQueue(q=>q.map(p=>p.id===id?{...p,...u}:p)); }
 
   function savePhotos() {
-    const toSave = photoQueue.filter(p=>p.keep&&p.title.trim());
+    let toSave = photoQueue.filter(p=>p.keep&&p.title.trim());
+    // Free tier: limit to 3 photo imports per day
+    if (!hasTier("basic")) {
+      const used = getDailyCount("photos");
+      const remaining = Math.max(0, 3 - used);
+      if (remaining === 0) { alert("Free accounts can import up to 3 photos per day. Subscribe to import unlimited photos."); return; }
+      if (toSave.length > remaining) { toSave = toSave.slice(0, remaining); alert("Free accounts can import "+remaining+" more photo"+(remaining===1?"":"s")+" today. The first "+remaining+" will be saved."); }
+    }
     const newMems = toSave.map(p=>({
       id: Date.now().toString()+Math.random().toString(36).slice(2),
       title: p.title, content: p.content||"", year: p.year, month: p.month, day: p.day,
@@ -8442,6 +8488,7 @@ function handleEdit(m) {
     const newKnownOrgs = allOrgs.length ? [...new Set([...knownOrgs,...allOrgs])].sort() : knownOrgs;
     const newAllMems = [...memories,...newMems].sort((a,b)=>sortKey(a)-sortKey(b));
     persistSubject({memories:newAllMems, knownPeople:newKnownPeople, knownOrgs:newKnownOrgs});
+    if (!hasTier("basic")) { for (let i=0;i<newMems.length;i++) incDailyCount("photos"); }
     setImportSaved(newMems.length); setPhotoQueue([]);
     setTimeout(()=>setImportSaved(0),3000);
   }
@@ -9403,7 +9450,12 @@ function handleEdit(m) {
       // ── MAP VIEW ──
       // ── PHOTOS VIEW ──
       // ── LIFE TIMELINE VIEW (standalone) ──
-      view==="life-timeline"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"720px"}},
+      view==="life-timeline"&&(!hasTier("basic")
+        ? React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"600px",textAlign:"center",padding:"60px 20px"}},
+            React.createElement("div",{style:{fontSize:"2.5rem",marginBottom:"12px",opacity:0.4}},"📊"),
+            React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.4rem",fontStyle:"italic",color:"#1a1208",margin:"0 0 10px"}},"Life Timeline"),
+            React.createElement("p",{style:{color:"#8a7460",fontSize:"0.92rem",lineHeight:1.6,marginBottom:"16px"}},"The graphical Life Timeline is available on the Share Basic plan and above."))
+        : React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"720px"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Life Timeline"),
         React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"18px",fontSize:"0.92rem"}},
           "A visual overview of where you lived, studied, and worked. Tag memories with home, education, or work and add an organisation or location."),
@@ -9413,7 +9465,7 @@ function handleEdit(m) {
             if(m){ handleEdit(m); setForm(f=>({...f, _expandEndDate:true})); }
           }
         })
-      ),
+      )),
 
       view==="photos"&&(()=>{
         const photosFlat = memories
@@ -9448,7 +9500,12 @@ function handleEdit(m) {
         );
       })(),
 
-      view==="map"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
+      view==="map"&&(!hasTier("basic")
+        ? React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"600px",textAlign:"center",padding:"60px 20px"}},
+            React.createElement("div",{style:{fontSize:"2.5rem",marginBottom:"12px",opacity:0.4}},"🗺"),
+            React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.4rem",fontStyle:"italic",color:"#1a1208",margin:"0 0 10px"}},"Map View"),
+            React.createElement("p",{style:{color:"#8a7460",fontSize:"0.92rem",lineHeight:1.6}},"The Map view is available on the Share Basic plan and above."))
+        : React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Map"),
         React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"18px",fontSize:"0.92rem"}},
           `${[...new Set(memories.flatMap(m=>[m.location,...(m.locations||[])].filter(Boolean)))].length} locations across ${isCarerMode&&ownerName?`${ownerName}'s memories`:"your memories"} — click a pin to explore`
@@ -9481,7 +9538,7 @@ function handleEdit(m) {
           filter: mapFilter,
           onFilterChange: setMapFilter,
         })
-      ),
+      )),
 
       // ── FAMILY TREE VIEW ──
       view==="tree"&&React.createElement(FamilyTreeView,{
@@ -9625,7 +9682,7 @@ function handleEdit(m) {
         shareCodeStatus, importFromCode,
         saveBackupBusy, setSaveBackupBusy,
         syncInfo, syncStatus, chooseSyncFile, createSyncFile, doSync, clearSyncFile, buildBackupJson, isMobile,
-        emailVerified, verifyingEmail, setVerifyingEmail, sendVerifyCode, confirmVerifyCode, verifyCode, setVerifyCode, verifyStatus,
+        emailVerified, verifyingEmail, setVerifyingEmail, sendVerifyCode, confirmVerifyCode, verifyCode, setVerifyCode, verifyStatus, userTier, hasTier,
         settingsMode: view==="backup"?"backup":"account",
       }),
 
@@ -10238,7 +10295,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         isSubscriber, ownerName, ownerEmail, localConnections,
         handleEdit, handleDelete, handleSavePerspectives,
         recordShare, removeShareRecord, toggleLegacy,
-        isHistoryMode,
+        isHistoryMode, userTier,
         onSaveEmails: emails => persistSubject({peopleEmails:{...peopleEmails,...emails}}),
         onSetSenderEmail: email => persistTop({carerEmail:email}),
       }),
