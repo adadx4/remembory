@@ -80,27 +80,31 @@ function SubOptions({mode="buttons"}) {
       : {padding:mode==="full"?"12px":"6px 14px",fontSize:mode==="full"?"0.95rem":"0.84rem",color:"#8a7460",fontStyle:"italic"};
     return React.createElement("span",{style},"Subscriptions available soon");
   }
-  // Show tier selection
+  const subUrl = "https://remembory.net/#subscribe";
+  // Simple link for "links" and "buttons" modes
+  if (mode==="links") return React.createElement("a",{href:subUrl,target:"_blank",rel:"noopener",
+    style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)",fontSize:"inherit"}},"subscribe from $20/yr");
+  if (mode==="buttons") return React.createElement("a",{href:subUrl,target:"_blank",rel:"noopener",
+    style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem",textDecoration:"none",display:"inline-block"}},"View plans");
+  // Full mode: detailed tier cards with all payment options
   const tiers = [
     {id:"basic",label:"Share Basic",price:"$20/yr",monthly:"$5/mo"},
     {id:"premium",label:"Share Premium",price:"$30/yr",monthly:"$8/mo"},
     {id:"social",label:"Social",price:"$40/yr",monthly:"$10/mo"},
   ];
-  if (mode==="links") return React.createElement("span",{style:{color:"#a8885a",fontSize:"inherit"}},
-    tiers.map((t,i)=>React.createElement(React.Fragment,{key:t.id},
-      i>0&&React.createElement("span",{style:{color:"#c8b89a",margin:"0 4px"}}," \u00b7 "),
-      React.createElement("a",{href:TIER_PAYPAL[t.id+"_annual"]||"#",target:"_blank",rel:"noopener",
-        style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},t.label+" "+t.price)
-    )));
   return React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"8px",width:"100%"}},
-    tiers.map(t=>React.createElement("div",{key:t.id,style:{border:"1px solid #d4c4a8",borderRadius:"3px",padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}},
-      React.createElement("div",null,
-        React.createElement("div",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208"}},t.label),
-        React.createElement("div",{style:{fontSize:"0.78rem",color:"#8a7460"}},t.price+" or "+t.monthly)
+    tiers.map(t=>React.createElement("div",{key:t.id,style:{border:"1px solid #d4c4a8",borderRadius:"3px",padding:"10px 14px"}},
+      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}},
+        React.createElement("div",null,
+          React.createElement("div",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208"}},t.label),
+          React.createElement("div",{style:{fontSize:"0.78rem",color:"#8a7460"}},t.price+" or "+t.monthly)
+        )
       ),
-      React.createElement("div",{style:{display:"flex",gap:"6px"}},
-        TIER_STRIPE[t.id+"_annual"]&&React.createElement("a",{href:TIER_STRIPE[t.id+"_annual"],target:"_blank",rel:"noopener",style:{...S.btn,padding:"5px 12px",fontSize:"0.82rem",textDecoration:"none"}},"Card"),
-        React.createElement("a",{href:TIER_PAYPAL[t.id+"_annual"],target:"_blank",rel:"noopener",style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.82rem",textDecoration:"none",color:"#003087",borderColor:"#1a9dd9"}},"PayPal")
+      React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap"}},
+        React.createElement("a",{href:TIER_STRIPE[t.id+"_annual"],target:"_blank",rel:"noopener",style:{...S.btn,padding:"5px 10px",fontSize:"0.82rem",textDecoration:"none"}},"Annual (Card)"),
+        React.createElement("a",{href:TIER_STRIPE[t.id+"_monthly"],target:"_blank",rel:"noopener",style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.82rem",textDecoration:"none"}},"Monthly (Card)"),
+        React.createElement("a",{href:TIER_PAYPAL[t.id+"_annual"],target:"_blank",rel:"noopener",style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.82rem",textDecoration:"none",color:"#003087",borderColor:"#1a9dd9"}},"Annual (PayPal)"),
+        React.createElement("a",{href:TIER_PAYPAL[t.id+"_monthly"],target:"_blank",rel:"noopener",style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.82rem",textDecoration:"none",color:"#003087",borderColor:"#1a9dd9"}},"Monthly (PayPal)")
       )
     ))
   );
@@ -109,14 +113,7 @@ function SubOptions({mode="buttons"}) {
 // ── Subscribe pill (header) ───────────────────────────────────
 function SubscribePill() {
   if (SUBS_PAUSED) return React.createElement("span",{style:{display:"inline-flex",alignItems:"center",padding:"4px 10px",border:"1px solid rgba(138,116,96,0.3)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",color:"#8a7460"}},"Subscriptions coming soon");
-  const [open, setOpen] = React.useState(false);
-  const pill = {display:"inline-flex",alignItems:"center",gap:"6px",padding:"4px 10px",border:"1px solid rgba(168,136,90,0.45)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",whiteSpace:"nowrap",flexShrink:0};
-  if (open) return React.createElement("div",{style:{...pill,background:"transparent"}},
-    React.createElement("a",{href:STRIPE_URL,target:"_blank",rel:"noopener",style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)"}},"💳 Card"),
-    React.createElement("span",{style:{color:"#c8b89a"}},"·"),
-    React.createElement("a",{href:PAYPAL_URL,target:"_blank",rel:"noopener",style:{color:"#003087",textDecoration:"none",borderBottom:"1px solid rgba(0,48,135,0.3)"}},"🅿 PayPal")
-  );
-  return React.createElement("button",{onClick:()=>setOpen(true),style:{...pill,cursor:"pointer",background:"transparent",color:"#a8885a"}},"✨ Subscribe");
+  return React.createElement("a",{href:"https://remembory.net/#subscribe",target:"_blank",rel:"noopener",style:{display:"inline-flex",alignItems:"center",gap:"6px",padding:"4px 10px",border:"1px solid rgba(168,136,90,0.45)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",whiteSpace:"nowrap",flexShrink:0,cursor:"pointer",background:"transparent",color:"#a8885a",textDecoration:"none"}},"\u2728 Subscribe");
 }
 
 // ── Dropdown nav menu ──────────────────────────────────────────
