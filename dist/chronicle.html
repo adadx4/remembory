@@ -71,7 +71,7 @@ const TIER_STRIPE = {
 // ── Subscribe buttons helper ────────────────────────────────────
 // Renders Stripe + PayPal options. mode: "buttons"|"links"|"full"
 // Subscriptions temporarily paused
-const SUBS_PAUSED = true;
+const SUBS_PAUSED = false;
 
 function SubOptions({mode="buttons"}) {
   if (SUBS_PAUSED) {
@@ -8651,7 +8651,7 @@ function handleEdit(m) {
         }).catch(()=>{});
     }, 30 * 1000);
     return () => clearInterval(id);
-  }, [lastShareSentAt]);
+  }, [lastShareSentAt, ownerEmail, licenceKey]);
 
   // ── Navigation ───────────────────────────────────────────────
   function goBack() {

@@ -1,5 +1,5 @@
-// Chronicle Service Worker v6
-const CACHE_VERSION = "chronicle-v6";
+// Chronicle Service Worker v7
+const CACHE_VERSION = "chronicle-v7";
 const SHELL_CACHE   = `${CACHE_VERSION}-shell`;
 const TILES_CACHE   = `${CACHE_VERSION}-tiles`;
 const MAX_TILES     = 500;
