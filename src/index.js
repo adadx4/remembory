@@ -2751,7 +2751,7 @@ function termsPage() {
 
 <h2>5. Subscriptions and Payment</h2>
 <ul>
-<li>Chronicle offers three subscription tiers: Share Basic, Share Premium, and Social. Each unlocks progressively more features.</li>
+<li>Chronicle offers subscription tiers: Share Basic and Share Premium. Each unlocks progressively more features.</li>
 <li>Subscriptions are billed monthly or annually through Stripe or PayPal.</li>
 <li>You may cancel at any time. Access continues until the end of your current billing period.</li>
 <li>You can upgrade or downgrade your plan at any time. Changes take effect at the next billing cycle.</li>

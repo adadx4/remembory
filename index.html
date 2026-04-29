@@ -804,12 +804,12 @@
 }
 .subscription-cards {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
   align-items: start;
 }
 @media (max-width: 900px) {
-  .subscription-cards { grid-template-columns: 1fr 1fr; }
+  .subscription-cards { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
   .subscription-cards { grid-template-columns: 1fr; }
@@ -1209,26 +1209,6 @@
           <p class="sub-note" style="margin:6px 0 0;font-size:0.72rem;">All plans auto-renew. Cancel anytime from Settings.</p>
         </div>
       </div>
-      <div class="sub-card sub-card--subscriber" style="border:2px solid var(--gold-dark);">
-        <div class="sub-card-label">Social</div>
-        <div class="sub-card-price">$40 <span>/ year</span></div>
-        <p style="font-size:0.78rem;color:var(--ink-faint);margin:-16px 0 16px;font-style:italic;">or $10/month</p>
-        <ul class="sub-features">
-          <li>✓ Everything in Premium</li>
-          <li>✓ <strong>Public profile</strong></li>
-          <li>✓ Publish memories online</li>
-          <li>✓ Connections &amp; visibility</li>
-        </ul>
-        <button class="btn-subscribe" onclick="this.style.display='none';this.nextElementSibling.style.display='flex';">Subscribe</button>
-        <div style="display:none;flex-direction:column;gap:6px;">
-          <p class="sub-note" style="margin:0 0 2px;text-align:center;font-weight:600;color:var(--ink-mid);">Annual</p>
-          <a href="https://buy.stripe.com/28E3cu47M1mu8HhcFT8IU08" class="btn-subscribe" target="_blank" rel="noopener" style="margin:0;">$40/year — Card</a>
-          <a href="https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-0VE52677U6814661SNHWDLVA&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net" class="btn-subscribe" target="_blank" rel="noopener" style="margin:0;background:#003087;">$40/year — PayPal</a>
-          <p class="sub-note" style="margin:8px 0 2px;text-align:center;font-weight:600;color:var(--ink-mid);">Monthly</p>
-          <a href="https://buy.stripe.com/9B66oG7jY0iq5v5axL8IU07" class="btn-subscribe" target="_blank" rel="noopener" style="margin:0;background:var(--ink-light);">$10/month — Card</a>
-          <a href="https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-5ME91618BL673874NNHWDLJY&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net" class="btn-subscribe" target="_blank" rel="noopener" style="margin:0;background:#1a5a87;">$10/month — PayPal</a>
-          <p class="sub-note" style="margin:6px 0 0;font-size:0.72rem;">All plans auto-renew. Cancel anytime from Settings.</p>
-        </div>
       </div>
     </div>
   </div>
