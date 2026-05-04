@@ -4488,6 +4488,7 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
   const [pendingDeliveries, setPendingDeliveries] = React.useState([]);
   const [inboxItems, setInboxItems] = React.useState([]);
   const [serverDeclined, setServerDeclined] = React.useState([]);
+  const [inboxError, setInboxError] = React.useState("");
 
   // Inline review state (replaces the App-level modal)
   const [reviewing, setReviewing] = React.useState(null); // {delivery, memIdx}
@@ -4512,6 +4513,7 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
     } else {
       (async()=>{
         let d = {inbox:[],declined:[]};
+        let errMsg = "";
         try {
           const headers = {"Content-Type":"application/json"};
           if (licenceKey) headers["X-LS-Key"] = licenceKey;
@@ -4520,17 +4522,28 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
           const r = await fetch(WORKER_URL + "/share/inbox/fetch", {
             method:"POST", headers, body:JSON.stringify(bodyObj)
           });
-          if (r.ok) d = await r.json();
-        } catch(e) {}
+          if (r.ok) {
+            d = await r.json();
+          } else if (r.status === 403) {
+            errMsg = emailVerifyToken
+              ? "Your email verification has expired or doesn't match the current address. Re-verify in Settings to see shared memories."
+              : "Verify your email in Settings to see memories shared with you.";
+          } else {
+            errMsg = "Couldn't load your inbox (server returned " + r.status + "). Try again shortly.";
+          }
+        } catch(e) {
+          errMsg = "Couldn't reach the server. Check your connection and try again.";
+        }
         const items = d.inbox || [];
         const dec = d.declined || [];
         const activeCount = items.filter(item=>!dec.some(dc=>dc.shareId===item._shareId)).length;
         setInboxItems(items);
         setServerDeclined(dec);
+        setInboxError(errMsg);
         if (onShareBadgeCount) onShareBadgeCount(activeCount);
       })();
     }
-  }, [ownerEmail]);
+  }, [ownerEmail, emailVerifyToken, licenceKey]);
 
   const received = memories.filter(m => m.sharedBy);
   const sent = shareHistory || [];
@@ -4813,7 +4826,9 @@ function SharingView({memories, shareHistory, ownerName, shareCodeInput, setShar
 
     // INBOX tab (personal mode — direct shares via /share/send)
     tab==="inbox"&&React.createElement("div",null,
-      activeInboxItems.length===0&&
+      inboxError&&
+        React.createElement("p",{style:{color:"#8a4a2a",background:"rgba(196,133,138,0.12)",border:"1px solid #e0c8c8",borderRadius:"6px",padding:"10px 12px",fontSize:"0.88rem"}},inboxError),
+      !inboxError&&activeInboxItems.length===0&&
         React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic"}},"Your inbox is empty."),
       activeInboxItems.map(item=>
         React.createElement("div",{key:item._shareId,style:{...cardStyle,borderColor:"#7a9e8a",background:"rgba(122,158,138,0.05)"}},
