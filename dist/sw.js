@@ -54,9 +54,10 @@ self.addEventListener("fetch", event => {
   }
 
   // App entry pages — network-first so updates always land
-  if (url.pathname === "/chronicle.html" || url.pathname === "/chronicle" || url.pathname === "/" ||
-      url.pathname === "/lineage.html"   || url.pathname === "/lineage"   ||
-      url.pathname === "/research.html"  || url.pathname === "/research"  ||
+  if (url.pathname === "/chronicle.html"   || url.pathname === "/chronicle"   || url.pathname === "/" ||
+      url.pathname === "/lineage.html"     || url.pathname === "/lineage"     ||
+      url.pathname === "/research.html"    || url.pathname === "/research"    ||
+      url.pathname === "/add-resource.html" || url.pathname === "/add-resource" ||
       url.pathname === "/resources/genealogy-free-resources.js") {
     event.respondWith(networkFirst(event.request)); return;
   }
