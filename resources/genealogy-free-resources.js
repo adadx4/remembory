@@ -659,7 +659,12 @@ window.GENEALOGY_RESOURCES = [
           "marriage",
           "death",
           "baptism",
-          "burial"
+          "burial",
+          "travel",
+          "military",
+          "employment",
+          "legal",
+          "other"
         ],
         "startYear": 1803,
         "endYear": 1990
@@ -1378,6 +1383,178 @@ window.GENEALOGY_RESOURCES = [
           }
         ],
         "notes": "Filtered FamilySearch search — surfaces each decennial Canadian census collection."
+      },
+      {
+        "id": "fs-philippines",
+        "name": "Philippines records",
+        "url": "https://www.familysearch.org/search/record/results?q.birthLikePlace=Philippines",
+        "scope": {
+          "countries": [
+            "Philippines"
+          ]
+        },
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence"
+            ],
+            "startYear": 1565,
+            "endYear": null
+          }
+        ],
+        "notes": "Surfaces Philippines Civil Registration, Catholic Church Records (Spanish colonial era onward), and 19th-century census fragments."
+      },
+      {
+        "id": "fs-thailand",
+        "name": "Thailand records",
+        "url": "https://www.familysearch.org/search/record/results?q.birthLikePlace=Thailand",
+        "scope": {
+          "countries": [
+            "Thailand"
+          ]
+        },
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial"
+            ],
+            "startYear": 1700,
+            "endYear": null
+          }
+        ],
+        "notes": "Limited indexed coverage — Thailand has thin free-online genealogy infrastructure. FamilySearch holds some Catholic mission and colonial-era records."
+      },
+      {
+        "id": "fs-mexico",
+        "name": "Mexico records",
+        "url": "https://www.familysearch.org/search/record/results?q.birthLikePlace=Mexico",
+        "scope": {
+          "countries": [
+            "Mexico"
+          ]
+        },
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence"
+            ],
+            "startYear": 1500,
+            "endYear": null
+          }
+        ],
+        "notes": "Mexico Catholic Church Records (1500s onward) — one of the largest digitised Catholic parish collections anywhere. Plus Mexico Civil Registration from the late 1800s."
+      },
+      {
+        "id": "fs-brazil",
+        "name": "Brazil records",
+        "url": "https://www.familysearch.org/search/record/results?q.birthLikePlace=Brazil",
+        "scope": {
+          "countries": [
+            "Brazil"
+          ]
+        },
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence"
+            ],
+            "startYear": 1600,
+            "endYear": null
+          }
+        ],
+        "notes": "Brazil Catholic Church Records, civil registration and slavery-era records."
+      },
+      {
+        "id": "fs-argentina",
+        "name": "Argentina records",
+        "url": "https://www.familysearch.org/search/record/results?q.birthLikePlace=Argentina",
+        "scope": {
+          "countries": [
+            "Argentina"
+          ]
+        },
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence"
+            ],
+            "startYear": 1600,
+            "endYear": null
+          }
+        ],
+        "notes": "Argentina Catholic Church Records and provincial civil registration."
+      },
+      {
+        "id": "fs-south-africa",
+        "name": "South Africa records",
+        "url": "https://www.familysearch.org/search/record/results?q.birthLikePlace=South%20Africa",
+        "scope": {
+          "countries": [
+            "South Africa"
+          ]
+        },
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence"
+            ],
+            "startYear": 1652,
+            "endYear": null
+          }
+        ],
+        "notes": "NGK (Dutch Reformed) church records, civil registration, and Cape Colony colonial documents."
+      },
+      {
+        "id": "fs-china",
+        "name": "China records",
+        "url": "https://www.familysearch.org/search/record/results?q.birthLikePlace=China",
+        "scope": {
+          "countries": [
+            "China"
+          ]
+        },
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "other"
+            ],
+            "startYear": 1300,
+            "endYear": null
+          }
+        ],
+        "notes": "Chinese Genealogies (jiapu) — clan and lineage books — plus some 19th- and 20th-century civil records. Coverage for surnames varies enormously."
       }
     ]
   },
@@ -1792,6 +1969,30 @@ window.GENEALOGY_RESOURCES = [
           }
         ],
         "notes": "Particularly strong for Irish Catholic parish registers, Petty Sessions, and the 1901/1911 censuses."
+      },
+      {
+        "id": "fmp-outbound-passengers",
+        "name": "Britain Outbound Passenger Lists 1890-1960",
+        "url": "https://search.findmypast.co.uk/search-world-records/passenger-lists-leaving-uk-1890-1960",
+        "scope": {
+          "countries": [
+            "England",
+            "Wales",
+            "Scotland",
+            "Ireland",
+            "Northern Ireland"
+          ]
+        },
+        "coverage": [
+          {
+            "events": [
+              "travel"
+            ],
+            "startYear": 1890,
+            "endYear": 1960
+          }
+        ],
+        "notes": "Board of Trade BT 27 — passenger lists for ships departing British ports. Free name-index via TNA Discovery; Findmypast has the searchable images."
       }
     ]
   },
@@ -3140,5 +3341,1777 @@ window.GENEALOGY_RESOURCES = [
     ],
     "bestFor": "US historical newspapers including African-American papers and Social Security Death Index",
     "notes": "Particularly strong for early American newspapers (pre-1830) and minority-press papers."
+  },
+  {
+    "id": "us-nara",
+    "resourceName": "National Archives (NARA) — Genealogy",
+    "url": "https://www.archives.gov/research/genealogy",
+    "homeUrl": "https://www.archives.gov/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "military",
+          "travel",
+          "legal",
+          "residence",
+          "employment",
+          "other"
+        ],
+        "startYear": 1775,
+        "endYear": null
+      }
+    ],
+    "bestFor": "US federal records — military service, immigration, naturalization, land, federal census",
+    "notes": "NARA holds the original federal census schedules, military service files, and ship passenger lists. Many digitised collections are indexed via Ancestry/FamilySearch but NARA itself is the authoritative free source."
+  },
+  {
+    "id": "us-chronicling-america",
+    "resourceName": "Chronicling America",
+    "url": "https://www.loc.gov/collections/chronicling-america/",
+    "homeUrl": "https://www.loc.gov/collections/chronicling-america/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "marriage",
+          "death",
+          "employment",
+          "military",
+          "legal",
+          "other"
+        ],
+        "startYear": 1690,
+        "endYear": 1963
+      }
+    ],
+    "bestFor": "Free full-text search of historic US newspapers",
+    "notes": "Library of Congress project. 22+ million pages from all 50 states, free to search and view."
+  },
+  {
+    "id": "us-dar",
+    "resourceName": "DAR Genealogical Research Database",
+    "url": "https://services.dar.org/Public/DAR_Research/search_adb/",
+    "homeUrl": "https://www.dar.org/library/genealogical-research",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "military",
+          "birth",
+          "marriage",
+          "death"
+        ],
+        "startYear": 1700,
+        "endYear": 1830
+      }
+    ],
+    "bestFor": "Index of American Revolutionary War patriots and their descendants",
+    "notes": "Free to search the Genealogical Research System — Ancestor Database, Member List, Bible Records, Genealogical Records Committee Reports."
+  },
+  {
+    "id": "us-castle-garden",
+    "resourceName": "Castle Garden",
+    "url": "https://www.castlegarden.org/searcher.php",
+    "homeUrl": "https://www.castlegarden.org/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "travel"
+        ],
+        "startYear": 1820,
+        "endYear": 1892
+      }
+    ],
+    "bestFor": "Free index of 11 million immigrants who entered the US through Castle Garden (the pre-Ellis Island port of entry in NYC)",
+    "notes": "Covers the period before Ellis Island opened in 1892. For Ellis-era arrivals (1892-1957) use FamilySearch or Ancestry."
+  },
+  {
+    "id": "us-civil-war-soldiers",
+    "resourceName": "Civil War Soldiers and Sailors System (NPS)",
+    "url": "https://www.nps.gov/civilwar/soldiers-and-sailors-database.htm",
+    "homeUrl": "https://www.nps.gov/civilwar/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "military",
+          "death"
+        ],
+        "startYear": 1861,
+        "endYear": 1865
+      }
+    ],
+    "bestFor": "Free index of 6.3 million US Civil War soldiers and sailors (Union and Confederate)",
+    "notes": "National Park Service project. Includes regimental histories, prisoner records, Medal of Honor recipients, and cemetery information."
+  },
+  {
+    "id": "us-stevemorse",
+    "resourceName": "Stephen P. Morse — One-Step Webpages",
+    "url": "https://www.stevemorse.org/",
+    "homeUrl": "https://www.stevemorse.org/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "marriage",
+          "death",
+          "travel",
+          "residence",
+          "military",
+          "other"
+        ],
+        "startYear": 1700,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Smarter search front-ends for Ellis Island, Castle Garden, US census, NYC vital records and many other sites",
+    "notes": "Not a record set — wraps clunky search forms with better UX. Especially useful for soundex-driven Ellis Island searches and NYC vital record indexes."
+  },
+  {
+    "id": "us-afrigeneas",
+    "resourceName": "AfriGeneas",
+    "url": "http://www.afrigeneas.com/",
+    "homeUrl": "http://www.afrigeneas.com/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "marriage",
+          "death",
+          "burial",
+          "other"
+        ],
+        "startYear": 1700,
+        "endYear": null
+      }
+    ],
+    "bestFor": "African American family research — slave records, Freedmen records, surnames, beginner help",
+    "notes": "Volunteer community site. Hosts surname databases, marriage and death indexes, and active research forums."
+  },
+  {
+    "id": "us-ny-archives",
+    "resourceName": "New York State Archives",
+    "url": "http://www.archives.nysed.gov/",
+    "homeUrl": "http://www.archives.nysed.gov/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "New York",
+      "stateAliases": [
+        "NY",
+        "New York"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "legal",
+          "military",
+          "travel",
+          "employment",
+          "education",
+          "birth",
+          "marriage",
+          "death",
+          "other"
+        ],
+        "startYear": 1664,
+        "endYear": null
+      }
+    ],
+    "bestFor": "New York State records — court, military, land, education, civil service",
+    "notes": "NY did not centralise vital registration until 1880; for earlier vitals see town clerks and FamilySearch."
+  },
+  {
+    "id": "us-ca-archives",
+    "resourceName": "California State Archives",
+    "url": "https://www.sos.ca.gov/archives/",
+    "homeUrl": "https://www.sos.ca.gov/archives/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "California",
+      "stateAliases": [
+        "CA",
+        "California"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "legal",
+          "military",
+          "travel",
+          "employment",
+          "education",
+          "other"
+        ],
+        "startYear": 1850,
+        "endYear": null
+      }
+    ],
+    "bestFor": "California state records — court, military, prison, land, government employment",
+    "notes": "Held by the Secretary of State. The CA Death Index 1905-1939 is freely searchable on FamilySearch."
+  },
+  {
+    "id": "us-ma-archives",
+    "resourceName": "Massachusetts Archives",
+    "url": "https://www.sec.state.ma.us/divisions/archives/research/genealogy.htm",
+    "homeUrl": "https://www.sec.state.ma.us/divisions/archives/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "Massachusetts",
+      "stateAliases": [
+        "MA",
+        "Massachusetts"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "legal",
+          "military",
+          "travel",
+          "employment",
+          "birth",
+          "marriage",
+          "death",
+          "other"
+        ],
+        "startYear": 1620,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Massachusetts state records — early colonial records, vital records, military, court",
+    "notes": "MA has continuous vital registration from 1841. Pre-1841 town vitals are covered by AmericanAncestors (NEHGS)."
+  },
+  {
+    "id": "us-pa-archives",
+    "resourceName": "Pennsylvania State Archives",
+    "url": "https://www.pa.gov/agencies/phmc",
+    "homeUrl": "https://www.pa.gov/agencies/phmc",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "Pennsylvania",
+      "stateAliases": [
+        "PA",
+        "Pennsylvania"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "legal",
+          "military",
+          "travel",
+          "employment",
+          "birth",
+          "marriage",
+          "death",
+          "other"
+        ],
+        "startYear": 1682,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Pennsylvania state records — military, naturalisation, land, vital records",
+    "notes": "PA Death Certificates 1906-1969 and Birth Certificates 1906-1909 are freely searchable on Ancestry via Pennsylvania State Archives."
+  },
+  {
+    "id": "us-tx-archives",
+    "resourceName": "Texas State Library and Archives",
+    "url": "https://www.tsl.texas.gov/arc/genealogy.html",
+    "homeUrl": "https://www.tsl.texas.gov/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "Texas",
+      "stateAliases": [
+        "TX",
+        "Texas"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "legal",
+          "military",
+          "travel",
+          "employment",
+          "birth",
+          "marriage",
+          "death",
+          "other"
+        ],
+        "startYear": 1836,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Texas state records — Republic-era documents, Confederate pensions, prison, vital records",
+    "notes": "Civil registration is 1903 onward but county clerks held earlier marriage records. Confederate Pension Applications are indexed online."
+  },
+  {
+    "id": "us-va-library",
+    "resourceName": "Library of Virginia",
+    "url": "https://www.lva.virginia.gov/",
+    "homeUrl": "https://www.lva.virginia.gov/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "Virginia",
+      "stateAliases": [
+        "VA",
+        "Virginia"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "legal",
+          "military",
+          "travel",
+          "employment",
+          "birth",
+          "marriage",
+          "death",
+          "other"
+        ],
+        "startYear": 1607,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Virginia state records — colonial and early American court, land, military",
+    "notes": "Holds extensive colonial records. Many county order books and chancery causes are digitised and freely searchable."
+  },
+  {
+    "id": "ca-canadian-headstones",
+    "resourceName": "Canadian Headstones",
+    "url": "https://canadianheadstones.ca/",
+    "homeUrl": "https://canadianheadstones.ca/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Canada"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "death",
+          "burial"
+        ],
+        "startYear": 1700,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Free Canadian cemetery and headstone index with photographs",
+    "notes": "Volunteer-driven; coverage varies by province. Complement to Find a Grave for Canadian burials."
+  },
+  {
+    "id": "ca-automated-genealogy",
+    "resourceName": "Automated Genealogy",
+    "url": "http://automatedgenealogy.com/",
+    "homeUrl": "http://automatedgenealogy.com/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Canada"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "residence"
+        ],
+        "startYear": 1851,
+        "endYear": 1911
+      }
+    ],
+    "bestFor": "Free name-indexed transcriptions of the Canadian census 1851-1911",
+    "notes": "Volunteer transcriptions of LAC images. Often easier to search than the official LAC interface."
+  },
+  {
+    "id": "ca-cvwm",
+    "resourceName": "Canadian Virtual War Memorial",
+    "url": "https://www.veterans.gc.ca/eng/remembrance/memorials/canadian-virtual-war-memorial",
+    "homeUrl": "https://www.veterans.gc.ca/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Canada"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "military",
+          "death",
+          "burial"
+        ],
+        "startYear": 1899,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Free index of Canadians who died in military service from the Boer War onward",
+    "notes": "Veterans Affairs Canada project. Includes service records, photos and burial information for over 118,000 Canadian war dead."
+  },
+  {
+    "id": "ca-ontario-archives",
+    "resourceName": "Archives of Ontario",
+    "url": "https://www.archives.gov.on.ca/en/family_history/",
+    "homeUrl": "https://www.archives.gov.on.ca/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Canada"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "Ontario",
+      "stateAliases": [
+        "ON",
+        "Ontario"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "marriage",
+          "death",
+          "legal",
+          "travel",
+          "military",
+          "employment",
+          "education",
+          "other"
+        ],
+        "startYear": 1791,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Ontario provincial records — vital statistics, land, court, education",
+    "notes": "Ontario civil registration: births 1869+, marriages 1801+ (county-held pre-1869), deaths 1869+. Many indexes free via FamilySearch."
+  },
+  {
+    "id": "ca-banq",
+    "resourceName": "Bibliothèque et Archives nationales du Québec (BAnQ)",
+    "url": "https://www.banq.qc.ca/",
+    "homeUrl": "https://www.banq.qc.ca/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Canada"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "Quebec",
+      "stateAliases": [
+        "QC",
+        "Quebec",
+        "Québec"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "legal",
+          "travel",
+          "other"
+        ],
+        "startYear": 1621,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Quebec genealogy — Catholic parish registers, notarial records, civil status",
+    "notes": "BAnQ holds the most comprehensive Quebec records. Many Catholic parish registers and notarial collections digitised and free online."
+  },
+  {
+    "id": "ca-ns-archives",
+    "resourceName": "Nova Scotia Archives",
+    "url": "https://archives.novascotia.ca/genealogy/",
+    "homeUrl": "https://archives.novascotia.ca/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Canada"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "Nova Scotia",
+      "stateAliases": [
+        "NS",
+        "Nova Scotia"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "marriage",
+          "death",
+          "baptism",
+          "burial",
+          "legal",
+          "travel",
+          "military",
+          "other"
+        ],
+        "startYear": 1763,
+        "endYear": 1949
+      }
+    ],
+    "bestFor": "Nova Scotia provincial records — births, marriages, deaths, ship passenger lists",
+    "notes": "Excellent free online indexes — births 1864-1924, marriages 1763-1949, deaths 1864-1974 are all searchable with images."
+  },
+  {
+    "id": "ca-bc-archives",
+    "resourceName": "British Columbia Archives",
+    "url": "https://search-bcarchives.royalbcmuseum.bc.ca/",
+    "homeUrl": "https://rbcm.ca/research/bc-archives",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Canada"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "British Columbia",
+      "stateAliases": [
+        "BC",
+        "British Columbia"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "marriage",
+          "death",
+          "legal",
+          "travel",
+          "military",
+          "employment",
+          "other"
+        ],
+        "startYear": 1858,
+        "endYear": null
+      }
+    ],
+    "bestFor": "British Columbia provincial records — vital statistics, court, land, photographs",
+    "notes": "BC Vital Statistics Agency indexes births, marriages and deaths separately at https://www.vs.gov.bc.ca/. Free with images for older events."
+  },
+  {
+    "id": "ca-mb-archives",
+    "resourceName": "Archives of Manitoba",
+    "url": "https://www.gov.mb.ca/chc/archives/",
+    "homeUrl": "https://www.gov.mb.ca/chc/archives/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Canada"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "Manitoba",
+      "stateAliases": [
+        "MB",
+        "Manitoba"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "marriage",
+          "death",
+          "legal",
+          "travel",
+          "military",
+          "employment",
+          "other"
+        ],
+        "startYear": 1820,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Manitoba provincial records — Hudson's Bay Company, Métis scrip, civil registration",
+    "notes": "Holds the unique Hudson's Bay Company Archives, important for fur trade and Métis ancestry."
+  },
+  {
+    "id": "ca-sk-archives",
+    "resourceName": "Provincial Archives of Saskatchewan",
+    "url": "https://www.saskarchives.com/",
+    "homeUrl": "https://saskarchives.com/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Canada"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "Saskatchewan",
+      "stateAliases": [
+        "SK",
+        "Saskatchewan"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "marriage",
+          "death",
+          "legal",
+          "travel",
+          "employment",
+          "other"
+        ],
+        "startYear": 1878,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Saskatchewan provincial records — homestead files, school, vital statistics",
+    "notes": "Homestead Files (1872-1930) are particularly useful for tracing land grants to settlers."
+  },
+  {
+    "id": "ca-ab-archives",
+    "resourceName": "Provincial Archives of Alberta",
+    "url": "https://provincialarchives.alberta.ca/",
+    "homeUrl": "https://provincialarchives.alberta.ca/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Canada"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "Alberta",
+      "stateAliases": [
+        "AB",
+        "Alberta"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "marriage",
+          "death",
+          "legal",
+          "travel",
+          "employment",
+          "education",
+          "other"
+        ],
+        "startYear": 1870,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Alberta provincial records — homestead, school, court, vital statistics",
+    "notes": "Free online catalogue. Vital records (1898-1970s) are managed separately by Alberta Vital Statistics."
+  },
+  {
+    "id": "ca-nb-archives",
+    "resourceName": "Provincial Archives of New Brunswick",
+    "url": "https://archives.gnb.ca/",
+    "homeUrl": "https://archives.gnb.ca/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Canada"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "New Brunswick",
+      "stateAliases": [
+        "NB",
+        "New Brunswick"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "marriage",
+          "death",
+          "baptism",
+          "burial",
+          "legal",
+          "travel",
+          "military",
+          "other"
+        ],
+        "startYear": 1784,
+        "endYear": null
+      }
+    ],
+    "bestFor": "New Brunswick provincial records — Loyalist arrivals, Acadian records, vital statistics",
+    "notes": "Excellent free online indexes including vital statistics (1888-1965), late registrations and county marriage registers."
+  },
+  {
+    "id": "paid-prdh-igd",
+    "resourceName": "PRDH-IGD",
+    "url": "https://www.prdh-igd.com/en/Home",
+    "homeUrl": "https://www.prdh-igd.com/",
+    "accessType": "paid",
+    "scope": {
+      "countries": [
+        "Canada"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "Quebec",
+      "stateAliases": [
+        "QC",
+        "Quebec",
+        "Québec"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "Catholic"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial"
+        ],
+        "startYear": 1621,
+        "endYear": 1865
+      }
+    ],
+    "bestFor": "Reconstructed family files for every Quebec Catholic to 1865",
+    "notes": "Université de Montréal project. The most comprehensive linked dataset for Quebec Catholic ancestry — pay-per-request or subscription."
+  },
+  {
+    "id": "au-convict-records",
+    "resourceName": "Convict Records of Australia",
+    "url": "https://convictrecords.com.au/",
+    "homeUrl": "https://convictrecords.com.au/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Australia",
+        "England",
+        "Wales",
+        "Scotland",
+        "Ireland"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "legal",
+          "travel"
+        ],
+        "startYear": 1788,
+        "endYear": 1868
+      }
+    ],
+    "bestFor": "Free aggregated index of British and Irish convicts transported to Australia",
+    "notes": "Volunteer-driven; pulls together transportation records, ship arrival lists and conduct registers across all penal colonies (NSW, VDL, WA)."
+  },
+  {
+    "id": "au-founders-survivors",
+    "resourceName": "Founders and Survivors",
+    "url": "https://www.foundersandsurvivors.org/",
+    "homeUrl": "https://www.foundersandsurvivors.org/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Australia"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "Tasmania",
+      "stateAliases": [
+        "TAS",
+        "Tasmania"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "legal",
+          "travel",
+          "birth",
+          "marriage",
+          "death",
+          "other"
+        ],
+        "startYear": 1803,
+        "endYear": 1920
+      }
+    ],
+    "bestFor": "Academic project linking Tasmanian convicts to their descendants",
+    "notes": "University of Tasmania research project. Connects convict records, vital events, and family-history submissions; particularly powerful for tracing descendants of Van Diemen's Land convicts."
+  },
+  {
+    "id": "au-passengers-history",
+    "resourceName": "Passengers in History",
+    "url": "https://passengersinhistory.sa.gov.au/",
+    "homeUrl": "https://passengersinhistory.sa.gov.au/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Australia"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "South Australia",
+      "stateAliases": [
+        "SA",
+        "South Australia"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "travel"
+        ],
+        "startYear": 1836,
+        "endYear": 1900
+      }
+    ],
+    "bestFor": "Free name-search index of South Australian passenger arrivals",
+    "notes": "Hosted by the South Australian Maritime Museum. Combines assisted and unassisted arrivals and links to original ship and voyage details."
+  },
+  {
+    "id": "au-mariners-ships",
+    "resourceName": "Mariners and Ships in Australian Waters (NSW)",
+    "url": "https://mariners.records.nsw.gov.au/",
+    "homeUrl": "https://mariners.records.nsw.gov.au/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Australia"
+      ],
+      "alsoCovers": [],
+      "stateProvince": "New South Wales",
+      "stateAliases": [
+        "NSW",
+        "New South Wales"
+      ],
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "travel",
+          "employment"
+        ],
+        "startYear": 1788,
+        "endYear": 1900
+      }
+    ],
+    "bestFor": "Free index of seamen and ships visiting NSW ports",
+    "notes": "Originally hosted by NSW State Records, now under MHNSW. Useful for ancestors who served on or arrived via shipping into Sydney and other NSW ports."
+  },
+  {
+    "id": "global-slave-voyages",
+    "resourceName": "Slave Voyages Database",
+    "url": "https://www.slavevoyages.org/voyage/database",
+    "homeUrl": "https://www.slavevoyages.org/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "United States",
+        "Brazil",
+        "Jamaica",
+        "Cuba",
+        "Haiti",
+        "Dominican Republic",
+        "Trinidad and Tobago",
+        "Barbados",
+        "Bahamas",
+        "Puerto Rico"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "travel",
+          "other"
+        ],
+        "startYear": 1500,
+        "endYear": 1875
+      }
+    ],
+    "bestFor": "Free comprehensive index of trans-Atlantic and intra-American slave voyages",
+    "notes": "Hosts records for ~36,000 voyages, naming captains and ports of departure/arrival; the African Origins and Intra-American databases name 100,000+ enslaved individuals."
+  },
+  {
+    "id": "caribbean-jamaican-fs",
+    "resourceName": "Jamaican Family Search Genealogy Research Library",
+    "url": "https://www.jamaicanfamilysearch.com/",
+    "homeUrl": "https://www.jamaicanfamilysearch.com/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Jamaica"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "other"
+        ],
+        "startYear": 1655,
+        "endYear": 1962
+      }
+    ],
+    "bestFor": "Free Jamaican parish registers, BMD indexes, wills and surname lists",
+    "notes": "Long-running volunteer site with the largest free Jamaica-specific genealogy collection online. Includes coverage of the planter/slave-owning class as well as later civil records."
+  },
+  {
+    "id": "asia-fibis",
+    "resourceName": "Families in British India Society (FIBIS)",
+    "url": "https://search.fibis.org/",
+    "homeUrl": "https://www.fibis.org/",
+    "accessType": "free-with-login",
+    "scope": {
+      "countries": [
+        "India",
+        "Pakistan",
+        "Bangladesh",
+        "Myanmar"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "military",
+          "employment",
+          "travel",
+          "residence",
+          "other"
+        ],
+        "startYear": 1600,
+        "endYear": 1947
+      }
+    ],
+    "bestFor": "Free indexes for British and Anglo-Indian families during the Raj",
+    "notes": "FIBIwiki + FIBIS Database. Strong on Indian Army, East India Company, civil service, ecclesiastical records and cemetery transcriptions."
+  },
+  {
+    "id": "africa-eggsa",
+    "resourceName": "eGGSA — Genealogical Society of South Africa",
+    "url": "https://www.eggsa.org/",
+    "homeUrl": "https://www.eggsa.org/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "South Africa",
+        "Namibia",
+        "Zimbabwe",
+        "Botswana"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "legal",
+          "other"
+        ],
+        "startYear": 1652,
+        "endYear": 1990
+      }
+    ],
+    "bestFor": "Free Southern African genealogy — gravestone photos, NGK church records, BMDs, family pedigrees",
+    "notes": "The largest free SA-region database. Holds the eGGSA Branch image library, Source Cards, gravestone photos and the GISA collection."
+  },
+  {
+    "id": "asia-philippine-archives",
+    "resourceName": "National Archives of the Philippines",
+    "url": "http://nationalarchives.gov.ph/",
+    "homeUrl": "http://nationalarchives.gov.ph/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Philippines"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "legal",
+          "residence",
+          "birth",
+          "marriage",
+          "death",
+          "other"
+        ],
+        "startYear": 1565,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Spanish colonial documents, civil registration and notarial records",
+    "notes": "Holds the Philippine Revolutionary Records, Spanish-era parish documents and civil registers. Many records require an in-person visit to Manila but the catalogue is online."
+  },
+  {
+    "id": "la-mexico-agn",
+    "resourceName": "Archivo General de la Nación (México)",
+    "url": "https://www.gob.mx/agn",
+    "homeUrl": "https://www.gob.mx/agn",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Mexico"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "legal",
+          "travel",
+          "employment",
+          "military",
+          "residence",
+          "other"
+        ],
+        "startYear": 1521,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Mexican federal records — colonial, Inquisition, land grants, civil and military",
+    "notes": "AGN holds the colonial-era Ramo de la Inquisición, Mercedes (land grants), and civil registration backups. Some collections digitised; many require a visit."
+  },
+  {
+    "id": "eu-it-antenati",
+    "resourceName": "Antenati (Portale Antenati)",
+    "url": "https://antenati.cultura.gov.it/",
+    "homeUrl": "https://antenati.cultura.gov.it/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Italy"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "legal"
+        ],
+        "startYear": 1500,
+        "endYear": 1940
+      }
+    ],
+    "bestFor": "Italian state archives — civil registration, parish duplicates, conscription rolls",
+    "notes": "Free, no registration. Hosted by the Ministry of Culture. Coverage varies by province; Napoleonic-era civil records (1809-1815) and post-unification civil records (1866+) are extensive."
+  },
+  {
+    "id": "eu-nl-wiewaswie",
+    "resourceName": "WieWasWie",
+    "url": "https://www.wiewaswie.nl/",
+    "homeUrl": "https://www.wiewaswie.nl/",
+    "accessType": "free-with-login",
+    "scope": {
+      "countries": [
+        "Netherlands"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence"
+        ],
+        "startYear": 1500,
+        "endYear": 1960
+      }
+    ],
+    "bestFor": "Aggregated index of Dutch civil registration and church records from regional archives",
+    "notes": "Free with a login. Combines records from CBG, Nationaal Archief and provincial archives."
+  },
+  {
+    "id": "eu-no-digitalarkivet",
+    "resourceName": "Digitalarkivet (National Archives of Norway)",
+    "url": "https://www.digitalarkivet.no/en/",
+    "homeUrl": "https://www.digitalarkivet.no/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Norway"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "travel",
+          "military",
+          "legal",
+          "employment",
+          "education"
+        ],
+        "startYear": 1500,
+        "endYear": 1960
+      }
+    ],
+    "bestFor": "Norway parish registers, censuses, emigration lists, court records — fully free",
+    "notes": "One of the most generous national archive portals anywhere. English interface available; censuses 1801-1910 fully indexed; parish registers digitised back to the 1600s."
+  },
+  {
+    "id": "eu-se-riksarkivet",
+    "resourceName": "Riksarkivet / SVAR (Sweden)",
+    "url": "https://sok.riksarkivet.se/",
+    "homeUrl": "https://riksarkivet.se/",
+    "accessType": "freemium",
+    "scope": {
+      "countries": [
+        "Sweden"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "military",
+          "legal"
+        ],
+        "startYear": 1500,
+        "endYear": 1960
+      }
+    ],
+    "bestFor": "Swedish state archives — Husförhörslängder (household examination), parish registers, military, court",
+    "notes": "Index search free. Many digital images free; some collections via SVAR require credits or a subscription via ArkivDigital."
+  },
+  {
+    "id": "eu-dk-arkivalieronline",
+    "resourceName": "Arkivalieronline (Rigsarkivet, Denmark)",
+    "url": "https://www.sa.dk/ao-soegesider/da/billedviser",
+    "homeUrl": "https://www.sa.dk/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Denmark",
+        "Greenland",
+        "Iceland"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "military",
+          "legal"
+        ],
+        "startYear": 1645,
+        "endYear": 1960
+      }
+    ],
+    "bestFor": "Danish parish registers, censuses 1787-1940, probate, military levying rolls",
+    "notes": "Free, fully digitised images (transcription via volunteer projects). Includes Greenland and Iceland records up to their independence."
+  },
+  {
+    "id": "eu-fi-kansallisarkisto",
+    "resourceName": "Kansallisarkisto (National Archives of Finland)",
+    "url": "https://astia.narc.fi/uusiastia/",
+    "homeUrl": "https://www.arkisto.fi/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Finland"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "military",
+          "legal"
+        ],
+        "startYear": 1600,
+        "endYear": 1960
+      }
+    ],
+    "bestFor": "Finnish church records (Lutheran and Orthodox), military, court, civil registration",
+    "notes": "Astia is the public catalogue. Most Lutheran parish books are digitised free; Karelian (lost-territory) records also covered."
+  },
+  {
+    "id": "eu-be-state-archives",
+    "resourceName": "Belgian State Archives",
+    "url": "https://search.arch.be/",
+    "homeUrl": "https://www.arch.be/",
+    "accessType": "free-with-login",
+    "scope": {
+      "countries": [
+        "Belgium"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "military",
+          "legal"
+        ],
+        "startYear": 1500,
+        "endYear": 1920
+      }
+    ],
+    "bestFor": "Belgian parish and civil registers — Flanders, Wallonia and Brussels",
+    "notes": "Free with login. Digitised images for parish records and civil registers up to the 100-year/120-year privacy cutoff."
+  },
+  {
+    "id": "eu-pl-szukaj",
+    "resourceName": "Szukaj w Archiwach (Polish State Archives)",
+    "url": "https://www.szukajwarchiwach.gov.pl/",
+    "homeUrl": "https://www.szukajwarchiwach.gov.pl/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Poland"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "military",
+          "legal"
+        ],
+        "startYear": 1500,
+        "endYear": 1950
+      }
+    ],
+    "bestFor": "Polish state archives — Catholic, Lutheran, Orthodox and Jewish parish records",
+    "notes": "Free, no registration. Covers former Polish-Lithuanian Commonwealth territories (now spanning Poland, Belarus, Lithuania, Ukraine). Strong for Galician and Russian-partition records."
+  },
+  {
+    "id": "eu-es-pares",
+    "resourceName": "PARES (Portal de Archivos Españoles)",
+    "url": "https://pares.cultura.gob.es/",
+    "homeUrl": "https://pares.cultura.gob.es/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Spain"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "travel",
+          "military",
+          "legal"
+        ],
+        "startYear": 1500,
+        "endYear": 1900
+      }
+    ],
+    "bestFor": "Spanish state archives — Inquisition, military, ship lists to the Americas, colonial records",
+    "notes": "Free, no registration. Particularly strong for the Archivo General de Indias (AGI) for Spanish colonial families."
+  },
+  {
+    "id": "eu-pt-digitarq",
+    "resourceName": "DigitArq (Portuguese National Archives)",
+    "url": "https://digitarq.arquivos.pt/",
+    "homeUrl": "https://digitarq.arquivos.pt/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Portugal",
+        "Brazil"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "travel",
+          "military",
+          "legal"
+        ],
+        "startYear": 1500,
+        "endYear": 1920
+      }
+    ],
+    "bestFor": "Portuguese state archives — Torre do Tombo, Inquisition, parish, notarial, colonial Brazil",
+    "notes": "Free. Includes Tombo Antigo (medieval) records and the early colonial Brazil inquisition files."
+  },
+  {
+    "id": "eu-hu-hungaricana",
+    "resourceName": "Hungaricana (Hungarian National Archives)",
+    "url": "https://archives.hungaricana.hu/",
+    "homeUrl": "https://hungaricana.hu/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Hungary",
+        "Slovakia",
+        "Romania",
+        "Croatia",
+        "Serbia"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "military",
+          "legal"
+        ],
+        "startYear": 1500,
+        "endYear": 1900
+      }
+    ],
+    "bestFor": "Hungarian Kingdom-era civil and church records (covers modern Hungary, Slovakia, Transylvania and parts of the former Yugoslavia)",
+    "notes": "Free. The collection spans the historic Kingdom of Hungary, so it is essential for ancestry research across the post-1920 successor states."
+  },
+  {
+    "id": "eu-cz-portafontium",
+    "resourceName": "Portafontium (Czech-Bavarian parish registers)",
+    "url": "https://www.portafontium.eu/",
+    "homeUrl": "https://www.portafontium.eu/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Czech Republic",
+        "Germany"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "Catholic"
+    },
+    "coverage": [
+      {
+        "events": [
+          "baptism",
+          "marriage",
+          "burial"
+        ],
+        "startYear": 1500,
+        "endYear": 1900
+      }
+    ],
+    "bestFor": "Free digitised Catholic parish registers from western Bohemia and adjacent Bavarian dioceses",
+    "notes": "Cross-border project of the State Regional Archive in Plzeň and the Bavarian State Archives. Excellent for Sudeten-German ancestry."
+  },
+  {
+    "id": "eu-ee-saaga",
+    "resourceName": "Saaga (National Archives of Estonia)",
+    "url": "https://www.ra.ee/en/",
+    "homeUrl": "https://www.ra.ee/",
+    "accessType": "free-with-login",
+    "scope": {
+      "countries": [
+        "Estonia"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "military",
+          "legal"
+        ],
+        "startYear": 1500,
+        "endYear": 1940
+      }
+    ],
+    "bestFor": "Estonian church records — Lutheran, Orthodox, Catholic — plus revision lists and civil registration",
+    "notes": "Free with registration. The \"Pärsised\" (revision lists / soul revisions) are a key resource for tax-paying populations under Russian rule."
+  },
+  {
+    "id": "eu-lv-raduraksti",
+    "resourceName": "Raduraksti (Latvian State Archives)",
+    "url": "https://www.lvva-raduraksti.lv/en.html",
+    "homeUrl": "https://www.lvva-raduraksti.lv/",
+    "accessType": "free-with-login",
+    "scope": {
+      "countries": [
+        "Latvia"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "legal"
+        ],
+        "startYear": 1600,
+        "endYear": 1940
+      }
+    ],
+    "bestFor": "Latvian church records (Lutheran, Catholic, Orthodox), revision lists, vital records",
+    "notes": "Free with registration. English interface available. Covers Courland, Vidzeme and Latgale records under Russian and German Baltic governance."
+  },
+  {
+    "id": "eu-lt-epaveldas",
+    "resourceName": "ePaveldas (Lithuanian Heritage Portal)",
+    "url": "https://www.epaveldas.lt/en/home",
+    "homeUrl": "https://www.epaveldas.lt/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "Lithuania"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "birth",
+          "baptism",
+          "marriage",
+          "death",
+          "burial",
+          "residence",
+          "legal"
+        ],
+        "startYear": 1600,
+        "endYear": 1940
+      }
+    ],
+    "bestFor": "Lithuanian church metric books — Catholic, Lutheran, Orthodox, Jewish",
+    "notes": "Free. Includes records for territories that are now in Poland, Belarus and Russia (the historic Grand Duchy and inter-war Lithuania)."
   }
 ];
