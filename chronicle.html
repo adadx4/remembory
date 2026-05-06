@@ -579,9 +579,24 @@ async function saveEncrypted(password, data) {
       }))
     }))
   };
-  const stored = await encryptData(password, JSON.stringify(clean));
-  localStorage.setItem(CRYPTO_KEY, JSON.stringify(stored));
-  localStorage.removeItem(STORAGE_KEY); // remove unencrypted copy
+  // CRITICAL: only remove the unencrypted copy after confirming the encrypted write
+  // succeeded. localStorage can throw on quota errors, in private-browsing mode, or
+  // when the storage backend is in a bad state — losing both copies would be
+  // unrecoverable, so we keep the plaintext copy intact on failure.
+  try {
+    const stored = await encryptData(password, JSON.stringify(clean));
+    localStorage.setItem(CRYPTO_KEY, JSON.stringify(stored));
+  } catch (e) {
+    console.error("[saveEncrypted] failed:", e);
+    return false;
+  }
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (e) {
+    // Encrypted save succeeded; cleanup of the plaintext copy failed. Not fatal —
+    // next successful save will retry. Don't roll back the encrypted write.
+    console.warn("[saveEncrypted] could not remove plaintext copy:", e);
+  }
   return true;
 }
 
@@ -2575,7 +2590,13 @@ function OrgsPanel({knownOrgs,knownLocations,memories,orgNotes,orgLocations,orgP
   const [newName, setNewName] = React.useState("");
   const q = search.trim().toLowerCase();
   const filtered = q ? knownOrgs.filter(n=>n.toLowerCase().includes(q)) : knownOrgs;
-  const orgCount = name => memories.filter(m=>m.orgs?.includes(name)).length;
+  // Precompute counts once per memories change. Avoids O(orgs × memories) per render.
+  const orgCounts = React.useMemo(() => {
+    const c = new Map();
+    (memories||[]).forEach(m => (m.orgs||[]).forEach(o => c.set(o, (c.get(o)||0) + 1)));
+    return c;
+  }, [memories]);
+  const orgCount = name => orgCounts.get(name) || 0;
   function commitAdd() {
     const v=newName.trim(); if(!v||knownOrgs.includes(v)) return;
     persistSubject({knownOrgs:[...knownOrgs,v].sort()});
@@ -2727,8 +2748,19 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
   const [addingPerson, setAddingPerson] = React.useState(false);
   const [addingOrg, setAddingOrg] = React.useState(false);
   const [newName, setNewName] = React.useState("");
-  const personCount=name=>memories.filter(m=>m.people?.includes(name)).length;
-  const orgCount=name=>memories.filter(m=>m.orgs?.includes(name)).length;
+  // Precompute counts once per memories change. Avoids O(people × memories) per render.
+  const personCounts = React.useMemo(() => {
+    const c = new Map();
+    (memories||[]).forEach(m => (m.people||[]).forEach(p => c.set(p, (c.get(p)||0) + 1)));
+    return c;
+  }, [memories]);
+  const orgCounts = React.useMemo(() => {
+    const c = new Map();
+    (memories||[]).forEach(m => (m.orgs||[]).forEach(o => c.set(o, (c.get(o)||0) + 1)));
+    return c;
+  }, [memories]);
+  const personCount=name=>personCounts.get(name)||0;
+  const orgCount=name=>orgCounts.get(name)||0;
   const q = search.trim().toLowerCase();
   const allFilterRels=[...new Set(Object.values(peopleRelationships).filter(Boolean))].sort();
   const allFilterOrgs=[...new Set(Object.values(personOrgs||{}).flat())].sort();
@@ -7979,7 +8011,21 @@ function handleEdit(m) {
       setTimeout(() => setSyncStatus(""), 3000);
     } catch(e) {
       console.error("doSync:", e);
-      setSyncStatus("error: " + (e?.message || e));
+      // Classify common failures so the message gives the user something to do.
+      let msg;
+      const m = (e && e.message) ? e.message : "";
+      if (e && (e.name === "NotAllowedError" || /permission/i.test(m))) {
+        msg = "error: Sync file permission denied — choose the file again under Settings > Backup.";
+      } else if (e && e.name === "NotFoundError") {
+        msg = "error: Sync file not found. Clear and reselect it under Settings > Backup.";
+      } else if (e && (e.name === "QuotaExceededError" || /quota/i.test(m))) {
+        msg = "error: Out of disk space.";
+      } else if (/network|fetch|failed to fetch|networkerror/i.test(m)) {
+        msg = "error: Couldn't reach the server. Check your connection and try again.";
+      } else {
+        msg = "error: " + (m || "unknown error — check the browser console for details");
+      }
+      setSyncStatus(msg);
       setTimeout(() => setSyncStatus(""), 8000);
     }
   }
@@ -8645,8 +8691,29 @@ function handleEdit(m) {
         setGedPreview(null);
         setGedSearch("");
       } catch(err) {
-        alert("Could not parse GEDCOM file: " + err.message);
+        console.error("[GEDCOM] parse error:", err);
+        // Translate parser internals into actionable guidance for users.
+        const m = (err && err.message) || "";
+        let msg = "Couldn't read this GEDCOM file.\n\n";
+        if (/encoding|utf|ansel|character/i.test(m)) {
+          msg += "It looks like the file uses an unusual character encoding. Re-export from your genealogy app with UTF-8 selected.";
+        } else if (/header|HEAD|gedcom version/i.test(m)) {
+          msg += "The file is missing the standard GEDCOM header. Re-export from your genealogy app — most apps offer 'Standard GEDCOM' as an export option.";
+        } else if (/empty|no individuals|0 people|no persons/i.test(m)) {
+          msg += "The file doesn't contain any individuals. It may be a partial export — try re-exporting with all people included.";
+        } else if (/JSON|unexpected token|syntax/i.test(m)) {
+          msg += "This doesn't look like a GEDCOM file. Make sure you've selected a .ged file (not a JSON or zip).";
+        } else {
+          msg += "It may be corrupted or use a non-standard format. Try re-exporting from your genealogy app, or use a different tool to convert it to standard GEDCOM 5.5.";
+        }
+        msg += "\n\n(Technical detail: " + (m || "unknown error") + ")";
+        alert(msg);
       }
+      setGedBusy(false);
+    };
+    reader.onerror = () => {
+      console.error("[GEDCOM] file read error:", reader.error);
+      alert("Couldn't read the file. It may be too large, in use by another app, or you may not have permission to access it. Try copying it somewhere local and re-selecting.");
       setGedBusy(false);
     };
     reader.readAsText(file, "utf-8");

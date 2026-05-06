@@ -1198,6 +1198,13 @@ export default {
         const body = await request.json();
         const identifier = body.identifier;
         if (!identifier) return json({ error: "No identifier" }, 400);
+        // Verify the caller owns this profile — without this, any valid licence key
+        // could unpublish anyone else's profile if they knew the identifier.
+        const callerHash = await sha256hex(key.trim().toUpperCase());
+        const ownerIdentifier = await env.SHARES.get("keymap:" + callerHash);
+        if (!ownerIdentifier || ownerIdentifier !== identifier) {
+          return json({ error: "Forbidden" }, 403);
+        }
         await env.SHARES.delete("profile:" + identifier);
         await env.SHARES.delete("profile_compact:" + identifier);
         return json({ ok: true });
@@ -1682,7 +1689,12 @@ export default {
           if (callerKey) {
             const callerHash = await sha256hex(callerKey.trim().toUpperCase());
             const licRaw = await env.SHARES.get("license:" + callerHash);
-            if (licRaw) { const lic = JSON.parse(licRaw); if (!lic.email || lic.email === email) authorized = true; }
+            if (licRaw) {
+              const lic = JSON.parse(licRaw);
+              // Require the licence to have an email AND match the requested address.
+              // (A licence without an email used to be a wildcard for any inbox — a hole.)
+              if (lic.email && lic.email === email) authorized = true;
+            }
           }
         }
         if (!authorized) return json({ error: "Verify your email to access your inbox." }, 403);
