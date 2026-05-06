@@ -1980,13 +1980,7 @@ function MemoryCard({m, onClick}) {
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"12px"}},
       React.createElement("div",{style:{flex:1}},
         React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"7px",flexWrap:"wrap",margin:"0 0 3px"}},
-          React.createElement("p",{style:{margin:0,fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},fuzzyDateLabel(m),(m.location?` · ${m.location}`:""),(m.dominantAuthor?` · ${m.dominantAuthor}`:"")),
-          React.createElement("span",{style:{
-            fontSize:"0.78rem",padding:"1px 7px",borderRadius:"20px",letterSpacing:"0.04em",flexShrink:0,
-            background:(!m.visibility||m.visibility==="private")?"transparent":m.visibility==="public"?"rgba(74,122,90,0.15)":m.visibility==="subscriber"?"rgba(168,136,90,0.15)":"rgba(100,120,160,0.15)",
-            color:(!m.visibility||m.visibility==="private")?"#c0b0a0":m.visibility==="public"?"#2d6b3a":m.visibility==="subscriber"?"#7a5a20":"#3a4a7a",
-            border:(!m.visibility||m.visibility==="private")?"1px dashed rgba(180,160,140,0.4)":m.visibility==="public"?"1px solid rgba(74,122,90,0.35)":m.visibility==="subscriber"?"1px solid rgba(168,136,90,0.35)":"1px solid rgba(100,120,160,0.35)"
-          }},(!m.visibility||m.visibility==="private")?"Private":m.visibility==="public"?"Public":m.visibility==="subscriber"?"Subscribers":m.visibility==="connected"?"Connected":"Tagged")
+          React.createElement("p",{style:{margin:0,fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},fuzzyDateLabel(m),(m.location?` · ${m.location}`:""),(m.dominantAuthor?` · ${m.dominantAuthor}`:""))
         ),
         React.createElement("h4",{style:{margin:"0 0 5px",fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",fontWeight:700}},m.title),
         m.content && React.createElement("p",{style:{margin:0,fontSize:"0.88rem",color:"#6a5c48",lineHeight:1.5,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}},m.content)
@@ -3894,14 +3888,6 @@ function PrintView({memories, ownerName, allDecades}) {
                 m.mediaUrls.slice(0,3).map((med,i)=>React.createElement(MediaImg,{key:i,med,alt:"",style:{maxWidth:"180px",maxHeight:"140px",objectFit:"cover",borderRadius:"2px",border:"1px solid #c8b89a"}}))
               ),
               m.content&&React.createElement("p",{style:{lineHeight:"1.85",fontSize:"1.05rem",whiteSpace:"pre-wrap",margin:0,color:"#2c2416"}},linkify(m.content)),
-          m.publicSummary&&m.visibility&&m.visibility!=="private"&&React.createElement("div",{
-            style:{background:"rgba(122,158,138,0.08)",border:"1px solid rgba(122,158,138,0.25)",
-              borderRadius:"3px",padding:"10px 14px",marginTop:"12px"}},
-            React.createElement("p",{style:{fontSize:"0.78rem",letterSpacing:"0.08em",textTransform:"uppercase",
-              color:"#4a7a5a",marginBottom:"6px",fontWeight:600}},"Public summary"),
-            React.createElement("p",{style:{fontSize:"0.95rem",color:"#2c2416",lineHeight:1.75,whiteSpace:"pre-wrap",margin:0}},
-              m.publicSummary)
-          ),
               (m.perspectives||[]).filter(p=>p.content).map(p=>
                 React.createElement("div",{key:p.author,style:{marginTop:"14px",borderLeft:"3px solid #e0d4be",paddingLeft:"14px"}},
                   React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",margin:"0 0 4px",fontStyle:"italic"}},`${p.author}'s perspective`),
@@ -6143,18 +6129,12 @@ function DetailView({
   if (!m) return null;
  
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
-    // ── Date & visibility badge ──
+    // ── Date ──
     React.createElement("div",{style:{display:"flex",flexWrap:"wrap",alignItems:"center",gap:"8px",margin:"0 0 6px"}},
       React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",fontSize:"1rem",margin:0}},
         fuzzyDateLabel(m),
         [m.location,...(m.locations||[])].filter(Boolean).map(l=>` \u00b7 ${l}`).join("")
-      ),
-      React.createElement("span",{style:{
-        fontSize:"0.78rem",padding:"1px 8px",borderRadius:"20px",letterSpacing:"0.04em",
-        background:(!m.visibility||m.visibility==="private")?"transparent":(m.visibility==="public")?"rgba(74,122,90,0.15)":(m.visibility==="subscriber")?"rgba(168,136,90,0.15)":"rgba(100,120,160,0.15)",
-        color:(!m.visibility||m.visibility==="private")?"#c0b0a0":(m.visibility==="public")?"#2d6b3a":(m.visibility==="subscriber")?"#7a5a20":"#3a4a7a",
-        border:(!m.visibility||m.visibility==="private")?"1px dashed rgba(180,160,140,0.4)":(m.visibility==="public")?"1px solid rgba(74,122,90,0.35)":(m.visibility==="subscriber")?"1px solid rgba(168,136,90,0.35)":"1px solid rgba(100,120,160,0.35)"
-      }},(!m.visibility||m.visibility==="private")?"Private":m.visibility==="public"?"Public":m.visibility==="subscriber"?"Subscribers":m.visibility==="connected"?"Connected":"Tagged")
+      )
     ),
  
     // ── Title ──
@@ -6307,7 +6287,6 @@ function AddEditForm({
       ["people",     (form.people||[]).length],
       ["orgs",       (form.orgs||[]).length],
       ["photos",     (form.mediaUrls||[]).length],
-      ["visibility", form.visibility && form.visibility !== "private"],
       ["sources",    (form.sources||[]).length || (form.sourceIds||[]).length],
       ["researchnote", form.researchNote || form.candidateConfidence],
       ["candidateperson", form.candidatePersonId],
@@ -6327,7 +6306,7 @@ function AddEditForm({
   const secHasContent = {
     location: (form.locationLabel||"").trim()||(form.locations||[]).length, tags: (form.tags||[]).length,
     people: (form.people||[]).length, orgs: (form.orgs||[]).length, photos: (form.mediaUrls||[]).length,
-    visibility: form.visibility&&form.visibility!=="private", sources: (form.sources||[]).length || (form.sourceIds||[]).length,
+    sources: (form.sources||[]).length || (form.sourceIds||[]).length,
     researchnote: form.researchNote||form.candidateConfidence, enddate: form.endFuzzy||form.endOngoing,
     candidateperson: !!form.candidatePersonId,
   };
@@ -6432,8 +6411,7 @@ function AddEditForm({
       secToggle("photos",    "Photos",        "\ud83d\uddbc"),
       isHistoryMode&&secToggle("sources", "Sources", "\ud83d\udcda"),
       isHistoryMode&&secToggle("researchnote","Research Note","\ud83d\udcdd"),
-      isHistoryMode&&secToggle("candidateperson","Candidate Person","\ud83d\udd0d"),
-      wantPublicProfile&&secToggle("visibility","Visibility",  "\ud83d\udd12")
+      isHistoryMode&&secToggle("candidateperson","Candidate Person","\ud83d\udd0d")
     ),
 
     // ── Location ──
@@ -6610,31 +6588,6 @@ function AddEditForm({
             )
       );
     })()),
-
-    // ── Visibility ──
-    expanded.has("visibility")&&wantPublicProfile&&sec(React.createElement("div",null,
-      React.createElement("label",{style:S.label},"Visibility"),
-      React.createElement("select",{value:form.visibility||"private",onChange:e=>updateForm({visibility:e.target.value}),style:{...S.select,width:"100%"}},
-        React.createElement("option",{value:"private"},"Private \u2014 only on this device"),
-        React.createElement("option",{value:"public"},"Public \u2014 anyone with the link"),
-        React.createElement("option",{value:"subscriber"},"\u2728 Subscribers \u2014 Remembory subscribers only"),
-        React.createElement("option",{value:"connected"},"Connected \u2014 people linked to your profile"),
-        React.createElement("option",{value:"tagged"},"Present \u2014 only people tagged in this memory")
-      ),
-      React.createElement("p",{style:{fontSize:"0.8rem",color:"#8a7460",fontStyle:"italic",marginTop:"4px"}},
-        (form.visibility||"private")==="private"?"This memory stays on your device and never appears on your public profile.":"This memory will appear on your public profile with the selected visibility."
-      ),
-      (form.visibility&&form.visibility!=="private")&&React.createElement("div",{style:{marginTop:"10px"}},
-        React.createElement("label",{style:S.label},"Public summary"),
-        React.createElement("div",{style:{position:"relative"}},
-          React.createElement("textarea",{value:form.publicSummary!==undefined&&form.publicSummary!==null?form.publicSummary:(form.content||""),onChange:e=>updateForm({publicSummary:e.target.value}),placeholder:"Defaults to your full memory text. Edit to create a shorter public version.",rows:4,style:{...S.input,resize:"vertical",lineHeight:"1.7",borderColor:(form.publicSummary&&form.publicSummary!==form.content)?"#a8885a":undefined}}),
-          (form.publicSummary&&form.publicSummary!==form.content)&&React.createElement("span",{style:{position:"absolute",top:"6px",right:"8px",fontSize:"0.78rem",background:"#a8885a",color:"#fff",padding:"1px 7px",borderRadius:"20px",letterSpacing:"0.04em",pointerEvents:"none"}},"Edited")
-        ),
-        React.createElement("p",{style:{fontSize:"0.8rem",color:"#8a7460",fontStyle:"italic",marginTop:"3px"}},
-          (form.publicSummary&&form.publicSummary!==form.content)?"Custom public version active \u2014 differs from your private memory text.":"Defaults to your full memory text. Edit to create a shorter public version."
-        )
-      )
-    )),
 
     // ── Research note (History mode, collapsible) ──
     isHistoryMode&&expanded.has("researchnote")&&sec(React.createElement("div",null,
