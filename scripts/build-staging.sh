@@ -20,6 +20,7 @@ cp "$ROOT/index.html" "$DIST/"
 cp "$ROOT/manual.html" "$DIST/"
 cp "$ROOT/tips.html" "$DIST/"
 cp "$ROOT/research.html" "$DIST/"
+cp "$ROOT/add-resource.html" "$DIST/"
 # Lineage uses the same code as Chronicle — URL detection inside picks the product flag.
 cp "$ROOT/chronicle.html" "$DIST/lineage.html"
 cp "$ROOT/sw.js" "$DIST/"
