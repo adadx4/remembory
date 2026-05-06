@@ -239,6 +239,24 @@ const SOURCE_CONFIDENCE = [
   {id:"unknown",    label:"Unknown",    hint:"Confidence not assessed"},
 ];
 
+// Genealogical event types — must match the values accepted by the Genealogy
+// research tool's eventType field at https://adadx4.github.io/genealogy/.
+const EVENT_TYPES = [
+  {id:"birth",      label:"Birth"},
+  {id:"baptism",    label:"Baptism"},
+  {id:"marriage",   label:"Marriage"},
+  {id:"death",      label:"Death"},
+  {id:"burial",     label:"Burial"},
+  {id:"residence",  label:"Residence (census, directories, electoral rolls)"},
+  {id:"employment", label:"Employment / occupational"},
+  {id:"education",  label:"Education / schools"},
+  {id:"travel",     label:"Travel / immigration / emigration"},
+  {id:"military",   label:"Military"},
+  {id:"legal",      label:"Legal (wills, probate, court, land)"},
+  {id:"other",      label:"Other"},
+];
+const GENEALOGY_TOOL_URL = "/research.html";
+
 // ── Styles ─────────────────────────────────────────────────────
 const S = {
   input: { width:"100%", padding:"10px 13px", background:"rgba(255,252,245,0.9)", border:"1px solid #c8b89a", borderRadius:"2px", fontFamily:"'Crimson Text', serif", fontSize:"1rem", color:"#2c2416", outline:"none" },
@@ -288,6 +306,31 @@ function eventSources(m) {
   return [];
 }
 
+// Build a deep link to the Genealogy research tool with as much of the event
+// context prefilled as possible. m is optional — if absent, the tool opens bare.
+function genealogyResearchUrl(m, knownLocations) {
+  const params = new URLSearchParams();
+  if (m) {
+    if (m.eventType) params.set("eventType", m.eventType);
+    if (m.year) {
+      params.set("rangeStartYear", String(m.year));
+      params.set("rangeEndYear", String(m.year));
+    }
+    const label = m.location || "";
+    if (label) {
+      const known = (knownLocations||[]).find(l => (typeof l === "string" ? l : l.label) === label);
+      if (known && typeof known === "object") {
+        if (known.country) params.set("country", known.country);
+        if (known.state)   params.set("stateProvince", known.state);
+        if (known.town)    params.set("townParish", known.town);
+      }
+    }
+    if (params.get("eventType") && params.get("country")) params.set("autosubmit", "1");
+  }
+  const qs = params.toString();
+  return GENEALOGY_TOOL_URL + (qs ? "?" + qs : "");
+}
+
 // ── Location helpers ───────────────────────────────────────────
 // knownLocations is now an array of objects: { label, street, town, state, country }
 // m.location and m.locations remain plain label strings
@@ -333,7 +376,7 @@ function knownLocationValues(knownLocations, field) {
 }
 
 function newForm() {
-  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], sources:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town", researchNote:"", candidateConfidence:"possible", candidatePersonId:"", recalledBy:"self" };
+  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], sources:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town", researchNote:"", candidateConfidence:"possible", candidatePersonId:"", eventType:"", recalledBy:"self" };
 }
 
 // ── Storage ────────────────────────────────────────────────────
@@ -6118,7 +6161,7 @@ function CandidatePersonsPanel({candidatePersons, memories, knownPeople, subject
 
 function DetailView({
   selected, memories, isMobile,
-  peopleEmails, personOrgs, shareHistory, knownSources,
+  peopleEmails, personOrgs, shareHistory, knownSources, knownLocations,
   candidatePersons, setIndexFilter,
   isSubscriber, ownerName, ownerEmail, localConnections,
   handleEdit, handleDelete, handleSavePerspectives,
@@ -6242,6 +6285,7 @@ function DetailView({
     React.createElement("div",{style:{display:"flex",gap:"10px",marginBottom:"12px",flexWrap:"wrap"}},
       React.createElement("button",{onClick:()=>handleEdit(m),style:S.btn},"Edit"),
       React.createElement("button",{onClick:()=>handleDelete(m.id),style:{...S.btnOutline,color:"#c4858a",borderColor:"#c4858a"}},"Delete"),
+      isHistoryMode&&React.createElement("button",{onClick:()=>window.open(genealogyResearchUrl(m, knownLocations),"_blank","noopener"),style:{...S.btnOutline,color:"#5a4820",borderColor:"rgba(196,169,98,0.5)"},title:"Open the Genealogy research tool prefilled with this event's details"},"\ud83d\udd0e Research"),
       isSubscriber
         ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,localConnections:localConnections,onRecordShare:recordShare,onSaveEmails:onSaveEmails,onSetSenderEmail:onSetSenderEmail,userTier})
         : React.createElement("div",{style:{position:"relative",display:"inline-block"}},
@@ -6290,6 +6334,7 @@ function AddEditForm({
       ["sources",    (form.sources||[]).length || (form.sourceIds||[]).length],
       ["researchnote", form.researchNote || form.candidateConfidence],
       ["candidateperson", form.candidatePersonId],
+      ["eventtype", form.eventType],
     ];
     const first = checks.find(([,v])=>v);
     return first ? new Set([first[0]]) : new Set();
@@ -6309,6 +6354,7 @@ function AddEditForm({
     sources: (form.sources||[]).length || (form.sourceIds||[]).length,
     researchnote: form.researchNote||form.candidateConfidence, enddate: form.endFuzzy||form.endOngoing,
     candidateperson: !!form.candidatePersonId,
+    eventtype: !!form.eventType,
   };
   function secToggle(k, label, icon) {
     const on = expanded.has(k);
@@ -6411,7 +6457,8 @@ function AddEditForm({
       secToggle("photos",    "Photos",        "\ud83d\uddbc"),
       isHistoryMode&&secToggle("sources", "Sources", "\ud83d\udcda"),
       isHistoryMode&&secToggle("researchnote","Research Note","\ud83d\udcdd"),
-      isHistoryMode&&secToggle("candidateperson","Candidate Person","\ud83d\udd0d")
+      isHistoryMode&&secToggle("candidateperson","Candidate Person","\ud83d\udd0d"),
+      isHistoryMode&&secToggle("eventtype","Event Type","\ud83d\udcdc")
     ),
 
     // ── Location ──
@@ -6629,6 +6676,18 @@ function AddEditForm({
         )
       );
     })()),
+
+    // ── Event type (Genealogy mode, collapsible) ──
+    isHistoryMode&&expanded.has("eventtype")&&sec(React.createElement("div",null,
+      React.createElement("label",{style:S.label},"Event Type"),
+      React.createElement("select",{value:form.eventType||"",onChange:e=>updateForm({eventType:e.target.value}),style:{...S.select,width:"100%"}},
+        React.createElement("option",{value:""},"\u2014 not specified \u2014"),
+        EVENT_TYPES.map(t=>React.createElement("option",{key:t.id,value:t.id},t.label))
+      ),
+      React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"4px 0 0",lineHeight:1.5}},
+        "Categorise this event for research. Used by the Research tool to find matching record collections (births, marriages, censuses, etc.)."
+      )
+    )),
 
     // ── Sticky save footer ──
     React.createElement("div",{style:{position:"sticky",bottom:0,background:"rgba(245,240,232,0.97)",borderTop:"1px solid #d4c4a8",padding:"12px 0",marginTop:"20px",backdropFilter:"blur(4px)"}},
@@ -9694,6 +9753,7 @@ function handleEdit(m) {
               {label:"🔍 Candidate",action:()=>{setIndexFilter({type:"candidatePersons"});setView("index");},active:view==="index"&&indexFilter?.type==="candidatePersons"},
               {label:"👤 Person",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
               IS_STAGING&&{label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
+              {label:"🔎 Research",action:()=>window.open(genealogyResearchUrl(null, knownLocations),"_blank","noopener")},
             ]:[
               {label:"+ From Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
               {label:"📷 From Photo",action:()=>{setImportTab&&setImportTab("photos");setView("import");},active:view==="import"},
@@ -9761,6 +9821,7 @@ function handleEdit(m) {
           {label:"🔍 Candidate",action:()=>{setIndexFilter({type:"candidatePersons"});setView("index");},active:view==="index"&&indexFilter?.type==="candidatePersons"},
           {label:"👤 Person",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
           IS_STAGING&&{label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
+          {label:"🔎 Research",action:()=>window.open(genealogyResearchUrl(null, knownLocations),"_blank","noopener")},
         ]:[
           {label:"+ From Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
           {label:"📷 From Photo",action:()=>{setImportTab&&setImportTab("photos");setView("import");},active:view==="import"},
@@ -10636,7 +10697,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
 
       view==="detail"&&selected&&React.createElement(DetailView,{
         selected, memories, isMobile,
-        peopleEmails, personOrgs, shareHistory, knownSources,
+        peopleEmails, personOrgs, shareHistory, knownSources, knownLocations,
         candidatePersons, setIndexFilter,
         isSubscriber, ownerName, ownerEmail, localConnections,
         handleEdit, handleDelete, handleSavePerspectives,

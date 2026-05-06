@@ -239,6 +239,24 @@ const SOURCE_CONFIDENCE = [
   {id:"unknown",    label:"Unknown",    hint:"Confidence not assessed"},
 ];
 
+// Genealogical event types — must match the values accepted by the Genealogy
+// research tool's eventType field at https://adadx4.github.io/genealogy/.
+const EVENT_TYPES = [
+  {id:"birth",      label:"Birth"},
+  {id:"baptism",    label:"Baptism"},
+  {id:"marriage",   label:"Marriage"},
+  {id:"death",      label:"Death"},
+  {id:"burial",     label:"Burial"},
+  {id:"residence",  label:"Residence (census, directories, electoral rolls)"},
+  {id:"employment", label:"Employment / occupational"},
+  {id:"education",  label:"Education / schools"},
+  {id:"travel",     label:"Travel / immigration / emigration"},
+  {id:"military",   label:"Military"},
+  {id:"legal",      label:"Legal (wills, probate, court, land)"},
+  {id:"other",      label:"Other"},
+];
+const GENEALOGY_TOOL_URL = "https://adadx4.github.io/genealogy/";
+
 // ── Styles ─────────────────────────────────────────────────────
 const S = {
   input: { width:"100%", padding:"10px 13px", background:"rgba(255,252,245,0.9)", border:"1px solid #c8b89a", borderRadius:"2px", fontFamily:"'Crimson Text', serif", fontSize:"1rem", color:"#2c2416", outline:"none" },
@@ -288,6 +306,31 @@ function eventSources(m) {
   return [];
 }
 
+// Build a deep link to the Genealogy research tool with as much of the event
+// context prefilled as possible. m is optional — if absent, the tool opens bare.
+function genealogyResearchUrl(m, knownLocations) {
+  const params = new URLSearchParams();
+  if (m) {
+    if (m.eventType) params.set("eventType", m.eventType);
+    if (m.year) {
+      params.set("rangeStartYear", String(m.year));
+      params.set("rangeEndYear", String(m.year));
+    }
+    const label = m.location || "";
+    if (label) {
+      const known = (knownLocations||[]).find(l => (typeof l === "string" ? l : l.label) === label);
+      if (known && typeof known === "object") {
+        if (known.country) params.set("country", known.country);
+        if (known.state)   params.set("stateProvince", known.state);
+        if (known.town)    params.set("townParish", known.town);
+      }
+    }
+    if (params.get("eventType") && params.get("country")) params.set("autosubmit", "1");
+  }
+  const qs = params.toString();
+  return GENEALOGY_TOOL_URL + (qs ? "?" + qs : "");
+}
+
 // ── Location helpers ───────────────────────────────────────────
 // knownLocations is now an array of objects: { label, street, town, state, country }
 // m.location and m.locations remain plain label strings
@@ -333,7 +376,7 @@ function knownLocationValues(knownLocations, field) {
 }
 
 function newForm() {
-  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], sources:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town", researchNote:"", candidateConfidence:"possible", candidatePersonId:"", recalledBy:"self" };
+  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], sources:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town", researchNote:"", candidateConfidence:"possible", candidatePersonId:"", eventType:"", recalledBy:"self" };
 }
 
 // ── Storage ────────────────────────────────────────────────────
@@ -1980,13 +2023,7 @@ function MemoryCard({m, onClick}) {
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:"12px"}},
       React.createElement("div",{style:{flex:1}},
         React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"7px",flexWrap:"wrap",margin:"0 0 3px"}},
-          React.createElement("p",{style:{margin:0,fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},fuzzyDateLabel(m),(m.location?` · ${m.location}`:""),(m.dominantAuthor?` · ${m.dominantAuthor}`:"")),
-          React.createElement("span",{style:{
-            fontSize:"0.78rem",padding:"1px 7px",borderRadius:"20px",letterSpacing:"0.04em",flexShrink:0,
-            background:(!m.visibility||m.visibility==="private")?"transparent":m.visibility==="public"?"rgba(74,122,90,0.15)":m.visibility==="subscriber"?"rgba(168,136,90,0.15)":"rgba(100,120,160,0.15)",
-            color:(!m.visibility||m.visibility==="private")?"#c0b0a0":m.visibility==="public"?"#2d6b3a":m.visibility==="subscriber"?"#7a5a20":"#3a4a7a",
-            border:(!m.visibility||m.visibility==="private")?"1px dashed rgba(180,160,140,0.4)":m.visibility==="public"?"1px solid rgba(74,122,90,0.35)":m.visibility==="subscriber"?"1px solid rgba(168,136,90,0.35)":"1px solid rgba(100,120,160,0.35)"
-          }},(!m.visibility||m.visibility==="private")?"Private":m.visibility==="public"?"Public":m.visibility==="subscriber"?"Subscribers":m.visibility==="connected"?"Connected":"Tagged")
+          React.createElement("p",{style:{margin:0,fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},fuzzyDateLabel(m),(m.location?` · ${m.location}`:""),(m.dominantAuthor?` · ${m.dominantAuthor}`:""))
         ),
         React.createElement("h4",{style:{margin:"0 0 5px",fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",fontWeight:700}},m.title),
         m.content && React.createElement("p",{style:{margin:0,fontSize:"0.88rem",color:"#6a5c48",lineHeight:1.5,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}},m.content)
@@ -3894,14 +3931,6 @@ function PrintView({memories, ownerName, allDecades}) {
                 m.mediaUrls.slice(0,3).map((med,i)=>React.createElement(MediaImg,{key:i,med,alt:"",style:{maxWidth:"180px",maxHeight:"140px",objectFit:"cover",borderRadius:"2px",border:"1px solid #c8b89a"}}))
               ),
               m.content&&React.createElement("p",{style:{lineHeight:"1.85",fontSize:"1.05rem",whiteSpace:"pre-wrap",margin:0,color:"#2c2416"}},linkify(m.content)),
-          m.publicSummary&&m.visibility&&m.visibility!=="private"&&React.createElement("div",{
-            style:{background:"rgba(122,158,138,0.08)",border:"1px solid rgba(122,158,138,0.25)",
-              borderRadius:"3px",padding:"10px 14px",marginTop:"12px"}},
-            React.createElement("p",{style:{fontSize:"0.78rem",letterSpacing:"0.08em",textTransform:"uppercase",
-              color:"#4a7a5a",marginBottom:"6px",fontWeight:600}},"Public summary"),
-            React.createElement("p",{style:{fontSize:"0.95rem",color:"#2c2416",lineHeight:1.75,whiteSpace:"pre-wrap",margin:0}},
-              m.publicSummary)
-          ),
               (m.perspectives||[]).filter(p=>p.content).map(p=>
                 React.createElement("div",{key:p.author,style:{marginTop:"14px",borderLeft:"3px solid #e0d4be",paddingLeft:"14px"}},
                   React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",margin:"0 0 4px",fontStyle:"italic"}},`${p.author}'s perspective`),
@@ -6132,7 +6161,7 @@ function CandidatePersonsPanel({candidatePersons, memories, knownPeople, subject
 
 function DetailView({
   selected, memories, isMobile,
-  peopleEmails, personOrgs, shareHistory, knownSources,
+  peopleEmails, personOrgs, shareHistory, knownSources, knownLocations,
   candidatePersons, setIndexFilter,
   isSubscriber, ownerName, ownerEmail, localConnections,
   handleEdit, handleDelete, handleSavePerspectives,
@@ -6143,18 +6172,12 @@ function DetailView({
   if (!m) return null;
  
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
-    // ── Date & visibility badge ──
+    // ── Date ──
     React.createElement("div",{style:{display:"flex",flexWrap:"wrap",alignItems:"center",gap:"8px",margin:"0 0 6px"}},
       React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",fontSize:"1rem",margin:0}},
         fuzzyDateLabel(m),
         [m.location,...(m.locations||[])].filter(Boolean).map(l=>` \u00b7 ${l}`).join("")
-      ),
-      React.createElement("span",{style:{
-        fontSize:"0.78rem",padding:"1px 8px",borderRadius:"20px",letterSpacing:"0.04em",
-        background:(!m.visibility||m.visibility==="private")?"transparent":(m.visibility==="public")?"rgba(74,122,90,0.15)":(m.visibility==="subscriber")?"rgba(168,136,90,0.15)":"rgba(100,120,160,0.15)",
-        color:(!m.visibility||m.visibility==="private")?"#c0b0a0":(m.visibility==="public")?"#2d6b3a":(m.visibility==="subscriber")?"#7a5a20":"#3a4a7a",
-        border:(!m.visibility||m.visibility==="private")?"1px dashed rgba(180,160,140,0.4)":(m.visibility==="public")?"1px solid rgba(74,122,90,0.35)":(m.visibility==="subscriber")?"1px solid rgba(168,136,90,0.35)":"1px solid rgba(100,120,160,0.35)"
-      }},(!m.visibility||m.visibility==="private")?"Private":m.visibility==="public"?"Public":m.visibility==="subscriber"?"Subscribers":m.visibility==="connected"?"Connected":"Tagged")
+      )
     ),
  
     // ── Title ──
@@ -6262,6 +6285,7 @@ function DetailView({
     React.createElement("div",{style:{display:"flex",gap:"10px",marginBottom:"12px",flexWrap:"wrap"}},
       React.createElement("button",{onClick:()=>handleEdit(m),style:S.btn},"Edit"),
       React.createElement("button",{onClick:()=>handleDelete(m.id),style:{...S.btnOutline,color:"#c4858a",borderColor:"#c4858a"}},"Delete"),
+      isHistoryMode&&React.createElement("button",{onClick:()=>window.open(genealogyResearchUrl(m, knownLocations),"_blank","noopener"),style:{...S.btnOutline,color:"#5a4820",borderColor:"rgba(196,169,98,0.5)"},title:"Open the Genealogy research tool prefilled with this event's details"},"\ud83d\udd0e Research"),
       isSubscriber
         ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,localConnections:localConnections,onRecordShare:recordShare,onSaveEmails:onSaveEmails,onSetSenderEmail:onSetSenderEmail,userTier})
         : React.createElement("div",{style:{position:"relative",display:"inline-block"}},
@@ -6307,10 +6331,10 @@ function AddEditForm({
       ["people",     (form.people||[]).length],
       ["orgs",       (form.orgs||[]).length],
       ["photos",     (form.mediaUrls||[]).length],
-      ["visibility", form.visibility && form.visibility !== "private"],
       ["sources",    (form.sources||[]).length || (form.sourceIds||[]).length],
       ["researchnote", form.researchNote || form.candidateConfidence],
       ["candidateperson", form.candidatePersonId],
+      ["eventtype", form.eventType],
     ];
     const first = checks.find(([,v])=>v);
     return first ? new Set([first[0]]) : new Set();
@@ -6327,9 +6351,10 @@ function AddEditForm({
   const secHasContent = {
     location: (form.locationLabel||"").trim()||(form.locations||[]).length, tags: (form.tags||[]).length,
     people: (form.people||[]).length, orgs: (form.orgs||[]).length, photos: (form.mediaUrls||[]).length,
-    visibility: form.visibility&&form.visibility!=="private", sources: (form.sources||[]).length || (form.sourceIds||[]).length,
+    sources: (form.sources||[]).length || (form.sourceIds||[]).length,
     researchnote: form.researchNote||form.candidateConfidence, enddate: form.endFuzzy||form.endOngoing,
     candidateperson: !!form.candidatePersonId,
+    eventtype: !!form.eventType,
   };
   function secToggle(k, label, icon) {
     const on = expanded.has(k);
@@ -6433,7 +6458,7 @@ function AddEditForm({
       isHistoryMode&&secToggle("sources", "Sources", "\ud83d\udcda"),
       isHistoryMode&&secToggle("researchnote","Research Note","\ud83d\udcdd"),
       isHistoryMode&&secToggle("candidateperson","Candidate Person","\ud83d\udd0d"),
-      wantPublicProfile&&secToggle("visibility","Visibility",  "\ud83d\udd12")
+      isHistoryMode&&secToggle("eventtype","Event Type","\ud83d\udcdc")
     ),
 
     // ── Location ──
@@ -6611,31 +6636,6 @@ function AddEditForm({
       );
     })()),
 
-    // ── Visibility ──
-    expanded.has("visibility")&&wantPublicProfile&&sec(React.createElement("div",null,
-      React.createElement("label",{style:S.label},"Visibility"),
-      React.createElement("select",{value:form.visibility||"private",onChange:e=>updateForm({visibility:e.target.value}),style:{...S.select,width:"100%"}},
-        React.createElement("option",{value:"private"},"Private \u2014 only on this device"),
-        React.createElement("option",{value:"public"},"Public \u2014 anyone with the link"),
-        React.createElement("option",{value:"subscriber"},"\u2728 Subscribers \u2014 Remembory subscribers only"),
-        React.createElement("option",{value:"connected"},"Connected \u2014 people linked to your profile"),
-        React.createElement("option",{value:"tagged"},"Present \u2014 only people tagged in this memory")
-      ),
-      React.createElement("p",{style:{fontSize:"0.8rem",color:"#8a7460",fontStyle:"italic",marginTop:"4px"}},
-        (form.visibility||"private")==="private"?"This memory stays on your device and never appears on your public profile.":"This memory will appear on your public profile with the selected visibility."
-      ),
-      (form.visibility&&form.visibility!=="private")&&React.createElement("div",{style:{marginTop:"10px"}},
-        React.createElement("label",{style:S.label},"Public summary"),
-        React.createElement("div",{style:{position:"relative"}},
-          React.createElement("textarea",{value:form.publicSummary!==undefined&&form.publicSummary!==null?form.publicSummary:(form.content||""),onChange:e=>updateForm({publicSummary:e.target.value}),placeholder:"Defaults to your full memory text. Edit to create a shorter public version.",rows:4,style:{...S.input,resize:"vertical",lineHeight:"1.7",borderColor:(form.publicSummary&&form.publicSummary!==form.content)?"#a8885a":undefined}}),
-          (form.publicSummary&&form.publicSummary!==form.content)&&React.createElement("span",{style:{position:"absolute",top:"6px",right:"8px",fontSize:"0.78rem",background:"#a8885a",color:"#fff",padding:"1px 7px",borderRadius:"20px",letterSpacing:"0.04em",pointerEvents:"none"}},"Edited")
-        ),
-        React.createElement("p",{style:{fontSize:"0.8rem",color:"#8a7460",fontStyle:"italic",marginTop:"3px"}},
-          (form.publicSummary&&form.publicSummary!==form.content)?"Custom public version active \u2014 differs from your private memory text.":"Defaults to your full memory text. Edit to create a shorter public version."
-        )
-      )
-    )),
-
     // ── Research note (History mode, collapsible) ──
     isHistoryMode&&expanded.has("researchnote")&&sec(React.createElement("div",null,
       React.createElement("label",{style:S.label},"Research Note"),
@@ -6676,6 +6676,18 @@ function AddEditForm({
         )
       );
     })()),
+
+    // ── Event type (Genealogy mode, collapsible) ──
+    isHistoryMode&&expanded.has("eventtype")&&sec(React.createElement("div",null,
+      React.createElement("label",{style:S.label},"Event Type"),
+      React.createElement("select",{value:form.eventType||"",onChange:e=>updateForm({eventType:e.target.value}),style:{...S.select,width:"100%"}},
+        React.createElement("option",{value:""},"\u2014 not specified \u2014"),
+        EVENT_TYPES.map(t=>React.createElement("option",{key:t.id,value:t.id},t.label))
+      ),
+      React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"4px 0 0",lineHeight:1.5}},
+        "Categorise this event for research. Used by the Research tool to find matching record collections (births, marriages, censuses, etc.)."
+      )
+    )),
 
     // ── Sticky save footer ──
     React.createElement("div",{style:{position:"sticky",bottom:0,background:"rgba(245,240,232,0.97)",borderTop:"1px solid #d4c4a8",padding:"12px 0",marginTop:"20px",backdropFilter:"blur(4px)"}},
@@ -9741,6 +9753,7 @@ function handleEdit(m) {
               {label:"🔍 Candidate",action:()=>{setIndexFilter({type:"candidatePersons"});setView("index");},active:view==="index"&&indexFilter?.type==="candidatePersons"},
               {label:"👤 Person",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
               IS_STAGING&&{label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
+              {label:"🔎 Research",action:()=>window.open(genealogyResearchUrl(null, knownLocations),"_blank","noopener")},
             ]:[
               {label:"+ From Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
               {label:"📷 From Photo",action:()=>{setImportTab&&setImportTab("photos");setView("import");},active:view==="import"},
@@ -9808,6 +9821,7 @@ function handleEdit(m) {
           {label:"🔍 Candidate",action:()=>{setIndexFilter({type:"candidatePersons"});setView("index");},active:view==="index"&&indexFilter?.type==="candidatePersons"},
           {label:"👤 Person",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
           IS_STAGING&&{label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
+          {label:"🔎 Research",action:()=>window.open(genealogyResearchUrl(null, knownLocations),"_blank","noopener")},
         ]:[
           {label:"+ From Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
           {label:"📷 From Photo",action:()=>{setImportTab&&setImportTab("photos");setView("import");},active:view==="import"},
@@ -10683,7 +10697,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
 
       view==="detail"&&selected&&React.createElement(DetailView,{
         selected, memories, isMobile,
-        peopleEmails, personOrgs, shareHistory, knownSources,
+        peopleEmails, personOrgs, shareHistory, knownSources, knownLocations,
         candidatePersons, setIndexFilter,
         isSubscriber, ownerName, ownerEmail, localConnections,
         handleEdit, handleDelete, handleSavePerspectives,

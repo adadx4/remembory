@@ -51,8 +51,9 @@ self.addEventListener("fetch", event => {
     event.respondWith(tileStrategy(event.request)); return;
   }
 
-  // chronicle.html — network-first so updates always land
-  if (url.pathname === "/chronicle.html" || url.pathname === "/") {
+  // chronicle.html and research.html — network-first so updates always land
+  if (url.pathname === "/chronicle.html" || url.pathname === "/" ||
+      url.pathname === "/research.html" || url.pathname === "/resources/genealogy-free-resources.js") {
     event.respondWith(networkFirst(event.request)); return;
   }
 

@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Genealogy Research — Remembory</title>
+<meta name="description" content="Find free and paid genealogy record collections by place, date and event type.">
+<meta name="theme-color" content="#2c2416">
+<link rel="icon" type="image/png" href="/favicon.ico">
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
+
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #f5f0e8;
+    font-family: 'Crimson Text', Georgia, serif;
+    color: #2c2416;
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+  input, select, textarea, button {
+    font-family: inherit;
+    color: inherit;
+  }
+  input::placeholder, textarea::placeholder {
+    color: #7a6a58;
+    font-style: italic;
+  }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #f5f0e8; }
+  ::-webkit-scrollbar-thumb { background: #c8b89a; border-radius: 3px; }
+
+  .app-shell {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+    font-size: 0.92rem;
+  }
+  .topbar a {
+    color: #6a5840;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(106,88,64,0.3);
+  }
+  .topbar a:hover { border-bottom-color: #6a5840; }
+
+  header.page-head {
+    border-bottom: 2px solid #c8a87a;
+    padding-bottom: 14px;
+    margin-bottom: 24px;
+  }
+  header.page-head h1 {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 2rem;
+    color: #1a1208;
+    margin: 0 0 6px;
+    line-height: 1.2;
+    font-weight: 700;
+  }
+  header.page-head p {
+    margin: 0;
+    color: #8a7460;
+    font-style: italic;
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  .panel {
+    background: rgba(255,252,245,0.85);
+    border: 1px solid #e0d4be;
+    border-radius: 3px;
+    padding: 18px 22px;
+    margin-bottom: 22px;
+  }
+  .panel h2 {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 1.4rem;
+    color: #1a1208;
+    margin: 0 0 14px;
+    font-weight: 700;
+  }
+
+  .form-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 700px) { .form-columns { grid-template-columns: 1fr; } }
+
+  fieldset {
+    border: 1px solid #e0d4be;
+    border-radius: 3px;
+    padding: 14px 16px 16px;
+    margin: 0 0 14px;
+    background: rgba(255,252,245,0.5);
+  }
+  legend {
+    font-size: 0.84rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6a5840;
+    padding: 0 6px;
+    font-weight: 600;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 0.88rem;
+    color: #5a4838;
+  }
+  label:last-child { margin-bottom: 0; }
+
+  input[type="text"], input[type="number"], input[type="url"], select {
+    display: block;
+    width: 100%;
+    margin-top: 4px;
+    padding: 9px 12px;
+    background: rgba(255,252,245,0.95);
+    border: 1px solid #c8b89a;
+    border-radius: 2px;
+    font-size: 0.98rem;
+    color: #2c2416;
+    outline: none;
+  }
+  input:focus, select:focus { border-color: #8a7460; }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  button {
+    cursor: pointer;
+    font-size: 0.95rem;
+    border-radius: 2px;
+    padding: 9px 22px;
+    border: none;
+    transition: opacity 0.15s;
+  }
+  button[type="submit"], button:not(.secondary) {
+    background: #2c2416;
+    color: #f5f0e8;
+  }
+  button[type="submit"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  button.secondary {
+    background: transparent;
+    color: #6a5840;
+    border: 1px solid #c8b89a;
+  }
+
+  .hidden { display: none; }
+
+  .results-summary {
+    font-size: 0.92rem;
+    color: #5a4838;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .results-explanation {
+    font-size: 0.88rem;
+    color: #8a7460;
+    font-style: italic;
+    margin-bottom: 16px;
+    line-height: 1.55;
+  }
+  .results-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .result-card {
+    background: rgba(255,252,245,0.9);
+    border: 1px solid #d4c4a8;
+    border-radius: 4px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    border-left-width: 3px;
+  }
+  .result-card.result-free          { border-left-color: #4a7a4a; }
+  .result-card.result-free-with-login { border-left-color: #7a9e8a; }
+  .result-card.result-freemium      { border-left-color: #c4a962; }
+  .result-card.result-paid          { border-left-color: #c4858a; }
+  .result-card.result-unknown       { border-left-color: #8a7460; }
+
+  .result-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .result-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    color: #1a1208;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(26,18,8,0.25);
+    font-weight: 700;
+  }
+  .result-name:hover { border-bottom-color: #1a1208; }
+  .result-meta {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .result-badge, .result-access {
+    font-size: 0.74rem;
+    padding: 1px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+    text-transform: capitalize;
+  }
+  .result-badge {
+    background: rgba(196,169,98,0.18);
+    color: #7a5a20;
+    border: 1px solid rgba(196,169,98,0.4);
+  }
+  .result-access {
+    background: rgba(74,122,90,0.12);
+    color: #2d5a3a;
+    border: 1px solid rgba(74,122,90,0.35);
+  }
+  .result-card.result-paid .result-access {
+    background: rgba(196,133,138,0.12);
+    color: #8a3030;
+    border-color: rgba(196,133,138,0.35);
+  }
+  .result-card.result-freemium .result-access,
+  .result-card.result-unknown .result-access {
+    background: rgba(168,136,90,0.12);
+    color: #7a5a20;
+    border-color: rgba(168,136,90,0.35);
+  }
+  .result-scope {
+    font-size: 0.86rem;
+    color: #5a4838;
+    margin-bottom: 4px;
+  }
+  .result-coverage {
+    font-size: 0.82rem;
+    color: #8a7460;
+    margin-bottom: 6px;
+    font-style: italic;
+  }
+  .result-best-for {
+    font-size: 0.86rem;
+    color: #4a3828;
+    margin-bottom: 4px;
+  }
+  .result-notes {
+    font-size: 0.84rem;
+    color: #6a5c48;
+    line-height: 1.55;
+  }
+  .result-notes a { color: #6a5840; }
+
+  .note-panel ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #5a4838;
+    font-size: 0.92rem;
+    line-height: 1.7;
+  }
+  .note-panel li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<main class="app-shell">
+
+  <div class="topbar">
+    <a href="/chronicle.html">← Back to Chronicle</a>
+  </div>
+
+  <header class="page-head">
+    <h1>Genealogy Research</h1>
+    <p>Filter the catalogue of free and paid record collections by place, date and event. Every collection that matches the filters is listed, with a link to its search page.</p>
+  </header>
+
+  <section class="panel">
+    <form id="search-form">
+      <div class="form-columns">
+        <div>
+          <fieldset>
+            <legend>1. Event type</legend>
+            <select id="eventType">
+              <option value="">Choose an event</option>
+              <option value="birth">Birth</option>
+              <option value="baptism">Baptism</option>
+              <option value="marriage">Marriage</option>
+              <option value="death">Death</option>
+              <option value="burial">Burial</option>
+              <option value="residence">Residence (census, directories, electoral rolls)</option>
+              <option value="employment">Employment / occupational</option>
+              <option value="education">Education / schools</option>
+              <option value="travel">Travel / immigration / emigration</option>
+              <option value="military">Military</option>
+              <option value="legal">Legal (wills, probate, court, land)</option>
+              <option value="other">Other</option>
+            </select>
+          </fieldset>
+
+          <fieldset>
+            <legend>2. Location</legend>
+            <label>
+              Country
+              <input id="country" type="text" placeholder="Australia, England, Ireland, Scotland…" list="countries" autocomplete="off" />
+            </label>
+            <label>
+              State / province / region
+              <input id="stateProvince" type="text" placeholder="NSW, Victoria, Northern Ireland…" list="states" autocomplete="off" />
+            </label>
+            <label>
+              County / district
+              <input id="county" type="text" placeholder="Lancashire, Cheshire, Yorkshire…" list="counties" autocomplete="off" />
+            </label>
+            <label>
+              Town / parish
+              <input id="townParish" type="text" placeholder="St Albans" autocomplete="off" />
+            </label>
+          </fieldset>
+        </div>
+
+        <div>
+          <fieldset>
+            <legend>3. Date range</legend>
+            <label>
+              Start year
+              <input id="rangeStartYear" type="number" min="1500" max="2100" placeholder="1870" />
+            </label>
+            <label>
+              End year
+              <input id="rangeEndYear" type="number" min="1500" max="2100" placeholder="1890" />
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>4. Religion (optional)</legend>
+            <label>
+              Religion or denomination
+              <select id="religion">
+                <option value="any">Any / Unknown</option>
+                <option value="Catholic">Catholic</option>
+                <option value="Protestant">Protestant</option>
+                <option value="Jewish">Jewish</option>
+                <option value="LDS">LDS</option>
+                <option value="Orthodox">Orthodox</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+          </fieldset>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="submit" id="submitButton" disabled>Loading resources…</button>
+        <button type="button" id="resetButton" class="secondary">Reset</button>
+      </div>
+
+      <datalist id="countries">
+        <option value="Australia"><option value="England"><option value="Wales">
+        <option value="Scotland"><option value="Ireland"><option value="Northern Ireland">
+        <option value="United Kingdom"><option value="United States">
+        <option value="Canada"><option value="New Zealand"><option value="Germany">
+      </datalist>
+
+      <datalist id="states">
+        <option value="New South Wales"><option value="Victoria"><option value="Queensland">
+        <option value="Western Australia"><option value="South Australia"><option value="Tasmania">
+        <option value="Northern Territory">
+      </datalist>
+
+      <datalist id="counties">
+        <option value="Lancashire"><option value="Cheshire"><option value="Yorkshire">
+      </datalist>
+    </form>
+  </section>
+
+  <section id="results" class="panel hidden">
+    <h2>Matching resources</h2>
+    <div id="results-summary" class="results-summary"></div>
+    <div id="results-explanation" class="results-explanation"></div>
+    <ul id="results-list" class="results-list"></ul>
+  </section>
+
+  <section class="panel note-panel">
+    <h2>How to use it</h2>
+    <ul>
+      <li>Choose one event at a time and enter as much location and date detail as you know.</li>
+      <li>Every collection that overlaps your filters is listed — most specific first.</li>
+      <li>Empty fields act as wildcards. Clear the county/parish to broaden the search.</li>
+      <li>Each result links to the collection's search page (or its homepage where no deep link exists).</li>
+    </ul>
+  </section>
+
+</main>
+
+<script src="/resources/genealogy-free-resources.js"></script>
+<script>
+const searchForm = document.getElementById('search-form');
+const resultsSection = document.getElementById('results');
+const resultsListEl = document.getElementById('results-list');
+const resultsSummaryEl = document.getElementById('results-summary');
+const resultsExplanationEl = document.getElementById('results-explanation');
+const submitButton = document.getElementById('submitButton');
+const resetButton = document.getElementById('resetButton');
+
+let resourceIndex = [];
+
+const COUNTRY_ALIASES = {
+  'uk': 'united kingdom',
+  'great britain': 'united kingdom',
+  'britain': 'united kingdom',
+  'england and wales': 'england',
+  'eire': 'ireland',
+  'republic of ireland': 'ireland',
+  'usa': 'united states',
+  'us': 'united states',
+  'america': 'united states',
+};
+
+const UK_CONSTITUENTS = ['england', 'wales', 'scotland', 'northern ireland'];
+
+function normalize(text) {
+  return (text || '').trim().toLowerCase();
+}
+
+function canonicalCountry(text) {
+  const n = normalize(text);
+  return COUNTRY_ALIASES[n] || n;
+}
+
+function getFormData() {
+  const startYear = Number(document.getElementById('rangeStartYear').value) || null;
+  const endYear = Number(document.getElementById('rangeEndYear').value) || null;
+  return {
+    eventType: document.getElementById('eventType').value,
+    rangeStartYear: startYear,
+    rangeEndYear: endYear,
+    country: document.getElementById('country').value.trim(),
+    stateProvince: document.getElementById('stateProvince').value.trim(),
+    county: document.getElementById('county').value.trim(),
+    parish: document.getElementById('townParish').value.trim(),
+    religion: document.getElementById('religion').value,
+  };
+}
+
+function mergeWithParent(collection, parent) {
+  const parentScope = parent.scope || {};
+  const childScope = collection.scope || {};
+  const merged = {
+    ...parent,
+    ...collection,
+    scope: { ...parentScope, ...childScope },
+    coverage: collection.coverage || parent.coverage || [],
+    accessType: collection.accessType || parent.accessType,
+    parent,
+    isCollection: true,
+  };
+  delete merged.collections;
+  return merged;
+}
+
+function entryCountryMatches(entry, queryCountry) {
+  const scope = entry.scope || {};
+  const countries = (scope.countries || []).map(canonicalCountry);
+  const aliases = (scope.alsoCovers || []).map(canonicalCountry);
+  if (countries.length === 0) return true;
+  const q = canonicalCountry(queryCountry);
+  if (countries.includes(q) || aliases.includes(q)) return true;
+  if (q === 'united kingdom' && countries.some((c) => UK_CONSTITUENTS.includes(c))) return true;
+  return false;
+}
+
+function entryStateMatches(entry, queryState) {
+  if (!queryState) return true;
+  const scopeState = normalize(entry.scope?.stateProvince);
+  if (!scopeState) return true;
+  const aliases = (entry.scope?.stateAliases || []).map(normalize);
+  const q = normalize(queryState);
+  return scopeState === q || aliases.includes(q);
+}
+
+function entryCountyMatches(entry, queryCounty) {
+  if (!queryCounty) return true;
+  const scopeCounty = normalize(entry.scope?.county);
+  if (!scopeCounty) return true;
+  return scopeCounty === normalize(queryCounty);
+}
+
+function entryParishMatches(entry, queryParish) {
+  if (!queryParish) return true;
+  const scopeParish = normalize(entry.scope?.parish);
+  if (!scopeParish) return true;
+  return scopeParish === normalize(queryParish);
+}
+
+function entryReligionMatches(entry, queryReligion) {
+  const r = normalize(queryReligion);
+  if (!r || r === 'any') return true;
+  const scopeReligion = normalize(entry.scope?.religion);
+  if (!scopeReligion || scopeReligion === 'any') return true;
+  return scopeReligion === r;
+}
+
+function coverageEntryMatches(cov, eventType, queryStart, queryEnd) {
+  if (!cov.events || !cov.events.includes(eventType)) return false;
+  const start = cov.startYear == null ? -Infinity : cov.startYear;
+  const end = cov.endYear == null ? Infinity : cov.endYear;
+  const qs = queryStart == null ? -Infinity : queryStart;
+  const qe = queryEnd == null ? Infinity : queryEnd;
+  return start <= qe && end >= qs;
+}
+
+function findMatchingCoverage(entry, eventType, queryStart, queryEnd) {
+  return (entry.coverage || []).find((cov) =>
+    coverageEntryMatches(cov, eventType, queryStart, queryEnd)
+  );
+}
+
+function entryMatchesFilters(entry, query) {
+  if (!entryCountryMatches(entry, query.country)) return null;
+  if (!entryStateMatches(entry, query.stateProvince)) return null;
+  if (!entryCountyMatches(entry, query.county)) return null;
+  if (!entryParishMatches(entry, query.parish)) return null;
+  if (!entryReligionMatches(entry, query.religion)) return null;
+  const coverage = findMatchingCoverage(
+    entry,
+    query.eventType,
+    query.rangeStartYear,
+    query.rangeEndYear
+  );
+  if (!coverage) return null;
+  return { entry, coverage };
+}
+
+function specificityScore(entry) {
+  const scope = entry.scope || {};
+  if (scope.parish) return 4;
+  if (scope.county) return 3;
+  if (scope.stateProvince) return 2;
+  if ((scope.countries || []).length > 0) return 1;
+  return 0;
+}
+
+function accessRank(accessType) {
+  switch (accessType) {
+    case 'free': return 0;
+    case 'free-with-login': return 1;
+    case 'freemium': return 2;
+    case 'paid': return 3;
+    default: return 4;
+  }
+}
+
+function filterResources(query) {
+  const matches = [];
+  for (const resource of resourceIndex) {
+    const collections = resource.collections || [];
+    if (collections.length > 0) {
+      const collectionMatches = [];
+      for (const collection of collections) {
+        const merged = mergeWithParent(collection, resource);
+        const m = entryMatchesFilters(merged, query);
+        if (m) collectionMatches.push(m);
+      }
+      if (collectionMatches.length > 0) {
+        matches.push(...collectionMatches);
+        continue;
+      }
+      const fallback = entryMatchesFilters(resource, query);
+      if (fallback) matches.push(fallback);
+    } else {
+      const m = entryMatchesFilters(resource, query);
+      if (m) matches.push(m);
+    }
+  }
+  return matches.sort((a, b) => {
+    const sa = specificityScore(a.entry);
+    const sb = specificityScore(b.entry);
+    if (sa !== sb) return sb - sa;
+    const aa = accessRank(a.entry.accessType);
+    const ab = accessRank(b.entry.accessType);
+    if (aa !== ab) return aa - ab;
+    const an = a.entry.parent ? a.entry.parent.resourceName : a.entry.resourceName;
+    const bn = b.entry.parent ? b.entry.parent.resourceName : b.entry.resourceName;
+    if (an !== bn) return an.localeCompare(bn);
+    const ac = a.entry.name || '';
+    const bc = b.entry.name || '';
+    return ac.localeCompare(bc);
+  });
+}
+
+function describeScope(resource) {
+  const scope = resource.scope || {};
+  const parts = [];
+  if (scope.parish) parts.push(scope.parish);
+  if (scope.county) parts.push(scope.county);
+  if (scope.stateProvince) parts.push(scope.stateProvince);
+  if ((scope.countries || []).length > 0) {
+    parts.push(scope.countries.join(' / '));
+  } else if (parts.length === 0) {
+    parts.push('Global / multi-country');
+  }
+  if (scope.religion && scope.religion !== 'any') {
+    parts.push(scope.religion + ' only');
+  }
+  return parts.join(' — ');
+}
+
+function describeCoverage(coverage, queryEvent) {
+  const start = coverage.startYear ?? '…';
+  const end = coverage.endYear ?? 'present';
+  const allEvents = coverage.events || [];
+  const others = allEvents.filter((e) => e !== queryEvent);
+  const otherHint = others.length > 0
+    ? ' (also covers ' + (others.length === 1 ? others[0] : others.length + ' other event types') + ')'
+    : '';
+  return queryEvent + ': ' + start + '–' + end + otherHint;
+}
+
+function explanationFor(query, matches) {
+  const reasons = [];
+  if (matches.length === 0) {
+    reasons.push('No free or paid resource in the catalogue covers that exact combination of place, date and event.');
+    if (query.rangeStartYear || query.rangeEndYear) {
+      reasons.push('Try widening the date range or removing it to see what else exists for that place.');
+    }
+    if (query.parish) {
+      reasons.push('Parish-specific entries are limited; clear the parish field to see county- and country-level options.');
+    } else if (query.county) {
+      reasons.push('Clear the county field to see country-wide options.');
+    }
+    return reasons.join(' ');
+  }
+  const country = canonicalCountry(query.country);
+  if ((country === 'england' || country === 'wales') && query.rangeStartYear && query.rangeStartYear < 1837) {
+    reasons.push('Civil registration began in England and Wales in 1837 — for earlier events, parish registers (FreeREG, county sites) are the main free path.');
+  }
+  if (country === 'ireland' && query.rangeStartYear && query.rangeStartYear < 1864 && (query.eventType === 'birth' || query.eventType === 'death')) {
+    reasons.push('Irish civil birth and death registration began in 1864 — for earlier events, look at church baptism and burial registers.');
+  }
+  if (country === 'scotland' && query.rangeStartYear && query.rangeStartYear < 1855) {
+    reasons.push('Scottish statutory registration began in 1855 — for earlier events, use the Old Parish Registers via ScotlandsPeople.');
+  }
+  if (country === 'australia' && query.rangeStartYear && query.rangeStartYear < 1850 && (query.eventType === 'birth' || query.eventType === 'death')) {
+    reasons.push('Australian colonies introduced civil registration at different dates in the 1840s–1850s — Trove newspaper notices often fill the gap.');
+  }
+  return reasons.join(' ');
+}
+
+function renderResults(query, matches) {
+  resultsSection.classList.remove('hidden');
+  const isFreeish = (a) => a === 'free' || a === 'free-with-login' || a === 'freemium';
+  const freeCount = matches.filter((m) => isFreeish(m.entry.accessType)).length;
+  const paidCount = matches.filter((m) => m.entry.accessType === 'paid').length;
+  if (matches.length === 0) {
+    resultsSummaryEl.textContent = 'No matching resources found.';
+  } else {
+    const parts = [];
+    if (freeCount) parts.push(freeCount + ' free / freemium');
+    if (paidCount) parts.push(paidCount + ' paid');
+    const noun = matches.length === 1 ? 'result' : 'results';
+    resultsSummaryEl.textContent = matches.length + ' ' + noun + ' (' + parts.join(', ') + ').';
+  }
+  resultsExplanationEl.textContent = explanationFor(query, matches);
+  resultsListEl.innerHTML = matches.map((m) => renderResultCard(m, query.eventType)).join('');
+}
+
+function renderResultCard({ entry, coverage }, queryEvent) {
+  const access = entry.accessType || 'unknown';
+  const scopeText = describeScope(entry);
+  const coverageText = describeCoverage(coverage, queryEvent);
+  const isCollection = !!entry.isCollection;
+  const title = isCollection
+    ? entry.parent.resourceName + ' — ' + entry.name
+    : entry.resourceName;
+  const homeUrl = entry.homeUrl || (entry.parent && entry.parent.homeUrl);
+  const homeLink = homeUrl && homeUrl !== entry.url
+    ? ' · <a href="' + escapeAttr(homeUrl) + '" target="_blank" rel="noopener noreferrer">home</a>'
+    : '';
+  const bestFor = entry.bestFor || (isCollection ? entry.parent.bestFor : '');
+  const notes = entry.notes || '';
+  const collectionBadge = isCollection ? '<span class="result-badge">collection</span>' : '';
+  return '<li class="result-card result-' + access + '">' +
+    '<div class="result-head">' +
+      '<a class="result-name" href="' + escapeAttr(entry.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(title) + '</a>' +
+      '<span class="result-meta">' + collectionBadge + '<span class="result-access">' + escapeHtml(access) + '</span></span>' +
+    '</div>' +
+    '<div class="result-scope">' + escapeHtml(scopeText) + '</div>' +
+    '<div class="result-coverage">' + escapeHtml(coverageText) + '</div>' +
+    (bestFor ? '<div class="result-best-for">' + escapeHtml(bestFor) + '</div>' : '') +
+    '<div class="result-notes">' + escapeHtml(notes) + homeLink + '</div>' +
+  '</li>';
+}
+
+function escapeHtml(text) {
+  return String(text ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+function escapeAttr(text) { return escapeHtml(text); }
+
+searchForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const query = getFormData();
+  if (!query.eventType) {
+    alert('Please choose an event type.');
+    return;
+  }
+  if (!query.country) {
+    alert('Please enter a country.');
+    return;
+  }
+  const matches = filterResources(query);
+  renderResults(query, matches);
+});
+
+resetButton.addEventListener('click', () => {
+  searchForm.reset();
+  resultsSection.classList.add('hidden');
+});
+
+if (Array.isArray(window.GENEALOGY_RESOURCES)) {
+  resourceIndex = window.GENEALOGY_RESOURCES;
+  submitButton.disabled = false;
+  submitButton.textContent = 'Find matching resources';
+} else {
+  submitButton.textContent = 'Resource data missing';
+  console.error('window.GENEALOGY_RESOURCES is not defined.');
+}
+
+// Prefill from URL params (used by Chronicle's Research button)
+(function prefillFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  if (![...params.keys()].length) return;
+  ['eventType','country','stateProvince','county','townParish','rangeStartYear','rangeEndYear','religion'].forEach(id => {
+    const v = params.get(id);
+    if (v == null) return;
+    const el = document.getElementById(id);
+    if (el) el.value = v;
+  });
+  if (params.get('autosubmit') === '1' && resourceIndex.length > 0
+      && document.getElementById('eventType').value
+      && document.getElementById('country').value) {
+    searchForm.dispatchEvent(new Event('submit', { cancelable: true }));
+  }
+})();
+</script>
+
+</body>
+</html>

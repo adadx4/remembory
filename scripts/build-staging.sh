@@ -19,6 +19,7 @@ cp "$ROOT/chronicle.css" "$DIST/"
 cp "$ROOT/index.html" "$DIST/"
 cp "$ROOT/manual.html" "$DIST/"
 cp "$ROOT/tips.html" "$DIST/"
+cp "$ROOT/research.html" "$DIST/"
 cp "$ROOT/sw.js" "$DIST/"
 cp "$ROOT/manifest.json" "$DIST/"
 cp "$ROOT/favicon.ico" "$DIST/"
@@ -27,6 +28,10 @@ cp "$ROOT/icon-192.png" "$DIST/"
 cp "$ROOT/icon-512.png" "$DIST/"
 cp "$ROOT/icon-apple.png" "$DIST/"
 [ -f "$ROOT/CNAME" ] && cp "$ROOT/CNAME" "$DIST/"
+
+# Copy resources directory (genealogy data)
+mkdir -p "$DIST/resources"
+cp "$ROOT/resources/genealogy-free-resources.js" "$DIST/resources/"
 
 # Swap the worker URL in chronicle.html
 STAGING_WORKER="https://staging.remembory.net"
