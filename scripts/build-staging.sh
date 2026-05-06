@@ -20,6 +20,8 @@ cp "$ROOT/index.html" "$DIST/"
 cp "$ROOT/manual.html" "$DIST/"
 cp "$ROOT/tips.html" "$DIST/"
 cp "$ROOT/research.html" "$DIST/"
+# Lineage uses the same code as Chronicle — URL detection inside picks the product flag.
+cp "$ROOT/chronicle.html" "$DIST/lineage.html"
 cp "$ROOT/sw.js" "$DIST/"
 cp "$ROOT/manifest.json" "$DIST/"
 cp "$ROOT/favicon.ico" "$DIST/"
@@ -41,7 +43,7 @@ SHARE_PROD="https://share.remembory.net"
 sed -i \
   -e "s|const WORKER_URL = \"$PROD_WORKER\"|const WORKER_URL = \"$STAGING_WORKER\"|g" \
   -e "s|$SHARE_PROD|$STAGING_WORKER|g" \
-  "$DIST/chronicle.html"
+  "$DIST/chronicle.html" "$DIST/lineage.html"
 
 # Rewrite prod URLs in index.html so landing page links stay within staging
 sed -i \

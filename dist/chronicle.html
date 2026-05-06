@@ -8,6 +8,8 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Chronicle — Remembory</title>
+<!-- Title is overridden at runtime to match the active product (Chronicle or Lineage) -->
+<script>document.title = (window.location.pathname.toLowerCase().includes("lineage") ? "Lineage" : "Chronicle") + " \u2014 Remembory";</script>
 <meta name="description" content="A private, beautiful memory keeper. Record the stories that matter.">
 <meta name="theme-color" content="#2c2416">
 
@@ -47,6 +49,27 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 const TAGS = ["childhood","family","travel","education","work","love","health","milestone","home","friendship","adventure","loss"];
 const WORKER_URL = "https://staging.remembory.net";
 const IS_STAGING = WORKER_URL.includes('staging');
+
+// Product flag — derived from the URL the page was served from.
+// /chronicle (or /chronicle.html or /) → "chronicle" (covers Personal + Legacy modes)
+// /lineage  (or /lineage.html)        → "lineage"   (covers Lineage / ancestry research)
+// Same data store, shared subscription. Filters which subjects are visible and which UI shells render.
+const PRODUCT = (() => {
+  const p = (typeof window !== "undefined" ? window.location.pathname : "").toLowerCase();
+  if (p.includes("lineage")) return "lineage";
+  return "chronicle";
+})();
+const PRODUCT_LABEL = PRODUCT === "lineage" ? "Lineage" : "Chronicle";
+const OTHER_PRODUCT = PRODUCT === "lineage" ? "chronicle" : "lineage";
+const OTHER_PRODUCT_LABEL = OTHER_PRODUCT === "lineage" ? "Lineage" : "Chronicle";
+const OTHER_PRODUCT_URL = "/" + OTHER_PRODUCT + ".html";
+// A subject belongs to the current product if its mode lines up. Personal + Legacy live under Chronicle;
+// "history" (Lineage) lives under Lineage. Subjects with no mode default to Chronicle.
+function subjectInProduct(s) {
+  if (!s) return false;
+  if (PRODUCT === "lineage") return s.mode === "history";
+  return s.mode !== "history"; // chronicle catches personal, legacy, and unset
+}
 // Legacy single-plan URLs (kept for backwards compat)
 const STRIPE_URL  = "https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02";
 const PAYPAL_URL  = "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-05R23708A75872801NHNR24Q&return_url=https://staging.remembory.net/paypal/success&cancel_url=https://remembory.net";
@@ -255,7 +278,7 @@ const EVENT_TYPES = [
   {id:"legal",      label:"Legal (wills, probate, court, land)"},
   {id:"other",      label:"Other"},
 ];
-const GENEALOGY_TOOL_URL = "https://adadx4.github.io/genealogy/";
+const GENEALOGY_TOOL_URL = "/research.html";
 
 // ── Styles ─────────────────────────────────────────────────────
 const S = {
@@ -630,7 +653,7 @@ function emptySubject(id, name, isSelf=false, mode=null) {
 // ── Mode definitions ──────────────────────────────────────────
 const MODES = {
   personal: {
-    id:"personal", label:"Personal", icon:"◎",
+    id:"personal", label:"Chronicle", icon:"◎",
     tagline:"Your own life story",
     desc:"Record your own memories, build your personal timeline, and share with friends and family.",
     isSelf:true,
@@ -653,9 +676,9 @@ const MODES = {
     subtitle: (name, count, decades) => count===0 ? `${name ? name+"'s" : "Their"} story begins here.` : `${count} ${count===1?"memory":"memories"} across ${decades} ${decades===1?"decade":"decades"}`,
   },
   history: {
-    id:"history", label:"Genealogy", icon:"◇",
-    tagline:"Genealogy & family history",
-    desc:"Build a genealogical chronicle from research, records, and family trees. Construct timelines and connect lives across generations.",
+    id:"history", label:"Lineage", icon:"◇",
+    tagline:"Ancestry & family history",
+    desc:"Trace ancestors through research, records, and family trees. Construct timelines and connect lives across generations.",
     isSelf:false,
     color:"#c4a962", bg:"rgba(196,169,98,0.1)", border:"rgba(196,169,98,0.4)",
     addMemory: name => `Add an Event${name?" for "+name:""}`,
@@ -1808,7 +1831,7 @@ function ModePicker({subjectName, onPick}) {
         React.createElement("p",{style:{color:"#8a7460",fontSize:"0.92rem",lineHeight:1.6,margin:0}},
           "This helps Chronicle tailor the language and features to your purpose. You can change it later in Settings.")
       ),
-      Object.values(MODES).filter(m=>IS_STAGING||m.id!=="history").map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:selected===m.id,onSelect:setSelected})),
+      Object.values(MODES).filter(m=>PRODUCT==="lineage"?m.id==="history":m.id!=="history").map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:selected===m.id,onSelect:setSelected})),
       React.createElement("button",{
         onClick:()=>{ if(selected) onPick(selected); },
         disabled:!selected,
@@ -1866,7 +1889,7 @@ function SubjectManager({subjects, activeSubjectId, carerName, carerEmail, onSwi
               React.createElement("textarea",{value:draft.notes,onChange:e=>setDraft(d=>({...d,notes:e.target.value})),placeholder:"Notes (optional — family, context, etc.)",style:{...inputStyle,resize:"vertical",minHeight:"60px"}}),
               React.createElement("div",{style:{marginTop:"4px"}},
                 React.createElement("p",{style:{fontSize:"0.8rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}},"Chronicle type"),
-                Object.values(MODES).map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:draft.mode===m.id,onSelect:v=>setDraft(d=>({...d,mode:v}))}))
+                Object.values(MODES).filter(m=>PRODUCT==="lineage"?m.id==="history":m.id!=="history").map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:draft.mode===m.id,onSelect:v=>setDraft(d=>({...d,mode:v}))}))
               ),
               React.createElement("div",{style:{display:"flex",gap:"8px"}},
                 React.createElement("button",{onClick:commitEdit,style:btnStyle},"Save"),
@@ -1900,7 +1923,7 @@ function SubjectManager({subjects, activeSubjectId, carerName, carerEmail, onSwi
           React.createElement("textarea",{value:draft.notes,onChange:e=>setDraft(d=>({...d,notes:e.target.value})),placeholder:"Notes (optional)",style:{...inputStyle,resize:"vertical",minHeight:"60px"}}),
           React.createElement("div",{style:{marginTop:"4px"}},
             React.createElement("p",{style:{fontSize:"0.8rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#a8885a",fontWeight:600,marginBottom:"8px"}},"Chronicle type"),
-            Object.values(MODES).map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:draft.mode===m.id,onSelect:v=>setDraft(d=>({...d,mode:v}))}))
+            Object.values(MODES).filter(m=>PRODUCT==="lineage"?m.id==="history":m.id!=="history").map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:draft.mode===m.id,onSelect:v=>setDraft(d=>({...d,mode:v}))}))
           ),
           React.createElement("div",{style:{display:"flex",gap:"8px"}},
             React.createElement("button",{onClick:commitAdd,disabled:!draft.name.trim()||!draft.mode,style:{...btnStyle,opacity:(!draft.name.trim()||!draft.mode)?0.45:1}},"Add"),
@@ -4326,7 +4349,7 @@ function SettingsView({
         ),
         React.createElement("p",{style:{fontSize:"0.8rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#a8885a",fontWeight:600,margin:"0 0 8px"}},"Chronicle type"),
         React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
-          Object.values(MODES).filter(m=>IS_STAGING||m.id!=="history").map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:subject.mode===m.id,onSelect:v=>persistSubject({mode:v,isSelf:MODES[v]?.isSelf||false})}))
+          Object.values(MODES).filter(m=>PRODUCT==="lineage"?m.id==="history":m.id!=="history").map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:subject.mode===m.id,onSelect:v=>persistSubject({mode:v,isSelf:MODES[v]?.isSelf||false})}))
         )
       ),
 
@@ -4371,7 +4394,7 @@ function SettingsView({
         isSubscriber
           ? React.createElement("div",null,
               React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"6px"}},"\u2713 Subscriber"),
-              React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"Sharing and Genealogy Mode are enabled."),
+              React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"Sharing and Lineage Mode are enabled."),
               !activePassword&&React.createElement("div",{style:{background:"rgba(168,136,90,0.08)",border:"1px solid rgba(168,136,90,0.3)",borderRadius:"3px",padding:"9px 12px",marginBottom:"12px",fontSize:"0.8rem",color:"#5a4020",lineHeight:1.5}},
                 "\uD83D\uDD13 Your licence key is saved in plain text on this device \u2014 anyone who opens Chronicle here could use it. Set a password below to encrypt it along with all your memories."
               ),
@@ -4379,7 +4402,7 @@ function SettingsView({
             )
           : React.createElement("div",null,
               React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,marginBottom:"12px"}},
-                "A subscription unlocks sharing memories with others, Genealogy Mode, and public timelines. The core app is always free \u2014 no account ever required."),
+                "A subscription unlocks sharing memories with others, Lineage Mode, and public timelines. The core app is always free \u2014 no account ever required."),
               licenceStatus&&!licenceStatus.valid&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#c4858a",marginBottom:"8px",fontStyle:"italic"}},
                 licenceStatus.reason==="expired"?"Your licence key has expired \u2014 renew at remembory.net.":
                 licenceStatus.reason==="invalid"?"That key doesn\u2019t look right \u2014 check for typos.":"Couldn\u2019t validate that key."),
@@ -4415,7 +4438,7 @@ function SettingsView({
       ),
 
       !isSubscriber&&React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
-        "Unlock sharing & genealogy mode \u2014 ",
+        "Unlock sharing & Lineage mode \u2014 ",
         React.createElement(SubOptions,{mode:"links"}),
         "."
       ),
@@ -5114,9 +5137,9 @@ function ImportView({
     importTab==="gedcom"&&(!isSubscriber
       ? React.createElement("div",{style:{textAlign:"center",padding:"48px 24px",border:"1px solid #d4c4a8",borderRadius:"6px",background:"rgba(255,252,245,0.5)"}},
           React.createElement("div",{style:{fontSize:"2.5rem",marginBottom:"12px",opacity:0.5}},"\ud83c\udf33"),
-          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",fontStyle:"italic",color:"#1a1208",marginBottom:"10px"}},"Genealogy Mode"),
+          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",fontStyle:"italic",color:"#1a1208",marginBottom:"10px"}},"Lineage Mode"),
           React.createElement("p",{style:{fontSize:"0.9rem",color:"#6a5840",lineHeight:1.6,maxWidth:"380px",margin:"0 auto 16px"}},
-            "GEDCOM import is a subscriber feature. Import a family tree, flesh out your ancestors\u2019 lives, and connect genealogy research to narrative."),
+            "GEDCOM import is a subscriber feature. Import a family tree, flesh out your ancestors\u2019 lives, and connect ancestry research to narrative."),
           React.createElement(SubOptions,{mode:"full"})
         )
       : React.createElement("div",null,
@@ -5272,7 +5295,7 @@ function ImportView({
           gedPreview.subj.notes.length>300?gedPreview.subj.notes.slice(0,300)+"\u2026":gedPreview.subj.notes
         ),
         isHistoryMode&&React.createElement("div",{style:{background:"rgba(196,169,98,0.1)",border:"1px solid rgba(196,169,98,0.4)",borderRadius:"4px",padding:"14px 16px",marginBottom:"16px"}},
-          React.createElement("p",{style:{margin:"0 0 10px",fontSize:"0.88rem",fontWeight:600,color:"#5a4820"}},"🌳 Genealogy Mode — Import Entire Tree"),
+          React.createElement("p",{style:{margin:"0 0 10px",fontSize:"0.88rem",fontWeight:600,color:"#5a4820"}},"🌳 Lineage Mode — Import Entire Tree"),
           React.createElement("p",{style:{margin:"0 0 10px",fontSize:"0.82rem",color:"#6a5c48",lineHeight:1.55}},
             "Import all "+gedPersons.persons.length+" people and their family relationships into the Tree view. "+gedPicked.fullName+" will be set as the focal ancestor. You can start a full Chronicle for any individual later."
           ),
@@ -6285,7 +6308,7 @@ function DetailView({
     React.createElement("div",{style:{display:"flex",gap:"10px",marginBottom:"12px",flexWrap:"wrap"}},
       React.createElement("button",{onClick:()=>handleEdit(m),style:S.btn},"Edit"),
       React.createElement("button",{onClick:()=>handleDelete(m.id),style:{...S.btnOutline,color:"#c4858a",borderColor:"#c4858a"}},"Delete"),
-      isHistoryMode&&React.createElement("button",{onClick:()=>window.open(genealogyResearchUrl(m, knownLocations),"_blank","noopener"),style:{...S.btnOutline,color:"#5a4820",borderColor:"rgba(196,169,98,0.5)"},title:"Open the Genealogy research tool prefilled with this event's details"},"\ud83d\udd0e Research"),
+      isHistoryMode&&React.createElement("button",{onClick:()=>window.open(genealogyResearchUrl(m, knownLocations),"_blank","noopener"),style:{...S.btnOutline,color:"#5a4820",borderColor:"rgba(196,169,98,0.5)"},title:"Open the Lineage research tool prefilled with this event's details"},"\ud83d\udd0e Research"),
       isSubscriber
         ? React.createElement(ShareButton,{memory:m,peopleEmails,memories,ownerName,ownerEmail,shareHistory,localConnections:localConnections,onRecordShare:recordShare,onSaveEmails:onSaveEmails,onSetSenderEmail:onSetSenderEmail,userTier})
         : React.createElement("div",{style:{position:"relative",display:"inline-block"}},
@@ -6772,9 +6795,15 @@ function App() {
   }, []);
 
   // ── Active subject ────────────────────────────────────────────
-  const subjects = data.subjects || [];
-  const activeSubjectId = data.activeSubjectId || subjects[0]?.id;
-  const subject = subjects.find(s=>s.id===activeSubjectId) || subjects[0] || emptySubject("default","",true);
+  // Subjects are filtered to the current product (Chronicle vs Lineage). The underlying data
+  // store still holds all subjects across both products; we just hide the off-product ones from
+  // this page. `allSubjects` is preserved for persistence updates that need the full list.
+  const allSubjects = data.subjects || [];
+  const subjects = allSubjects.filter(subjectInProduct);
+  // If the persisted active subject belongs to the other product, fall back to the first match.
+  const activeSubjectId = subjects.find(s=>s.id===data.activeSubjectId)?.id || subjects[0]?.id;
+  const subject = subjects.find(s=>s.id===activeSubjectId) || subjects[0]
+    || emptySubject("default", "", PRODUCT === "chronicle", PRODUCT === "lineage" ? "history" : null);
 
   const memories            = subject.memories || [];
   const memoriesRef         = React.useRef(memories);
@@ -9120,7 +9149,7 @@ function handleEdit(m) {
 
     (!isSubscriber&&!subscribeNagDismissed&&!subscribeNagPermanent&&ownerName)&&React.createElement("div",{style:{background:"rgba(168,136,90,0.1)",borderBottom:"1px solid rgba(168,136,90,0.3)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
       React.createElement("p",{style:{margin:0,fontSize:"0.85rem",color:"#5a4020",lineHeight:1.4}},
-        "\u2728 Enjoying Chronicle? A subscription unlocks sharing, social features, and genealogy mode — and helps keep the project going."
+        "\u2728 Enjoying Chronicle? A subscription unlocks sharing, social features, and Lineage mode — and helps keep the project going."
       ),
       React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0,alignItems:"center"}},
         React.createElement(SubOptions,{mode:"buttons"}),
@@ -9155,7 +9184,7 @@ function handleEdit(m) {
       subjectName: subject.name,
       onPick: mode => {
         const isSelf = MODES[mode]?.isSelf||false;
-        const newSubjects = subjects.map(s=>s.id===subject.id?{...s,mode,isSelf}:s);
+        const newSubjects = allSubjects.map(s=>s.id===subject.id?{...s,mode,isSelf}:s);
         const newData = {...data, subjects:newSubjects};
         setData(newData); saveData(newData);
       }
@@ -9168,20 +9197,22 @@ function handleEdit(m) {
       onAdd: draft => {
         const id = "subj_" + Date.now();
         const s = {...emptySubject(id, draft.name, MODES[draft.mode]?.isSelf||false, draft.mode||null), dob:draft.dob||"", notes:draft.notes||""};
-        const newData = {...data, subjects:[...subjects, s], activeSubjectId: id};
+        const newData = {...data, subjects:[...allSubjects, s], activeSubjectId: id};
         setData(newData); saveData(newData);
         setView("life"); setSelected(null); setIndexFilter(null);
         setShowSubjectMgr(false);
       },
       onEdit: (id, draft) => {
-        const newSubjects = subjects.map(s => s.id===id ? {...s, name:draft.name, dob:draft.dob||"", notes:draft.notes||"", mode:draft.mode||null, isSelf:MODES[draft.mode]?.isSelf||false} : s);
+        const newSubjects = allSubjects.map(s => s.id===id ? {...s, name:draft.name, dob:draft.dob||"", notes:draft.notes||"", mode:draft.mode||null, isSelf:MODES[draft.mode]?.isSelf||false} : s);
         const newData = {...data, subjects:newSubjects};
         setData(newData); saveData(newData);
       },
       onDelete: id => {
-        if (subjects.length<=1) return;
-        const newSubjects = subjects.filter(s=>s.id!==id);
-        const newActiveId = id===activeSubjectId ? newSubjects[0].id : activeSubjectId;
+        if (subjects.length<=1) return; // don't let user delete their last visible subject in this product
+        const newSubjects = allSubjects.filter(s=>s.id!==id);
+        const newActiveId = id===activeSubjectId
+          ? (subjects.find(s=>s.id!==id)?.id || newSubjects.find(subjectInProduct)?.id)
+          : activeSubjectId;
         const newData = {...data, subjects:newSubjects, activeSubjectId:newActiveId};
         setData(newData); saveData(newData);
       },
@@ -9695,7 +9726,8 @@ function handleEdit(m) {
 
     React.createElement("header",{style:{borderBottom:"1px solid #c8b89a",padding:isMobile?"12px 16px":"15px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(245,240,232,0.96)",position:"sticky",top:0,zIndex:100,backdropFilter:"blur(8px)"}},
       React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",minWidth:0,flex:1}},
-        React.createElement("h1",{onClick:()=>setView("life"),style:{margin:0,fontFamily:"'Playfair Display',serif",fontSize:isMobile?"1.3rem":"1.6rem",fontWeight:700,color:"#1a1208",cursor:"pointer",whiteSpace:"nowrap"}},"Chronicle"),
+        React.createElement("h1",{onClick:()=>setView("life"),style:{margin:0,fontFamily:"'Playfair Display',serif",fontSize:isMobile?"1.3rem":"1.6rem",fontWeight:700,color:"#1a1208",cursor:"pointer",whiteSpace:"nowrap"}},PRODUCT_LABEL),
+        React.createElement("a",{href:OTHER_PRODUCT_URL,title:"Switch to "+OTHER_PRODUCT_LABEL,style:{fontSize:"0.74rem",color:"#a8885a",textDecoration:"none",borderBottom:"1px dotted rgba(168,136,90,0.4)",fontStyle:"italic",whiteSpace:"nowrap",flexShrink:0,paddingBottom:"1px"}},"\u2192 "+OTHER_PRODUCT_LABEL),
         React.createElement("button",{
           onClick:()=>setShowSubjectMgr(true),
           title:"Switch person",

@@ -1,11 +1,13 @@
 // Chronicle Service Worker v7
-const CACHE_VERSION = "chronicle-v7";
+const CACHE_VERSION = "chronicle-v8";
 const SHELL_CACHE   = `${CACHE_VERSION}-shell`;
 const TILES_CACHE   = `${CACHE_VERSION}-tiles`;
 const MAX_TILES     = 500;
 
 const SHELL_URLS = [
   "/chronicle.html",
+  "/lineage.html",
+  "/research.html",
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css",
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js",
@@ -51,9 +53,11 @@ self.addEventListener("fetch", event => {
     event.respondWith(tileStrategy(event.request)); return;
   }
 
-  // chronicle.html and research.html — network-first so updates always land
-  if (url.pathname === "/chronicle.html" || url.pathname === "/" ||
-      url.pathname === "/research.html" || url.pathname === "/resources/genealogy-free-resources.js") {
+  // App entry pages — network-first so updates always land
+  if (url.pathname === "/chronicle.html" || url.pathname === "/chronicle" || url.pathname === "/" ||
+      url.pathname === "/lineage.html"   || url.pathname === "/lineage"   ||
+      url.pathname === "/research.html"  || url.pathname === "/research"  ||
+      url.pathname === "/resources/genealogy-free-resources.js") {
     event.respondWith(networkFirst(event.request)); return;
   }
 
