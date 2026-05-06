@@ -149,6 +149,40 @@
   }
   .results-list { list-style: none; padding: 0; margin: 0; }
 
+  /* Broad/aggregator results — collapsible, in Chronicle's parchment palette. */
+  .results-general {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed #c8b89a;
+  }
+  .results-general[open] { padding-top: 8px; }
+  .results-general summary {
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-style: italic;
+    color: #6a5840;
+    padding: 6px 0;
+    list-style: none;
+  }
+  .results-general summary::-webkit-details-marker { display: none; }
+  .results-general summary::before {
+    content: '\25B8';     /* right-pointing triangle when collapsed */
+    display: inline-block;
+    margin-right: 8px;
+    color: #a8885a;
+    transition: transform 0.15s;
+  }
+  .results-general[open] summary::before { transform: rotate(90deg); }
+  .results-general summary:hover { color: #2c2416; }
+  .results-general[open] summary::after {
+    content: ' (click to collapse)';
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: #a89060;
+  }
+  .results-general .results-list { margin-top: 10px; opacity: 0.94; }
+  .results-general .result-card { background: rgba(255,252,245,0.55); }
+
   .result-card {
     background: rgba(255,252,245,0.85);
     border: 1px solid #e0d4be;
@@ -547,11 +581,23 @@ function explanationFor(query, matches) {
   return reasons.join(' ');
 }
 
+function isGeneralResult({ entry }) {
+  // Aggregator/global resources have no country scope — they cover everything.
+  // We surface them in a separate collapsible block so targeted matches lead.
+  const scope = entry.scope || {};
+  const countries = scope.countries || [];
+  return countries.length === 0;
+}
+
 function renderResults(query, matches) {
   resultsSection.classList.remove('hidden');
   const isFreeish = (a) => a === 'free' || a === 'free-with-login' || a === 'freemium';
   const freeCount = matches.filter((m) => isFreeish(m.entry.accessType)).length;
   const paidCount = matches.filter((m) => m.entry.accessType === 'paid').length;
+
+  const specific = matches.filter((m) => !isGeneralResult(m));
+  const general  = matches.filter((m) => isGeneralResult(m));
+
   if (matches.length === 0) {
     resultsSummaryEl.textContent = 'No matching resources found.';
   } else {
@@ -559,10 +605,33 @@ function renderResults(query, matches) {
     if (freeCount) parts.push(freeCount + ' free / freemium');
     if (paidCount) parts.push(paidCount + ' paid');
     const noun = matches.length === 1 ? 'result' : 'results';
-    resultsSummaryEl.textContent = matches.length + ' ' + noun + ' (' + parts.join(', ') + ').';
+    const split = general.length > 0 ? ' \u2014 ' + specific.length + ' targeted, ' + general.length + ' broad' : '';
+    resultsSummaryEl.textContent = matches.length + ' ' + noun + ' (' + parts.join(', ') + ')' + split + '.';
   }
   resultsExplanationEl.textContent = explanationFor(query, matches);
-  resultsListEl.innerHTML = matches.map((m) => renderResultCard(m, query.eventType)).join('');
+  resultsListEl.innerHTML = specific.map((m) => renderResultCard(m, query.eventType)).join('');
+
+  // Render (or hide) the broad/aggregator section after the main list, as a collapsible <details>.
+  let generalSection = document.getElementById('results-general');
+  if (!generalSection) {
+    generalSection = document.createElement('details');
+    generalSection.id = 'results-general';
+    generalSection.className = 'results-general';
+    resultsListEl.parentElement.appendChild(generalSection);
+  }
+  if (general.length === 0) {
+    generalSection.style.display = 'none';
+    generalSection.innerHTML = '';
+  } else {
+    generalSection.style.display = '';
+    // Auto-expand if nothing more specific exists, otherwise leave collapsed by default.
+    if (specific.length === 0) generalSection.setAttribute('open', '');
+    else generalSection.removeAttribute('open');
+    const noun = general.length === 1 ? 'broad / aggregator resource' : 'broad / aggregator resources';
+    generalSection.innerHTML =
+      '<summary>Show ' + general.length + ' ' + noun + '</summary>' +
+      '<ul class="results-list">' + general.map((m) => renderResultCard(m, query.eventType)).join('') + '</ul>';
+  }
 }
 
 function renderResultCard({ entry, coverage }, queryEvent) {
