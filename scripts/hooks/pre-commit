@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Auto-sync lineage.html with chronicle.html on every commit that touches chronicle.html.
+# Lineage and Chronicle share the same code; GitHub Pages can't rewrite URLs to point
+# two paths at one file, so we keep two physical copies in the repo root.
+# This hook keeps them in lock-step — you never have to think about it.
+#
+# Installed via: scripts/install-hooks.sh (or copy to .git/hooks/pre-commit manually).
+set -e
+
+ROOT="$(git rev-parse --show-toplevel)"
+
+if git diff --cached --name-only | grep -qx "chronicle.html"; then
+  cp "$ROOT/chronicle.html" "$ROOT/lineage.html"
+  git add "$ROOT/lineage.html"
+  echo "[pre-commit] synced lineage.html ← chronicle.html"
+fi
