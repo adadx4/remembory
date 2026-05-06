@@ -112,7 +112,31 @@
   @media (max-width: 600px) { .form-columns-tight { grid-template-columns: 1fr; } }
 
   .form-warning { color: #8a3030; font-style: italic; font-size: 0.82rem; }
-  .hidden { display: none; }
+  .hidden { display: none !important; }
+
+  /* Entry-type radio block */
+  .entry-type-row { display: grid; gap: 10px; }
+  .entry-type {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin: 0;
+    padding: 12px 14px;
+    background: rgba(255,252,245,0.55);
+    border: 1px solid #e0d4be;
+    border-radius: 3px;
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #2c2416;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    transition: border-color 0.15s;
+  }
+  .entry-type:has(input:checked) { border-color: #a8885a; background: rgba(196,169,98,0.08); }
+  .entry-type input { width: auto; padding: 0; margin-top: 4px; accent-color: #2c2416; cursor: pointer; flex-shrink: 0; }
+  .entry-type span { color: #5a4838; }
+  .entry-type strong { color: #2c2416; }
 
   /* Coverage rows */
   .coverage-row {
@@ -286,9 +310,8 @@
       <code>resources/</code>. Commit and push — that's it.
     </p>
     <p class="hint">
-      For adding a <strong>sub-collection under an existing resource</strong> (e.g. a new FamilySearch collection),
-      edit the <code>newSubCollections</code> array in <code>scripts/transform-data.js</code> directly —
-      that case isn't supported by this form yet.
+      Add a <strong>new resource</strong> (a stand-alone catalogue entry) or a
+      <strong>sub-collection</strong> under an existing resource — pick the type at the top of the form.
     </p>
   </header>
 
@@ -303,9 +326,35 @@
 
   <form id="add-form" class="panel">
     <fieldset>
+      <legend>0 · What are you adding?</legend>
+      <div class="entry-type-row">
+        <label class="entry-type">
+          <input type="radio" name="entryType" value="resource" checked>
+          <span><strong>New resource</strong> — a stand-alone catalogue entry (e.g. a county archive or a specific record website).</span>
+        </label>
+        <label class="entry-type">
+          <input type="radio" name="entryType" value="subcollection">
+          <span><strong>Sub-collection</strong> — a narrower collection inside an existing resource (e.g. a new FamilySearch country filter).</span>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset id="parent-fieldset" class="hidden">
+      <legend>0a · Parent resource</legend>
+      <label>
+        <span class="field-name">Parent *</span>
+        <select id="parentId">
+          <option value="">— pick the parent resource —</option>
+        </select>
+        <small>Inherits <code>accessType</code>, <code>homeUrl</code>, and <code>bestFor</code> from the parent. The sub-collection's scope and coverage can be the same or narrower.</small>
+      </label>
+    </fieldset>
+
+    <fieldset>
       <legend>1 · Identity</legend>
       <label>
-        <span class="field-name">Resource name *</span>
+        <span class="field-name field-resource-only">Resource name *</span>
+        <span class="field-name field-subcollection-only hidden">Collection name *</span>
         <input id="resourceName" type="text" required placeholder="e.g. Norfolk Family History Society">
       </label>
       <label>
@@ -319,13 +368,13 @@
         <input id="url" type="url" required placeholder="https://…">
         <small>The URL the result card links to. Prefer a search page or specific collection page over a homepage.</small>
       </label>
-      <label>
+      <label class="field-resource-only">
         <span class="field-name">Homepage URL <span class="optional">(optional)</span></span>
         <input id="homeUrl" type="url" placeholder="https://… — leave blank if same as Search URL">
       </label>
-      <label>
+      <label class="field-resource-only">
         <span class="field-name">Access type *</span>
-        <select id="accessType" required>
+        <select id="accessType">
           <option value="free">Free</option>
           <option value="free-with-login">Free with login</option>
           <option value="freemium">Freemium (some free, some paid)</option>
@@ -387,9 +436,9 @@
 
     <fieldset>
       <legend>4 · Description</legend>
-      <label>
+      <label class="field-resource-only">
         <span class="field-name">Best for *</span>
-        <textarea id="bestFor" rows="2" required placeholder="One-sentence summary of what this resource is best at."></textarea>
+        <textarea id="bestFor" rows="2" placeholder="One-sentence summary of what this resource is best at."></textarea>
       </label>
       <label>
         <span class="field-name">Notes <span class="optional">(optional)</span></span>
@@ -411,9 +460,8 @@
       with your new entry appended. Drop them into <code>resources/</code> (overwriting),
       commit, and push. GitHub Pages deploys automatically.
     </p>
-    <p style="font-size:0.88rem;color:#7a6a58;margin:0 0 14px;line-height:1.55;font-style:italic;">
-      Alternative: copy the JSON below and paste into the <code>newSpecific</code> array near the bottom
-      of <code>scripts/transform-data.js</code>, then run <code>node scripts/transform-data.js</code>.
+    <p id="output-alt-hint" style="font-size:0.88rem;color:#7a6a58;margin:0 0 14px;line-height:1.55;font-style:italic;">
+      Alternative: copy the JSON below and paste into the <code>newSpecific</code> array near the bottom of <code>scripts/transform-data.js</code>, then run <code>node scripts/transform-data.js</code>.
     </p>
     <div class="output-actions">
       <button type="button" id="download-files" class="primary">Download data files</button>
@@ -445,6 +493,42 @@ const existingIds = new Set(allResources.flatMap((r) => {
   for (const c of r.collections || []) ids.push(c.id);
   return ids;
 }));
+
+// Entry-type toggle (new resource vs sub-collection)
+const entryTypeRadios = document.querySelectorAll('input[name="entryType"]');
+const parentFieldset = document.getElementById('parent-fieldset');
+const parentSelect = document.getElementById('parentId');
+const accessTypeEl = document.getElementById('accessType');
+const bestForEl = document.getElementById('bestFor');
+const fieldResourceOnly = document.querySelectorAll('.field-resource-only');
+const fieldSubcollectionOnly = document.querySelectorAll('.field-subcollection-only');
+
+// Populate parent picker (sorted alphabetically by resourceName)
+allResources.slice().sort((a, b) => a.resourceName.localeCompare(b.resourceName)).forEach((r) => {
+  const opt = document.createElement('option');
+  opt.value = r.id;
+  opt.textContent = r.resourceName + ' (' + r.id + ')';
+  parentSelect.appendChild(opt);
+});
+
+function currentEntryType() {
+  const checked = document.querySelector('input[name="entryType"]:checked');
+  return checked ? checked.value : 'resource';
+}
+
+function applyEntryTypeToggle() {
+  const type = currentEntryType();
+  const isSub = type === 'subcollection';
+  parentFieldset.classList.toggle('hidden', !isSub);
+  parentSelect.required = isSub;
+  fieldResourceOnly.forEach((el) => el.classList.toggle('hidden', isSub));
+  fieldSubcollectionOnly.forEach((el) => el.classList.toggle('hidden', !isSub));
+  // Inherited fields shouldn't be required in sub-collection mode (they live on the parent)
+  accessTypeEl.required = !isSub;
+  bestForEl.required = !isSub;
+}
+entryTypeRadios.forEach((r) => r.addEventListener('change', applyEntryTypeToggle));
+applyEntryTypeToggle();
 
 function slugify(text) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -508,10 +592,22 @@ let lastEntry = null;
 
 form.addEventListener('submit', (e) => {
   e.preventDefault();
-  const entry = collectEntry();
-  if (!entry) return;
-  lastEntry = entry;
-  outputEl.textContent = JSON.stringify(entry, null, 2);
+  const result = collectEntry();
+  if (!result) return;
+  lastEntry = result;
+  // Show only the inner shape — for sub-collections that's {parentId, collection},
+  // matching exactly what gets pasted into transform-data.js's newSubCollections array.
+  const display = result._kind === 'subcollection'
+    ? { parentId: result.parentId, collection: result.collection }
+    : result.entry;
+  outputEl.textContent = JSON.stringify(display, null, 2);
+  // Update the alternative-path hint text dynamically
+  const altHint = document.getElementById('output-alt-hint');
+  if (altHint) {
+    altHint.textContent = result._kind === 'subcollection'
+      ? "Alternative: copy the JSON below and paste into the newSubCollections array in scripts/transform-data.js, then run node scripts/transform-data.js."
+      : "Alternative: copy the JSON below and paste into the newSpecific array near the bottom of scripts/transform-data.js, then run node scripts/transform-data.js.";
+  }
   outputSection.classList.remove('hidden');
   outputSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
@@ -523,7 +619,6 @@ function collectEntry() {
     idEl.focus();
     return null;
   }
-  const homeUrl = document.getElementById('homeUrl').value.trim();
   const stateProvince = document.getElementById('stateProvince').value.trim() || null;
   const stateAliases = parseCsv(document.getElementById('stateAliases').value);
   const county = document.getElementById('county').value.trim() || null;
@@ -556,19 +651,37 @@ function collectEntry() {
   };
   if (stateAliases.length > 0) scope.stateAliases = stateAliases;
 
+  const entryType = currentEntryType();
+  if (entryType === 'subcollection') {
+    const parentId = parentSelect.value;
+    if (!parentId) { alert('Pick a parent resource for this sub-collection.'); parentSelect.focus(); return null; }
+    const collection = {
+      id,
+      name: nameEl.value.trim(),
+      url: document.getElementById('url').value.trim(),
+      scope,
+      coverage,
+    };
+    const notes = document.getElementById('notes').value.trim();
+    if (notes) collection.notes = notes;
+    return { _kind: 'subcollection', parentId, collection };
+  }
+
+  // New resource
+  const homeUrl = document.getElementById('homeUrl').value.trim();
   const entry = {
     id,
     resourceName: nameEl.value.trim(),
     url: document.getElementById('url').value.trim(),
-    accessType: document.getElementById('accessType').value,
+    accessType: accessTypeEl.value,
     scope,
     coverage,
-    bestFor: document.getElementById('bestFor').value.trim(),
+    bestFor: bestForEl.value.trim(),
   };
   if (homeUrl) entry.homeUrl = homeUrl;
   const notes = document.getElementById('notes').value.trim();
   if (notes) entry.notes = notes;
-  return entry;
+  return { _kind: 'resource', entry };
 }
 
 function parseCsv(text) {
@@ -592,7 +705,19 @@ function triggerDownload(filename, content, mimeType) {
 
 document.getElementById('download-files').addEventListener('click', () => {
   if (!lastEntry) return;
-  const updated = allResources.concat([lastEntry]);
+  // Deep-clone the catalogue, then append a new resource OR push a sub-collection onto its parent.
+  const updated = JSON.parse(JSON.stringify(allResources));
+  if (lastEntry._kind === 'subcollection') {
+    const parent = updated.find((r) => r.id === lastEntry.parentId);
+    if (!parent) {
+      alert('Parent resource "' + lastEntry.parentId + '" not found in the catalogue. Re-load the page and try again.');
+      return;
+    }
+    parent.collections = parent.collections || [];
+    parent.collections.push(lastEntry.collection);
+  } else {
+    updated.push(lastEntry.entry);
+  }
   const header =
     '// Auto-generated by scripts/transform-data.js. Edit this file directly OR\n' +
     '// edit the script and re-run. The JSON snapshot at\n' +
