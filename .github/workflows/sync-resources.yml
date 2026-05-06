@@ -1,0 +1,37 @@
+name: Sync genealogy resources
+
+# Pulls the latest genealogy data file from the upstream genealogy project
+# (https://adadx4.github.io/genealogy/) into resources/genealogy-free-resources.js
+# and commits the change if anything is new. Runs once a day; can also be
+# triggered manually from the Actions tab.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # daily at 06:00 UTC
+  workflow_dispatch:        # manual trigger via Actions tab
+
+permissions:
+  contents: write           # needed to push the auto-update commit
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch upstream resources
+        run: |
+          curl -sSfLo resources/genealogy-free-resources.js \
+            https://adadx4.github.io/genealogy/resources/genealogy-free-resources.js
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet resources/genealogy-free-resources.js; then
+            echo "No upstream changes — resources file is already up to date."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add resources/genealogy-free-resources.js
+          git commit -m "sync genealogy resources from upstream"
+          git push
