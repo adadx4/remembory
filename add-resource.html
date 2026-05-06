@@ -283,6 +283,39 @@
   .cat-sub-meta { color: #8a7460; font-style: italic; font-size: 0.78rem; }
   .cat-sub-id { font-family: 'Courier New', monospace; font-size: 0.74rem; color: #6a5840; background: rgba(196,169,98,0.08); padding: 1px 4px; border-radius: 2px; }
 
+  .cat-row-actions { display: inline-flex; gap: 4px; }
+  .cat-action-btn {
+    padding: 2px 9px;
+    background: transparent;
+    border: 1px solid #c8b89a;
+    border-radius: 2px;
+    color: #6a5840;
+    font-family: 'Crimson Text', Georgia, serif;
+    font-size: 0.78rem;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  .cat-action-btn:hover { border-color: #8a7460; color: #2c2416; }
+  .cat-action-btn.cat-action-danger { color: #8a3030; border-color: rgba(196,133,138,0.4); }
+  .cat-action-btn.cat-action-danger:hover { border-color: #c4858a; color: #6a1818; }
+
+  /* Editing banner */
+  .editing-banner {
+    background: rgba(196,169,98,0.18);
+    border: 1px solid rgba(196,169,98,0.5);
+    border-radius: 3px;
+    padding: 10px 14px;
+    margin: 0 0 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 0.92rem;
+    color: #5a4820;
+  }
+  .editing-banner code { background: rgba(255,252,245,0.6); }
+
   h2 {
     font-family: 'Playfair Display', serif;
     font-style: italic;
@@ -325,6 +358,10 @@
   </details>
 
   <form id="add-form" class="panel">
+    <div id="editing-banner" class="editing-banner hidden">
+      <span><strong>Editing</strong> <span id="editing-target-label"></span></span>
+      <button type="button" id="cancel-edit" class="secondary">Cancel edit</button>
+    </div>
     <fieldset>
       <legend>0 · What are you adding?</legend>
       <div class="entry-type-row">
@@ -454,6 +491,9 @@
 
   <section id="output-section" class="panel hidden">
     <h2>Generated entry</h2>
+    <p id="edit-mode-notice" class="hidden" style="font-size:0.88rem;color:#5a4820;margin:0 0 12px;background:rgba(196,169,98,0.18);border:1px solid rgba(196,169,98,0.4);border-radius:3px;padding:8px 12px;">
+      <strong>Edit mode:</strong> downloading will <em>replace</em> the existing entry with this one.
+    </p>
     <p style="font-size:0.92rem;color:#5a4838;margin:0 0 14px;line-height:1.6;">
       <strong>Easy path:</strong> click <em>Download data files</em> below — both
       <code>genealogy-free-resources.js</code> and the matching JSON snapshot regenerate
@@ -488,11 +528,23 @@ const idEl = document.getElementById('id');
 const idWarningEl = document.getElementById('id-warning');
 
 const allResources = Array.isArray(window.GENEALOGY_RESOURCES) ? window.GENEALOGY_RESOURCES : [];
-const existingIds = new Set(allResources.flatMap((r) => {
-  const ids = [r.id];
-  for (const c of r.collections || []) ids.push(c.id);
-  return ids;
-}));
+
+// Editing state. null when adding fresh; otherwise records what's being edited so
+// the submit handler replaces (rather than appends) and the id-uniqueness check
+// permits the editing entry to keep its own id.
+//   { kind: "resource", id }
+//   { kind: "subcollection", parentId, id }
+let editingTarget = null;
+
+function buildExistingIds() {
+  const set = new Set(allResources.flatMap((r) => {
+    const ids = [r.id];
+    for (const c of r.collections || []) ids.push(c.id);
+    return ids;
+  }));
+  if (editingTarget) set.delete(editingTarget.id); // allow keeping the same id when editing
+  return set;
+}
 
 // Entry-type toggle (new resource vs sub-collection)
 const entryTypeRadios = document.querySelectorAll('input[name="entryType"]');
@@ -546,7 +598,7 @@ idEl.addEventListener('input', checkIdUniqueness);
 function checkIdUniqueness() {
   const id = idEl.value.trim();
   if (!id) { idWarningEl.classList.add('hidden'); return; }
-  if (existingIds.has(id)) {
+  if (buildExistingIds().has(id)) {
     idWarningEl.textContent = '⚠ "' + id + '" is already used by an existing entry. Pick a different slug.';
     idWarningEl.classList.remove('hidden');
   } else {
@@ -608,13 +660,16 @@ form.addEventListener('submit', (e) => {
       ? "Alternative: copy the JSON below and paste into the newSubCollections array in scripts/transform-data.js, then run node scripts/transform-data.js."
       : "Alternative: copy the JSON below and paste into the newSpecific array near the bottom of scripts/transform-data.js, then run node scripts/transform-data.js.";
   }
+  // Show the edit-mode banner above the output if we're editing
+  const editNotice = document.getElementById('edit-mode-notice');
+  if (editNotice) editNotice.classList.toggle('hidden', !editingTarget);
   outputSection.classList.remove('hidden');
   outputSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
 function collectEntry() {
   const id = idEl.value.trim();
-  if (existingIds.has(id)) {
+  if (buildExistingIds().has(id)) {
     alert('The slug ID "' + id + '" is already in use. Pick a different one.');
     idEl.focus();
     return null;
@@ -705,7 +760,7 @@ function triggerDownload(filename, content, mimeType) {
 
 document.getElementById('download-files').addEventListener('click', () => {
   if (!lastEntry) return;
-  // Deep-clone the catalogue, then append a new resource OR push a sub-collection onto its parent.
+  // Deep-clone the catalogue, then either replace (when editing) or append.
   const updated = JSON.parse(JSON.stringify(allResources));
   if (lastEntry._kind === 'subcollection') {
     const parent = updated.find((r) => r.id === lastEntry.parentId);
@@ -714,18 +769,30 @@ document.getElementById('download-files').addEventListener('click', () => {
       return;
     }
     parent.collections = parent.collections || [];
-    parent.collections.push(lastEntry.collection);
+    if (editingTarget && editingTarget.kind === 'subcollection') {
+      const idx = parent.collections.findIndex((c) => c.id === editingTarget.id);
+      if (idx === -1) parent.collections.push(lastEntry.collection);
+      else parent.collections[idx] = lastEntry.collection;
+    } else {
+      parent.collections.push(lastEntry.collection);
+    }
   } else {
-    updated.push(lastEntry.entry);
+    if (editingTarget && editingTarget.kind === 'resource') {
+      const idx = updated.findIndex((r) => r.id === editingTarget.id);
+      if (idx === -1) updated.push(lastEntry.entry);
+      else {
+        // Preserve the parent's existing collections — the form doesn't edit those
+        const existing = updated[idx];
+        const merged = (existing.collections && existing.collections.length > 0)
+          ? { ...lastEntry.entry, collections: existing.collections }
+          : lastEntry.entry;
+        updated[idx] = merged;
+      }
+    } else {
+      updated.push(lastEntry.entry);
+    }
   }
-  const header =
-    '// Auto-generated by scripts/transform-data.js. Edit this file directly OR\n' +
-    '// edit the script and re-run. The JSON snapshot at\n' +
-    '// resources/genealogy-free-resources.json is regenerated alongside.\n';
-  const jsContent = header + 'window.GENEALOGY_RESOURCES = ' + JSON.stringify(updated, null, 2) + ';\n';
-  const jsonContent = JSON.stringify(updated, null, 2) + '\n';
-  triggerDownload('genealogy-free-resources.js', jsContent, 'application/javascript');
-  setTimeout(() => triggerDownload('genealogy-free-resources.json', jsonContent, 'application/json'), 200);
+  downloadDataFiles(updated);
 });
 
 document.getElementById('copy-output').addEventListener('click', () => {
@@ -757,6 +824,7 @@ function escapeHtml(text) {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
 }
+function escapeAttr(text) { return escapeHtml(text); }
 
 function describeScopeShort(r) {
   const scope = r.scope || {};
@@ -803,6 +871,10 @@ function renderCatalogue(filterText) {
         '<span class="cat-sub-name">' + escapeHtml(c.name) + '</span>' +
         '<span class="cat-sub-meta">' + escapeHtml(events + rest) + ' · ' + escapeHtml(start + '–' + end) + '</span>' +
         '<code class="cat-sub-id">' + escapeHtml(c.id) + '</code>' +
+        '<span class="cat-row-actions">' +
+          '<button type="button" class="cat-action-btn" data-action="edit-sub" data-parent-id="' + escapeAttr(r.id) + '" data-id="' + escapeAttr(c.id) + '">Edit</button>' +
+          '<button type="button" class="cat-action-btn cat-action-danger" data-action="delete-sub" data-parent-id="' + escapeAttr(r.id) + '" data-id="' + escapeAttr(c.id) + '">Delete</button>' +
+        '</span>' +
         '</li>';
     }).join('');
     return '<li class="catalogue-item access-' + escapeHtml(access) + '">' +
@@ -811,6 +883,10 @@ function renderCatalogue(filterText) {
         '<span class="cat-meta">' +
           '<span class="cat-access cat-access-' + escapeHtml(access) + '">' + escapeHtml(access) + '</span>' +
           '<code class="cat-id">' + escapeHtml(r.id) + '</code>' +
+          '<span class="cat-row-actions">' +
+            '<button type="button" class="cat-action-btn" data-action="edit" data-id="' + escapeAttr(r.id) + '">Edit</button>' +
+            '<button type="button" class="cat-action-btn cat-action-danger" data-action="delete" data-id="' + escapeAttr(r.id) + '">Delete</button>' +
+          '</span>' +
         '</span>' +
       '</div>' +
       '<div class="cat-scope">' + escapeHtml(scopeText) + '</div>' +
@@ -821,6 +897,147 @@ function renderCatalogue(filterText) {
 
 catalogueFilterEl.addEventListener('input', (e) => renderCatalogue(e.target.value));
 renderCatalogue();
+
+// ── Edit / Delete ────────────────────────────────────────────────────────
+const editingBanner = document.getElementById('editing-banner');
+const editingTargetLabel = document.getElementById('editing-target-label');
+const cancelEditBtn = document.getElementById('cancel-edit');
+const submitBtn = form.querySelector('button[type="submit"]');
+
+function findResource(id) { return allResources.find((r) => r.id === id); }
+function findSubcollection(parentId, id) {
+  const parent = findResource(parentId);
+  if (!parent) return null;
+  return (parent.collections || []).find((c) => c.id === id) || null;
+}
+
+function clearForm() {
+  form.reset();
+  // form.reset doesn't clear dynamically-added rows or our id-warning state
+  coverageRowsEl.innerHTML = '';
+  addCoverageRow();
+  idWarningEl.classList.add('hidden');
+  document.querySelector('input[name="entryType"][value="resource"]').checked = true;
+  applyEntryTypeToggle();
+}
+
+function prefillForm(kind, entry, opts) {
+  // Populate form fields from an existing resource / sub-collection. opts.parentId
+  // is required when kind === 'subcollection'.
+  clearForm();
+  document.querySelector('input[name="entryType"][value="' + (kind === 'subcollection' ? 'subcollection' : 'resource') + '"]').checked = true;
+  applyEntryTypeToggle();
+
+  if (kind === 'subcollection' && opts && opts.parentId) {
+    parentSelect.value = opts.parentId;
+  }
+
+  idEl.value = entry.id || '';
+  // resourceName field is reused as collection name in sub-collection mode
+  nameEl.value = (kind === 'subcollection' ? entry.name : entry.resourceName) || '';
+  document.getElementById('url').value = entry.url || '';
+  if (kind === 'resource') {
+    document.getElementById('homeUrl').value = entry.homeUrl || '';
+    accessTypeEl.value = entry.accessType || 'free';
+    bestForEl.value = entry.bestFor || '';
+  }
+  document.getElementById('notes').value = entry.notes || '';
+
+  const scope = entry.scope || {};
+  document.getElementById('countries').value = (scope.countries || []).join(', ');
+  document.getElementById('stateProvince').value = scope.stateProvince || '';
+  document.getElementById('stateAliases').value = (scope.stateAliases || []).join(', ');
+  document.getElementById('county').value = scope.county || '';
+  document.getElementById('parish').value = scope.parish || '';
+  document.getElementById('religion').value = scope.religion || 'any';
+
+  // Coverage rows — clear and rebuild
+  coverageRowsEl.innerHTML = '';
+  const coverageList = (entry.coverage && entry.coverage.length > 0) ? entry.coverage : [{ events: [], startYear: null, endYear: null }];
+  coverageList.forEach((cov) => {
+    addCoverageRow();
+    const row = coverageRowsEl.lastElementChild;
+    (cov.events || []).forEach((e) => {
+      const cb = row.querySelector('input[name="event"][value="' + e + '"]');
+      if (cb) cb.checked = true;
+    });
+    row.querySelector('.start-year').value = cov.startYear == null ? '' : String(cov.startYear);
+    row.querySelector('.end-year').value = cov.endYear == null ? '' : String(cov.endYear);
+  });
+
+  // Lock entry-type toggle while editing
+  entryTypeRadios.forEach((r) => (r.disabled = true));
+  if (kind === 'subcollection') parentSelect.disabled = true;
+
+  checkIdUniqueness();
+}
+
+function startEdit(kind, id, parentId) {
+  const entry = kind === 'subcollection' ? findSubcollection(parentId, id) : findResource(id);
+  if (!entry) { alert('That entry could not be found in the catalogue.'); return; }
+  editingTarget = kind === 'subcollection' ? { kind, parentId, id } : { kind, id };
+  prefillForm(kind, entry, { parentId });
+  editingTargetLabel.innerHTML = (kind === 'subcollection' ? 'sub-collection ' : 'resource ') + '<code>' + escapeHtml(id) + '</code>';
+  editingBanner.classList.remove('hidden');
+  if (submitBtn) submitBtn.textContent = 'Save changes';
+  outputSection.classList.add('hidden');
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelEdit() {
+  editingTarget = null;
+  editingBanner.classList.add('hidden');
+  editingTargetLabel.innerHTML = '';
+  if (submitBtn) submitBtn.textContent = 'Generate entry';
+  entryTypeRadios.forEach((r) => (r.disabled = false));
+  parentSelect.disabled = false;
+  clearForm();
+  outputSection.classList.add('hidden');
+}
+
+cancelEditBtn.addEventListener('click', cancelEdit);
+
+function deleteEntry(kind, id, parentId) {
+  const label = kind === 'subcollection' ? 'sub-collection "' + id + '"' : 'resource "' + id + '"';
+  const note = kind === 'resource' ? '\n\nThis will also remove all of its sub-collections.' : '';
+  if (!confirm('Delete ' + label + '?' + note + '\n\nThe page will then download an updated genealogy-free-resources.js (and .json) for you to drop into the resources/ folder. The catalogue here won\'t actually update until you commit and reload.')) return;
+
+  const updated = JSON.parse(JSON.stringify(allResources));
+  if (kind === 'resource') {
+    const idx = updated.findIndex((r) => r.id === id);
+    if (idx === -1) return;
+    updated.splice(idx, 1);
+  } else {
+    const parent = updated.find((r) => r.id === parentId);
+    if (!parent) return;
+    parent.collections = (parent.collections || []).filter((c) => c.id !== id);
+  }
+  downloadDataFiles(updated);
+}
+
+function downloadDataFiles(updated) {
+  const header =
+    '// Auto-generated by scripts/transform-data.js. Edit this file directly OR\n' +
+    '// edit the script and re-run. The JSON snapshot at\n' +
+    '// resources/genealogy-free-resources.json is regenerated alongside.\n';
+  const jsContent = header + 'window.GENEALOGY_RESOURCES = ' + JSON.stringify(updated, null, 2) + ';\n';
+  const jsonContent = JSON.stringify(updated, null, 2) + '\n';
+  triggerDownload('genealogy-free-resources.js', jsContent, 'application/javascript');
+  setTimeout(() => triggerDownload('genealogy-free-resources.json', jsonContent, 'application/json'), 200);
+}
+
+// Delegated clicks on catalogue items
+catalogueListEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const action = btn.getAttribute('data-action');
+  const id = btn.getAttribute('data-id');
+  const parentId = btn.getAttribute('data-parent-id');
+  if (action === 'edit')        startEdit('resource', id);
+  if (action === 'edit-sub')    startEdit('subcollection', id, parentId);
+  if (action === 'delete')      deleteEntry('resource', id);
+  if (action === 'delete-sub')  deleteEntry('subcollection', id, parentId);
+});
 </script>
 
 </body>
