@@ -599,7 +599,14 @@ function renderResults(query, matches) {
   const general  = matches.filter((m) => isGeneralResult(m));
 
   if (matches.length === 0) {
-    resultsSummaryEl.textContent = 'No matching resources found.';
+    // Offer specific suggestions based on what's filled in — turn a dead end into next steps.
+    const tips = [];
+    if (query.parish)        tips.push('clear the town/parish to widen to county-level entries');
+    else if (query.county)   tips.push('clear the county/district to widen to country-level entries');
+    if (query.rangeStartYear || query.rangeEndYear) tips.push('widen or remove the date range');
+    if (query.religion && query.religion !== 'any') tips.push('try without the religion filter');
+    const tipText = tips.length > 0 ? ' Try ' + tips.join(', or ') + '.' : ' Try a broader country or different event type.';
+    resultsSummaryEl.textContent = 'No matching resources found.' + tipText;
   } else {
     const parts = [];
     if (freeCount) parts.push(freeCount + ' free / freemium');
@@ -668,11 +675,34 @@ function escapeHtml(text) {
 }
 function escapeAttr(text) { return escapeHtml(text); }
 
+function clearFieldError(el) {
+  if (!el) return;
+  el.style.borderColor = '';
+  const sib = el.parentElement && el.parentElement.querySelector('.field-error');
+  if (sib) sib.remove();
+}
+function showFieldError(el, msg) {
+  if (!el) return;
+  el.style.borderColor = '#c4858a';
+  el.parentElement && el.parentElement.querySelectorAll('.field-error').forEach(n => n.remove());
+  const note = document.createElement('p');
+  note.className = 'field-error';
+  note.textContent = msg;
+  note.style.cssText = 'margin:4px 0 0;font-size:0.78rem;color:#8a3030;font-style:italic;';
+  el.parentElement && el.parentElement.appendChild(note);
+  el.addEventListener('input', () => clearFieldError(el), { once: true });
+}
+
 searchForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const query = getFormData();
-  if (!query.eventType) { alert('Please choose an event type.'); return; }
-  if (!query.country)   { alert('Please enter a country.');     return; }
+  // Inline validation — clearer than alert() and the offending field gets focus.
+  const eventTypeEl = document.getElementById('eventType');
+  const countryEl   = document.getElementById('country');
+  clearFieldError(eventTypeEl);
+  clearFieldError(countryEl);
+  if (!query.eventType) { showFieldError(eventTypeEl, 'Choose an event type to search.'); eventTypeEl.focus(); return; }
+  if (!query.country)   { showFieldError(countryEl,   'Enter a country (e.g. England).'); countryEl.focus(); return; }
   const matches = filterResources(query);
   renderResults(query, matches);
 });

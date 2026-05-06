@@ -1675,6 +1675,11 @@ export default {
         const body = await request.json();
         const email = (body.email || "").trim().toLowerCase();
         if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
+        // Also rate-limit per-email so an attacker spreading attempts across many IPs
+        // can't quietly brute-force an individual address.
+        if (!await checkRateLimit(env, "email:" + email, "inbox_fetch_email", 60, 600)) {
+          return json({ error: "Too many requests for this address" }, 429);
+        }
         // Verify caller owns this email via verified email token
         const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
         let authorized = false;
@@ -2469,7 +2474,10 @@ export default {
 
         return new Response("OK", { status: 200 });
       } catch (e) {
-        return new Response("Error: " + e.message, { status: 500 });
+        // Don't leak internal error details (could expose stack frames, env paths, etc.).
+        // Server-side log for diagnostics; the client just sees a generic 500.
+        console.error("[paypal-webhook] processing failed:", e);
+        return new Response("Internal error", { status: 500 });
       }
     }
 

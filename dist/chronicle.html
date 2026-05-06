@@ -579,9 +579,24 @@ async function saveEncrypted(password, data) {
       }))
     }))
   };
-  const stored = await encryptData(password, JSON.stringify(clean));
-  localStorage.setItem(CRYPTO_KEY, JSON.stringify(stored));
-  localStorage.removeItem(STORAGE_KEY); // remove unencrypted copy
+  // CRITICAL: only remove the unencrypted copy after confirming the encrypted write
+  // succeeded. localStorage can throw on quota errors, in private-browsing mode, or
+  // when the storage backend is in a bad state — losing both copies would be
+  // unrecoverable, so we keep the plaintext copy intact on failure.
+  try {
+    const stored = await encryptData(password, JSON.stringify(clean));
+    localStorage.setItem(CRYPTO_KEY, JSON.stringify(stored));
+  } catch (e) {
+    console.error("[saveEncrypted] failed:", e);
+    return false;
+  }
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (e) {
+    // Encrypted save succeeded; cleanup of the plaintext copy failed. Not fatal —
+    // next successful save will retry. Don't roll back the encrypted write.
+    console.warn("[saveEncrypted] could not remove plaintext copy:", e);
+  }
   return true;
 }
 
@@ -1888,7 +1903,7 @@ function SubjectManager({subjects, activeSubjectId, carerName, carerEmail, onSwi
 
       React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.4rem",fontStyle:"italic",margin:0,color:"#1a1208"}},"People"),
-        React.createElement("button",{onClick:onClose,style:{background:"transparent",border:"none",fontSize:"1.3rem",cursor:"pointer",color:"#8a7460",lineHeight:1}},"×")
+        React.createElement("button",{onClick:onClose,"aria-label":"Close","style":{background:"transparent",border:"none",fontSize:"1.4rem",cursor:"pointer",color:"#8a7460",lineHeight:1,minWidth:"36px",minHeight:"36px",display:"flex",alignItems:"center",justifyContent:"center",padding:"4px 8px"}},"×")
       ),
 
       // Subjects list
@@ -2575,7 +2590,13 @@ function OrgsPanel({knownOrgs,knownLocations,memories,orgNotes,orgLocations,orgP
   const [newName, setNewName] = React.useState("");
   const q = search.trim().toLowerCase();
   const filtered = q ? knownOrgs.filter(n=>n.toLowerCase().includes(q)) : knownOrgs;
-  const orgCount = name => memories.filter(m=>m.orgs?.includes(name)).length;
+  // Precompute counts once per memories change. Avoids O(orgs × memories) per render.
+  const orgCounts = React.useMemo(() => {
+    const c = new Map();
+    (memories||[]).forEach(m => (m.orgs||[]).forEach(o => c.set(o, (c.get(o)||0) + 1)));
+    return c;
+  }, [memories]);
+  const orgCount = name => orgCounts.get(name) || 0;
   function commitAdd() {
     const v=newName.trim(); if(!v||knownOrgs.includes(v)) return;
     persistSubject({knownOrgs:[...knownOrgs,v].sort()});
@@ -2727,8 +2748,19 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
   const [addingPerson, setAddingPerson] = React.useState(false);
   const [addingOrg, setAddingOrg] = React.useState(false);
   const [newName, setNewName] = React.useState("");
-  const personCount=name=>memories.filter(m=>m.people?.includes(name)).length;
-  const orgCount=name=>memories.filter(m=>m.orgs?.includes(name)).length;
+  // Precompute counts once per memories change. Avoids O(people × memories) per render.
+  const personCounts = React.useMemo(() => {
+    const c = new Map();
+    (memories||[]).forEach(m => (m.people||[]).forEach(p => c.set(p, (c.get(p)||0) + 1)));
+    return c;
+  }, [memories]);
+  const orgCounts = React.useMemo(() => {
+    const c = new Map();
+    (memories||[]).forEach(m => (m.orgs||[]).forEach(o => c.set(o, (c.get(o)||0) + 1)));
+    return c;
+  }, [memories]);
+  const personCount=name=>personCounts.get(name)||0;
+  const orgCount=name=>orgCounts.get(name)||0;
   const q = search.trim().toLowerCase();
   const allFilterRels=[...new Set(Object.values(peopleRelationships).filter(Boolean))].sort();
   const allFilterOrgs=[...new Set(Object.values(personOrgs||{}).flat())].sort();
@@ -3009,10 +3041,14 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
     };
   }, []); // only run once on mount
 
-  // Build filter options from memories
-  const allTags = [...new Set(memories.flatMap(m=>m.tags||[]))].sort();
-  const allPeople = [...new Set(memories.flatMap(m=>m.people||[]))].sort();
-  const allDecades = [...new Set(memories.map(m=>Math.floor(m.year/10)*10))].sort();
+  // Build filter options from memories. Memoised — the flatMap+Set+sort chain is
+  // O(n) over all memories and ran on every render before; it only needs to change
+  // when the memories array itself changes.
+  const { allTags, allPeople, allDecades } = React.useMemo(() => ({
+    allTags:    [...new Set(memories.flatMap(m=>m.tags||[]))].sort(),
+    allPeople:  [...new Set(memories.flatMap(m=>m.people||[]))].sort(),
+    allDecades: [...new Set(memories.map(m=>Math.floor(m.year/10)*10))].sort(),
+  }), [memories]);
 
   return React.createElement("div", null,
     // Filter bar
@@ -3071,7 +3107,7 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
                 geocodeCache[selectedLoc]&&React.createElement("p",{style:{margin:"0",fontSize:"0.78rem",color:"#a89a7a",fontStyle:"italic"}},
                   `📍 ${geocodeCache[selectedLoc].lat?.toFixed(5)}, ${geocodeCache[selectedLoc].lng?.toFixed(5)}`)
               ),
-              React.createElement("button",{onClick:()=>setSelectedLoc(null),style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1.1rem",padding:"0 4px",lineHeight:1}},"×")
+              React.createElement("button",{onClick:()=>setSelectedLoc(null),"aria-label":"Close",style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1.3rem",padding:"6px 10px",lineHeight:1,minWidth:"36px",minHeight:"36px",display:"flex",alignItems:"center",justifyContent:"center"}},"×")
             ),
             // Memory list
             (locationMemories[selectedLoc]||[]).length===0
@@ -3414,7 +3450,7 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
       React.createElement("span",{style:{fontSize:"0.88rem",fontWeight:600,color:"#4a7a5a",letterSpacing:"0.05em",textTransform:"uppercase"}},
         step==="link" ? "✓ Ready to send" : "Share memories"
       ),
-      React.createElement("button",{onClick:handleClose,style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1.1rem"}},"×")
+      React.createElement("button",{onClick:handleClose,"aria-label":"Close",style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1.3rem",padding:"6px 10px",lineHeight:1,minWidth:"36px",minHeight:"36px",display:"flex",alignItems:"center",justifyContent:"center"}},"×")
     ),
 
     step==="compose" && React.createElement("div",null,
@@ -5889,7 +5925,7 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
             detailPerson.birthPlace&&React.createElement("p",{style:{margin:"0 0 4px",fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},"📍 "+detailPerson.birthPlace),
             detailPerson.notes&&React.createElement("p",{style:{margin:"4px 0 0",fontSize:"0.78rem",color:"#6a5840",lineHeight:1.5}},detailPerson.notes.slice(0,200)+(detailPerson.notes.length>200?"…":""))
           ),
-          React.createElement("button",{onClick:()=>setPersonDetail(null),style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1rem",padding:"0 4px"}},"×")
+          React.createElement("button",{onClick:()=>setPersonDetail(null),"aria-label":"Close",style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1.3rem",padding:"6px 10px",lineHeight:1,minWidth:"36px",minHeight:"36px",display:"flex",alignItems:"center",justifyContent:"center"}},"×")
         ),
         React.createElement("div",{style:{display:"flex",gap:"8px",marginTop:"12px",flexWrap:"wrap"}},
           linkedSubject
@@ -7979,7 +8015,21 @@ function handleEdit(m) {
       setTimeout(() => setSyncStatus(""), 3000);
     } catch(e) {
       console.error("doSync:", e);
-      setSyncStatus("error: " + (e?.message || e));
+      // Classify common failures so the message gives the user something to do.
+      let msg;
+      const m = (e && e.message) ? e.message : "";
+      if (e && (e.name === "NotAllowedError" || /permission/i.test(m))) {
+        msg = "error: Sync file permission denied — choose the file again under Settings > Backup.";
+      } else if (e && e.name === "NotFoundError") {
+        msg = "error: Sync file not found. Clear and reselect it under Settings > Backup.";
+      } else if (e && (e.name === "QuotaExceededError" || /quota/i.test(m))) {
+        msg = "error: Out of disk space.";
+      } else if (/network|fetch|failed to fetch|networkerror/i.test(m)) {
+        msg = "error: Couldn't reach the server. Check your connection and try again.";
+      } else {
+        msg = "error: " + (m || "unknown error — check the browser console for details");
+      }
+      setSyncStatus(msg);
       setTimeout(() => setSyncStatus(""), 8000);
     }
   }
@@ -8645,8 +8695,29 @@ function handleEdit(m) {
         setGedPreview(null);
         setGedSearch("");
       } catch(err) {
-        alert("Could not parse GEDCOM file: " + err.message);
+        console.error("[GEDCOM] parse error:", err);
+        // Translate parser internals into actionable guidance for users.
+        const m = (err && err.message) || "";
+        let msg = "Couldn't read this GEDCOM file.\n\n";
+        if (/encoding|utf|ansel|character/i.test(m)) {
+          msg += "It looks like the file uses an unusual character encoding. Re-export from your genealogy app with UTF-8 selected.";
+        } else if (/header|HEAD|gedcom version/i.test(m)) {
+          msg += "The file is missing the standard GEDCOM header. Re-export from your genealogy app — most apps offer 'Standard GEDCOM' as an export option.";
+        } else if (/empty|no individuals|0 people|no persons/i.test(m)) {
+          msg += "The file doesn't contain any individuals. It may be a partial export — try re-exporting with all people included.";
+        } else if (/JSON|unexpected token|syntax/i.test(m)) {
+          msg += "This doesn't look like a GEDCOM file. Make sure you've selected a .ged file (not a JSON or zip).";
+        } else {
+          msg += "It may be corrupted or use a non-standard format. Try re-exporting from your genealogy app, or use a different tool to convert it to standard GEDCOM 5.5.";
+        }
+        msg += "\n\n(Technical detail: " + (m || "unknown error") + ")";
+        alert(msg);
       }
+      setGedBusy(false);
+    };
+    reader.onerror = () => {
+      console.error("[GEDCOM] file read error:", reader.error);
+      alert("Couldn't read the file. It may be too large, in use by another app, or you may not have permission to access it. Try copying it somewhere local and re-selecting.");
       setGedBusy(false);
     };
     reader.readAsText(file, "utf-8");
@@ -8785,12 +8856,15 @@ function handleEdit(m) {
           if (newP.length) mergedPerspectivesCount++;
           return {...m, perspectives:[...existing,...newP], sharedBy:incoming.sharedBy||m.sharedBy};
         }
-        // Sync import: check if the memory has actually changed
+        // Sync import: check if the memory has actually changed.
+        // Use sorted-array stringify to avoid false-positive conflicts when the same
+        // set of tags/people is stored in a different order between local and incoming.
+        const sortedJSON = (arr) => JSON.stringify([...(arr||[])].sort());
         const changed = m.title!==incoming.title || m.content!==incoming.content || m.year!==incoming.year
           || m.month!==incoming.month || m.day!==incoming.day || m.location!==incoming.location
-          || JSON.stringify(m.tags||[])!==JSON.stringify(incoming.tags||[])
-          || JSON.stringify(m.people||[])!==JSON.stringify(incoming.people||[])
-          || JSON.stringify((m.mediaUrls||[]).map(u=>u.mediaId))!==JSON.stringify((incoming.mediaUrls||[]).map(u=>u.mediaId))
+          || sortedJSON(m.tags)!==sortedJSON(incoming.tags)
+          || sortedJSON(m.people)!==sortedJSON(incoming.people)
+          || sortedJSON((m.mediaUrls||[]).map(u=>u.mediaId))!==sortedJSON((incoming.mediaUrls||[]).map(u=>u.mediaId))
           || m.endYear!==incoming.endYear || m.endMonth!==incoming.endMonth;
         if (!changed) return m; // identical — skip
         // Both sides have this memory and it differs — flag as conflict
@@ -8897,7 +8971,25 @@ function handleEdit(m) {
         }
         alert("Sync complete" + (parts.length ? " \u2014 " + parts.join(", ") : "") + ".");
       }
-    } catch(err) { alert("Import failed: " + err.message); } };
+    } catch(err) {
+      console.error("[importBackup] failed:", err);
+      const m = (err && err.message) || "";
+      let msg = "Import failed.\n\n";
+      if (/JSON|unexpected token|syntax/i.test(m)) {
+        msg += "The file isn't a valid Chronicle backup. Make sure you've selected a .json file exported from Chronicle.";
+      } else if (/Invalid backup file/i.test(m)) {
+        msg += "The file is missing the expected memories section.";
+      } else if (/decrypt|password/i.test(m)) {
+        msg += "Could not decrypt the backup. Check the password.";
+      } else {
+        msg += m || "An unexpected error occurred while reading the backup.";
+      }
+      alert(msg);
+    } };
+    r.onerror = () => {
+      console.error("[importBackup] FileReader error:", r.error);
+      alert("Couldn't read the backup file. It may be too large or in use by another app. Try copying it somewhere local and re-selecting.");
+    };
     r.readAsText(file);
   }
 
@@ -9007,11 +9099,15 @@ function handleEdit(m) {
   // belong on the Shared Timeline, not in the subject's own Life view / Life Events / drill-downs.
   const ownMems = memories.filter(m => !m.gedcomContext);
   // Subject's birth year (for "age N" display). dob may be a 4-digit year alone or a full date.
+  // Reject implausible values: must be in [1500, current year]. Otherwise age renders nonsense.
   const dobYear = (() => {
     const m = (subject?.dob || "").match(/\d{4}/);
-    return m ? parseInt(m[0], 10) : null;
+    if (!m) return null;
+    const y = parseInt(m[0], 10);
+    const thisYear = new Date().getFullYear();
+    return (y >= 1500 && y <= thisYear) ? y : null;
   })();
-  const ageAtYear = (yr) => (dobYear && yr) ? yr - dobYear : null;
+  const ageAtYear = (yr) => (dobYear && yr && yr >= dobYear) ? yr - dobYear : null;
   const allDecades=[...new Set(ownMems.map(m=>Math.floor(m.year/10)*10))].sort();
   const memsForDec=dec=>ownMems.filter(m=>Math.floor(m.year/10)*10===dec).sort((a,b)=>sortKey(a)-sortKey(b));
   const memsForYear=yr=>ownMems.filter(m=>m.year===yr).sort((a,b)=>sortKey(a)-sortKey(b));

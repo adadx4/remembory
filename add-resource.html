@@ -895,7 +895,13 @@ function renderCatalogue(filterText) {
   }).join('');
 }
 
-catalogueFilterEl.addEventListener('input', (e) => renderCatalogue(e.target.value));
+// Debounce filter input — avoids re-rendering the full catalogue on every keystroke.
+let catalogueFilterTimer = null;
+catalogueFilterEl.addEventListener('input', (e) => {
+  const v = e.target.value;
+  clearTimeout(catalogueFilterTimer);
+  catalogueFilterTimer = setTimeout(() => renderCatalogue(v), 150);
+});
 renderCatalogue();
 
 // ── Edit / Delete ────────────────────────────────────────────────────────
