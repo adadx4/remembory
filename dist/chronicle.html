@@ -8921,12 +8921,15 @@ function handleEdit(m) {
   }
 
   // ── Data views ───────────────────────────────────────────────
-  const allDecades=[...new Set(memories.map(m=>Math.floor(m.year/10)*10))].sort();
-  const memsForDec=dec=>memories.filter(m=>Math.floor(m.year/10)*10===dec).sort((a,b)=>sortKey(a)-sortKey(b));
-  const memsForYear=yr=>memories.filter(m=>m.year===yr).sort((a,b)=>sortKey(a)-sortKey(b));
+  // Subject's own memories. GEDCOM-imported context events (relative birth/marriage/death)
+  // belong on the Shared Timeline, not in the subject's own Life view / Life Events / drill-downs.
+  const ownMems = memories.filter(m => !m.gedcomContext);
+  const allDecades=[...new Set(ownMems.map(m=>Math.floor(m.year/10)*10))].sort();
+  const memsForDec=dec=>ownMems.filter(m=>Math.floor(m.year/10)*10===dec).sort((a,b)=>sortKey(a)-sortKey(b));
+  const memsForYear=yr=>ownMems.filter(m=>m.year===yr).sort((a,b)=>sortKey(a)-sortKey(b));
   const yearsInDec=dec=>[...new Set(memsForDec(dec).map(m=>m.year))].sort();
 
-  const filtered=memories.filter(m=>{
+  const filtered=ownMems.filter(m=>{
     if (filter.tag&&!m.tags.includes(filter.tag)) return false;
     if (filter.search){
       const q=filter.search.toLowerCase();
@@ -9769,7 +9772,7 @@ function handleEdit(m) {
               {divider:true},
               {label:"🖼 Photos",action:()=>setView("photos"),active:view==="photos"},
               {label:"🗺 Map",action:()=>setView("map"),active:view==="map"},
-              IS_STAGING&&isHistoryMode&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
+              isHistoryMode&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
             ].filter(Boolean)}),
             !isHistoryMode&&React.createElement(NavDropdown,{label:"Social",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,items:[
               {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing",badge:shareBadgeCount},
@@ -9783,7 +9786,7 @@ function handleEdit(m) {
               {label:"📚 Source",action:()=>{setIndexFilter({type:"sources"});setView("index");},active:view==="index"&&indexFilter?.type==="sources"},
               {label:"🔍 Candidate",action:()=>{setIndexFilter({type:"candidatePersons"});setView("index");},active:view==="index"&&indexFilter?.type==="candidatePersons"},
               {label:"👤 Person",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
-              IS_STAGING&&{label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
+              {label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
               {label:"🔎 Research",action:()=>window.open(genealogyResearchUrl(null, knownLocations),"_blank","noopener")},
             ]:[
               {label:"+ From Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
@@ -9837,7 +9840,7 @@ function handleEdit(m) {
           {divider:true},
           {label:"🖼 Photos",action:()=>setView("photos"),active:view==="photos"},
           {label:"🗺 Map",action:()=>setView("map"),active:view==="map"},
-          IS_STAGING&&isHistoryMode&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
+          isHistoryMode&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
         ].filter(Boolean)}),
         !isHistoryMode&&React.createElement(NavDropdown,{label:"Social",icon:"⇌",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,variant:"mobile",direction:"up",menuAlign:"left",items:[
           {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing",badge:shareBadgeCount},
@@ -9851,7 +9854,7 @@ function handleEdit(m) {
           {label:"📚 Source",action:()=>{setIndexFilter({type:"sources"});setView("index");},active:view==="index"&&indexFilter?.type==="sources"},
           {label:"🔍 Candidate",action:()=>{setIndexFilter({type:"candidatePersons"});setView("index");},active:view==="index"&&indexFilter?.type==="candidatePersons"},
           {label:"👤 Person",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
-          IS_STAGING&&{label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
+          {label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
           {label:"🔎 Research",action:()=>window.open(genealogyResearchUrl(null, knownLocations),"_blank","noopener")},
         ]:[
           {label:"+ From Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
@@ -10513,20 +10516,20 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
                         
       // ── LIFE VIEW ──
       view==="life"&&React.createElement("div",{style:{animation:"fadeIn 0.35s ease"}},
-        React.createElement("p",{style:{fontStyle:"italic",color:"#8a7460",marginBottom:"22px",fontSize:"0.95rem"}},modeFor(subject).subtitle(subject.name, memories.length, allDecades.length)),
-        memories.length===0&&(()=>{const sm=modeFor(subject);return React.createElement("div",{style:{textAlign:"center",padding:"60px 20px",color:"#8a7460"}},
+        React.createElement("p",{style:{fontStyle:"italic",color:"#8a7460",marginBottom:"22px",fontSize:"0.95rem"}},modeFor(subject).subtitle(subject.name, ownMems.length, allDecades.length)),
+        ownMems.length===0&&(()=>{const sm=modeFor(subject);return React.createElement("div",{style:{textAlign:"center",padding:"60px 20px",color:"#8a7460"}},
           React.createElement("div",{style:{fontSize:"3rem",marginBottom:"12px",opacity:0.4}},sm.icon),
           React.createElement("p",{style:{fontFamily:"'Playfair Display',serif",fontStyle:"italic",fontSize:"1.2rem",margin:"0 0 8px"}},sm.emptyTitle(subject.name)),
           React.createElement("p",{style:{fontSize:"0.95rem",margin:0}},sm.emptyPrompt(subject.name))
         );})(),
         React.createElement("div",{style:{display:"grid",gridTemplateColumns:isMobile?"repeat(auto-fill, minmax(140px, 1fr))":"repeat(auto-fill, minmax(190px, 1fr))",gap:isMobile?"10px":"14px"}},
           (()=>{
-            const globalMax=Math.max(1,...allDecades.flatMap(dec=>Array.from({length:10},(_,i)=>memories.filter(m=>m.year===dec+i).length)));
+            const globalMax=Math.max(1,...allDecades.flatMap(dec=>Array.from({length:10},(_,i)=>ownMems.filter(m=>m.year===dec+i).length)));
             return allDecades.map(dec=>{
             const mems=memsForDec(dec);
             const tagCounts={}; mems.forEach(m=>m.tags.forEach(t=>{tagCounts[t]=(tagCounts[t]||0)+1;}));
             const topTags=Object.entries(tagCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
-            const perYear=Array.from({length:10},(_,i)=>memories.filter(m=>m.year===dec+i).length);
+            const perYear=Array.from({length:10},(_,i)=>ownMems.filter(m=>m.year===dec+i).length);
             return React.createElement("div",{key:dec,onClick:()=>{setScrollToDecade(dec);setView("timeline");},style:{cursor:"pointer",background:"rgba(255,252,245,0.85)",border:"1px solid #e0d4be",borderRadius:"4px",padding:"16px 14px",transition:"all 0.2s"},
               onMouseEnter:e=>{e.currentTarget.style.borderColor="#c8b89a";e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.07)";},
               onMouseLeave:e=>{e.currentTarget.style.borderColor="#e0d4be";e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="none";}},
