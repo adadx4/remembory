@@ -5113,5 +5113,36 @@ window.GENEALOGY_RESOURCES = [
     ],
     "bestFor": "Lithuanian church metric books — Catholic, Lutheran, Orthodox, Jewish",
     "notes": "Free. Includes records for territories that are now in Poland, Belarus and Russia (the historic Grand Duchy and inter-war Lithuania)."
+  },
+  {
+    "id": "ancestors-at-rest",
+    "resourceName": "Ancestors at Rest",
+    "url": "https://www.ancestorsatrest.com/",
+    "accessType": "free",
+    "scope": {
+      "countries": [
+        "England",
+        "Scotland",
+        "Ireland",
+        "Canada",
+        "United States"
+      ],
+      "alsoCovers": [],
+      "stateProvince": null,
+      "county": null,
+      "parish": null,
+      "religion": "any"
+    },
+    "coverage": [
+      {
+        "events": [
+          "death"
+        ],
+        "startYear": null,
+        "endYear": null
+      }
+    ],
+    "bestFor": "Free death record databases.",
+    "notes": "These searchable indexes to Coffin Plates, Funeral Cards, Cemetery Records, Cenotaph Records, German Death Cards, Wills, Church Records, Family Bibles, Vital Statistics and more"
   }
 ];
