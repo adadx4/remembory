@@ -6213,6 +6213,7 @@ function DetailView({
                 src&&src.repository&&React.createElement("span",{style:{fontSize:"0.74rem",color:"#7a6a58",marginLeft:"auto"}},"\ud83c\udfdb "+src.repository)
               ),
               cit.citation&&React.createElement("p",{style:{fontSize:"0.88rem",color:"#3a3020",margin:"0 0 6px",fontFamily:"'Crimson Text',serif"}},cit.citation),
+              cit.url&&React.createElement("a",{href:cit.url,target:"_blank",rel:"noopener",style:{fontSize:"0.82rem",color:"#5a4820",textDecoration:"none",borderBottom:"1px solid rgba(90,72,32,0.3)",display:"inline-block",margin:"0 0 6px",wordBreak:"break-all"}},"\u2192 View record"),
               cit.recordNotes&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#5a4820",margin:"0 0 6px",fontStyle:"italic",lineHeight:1.5,whiteSpace:"pre-wrap"}},cit.recordNotes),
               (cit.mediaUrls||[]).length>0&&React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap",marginTop:"6px"}},
                 cit.mediaUrls.map((med,j)=>React.createElement(MediaImg,{key:j,med,alt:"",style:{width:"72px",height:"72px",objectFit:"cover",borderRadius:"3px",border:"1px solid #c8b89a"}}))
@@ -6436,44 +6437,57 @@ function AddEditForm({
     ),
 
     // ── Location ──
-    expanded.has("location")&&sec(React.createElement("div",{style:{display:"grid",gap:"10px"}},
-      React.createElement("div",null,
-        React.createElement("label",{style:S.label},"Location"),
-        React.createElement(LocationAutocomplete,{value:form.locationLabel||"",onChange:v=>updateForm({locationLabel:v}),knownLocations,placeholder:"e.g. Bob\u2019s house, Grandma\u2019s kitchen, that caf\u00e9 in Paris\u2026",
-          onSelect:loc=>updateForm({locationLabel:loc.label||"",locationStreet:loc.street||"",locationTown:loc.town||"",locationState:loc.state||"",locationCountry:loc.country||""})}),
-        (()=>{
-          const label=(form.locationLabel||"").trim(), editingLabel=form.location||"";
-          if(label&&label!==editingLabel){
-            const existing=(knownLocations||[]).find(l=>(typeof l==="string"?l:l.label)===label);
-            if(existing) return React.createElement("p",{style:{fontSize:"0.74rem",color:"#c4858a",fontStyle:"italic",marginTop:"4px"}},"\u26a0 A location called \u201c"+label+"\u201d already exists. Saving will update its address details.");
-          }
-          return null;
-        })(),
-        (form.locationLabel||"").trim()&&React.createElement("div",{style:{marginTop:"8px",padding:"10px 12px",background:"rgba(200,184,154,0.08)",border:"1px solid #e0d4be",borderRadius:"3px"}},
-          React.createElement("p",{style:{fontSize:"0.74rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px"}},"Address details (optional \u2014 needed for map & public posting)"),
-          React.createElement(FieldAutocomplete,{value:form.locationStreet||"",onChange:v=>updateForm({locationStreet:v}),suggestions:knownLocationValues(knownLocations,"street"),placeholder:"Street address"}),
-          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginTop:"6px"}},
-            React.createElement(FieldAutocomplete,{value:form.locationTown||"",onChange:v=>updateForm({locationTown:v}),suggestions:knownLocationValues(knownLocations,"town"),placeholder:"Town / City"}),
-            React.createElement(FieldAutocomplete,{value:form.locationState||"",onChange:v=>updateForm({locationState:v}),suggestions:knownLocationValues(knownLocations,"state"),placeholder:"State / Region"})
-          ),
-          React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px",marginTop:"6px"}},
-            React.createElement(FieldAutocomplete,{value:form.locationCountry||"",onChange:v=>updateForm({locationCountry:v}),suggestions:knownLocationValues(knownLocations,"country"),placeholder:"Country"}),
-            React.createElement("select",{value:form.locationPrivacy||"town",onChange:e=>updateForm({locationPrivacy:e.target.value}),style:{...S.input,fontSize:"0.82rem",color:"#8a7460"},title:"Location detail to show when publishing"},
-              React.createElement("option",{value:"full"},"Publish: Full address"),
-              React.createElement("option",{value:"town"},"Publish: Town + Country"),
-              React.createElement("option",{value:"state"},"Publish: State + Country"),
-              React.createElement("option",{value:"country"},"Publish: Country only"),
-              React.createElement("option",{value:"none"},"Publish: Don\u2019t show")
+    expanded.has("location")&&sec((()=>{
+      const derivedLabel = [form.locationStreet, form.locationTown, form.locationState, form.locationCountry]
+        .map(s=>(s||"").trim()).filter(Boolean).join(", ");
+      const typedLabel = (form.locationLabel||"").trim();
+      const editingLabel = form.location||"";
+      const dupExisting = typedLabel && typedLabel!==editingLabel
+        ? (knownLocations||[]).find(l=>(typeof l==="string"?l:l.label)===typedLabel)
+        : null;
+      return React.createElement("div",{style:{display:"grid",gap:"10px"}},
+        React.createElement("div",null,
+          React.createElement("label",{style:S.label},"Location"),
+          React.createElement("div",{style:{padding:"10px 12px",background:"rgba(200,184,154,0.08)",border:"1px solid #e0d4be",borderRadius:"3px",display:"grid",gap:"6px"}},
+            React.createElement(FieldAutocomplete,{value:form.locationStreet||"",onChange:v=>updateForm({locationStreet:v}),suggestions:knownLocationValues(knownLocations,"street"),placeholder:"Street address (number and name)"}),
+            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}},
+              React.createElement(FieldAutocomplete,{value:form.locationTown||"",onChange:v=>updateForm({locationTown:v}),suggestions:knownLocationValues(knownLocations,"town"),placeholder:"Town / City"}),
+              React.createElement(FieldAutocomplete,{value:form.locationState||"",onChange:v=>updateForm({locationState:v}),suggestions:knownLocationValues(knownLocations,"state"),placeholder:"State / Region"})
+            ),
+            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}},
+              React.createElement(FieldAutocomplete,{value:form.locationCountry||"",onChange:v=>updateForm({locationCountry:v}),suggestions:knownLocationValues(knownLocations,"country"),placeholder:"Country"}),
+              React.createElement("select",{value:form.locationPrivacy||"town",onChange:e=>updateForm({locationPrivacy:e.target.value}),style:{...S.input,fontSize:"0.82rem",color:"#8a7460"},title:"Location detail to show when publishing"},
+                React.createElement("option",{value:"full"},"Publish: Full address"),
+                React.createElement("option",{value:"town"},"Publish: Town + Country"),
+                React.createElement("option",{value:"state"},"Publish: State + Country"),
+                React.createElement("option",{value:"country"},"Publish: Country only"),
+                React.createElement("option",{value:"none"},"Publish: Don\u2019t show")
+              )
+            ),
+            React.createElement("div",{style:{borderTop:"1px dashed rgba(168,136,90,0.3)",paddingTop:"8px",marginTop:"2px"}},
+              React.createElement(LocationAutocomplete,{
+                value:form.locationLabel||"",
+                onChange:v=>updateForm({locationLabel:v}),
+                knownLocations,
+                placeholder: derivedLabel
+                  ? `Label \u2014 leave blank to use: ${derivedLabel}`
+                  : "Label \u2014 e.g. Bob\u2019s house, Grandma\u2019s kitchen, or leave blank to derive from above",
+                onSelect:loc=>updateForm({locationLabel:loc.label||"",locationStreet:loc.street||"",locationTown:loc.town||"",locationState:loc.state||"",locationCountry:loc.country||""})
+              }),
+              React.createElement("p",{style:{fontSize:"0.74rem",color:"#8a7460",fontStyle:"italic",margin:"4px 0 0"}},
+                "Optional friendly name. If blank, the address fields above will be combined into a label automatically."
+              ),
+              dupExisting&&React.createElement("p",{style:{fontSize:"0.74rem",color:"#c4858a",fontStyle:"italic",marginTop:"4px"}},"\u26a0 A location called \u201c"+typedLabel+"\u201d already exists. Saving will update its address details.")
             )
           )
+        ),
+        React.createElement("div",null,
+          React.createElement("label",{style:{...S.label,fontSize:"0.78rem",color:"#8a7460"}},"Additional locations"),
+          React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 5px"}},"Road trips, multi-city visits, or memories spanning several places"),
+          React.createElement(PeopleOrgField,{icon:"\ud83d\udccd",values:form.locations||[],allValues:knownLocationLabels(knownLocations),onChange:v=>updateForm({locations:v}),placeholder:"Add another location\u2026"})
         )
-      ),
-      React.createElement("div",null,
-        React.createElement("label",{style:{...S.label,fontSize:"0.78rem",color:"#8a7460"}},"Additional locations"),
-        React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 5px"}},"Road trips, multi-city visits, or memories spanning several places"),
-        React.createElement(PeopleOrgField,{icon:"\ud83d\udccd",values:form.locations||[],allValues:knownLocationLabels(knownLocations),onChange:v=>updateForm({locations:v}),placeholder:"Add another location\u2026"})
-      )
-    )),
+      );
+    })()),
 
     // ── Tags ──
     expanded.has("tags")&&sec(React.createElement("div",null,
@@ -6571,6 +6585,7 @@ function AddEditForm({
                   ),
                   React.createElement("div",{style:{display:"grid",gap:"8px"}},
                     React.createElement("input",{value:cit.citation||"",onChange:e=>updateCitation(idx,{citation:e.target.value}),placeholder:"Citation \u2014 e.g. Page 47, household 12, line 3",style:S.input}),
+                    React.createElement("input",{type:"url",value:cit.url||"",onChange:e=>updateCitation(idx,{url:e.target.value}),placeholder:"Record URL (optional) \u2014 direct link to this record on a website",style:{...S.input,fontSize:"0.9rem"}}),
                     React.createElement("textarea",{value:cit.recordNotes||"",onChange:e=>updateCitation(idx,{recordNotes:e.target.value}),placeholder:"Record notes (optional) \u2014 transcript, why this is the right record, anything else",rows:2,style:{...S.input,resize:"vertical",fontSize:"0.92rem"}}),
                     React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}},
                       React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",marginRight:"4px"}},"Confidence:"),
@@ -7274,9 +7289,14 @@ function App() {
   function handleSubmit() {
     if (!form.title.trim()) return;
 
-    // Use label as the location string saved on the memory
-    const locationLabel = (form.locationLabel || "").trim();
-    const formWithLoc = {...form, location: locationLabel};
+    // Address fields — read once and derive a fallback label if user left it blank
+    const fStreet = (form.locationStreet||"").trim();
+    const fTown   = (form.locationTown||"").trim();
+    const fState  = (form.locationState||"").trim();
+    const fCountry= (form.locationCountry||"").trim();
+    const typedLabel = (form.locationLabel || "").trim();
+    const locationLabel = typedLabel || [fStreet, fTown, fState, fCountry].filter(Boolean).join(", ");
+    const formWithLoc = {...form, location: locationLabel, locationLabel};
 
     const primaryId = editingId || (Date.now().toString()+Math.random().toString(36).slice(2));
     const primary = {...formWithLoc, id:primaryId, modifiedAt:new Date().toISOString()};
@@ -7285,10 +7305,6 @@ function App() {
     // commitMemory will include this in its single batch save to avoid stale-closure stomping)
     let updatedKnownLocs = knownLocations;
     if (locationLabel) {
-      const fStreet = (form.locationStreet||"").trim();
-      const fTown   = (form.locationTown||"").trim();
-      const fState  = (form.locationState||"").trim();
-      const fCountry= (form.locationCountry||"").trim();
       const existingIdx = knownLocations.findIndex(l => (typeof l==='string'?l:l.label) === locationLabel);
       if (existingIdx >= 0) {
         // Only overwrite an address field when the form has a non-empty value — this preserves
@@ -7486,13 +7502,14 @@ function App() {
 
   function handleSaveCandidateSubmit() {
     if (!form.title.trim()) return;
-    const locationLabel = (form.locationLabel||"").trim();
-    const formWithLoc = {...form, location:locationLabel};
+    const fStreet=(form.locationStreet||"").trim(), fTown=(form.locationTown||"").trim(), fState=(form.locationState||"").trim(), fCountry=(form.locationCountry||"").trim();
+    const typedLabel = (form.locationLabel||"").trim();
+    const locationLabel = typedLabel || [fStreet, fTown, fState, fCountry].filter(Boolean).join(", ");
+    const formWithLoc = {...form, location:locationLabel, locationLabel};
     const primaryId = editingCandidateId || (Date.now().toString()+Math.random().toString(36).slice(2));
     const primary = {...formWithLoc, id:primaryId};
     let updatedKnownLocs = knownLocations;
     if (locationLabel) {
-      const fStreet=(form.locationStreet||"").trim(), fTown=(form.locationTown||"").trim(), fState=(form.locationState||"").trim(), fCountry=(form.locationCountry||"").trim();
       const existingIdx=knownLocations.findIndex(l=>(typeof l==='string'?l:l.label)===locationLabel);
       if (existingIdx>=0) {
         updatedKnownLocs=knownLocations.map((l,i)=>{ if(i!==existingIdx) return l; const base=typeof l==='string'?{label:l,street:"",town:"",state:"",country:""}:l; return {...base,label:locationLabel,...(fStreet?{street:fStreet}:{}),...(fTown?{town:fTown}:{}),...(fState?{state:fState}:{}),...(fCountry?{country:fCountry}:{})}; });
@@ -7505,8 +7522,10 @@ function App() {
 
   function handleAcceptFromForm() {
     if (!form.title.trim() || !editingCandidateId) return;
-    const locationLabel = (form.locationLabel||"").trim();
-    const formWithLoc = {...form, location:locationLabel};
+    const fStreet=(form.locationStreet||"").trim(), fTown=(form.locationTown||"").trim(), fState=(form.locationState||"").trim(), fCountry=(form.locationCountry||"").trim();
+    const typedLabel = (form.locationLabel||"").trim();
+    const locationLabel = typedLabel || [fStreet, fTown, fState, fCountry].filter(Boolean).join(", ");
+    const formWithLoc = {...form, location:locationLabel, locationLabel};
     const {researchNote:_rn, candidateConfidence:_cc, ...memData} = {...formWithLoc, id:editingCandidateId};
     const newPeople = [...new Set([...knownPeople,...(memData.people||[])])].sort();
     const newOrgs   = [...new Set([...knownOrgs,...(memData.orgs||[])])].sort();
@@ -10641,7 +10660,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
                   React.createElement("div",{style:{flex:1,minWidth:0}},
                     React.createElement("div",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",lineHeight:1.3,marginBottom:m.content?"4px":"0"}},m.title),
                     m.content&&React.createElement("p",{style:{fontSize:"0.9rem",color:"#5a4838",lineHeight:1.65,margin:"0 0 4px",whiteSpace:"pre-wrap"}},m.content),
-                    (m.location||(m.tags&&m.tags.length))&&React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap",marginTop:"4px"}},
+                    (m.location||(m.tags||[]).length>0)&&React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap",marginTop:"4px"}},
                       m.location&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},m.location),
                       (m.tags||[]).map(t=>React.createElement("span",{key:t,style:{fontSize:"0.72rem",padding:"1px 7px",borderRadius:"10px",background:(TAG_COLORS[t]||"#9a8a7a")+"22",color:TAG_COLORS[t]||"#9a8a7a",border:"1px solid "+(TAG_COLORS[t]||"#9a8a7a")+"44"}},t))
                     ),
