@@ -3211,7 +3211,7 @@ async function geocode(name, cache) {
 }
 
 // ── MapView component ──────────────────────────────────────────
-function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, locationCoords, onSaveCoords, knownLocations, filter, onFilterChange }) {
+function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, locationCoords, onSaveCoords, onSetCoords, onSetAddress, knownLocations, filter, onFilterChange }) {
   // Build a map from label → structured address for better geocoding
   const knownLocMap = React.useMemo(() => {
     const m = {};
@@ -3220,11 +3220,21 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
   }, [knownLocations]);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const markersRef = useRef({});  // {[label]: L.Marker} — keep handles for drag/replace
+  const addMarkerForRef = useRef(() => null); // populated by the mount effect
   const [status, setStatus] = useState(""); // loading message
   const [geocodeCache, setGeocodeCache] = useState(loadGeocodeCache);
   const [selectedLoc, setSelectedLoc] = useState(null);
   const [useEnglish, setUseEnglish] = useState(true);
+  const [passCompleted, setPassCompleted] = useState(false);
+  const [dropMode, setDropMode] = useState(null); // label being placed via map-click
+  const [fixingLabel, setFixingLabel] = useState(null); // label whose search row is open
   const tileLayers = React.useRef({});
+
+  // Keep marker handlers fresh across re-renders (they're attached inside the
+  // mount-once effect and would otherwise capture the first render's callbacks).
+  const propsRef = useRef({});
+  propsRef.current = { onSetCoords, onSetAddress, onSelectMemory };
 
   // Apply filters
   const filtered = React.useMemo(() => {
@@ -3290,7 +3300,41 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
     const pending = uniqueLocations.filter(l => !cache[l]);
     if (pending.length > 0) setStatus(`Locating ${pending.length} place${pending.length===1?"":"s"}...`);
 
-    const markers = [];
+    function buildIcon(loc) {
+      const mems = locationMemories[loc] || [];
+      const count = mems.length || 1;
+      const size = Math.min(36, 20 + count * 3);
+      const isPrimary = locationIsPrimary[loc];
+      const isCtx = locationIsContext[loc];
+      const pinColor = isCtx ? "#7a9e8a" : isPrimary ? "#c8a87a" : "#8b9dc3";
+      const borderColor = isCtx ? "#2c5a3a" : isPrimary ? "#2c2416" : "#3a4a7a";
+      return L.divIcon({
+        className: "",
+        html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${pinColor};border:2.5px solid ${borderColor};display:flex;align-items:center;justify-content:center;font-family:'Crimson Text',serif;font-size:${size>26?'0.8rem':'0.7rem'};color:${borderColor};font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.25);cursor:pointer;">${count}</div>`,
+        iconSize: [size, size],
+        iconAnchor: [size/2, size/2]
+      });
+    }
+
+    function addMarkerFor(loc, coords) {
+      if (!mapInstanceRef.current || !coords || coords.lat == null) return null;
+      // Replace any existing marker for this label so drag→update→re-add works.
+      if (markersRef.current[loc]) { try { markersRef.current[loc].remove(); } catch(e){} delete markersRef.current[loc]; }
+      const marker = L.marker([coords.lat, coords.lng], { icon: buildIcon(loc), draggable: true }).addTo(mapInstanceRef.current);
+      marker.on("click", () => setSelectedLoc(loc));
+      marker.on("dragend", (ev) => {
+        const ll = ev.target.getLatLng();
+        const next = { lat: ll.lat, lng: ll.lng, manual: true };
+        const fn = propsRef.current.onSetCoords;
+        if (fn) fn(loc, next);
+        setGeocodeCache(c => ({...c, [loc]: { lat: next.lat, lng: next.lng, display: loc, fromCoords: true }}));
+      });
+      markersRef.current[loc] = marker;
+      return marker;
+    }
+
+    // Expose for the imperative-add path (drop mode + unmatched fixes)
+    addMarkerForRef.current = addMarkerFor;
 
     async function placePins() {
       for (const loc of uniqueLocations) {
@@ -3309,37 +3353,20 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
         let coords = cache[loc];
         if (!coords) {
           coords = await geocode(geocodeQuery, cache);
-          if (coords) cache[loc] = coords; // store under label key
+          if (coords) cache[loc] = coords;
         }
         if (!coords || !mapInstanceRef.current) continue;
-
-        const mems = locationMemories[loc];
-        const count = mems.length;
-        const size = Math.min(36, 20 + count * 3);
-        const isPrimary = locationIsPrimary[loc];
-        const isCtx = locationIsContext[loc];
-        const pinColor = isCtx ? "#7a9e8a" : isPrimary ? "#c8a87a" : "#8b9dc3";
-        const borderColor = isCtx ? "#2c5a3a" : isPrimary ? "#2c2416" : "#3a4a7a";
-
-        const icon = L.divIcon({
-          className: "",
-          html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${pinColor};border:2.5px solid ${borderColor};display:flex;align-items:center;justify-content:center;font-family:'Crimson Text',serif;font-size:${size>26?'0.8rem':'0.7rem'};color:${borderColor};font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.25);cursor:pointer;">${count}</div>`,
-          iconSize: [size, size],
-          iconAnchor: [size/2, size/2]
-        });
-
-        const marker = L.marker([coords.lat, coords.lng], { icon }).addTo(map);
-        marker.on("click", () => window._chronicleSetSelectedLoc(loc));
-        markers.push(marker);
+        addMarkerFor(loc, coords);
       }
 
       setStatus("");
-      // Fit map to pins if any found
+      const markers = Object.values(markersRef.current);
       if (markers.length > 0) {
         const group = L.featureGroup(markers);
         map.fitBounds(group.getBounds().pad(0.2));
       }
       setGeocodeCache({...cache});
+      setPassCompleted(true);
       // Persist auto-discovered coords in one batch — individual calls would stomp each other
       if (onSaveCoords) {
         const newCoords = {...(locationCoords||{})};
@@ -3354,16 +3381,33 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
       }
     }
 
-    // Expose callback for pin clicks (stable setSelectedLoc doesn't need cleanup re-registration)
-    window._chronicleSetSelectedLoc = (loc) => setSelectedLoc(loc);
-
     placePins();
 
     return () => {
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
-      delete window._chronicleSetSelectedLoc;
+      markersRef.current = {};
     };
   }, []); // only run once on mount
+
+  // Drop-pin mode: while a label is set in dropMode, the next map click
+  // captures coords and saves them as a manual placement for that label.
+  React.useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    if (!dropMode) { map.getContainer().style.cursor = ""; return; }
+    map.getContainer().style.cursor = "crosshair";
+    const handler = (ev) => {
+      const lat = ev.latlng.lat, lng = ev.latlng.lng;
+      const next = { lat, lng, manual: true };
+      const fn = propsRef.current.onSetCoords;
+      if (fn) fn(dropMode, next);
+      setGeocodeCache(c => ({...c, [dropMode]: { lat, lng, display: dropMode, fromCoords: true }}));
+      addMarkerForRef.current && addMarkerForRef.current(dropMode, next);
+      setDropMode(null);
+    };
+    map.on("click", handler);
+    return () => { map.off("click", handler); map.getContainer().style.cursor = ""; };
+  }, [dropMode]);
 
   // Build filter options from memories. Memoised — the flatMap+Set+sort chain is
   // O(n) over all memories and ran on every render before; it only needs to change
@@ -3422,6 +3466,84 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
               style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.78rem",marginLeft:"auto",whiteSpace:"nowrap"}
             }, useEnglish ? "Switch to local names" : "Switch to English names")
           ),
+
+          // Drag-pin hint
+          passCompleted && Object.keys(markersRef.current||{}).length>0 && React.createElement("p",{style:{margin:"6px 0 0",fontSize:"0.78rem",color:"#a89a7a",fontStyle:"italic"}},
+            "Tip: drag any pin to place it more accurately. Manual placements stick — they\u2019re never overwritten by automatic geocoding."
+          ),
+
+          // ── Drop-pin banner ──
+          dropMode && React.createElement("div",{style:{marginTop:"10px",padding:"10px 14px",background:"rgba(196,169,98,0.18)",border:"1px solid rgba(168,136,90,0.5)",borderRadius:"4px",display:"flex",alignItems:"center",gap:"10px"}},
+            React.createElement("span",{style:{flex:1,fontFamily:"'Crimson Text',serif",color:"#5a4820"}},
+              "Click on the map to place \u201c"+dropMode+"\u201d"
+            ),
+            React.createElement("button",{onClick:()=>setDropMode(null),style:{...S.btnOutline,padding:"4px 12px",fontSize:"0.82rem"}},"Cancel")
+          ),
+
+          // ── Unmatched locations panel ──
+          (() => {
+            if (!passCompleted) return null;
+            const unmatched = uniqueLocations.filter(l => !geocodeCache[l] || geocodeCache[l].lat == null);
+            if (unmatched.length === 0) return null;
+            return React.createElement("div",{style:{marginTop:"14px",border:"1px solid #c8b89a",borderRadius:"4px",background:"rgba(255,252,245,0.97)",padding:"14px 16px"}},
+              React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",fontStyle:"italic",color:"#1a1208",margin:"0 0 4px"}},
+                unmatched.length+" location"+(unmatched.length===1?"":"s")+" couldn\u2019t be placed"
+              ),
+              React.createElement("p",{style:{margin:"0 0 12px",fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic"}},
+                "Search for a more specific name, drop a pin on the map, or remove it."
+              ),
+              unmatched.map(label => {
+                const isOpen = fixingLabel === label;
+                const kl = knownLocMap[label];
+                const addrLine = kl ? [kl.street,kl.town,kl.state,kl.country].filter(Boolean).join(", ") : "";
+                return React.createElement("div",{key:label,style:{padding:"10px 0",borderTop:"1px solid #ede5d4"}},
+                  React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:"8px",flexWrap:"wrap"}},
+                    React.createElement("div",{style:{flex:"1 1 220px",minWidth:0}},
+                      React.createElement("div",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",color:"#1a1208"}}, "📍 "+label),
+                      addrLine && React.createElement("div",{style:{fontSize:"0.78rem",color:"#8a7460",marginTop:"1px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, addrLine),
+                      React.createElement("div",{style:{fontSize:"0.78rem",color:"#a89a7a",marginTop:"1px"}},
+                        (locationMemories[label]||[]).length+" memor"+((locationMemories[label]||[]).length===1?"y":"ies")
+                      )
+                    ),
+                    React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap"}},
+                      React.createElement("button",{
+                        onClick:()=>setFixingLabel(isOpen?null:label),
+                        style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.82rem",background:isOpen?"#f5ede0":"transparent"}
+                      }, isOpen ? "Cancel search" : "🔍 Search"),
+                      React.createElement("button",{
+                        onClick:()=>{ setFixingLabel(null); setDropMode(label); },
+                        disabled: dropMode === label,
+                        style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.82rem",opacity:dropMode===label?0.5:1}
+                      }, "📌 Drop pin")
+                    )
+                  ),
+                  isOpen && React.createElement("div",{style:{marginTop:"10px"}},
+                    React.createElement(PlacePicker,{
+                      value:"",
+                      knownLocations:[],
+                      placeholder:"Search a more specific place\u2026",
+                      autoFocus:true,
+                      onPickKnown:()=>{},
+                      onPickRemote: place => {
+                        const fnC = propsRef.current.onSetCoords;
+                        const fnA = propsRef.current.onSetAddress;
+                        if (fnC && place.coords) fnC(label, place.coords);
+                        if (fnA && (place.street||place.town||place.state||place.country)) fnA(label, {street:place.street||"", town:place.town||"", state:place.state||"", country:place.country||""});
+                        if (place.coords) {
+                          setGeocodeCache(c => ({...c, [label]: { lat: place.coords.lat, lng: place.coords.lng, display: label, fromCoords: true }}));
+                          addMarkerForRef.current && addMarkerForRef.current(label, place.coords);
+                        }
+                        setFixingLabel(null);
+                      },
+                      onPickCustom:()=>setFixingLabel(null),
+                      onClear:()=>{},
+                    })
+                  )
+                );
+              })
+            );
+          })(),
+
           // ── Location detail panel ──
           selectedLoc&&React.createElement("div",{style:{marginTop:"14px",border:"1px solid #c8b89a",borderRadius:"4px",background:"rgba(255,252,245,0.97)",padding:"14px 16px"}},
             React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:"8px",marginBottom:"10px"}},
@@ -10705,6 +10827,8 @@ function handleEdit(m) {
             });
             persistSubject({knownLocations: updated});
           },
+          onSetCoords: setLocationCoords,
+          onSetAddress: setLocationAddress,
           onSelectLocation: loc => {
             setIndexFilter({type:"locations",value:loc});
             setIndexTab("locations");
