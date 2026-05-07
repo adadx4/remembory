@@ -5874,16 +5874,21 @@ function buildMemsFromTree(tp, tpById, treeF) {
   const rels = {};
   const ctxSeen = new Set();
 
+  // Only bring in events where the relative is the *primary* — birth, death,
+  // and marriage. Don't add "Birth of {child}" from the parent's perspective:
+  // the child's own Born event (added when we iterate them as a relative) covers it.
+  // Marriages are deduped by family id so they appear once even if both spouses
+  // are relatives.
   relativeIds.forEach(relId=>{
     const rel = tpById[relId]; if(!rel) return;
     const rl = relLabel(relId);
     if(rl) rels[rel.name]=rl;
     const rlTag = rl?" ["+rl+"]":"";
-    function addCtx(title, year, loc, people) {
+    function addCtx(title, year, loc, people, dedupKey) {
       if(!inLifetime(year)) return;
-      const dedupKey = title+"|"+year+"|"+rel.name;
-      if(ctxSeen.has(dedupKey)) return;
-      ctxSeen.add(dedupKey);
+      const key = dedupKey || (title+"|"+year+"|"+rel.name);
+      if(ctxSeen.has(key)) return;
+      ctxSeen.add(key);
       const verb = title.charAt(0).toLowerCase()+title.slice(1);
       const m = mkMem(rel.name+rlTag+" "+verb, year, loc, [rel.name,...(people||[])],
         {gedcomContext:true, visibility:"private"});
@@ -5893,14 +5898,17 @@ function buildMemsFromTree(tp, tpById, treeF) {
     addCtx("Died", parseInt(rel.dod)||null, rel.deathPlace||"", []);
     (treeF||[]).forEach(fam=>{
       if(fam.husbandId!==relId && fam.wifeId!==relId) return;
+      if(!fam.marriageYear) return;
       const spId = fam.husbandId===relId ? fam.wifeId : fam.husbandId;
       const sp = spId ? tpById[spId] : null;
-      if(fam.marriageYear) addCtx(sp?"Married "+sp.name:"Married", fam.marriageYear, fam.marriagePlace||"", sp?[sp.name]:[]);
-      (fam.childIds||[]).forEach(cid=>{
-        const ch=tpById[cid]; if(!ch) return;
-        addCtx("Birth of "+ch.name, parseInt(ch.dob)||null, ch.birthPlace||"", [ch.name]);
-        if(ch.dod) addCtx("Death of "+ch.name, parseInt(ch.dod)||null, ch.deathPlace||"", [ch.name]);
-      });
+      // Dedup by family id so a marriage between two relatives shows once,
+      // not once per spouse.
+      addCtx(
+        sp?"Married "+sp.name:"Married",
+        fam.marriageYear, fam.marriagePlace||"",
+        sp?[sp.name]:[],
+        "marriage|"+(fam.id||relId+"|"+(spId||""))
+      );
     });
   });
 
@@ -6159,9 +6167,10 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
             const hasSubject=!!tp.subjectId;
             const linked = hasSubject ? subjects.find(s=>s.id===tp.subjectId) : null;
             const isActive = linked && linked.id===activeSubjectId;
-            const cardBg = isFocal?"#2c2416":hasSubject?"#fffbf0":"rgba(255,252,245,0.97)";
-            const cardBorder = isFocal?"2px solid #2c2416":hasSubject?"1px solid #c8a84a":"1px solid #d4c4a8";
-            const cardShadow = isFocal?"0 3px 12px rgba(0,0,0,0.2)":hasSubject?"0 2px 8px rgba(196,160,60,0.18)":isActive?"0 2px 8px rgba(196,169,98,0.4)":"none";
+            // hasSubject styling — strongly distinct so chronicled people are immediately obvious in the tree.
+            const cardBg = isFocal?"#2c2416":hasSubject?"rgba(196,169,98,0.22)":"rgba(255,252,245,0.97)";
+            const cardBorder = isFocal?"2px solid #2c2416":hasSubject?"1px solid #a8882a":"1px solid #d4c4a8";
+            const cardShadow = isFocal?"0 3px 12px rgba(0,0,0,0.2)":hasSubject?"0 3px 10px rgba(168,136,42,0.32)":isActive?"0 2px 8px rgba(196,169,98,0.4)":"none";
             return React.createElement("div",{key:id,
               onClick:()=>setPersonDetail(id),
               style:{
@@ -6169,23 +6178,25 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
                 width:NW+"px",height:NH+"px",
                 background:cardBg,
                 border:cardBorder,
-                borderLeft:isFocal?"4px solid #8a7040":hasSubject?"4px solid #c8a84a":"1px solid #d4c4a8",
+                borderLeft:isFocal?"4px solid #8a7040":hasSubject?"5px solid #c8a84a":"1px solid #d4c4a8",
                 borderRadius:"4px",padding:"6px 8px 6px "+(hasSubject||isFocal?"6px":"8px"),
                 cursor:"pointer",boxSizing:"border-box",
                 boxShadow:cardShadow,
               },
-              onMouseEnter:e=>{if(!isFocal)e.currentTarget.style.borderColor=hasSubject?"#a8882a":"#a8885a";},
-              onMouseLeave:e=>{if(!isFocal)e.currentTarget.style.borderColor=hasSubject?"#c8a84a":"#d4c4a8";}
+              onMouseEnter:e=>{if(!isFocal)e.currentTarget.style.borderColor=hasSubject?"#7a5a20":"#a8885a";},
+              onMouseLeave:e=>{if(!isFocal)e.currentTarget.style.borderColor=hasSubject?"#a8882a":"#d4c4a8";}
             },
-              React.createElement("div",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.85rem",color:isFocal?"#f5f0e8":"#1a1208",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.2,marginBottom:"2px"}},
-                hasSubject&&!isFocal&&React.createElement("span",{style:{marginRight:"3px",fontSize:"0.8rem"}},"📖"),
+              // Chronicle badge — top-right corner. Clear coloured pill rather than a subtle italic.
+              hasSubject&&!isFocal&&React.createElement("span",{
+                style:{position:"absolute",top:"-7px",right:"-6px",background:"#4a7a5a",color:"#fff",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.06em",padding:"2px 7px",borderRadius:"10px",textTransform:"uppercase",boxShadow:"0 1px 3px rgba(0,0,0,0.18)",fontFamily:"Arial,sans-serif",pointerEvents:"none"}
+              },"\u2713 Chronicle"),
+              React.createElement("div",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.85rem",color:isFocal?"#f5f0e8":"#1a1208",fontWeight:hasSubject?700:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.2,marginBottom:"2px"}},
                 tp.name
               ),
-              React.createElement("div",{style:{fontSize:"0.78rem",color:isFocal?"rgba(245,240,232,0.6)":"#8a7460"}},
+              React.createElement("div",{style:{fontSize:"0.78rem",color:isFocal?"rgba(245,240,232,0.6)":hasSubject?"#7a5a20":"#8a7460"}},
                 [tp.dob&&"b."+tp.dob, tp.dod&&"d."+tp.dod].filter(Boolean).join("  ")||"\u00a0"
               ),
-              tp.birthPlace&&React.createElement("div",{style:{fontSize:"0.64rem",color:isFocal?"rgba(245,240,232,0.5)":"#a89a7a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:"2px"}},tp.birthPlace.split(",")[0]),
-              hasSubject&&!isFocal&&React.createElement("div",{style:{position:"absolute",bottom:"5px",right:"7px",fontSize:"0.7rem",color:"#9a7830",fontFamily:"'Crimson Text',serif",letterSpacing:"0.03em",fontStyle:"italic"}},"chronicle")
+              tp.birthPlace&&React.createElement("div",{style:{fontSize:"0.64rem",color:isFocal?"rgba(245,240,232,0.5)":hasSubject?"#9a7830":"#a89a7a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:"2px"}},tp.birthPlace.split(",")[0])
             );
           })
         ),
@@ -6675,13 +6686,13 @@ function AddEditForm({
       ["sources",    (form.sources||[]).length || (form.sourceIds||[]).length],
       ["researchnote", form.researchNote || form.candidateConfidence],
       ["candidateperson", form.candidatePersonId],
-      ["eventtype", form.eventType],
     ];
     const first = checks.find(([,v])=>v);
     return first ? new Set([first[0]]) : new Set();
   });
   const toggle = k => setExpanded(s => { if (s.has(k)) return new Set(); return new Set([k]); });
-  const canSave = !!(form.title?.trim() && form.year);
+  // In Lineage mode, eventType must be picked (even if just "Other").
+  const canSave = !!(form.title?.trim() && form.year && (!isHistoryMode || form.eventType));
   const sm = modeFor(subject);
   const addTitle = typeof sm.addMemory==="function" ? sm.addMemory(ownerName||subject?.name) : (sm.addMemory||"Record a Memory");
   // Inline new-candidate-person creation from the form
@@ -6695,7 +6706,6 @@ function AddEditForm({
     sources: (form.sources||[]).length || (form.sourceIds||[]).length,
     researchnote: form.researchNote||form.candidateConfidence, enddate: form.endFuzzy||form.endOngoing,
     candidateperson: !!form.candidatePersonId,
-    eventtype: !!form.eventType,
   };
   function secToggle(k, label, icon) {
     const on = expanded.has(k);
@@ -6739,9 +6749,26 @@ function AddEditForm({
 
     // ── Core fields ──
     React.createElement("div",{style:{display:"grid",gap:"13px"}},
+      // Event type — required in Lineage mode, surfaced at the top so it's
+      // chosen before anything else (it shapes downstream research / filtering).
+      isHistoryMode && React.createElement("div",{style:{background:"rgba(196,169,98,0.08)",border:"1px solid rgba(196,169,98,0.35)",borderRadius:"3px",padding:"12px 14px"}},
+        React.createElement("label",{style:{...S.label,marginBottom:"6px"}},"\ud83d\udcdc Event Type *"),
+        React.createElement("select",{
+          value:form.eventType||"",
+          onChange:e=>updateForm({eventType:e.target.value}),
+          style:{...S.select,width:"100%",borderColor:!form.eventType?"#c4858a":undefined},
+          autoFocus:view==="add"
+        },
+          React.createElement("option",{value:"",disabled:true},"\u2014 pick an event type \u2014"),
+          EVENT_TYPES.map(t=>React.createElement("option",{key:t.id,value:t.id},t.label))
+        ),
+        React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"6px 0 0",lineHeight:1.4}},
+          "Pick the closest match \u2014 use \u201cOther\u201d if none apply."
+        )
+      ),
       React.createElement("div",null,
         React.createElement("label",{style:S.label},"Title *"),
-        React.createElement("input",{value:form.title,onChange:e=>updateForm({title:e.target.value}),placeholder:"What do you want to call this memory?",style:S.input,autoFocus:view==="add"})
+        React.createElement("input",{value:form.title,onChange:e=>updateForm({title:e.target.value}),placeholder:isHistoryMode?"e.g. Birth of John Smith":"What do you want to call this memory?",style:S.input,autoFocus:view==="add"&&!isHistoryMode})
       ),
       React.createElement(DateFields,{form,setForm:updateForm}),
       // End date — visible button
@@ -6798,8 +6825,7 @@ function AddEditForm({
       secToggle("photos",    "Photos",        "\ud83d\uddbc"),
       isHistoryMode&&secToggle("sources", "Sources", "\ud83d\udcda"),
       isHistoryMode&&secToggle("researchnote","Research Note","\ud83d\udcdd"),
-      isHistoryMode&&secToggle("candidateperson","Candidate Person","\ud83d\udd0d"),
-      isHistoryMode&&secToggle("eventtype","Event Type","\ud83d\udcdc")
+      isHistoryMode&&secToggle("candidateperson","Candidate Person","\ud83d\udd0d")
     ),
 
     // ── Location ──
@@ -7018,18 +7044,6 @@ function AddEditForm({
       );
     })()),
 
-    // ── Event type (Genealogy mode, collapsible) ──
-    isHistoryMode&&expanded.has("eventtype")&&sec(React.createElement("div",null,
-      React.createElement("label",{style:S.label},"Event Type"),
-      React.createElement("select",{value:form.eventType||"",onChange:e=>updateForm({eventType:e.target.value}),style:{...S.select,width:"100%"}},
-        React.createElement("option",{value:""},"\u2014 not specified \u2014"),
-        EVENT_TYPES.map(t=>React.createElement("option",{key:t.id,value:t.id},t.label))
-      ),
-      React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"4px 0 0",lineHeight:1.5}},
-        "Categorise this event for research. Used by the Research tool to find matching record collections (births, marriages, censuses, etc.)."
-      )
-    )),
-
     // ── Sticky save footer ──
     React.createElement("div",{style:{position:"sticky",bottom:0,background:"rgba(245,240,232,0.97)",borderTop:"1px solid #d4c4a8",padding:"12px 0",marginTop:"20px",backdropFilter:"blur(4px)"}},
       React.createElement("div",{style:{display:"flex",gap:"10px",alignItems:"center",flexWrap:"wrap"}},
@@ -7043,7 +7057,7 @@ function AddEditForm({
         isHistoryMode&&!editingCandidateId&&view==="add"&&React.createElement("button",{onClick:canSave?handleSaveCandidateSubmit:undefined,disabled:!canSave,style:{...S.btnOutline,borderColor:"rgba(196,169,98,0.6)",color:"#7a5a20",opacity:canSave?1:0.45,cursor:canSave?"pointer":"not-allowed"}},"📥 Save as Candidate"),
         React.createElement("button",{onClick:onCancel,style:S.btnOutline},"Cancel"),
         !canSave&&React.createElement("span",{style:{fontSize:"0.8rem",color:"#8a7460",fontStyle:"italic"}},
-          !form.title?.trim()?"Add a title to save":!form.year?"Add a date to save":"")
+          !form.title?.trim()?"Add a title to save":!form.year?"Add a date to save":(isHistoryMode&&!form.eventType)?"Pick an event type to save":"")
       )
     )
   );
@@ -8890,18 +8904,10 @@ function handleEdit(m) {
             const note = children(node,"NOTE").map(n=>fullText(n)).filter(Boolean).join("\n\n");
             addCtxEvent(famEvTitle, parseDate(child(node,"DATE")), child(node,"PLAC"), note, spouseName?[spouseName]:[]);
           }
-          // Relative's children — birth and death
-          for (const childRef of fam.children.filter(n=>n.tag==="CHIL")) {
-            const childRec = indiMap[childRef.value];
-            if (!childRec) continue;
-            const cn = childRec.children.find(n=>n.tag==="NAME");
-            if (!cn) continue;
-            const cname = fullText(cn).replace(/\//g,"").replace(/\s+/g," ").trim();
-            const cbirt = childRec.children.find(n=>n.tag==="BIRT");
-            if (cbirt) addCtxEvent("Birth of "+cname, parseDate(child(cbirt,"DATE")), child(cbirt,"PLAC"), "", [cname]);
-            const cdeat = childRec.children.find(n=>n.tag==="DEAT");
-            if (cdeat) addCtxEvent("Death of "+cname, parseDate(child(cdeat,"DATE")), child(cdeat,"PLAC"), "", [cname]);
-          }
+          // Don't add the relative's children's birth/death from this relative's
+          // perspective — those events belong to the children themselves and would
+          // otherwise appear duplicated for each parent. The child's own birth/death
+          // event is added when we iterate the child as a relative.
         }
         if (events.length===0) continue;
         events.sort((a,b)=>(a.year||0)-(b.year||0));
