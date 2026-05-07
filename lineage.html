@@ -4340,20 +4340,41 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey, onSyncComple
   }
 
   async function buildSyncJson() {
-    // Like buildBackupJson but strips media blobs — returns {json, mediaIds}
+    // Like buildBackupJson but strips media blobs — returns {json, mediaIds}.
+    // Photos are uploaded separately to R2; the JSON only carries id+name refs.
     const full = await buildBackupJson();
     const parsed = JSON.parse(full);
     const mediaIds = new Set();
-    if (parsed.memories) parsed.memories = parsed.memories.map(m => ({
-      ...m, mediaUrls: (m.mediaUrls||[]).map(med => {
-        if (med.mediaId) { mediaIds.add(med.mediaId); return {mediaId:med.mediaId,name:med.name}; }
-        return med;
-      })
-    }));
-    if (parsed.entityPhotos) Object.keys(parsed.entityPhotos).forEach(k => {
-      const ep = parsed.entityPhotos[k];
-      if (ep?.mediaId) { mediaIds.add(ep.mediaId); parsed.entityPhotos[k] = {mediaId:ep.mediaId,name:ep.name}; }
-    });
+    function stripMems(mems) {
+      return (mems || []).map(m => ({
+        ...m, mediaUrls: (m.mediaUrls||[]).map(med => {
+          if (med && med.mediaId) { mediaIds.add(med.mediaId); return {mediaId:med.mediaId,name:med.name}; }
+          return med;
+        })
+      }));
+    }
+    function stripEntityPhotos(ep) {
+      const out = {};
+      Object.keys(ep || {}).forEach(k => {
+        const v = ep[k];
+        if (v && v.mediaId) { mediaIds.add(v.mediaId); out[k] = {mediaId:v.mediaId,name:v.name}; }
+        else if (v) out[k] = v;
+      });
+      return out;
+    }
+    if (Array.isArray(parsed.subjects)) {
+      // v3 multi-subject — strip media from each subject's memories/candidates/entityPhotos
+      parsed.subjects = parsed.subjects.map(s => ({
+        ...s,
+        memories:   stripMems(s.memories),
+        candidates: stripMems(s.candidates),
+        entityPhotos: stripEntityPhotos(s.entityPhotos),
+      }));
+    } else {
+      // Legacy v2 fallback (in case buildBackupJson regresses or a caller passes v2 data)
+      if (parsed.memories) parsed.memories = stripMems(parsed.memories);
+      if (parsed.entityPhotos) parsed.entityPhotos = stripEntityPhotos(parsed.entityPhotos);
+    }
     return { json: JSON.stringify(parsed), mediaIds: [...mediaIds] };
   }
 
