@@ -2657,6 +2657,45 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
   function toggle(path) {
     setExpanded(prev => { const n = new Set(prev); if (n.has(path)) n.delete(path); else n.add(path); return n; });
   }
+  // Bulk-edit state: which tree node has its editor open + the form values.
+  // editLabels captures the leaf set when the editor opens so save scopes to
+  // exactly that group even after the underlying knownLocations array changes.
+  const [editingPath, setEditingPath] = React.useState(null);
+  const [editForm, setEditForm] = React.useState({country:"",state:"",town:"",street:""});
+  const [editOriginal, setEditOriginal] = React.useState({country:"",state:"",town:"",street:""});
+  const [editLabels, setEditLabels] = React.useState(null);
+  function openEditor(path, leaves) {
+    function commonValue(key) {
+      if (!leaves.length) return "";
+      const norm = l => ((typeof l === 'object' ? (l[key]||"") : "")).trim();
+      const first = norm(leaves[0]);
+      for (const l of leaves) if (norm(l) !== first) return "";
+      return first;
+    }
+    const original = { country: commonValue("country"), state: commonValue("state"), town: commonValue("town"), street: commonValue("street") };
+    setEditingPath(path);
+    setEditOriginal(original);
+    setEditForm({...original});
+    setEditLabels(new Set(leaves.map(l => typeof l === 'string' ? l : l.label)));
+  }
+  function closeEditor() { setEditingPath(null); setEditLabels(null); }
+  function saveEditor() {
+    if (!editLabels) { closeEditor(); return; }
+    const changes = {};
+    for (const k of ["country","state","town","street"]) {
+      const cur = (editForm[k]||"").trim();
+      const orig = (editOriginal[k]||"").trim();
+      if (cur !== orig) changes[k] = cur;
+    }
+    if (Object.keys(changes).length === 0) { closeEditor(); return; }
+    const updated = knownLocations.map(l => {
+      if (typeof l === 'string') return l;
+      if (!editLabels.has(l.label)) return l;
+      return {...l, ...changes};
+    });
+    persistSubject({knownLocations: updated});
+    closeEditor();
+  }
   function commitAdd(){
     const v=newLoc.trim();
     if(!v)return;
@@ -2749,16 +2788,36 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
         if (Array.isArray(node)) return node.length;
         return Object.values(node).reduce((acc,v)=>acc+countLeaves(v),0);
       }
+      function collectLeaves(node) {
+        if (Array.isArray(node)) return node;
+        return Object.values(node).flatMap(collectLeaves);
+      }
 
-      const headerStyle = (depth) => ({
-        display:"flex", alignItems:"center", gap:"6px",
-        background:"transparent", border:"none", cursor:"pointer",
-        padding:"4px 0", marginLeft:(depth*16)+"px",
-        fontFamily:"'Crimson Text',serif", color:"#5a4820",
-        fontSize: depth === 0 ? "0.95rem" : "0.88rem",
-        fontWeight: depth === 0 ? 600 : 500,
-        width:"100%", textAlign:"left"
-      });
+      const FIELD_LABELS = { country:"Country", state:"State / Region", town:"Town / City", street:"Street" };
+
+      function renderEditor(depth) {
+        if (!editLabels) return null;
+        return React.createElement("div",{
+          style:{margin:"4px 0 8px",marginLeft:((depth+1)*16)+"px",padding:"10px 12px",background:"rgba(168,136,90,0.08)",border:"1px solid rgba(168,136,90,0.3)",borderRadius:"3px"}
+        },
+          React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px"}},
+            "Bulk-edit "+editLabels.size+" location"+(editLabels.size===1?"":"s")+" under this branch. A field shown as \u201c(varies)\u201d means entries already differ \u2014 type a value to set them all the same; leave it as-is to keep them per entry."
+          ),
+          ["country","state","town","street"].map(k => React.createElement("div",{key:k,style:{marginBottom:"6px"}},
+            React.createElement("label",{style:{fontSize:"0.76rem",color:"#8a7460",display:"block",marginBottom:"2px"}}, FIELD_LABELS[k]),
+            React.createElement("input",{
+              value: editForm[k]||"",
+              onChange: e => setEditForm(f => ({...f, [k]: e.target.value})),
+              placeholder: editOriginal[k] === "" ? "(varies)" : "",
+              style:{...S.input, fontSize:"0.86rem", padding:"5px 9px"}
+            })
+          )),
+          React.createElement("div",{style:{display:"flex",gap:"6px",marginTop:"8px"}},
+            React.createElement("button",{onClick:saveEditor,style:{...S.btn,padding:"5px 12px",fontSize:"0.84rem"}},"Apply to all"),
+            React.createElement("button",{onClick:closeEditor,style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.84rem"}},"Cancel")
+          )
+        );
+      }
 
       // Skip groups that only have a single PLACEHOLDER child — collapse them
       // so a location with just country="USA" doesn't render as
@@ -2799,16 +2858,33 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
             );
           }
           return React.createElement("div",{key:subPath},
-            React.createElement("button",{
-              onClick: () => toggle(subPath),
-              style: headerStyle(depth)
-            },
-              React.createElement("span",{style:{display:"inline-block",width:"10px",fontSize:"0.7rem",color:"#a89a7a"}},
-                isLeafGroup ? (isOpen ? "▼" : "▶") : (isOpen ? "▼" : "▶")
+            React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"4px",marginLeft:(depth*16)+"px"}},
+              React.createElement("button",{
+                onClick: () => toggle(subPath),
+                style:{
+                  flex:1,
+                  display:"flex",alignItems:"center",gap:"6px",
+                  background:"transparent",border:"none",cursor:"pointer",
+                  padding:"4px 0",
+                  fontFamily:"'Crimson Text',serif",color:"#5a4820",
+                  textAlign:"left",
+                  fontSize: depth === 0 ? "0.95rem" : "0.88rem",
+                  fontWeight: depth === 0 ? 600 : 500
+                }
+              },
+                React.createElement("span",{style:{display:"inline-block",width:"10px",fontSize:"0.7rem",color:"#a89a7a"}},
+                  isOpen ? "▼" : "▶"
+                ),
+                React.createElement("span",null, displayName),
+                React.createElement("span",{style:{fontSize:"0.78rem",color:"#a89a7a",fontWeight:400,marginLeft:"4px"}}, "("+leafCount+")")
               ),
-              React.createElement("span",null, displayName),
-              React.createElement("span",{style:{fontSize:"0.78rem",color:"#a89a7a",fontWeight:400,marginLeft:"4px"}}, "("+leafCount+")")
+              React.createElement("button",{
+                onClick: () => openEditor(subPath, collectLeaves(childRaw)),
+                title: "Bulk-edit address fields for everything in this group",
+                style: { background:"transparent",border:"none",cursor:"pointer",padding:"4px 8px",fontSize:"0.84rem",color:"#a89a7a" }
+              }, "\u270e Edit")
             ),
+            editingPath === subPath && renderEditor(depth),
             isOpen && React.createElement("div",{style:{marginLeft:"4px"}},
               renderNode(child, subPath, depth+1, ({country:"state",state:"town",town:"street",street:null}[levelLabel]))
             )
