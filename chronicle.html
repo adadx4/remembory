@@ -1248,6 +1248,148 @@ function LocationAutocomplete({value, onChange, knownLocations, placeholder, onS
   );
 }
 
+// PlacePicker — single-field location entry that searches saved places
+// instantly and Nominatim live (debounced). Picking a Nominatim result
+// captures structured address + coordinates, so users don't have to type
+// admin levels or worry about disambiguating "Boston, UK" vs "Boston, MA".
+function PlacePicker({value, displayValue, onClear, onPickKnown, onPickRemote, onPickCustom, knownLocations, placeholder, autoFocus}) {
+  const [query, setQuery] = React.useState("");
+  const [showSugs, setShowSugs] = React.useState(false);
+  const [remoteSugs, setRemoteSugs] = React.useState([]);
+  const [searching, setSearching] = React.useState(false);
+  const [editing, setEditing] = React.useState(!value);
+  const abortRef = React.useRef(null);
+  const debounceRef = React.useRef(null);
+  const inputRef = React.useRef(null);
+
+  React.useEffect(() => { setEditing(!value); }, [value]);
+
+  const localMatches = React.useMemo(() => {
+    if (!query) return [];
+    const q = query.toLowerCase();
+    return (knownLocations||[])
+      .filter(l => l && l.label && l.label.toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [query, knownLocations]);
+
+  React.useEffect(() => {
+    if (!query || query.trim().length < 3) { setRemoteSugs([]); setSearching(false); return; }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      if (abortRef.current) abortRef.current.abort();
+      const ctrl = new AbortController(); abortRef.current = ctrl;
+      setSearching(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`,
+          { signal: ctrl.signal, headers: { "Accept-Language": "en" } }
+        );
+        if (ctrl.signal.aborted) return;
+        const data = await res.json();
+        if (!ctrl.signal.aborted) setRemoteSugs(Array.isArray(data) ? data : []);
+      } catch (e) { if (e.name !== "AbortError") setRemoteSugs([]); }
+      finally { setSearching(false); }
+    }, 600);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query]);
+
+  function buildLabelFromNominatim(r) {
+    const a = r.address || {};
+    const town = a.city || a.town || a.village || a.hamlet || a.suburb || a.municipality || "";
+    const state = a.state || a.region || a.province || a.county || "";
+    const country = a.country || "";
+    if (town && country) return state && state !== town ? `${town}, ${state}, ${country}` : `${town}, ${country}`;
+    if (state && country) return `${state}, ${country}`;
+    if (country) return country;
+    return (r.display_name||"").split(",").slice(0,3).map(s=>s.trim()).join(", ");
+  }
+
+  function pickRemote(r) {
+    const a = r.address || {};
+    const town = a.city || a.town || a.village || a.hamlet || a.suburb || a.municipality || "";
+    const state = a.state || a.region || a.province || a.county || "";
+    const country = a.country || "";
+    const street = [a.house_number, a.road].filter(Boolean).join(" ");
+    const label = buildLabelFromNominatim(r);
+    onPickRemote && onPickRemote({
+      label, street, town, state, country,
+      coords: { lat: parseFloat(r.lat), lng: parseFloat(r.lon), manual: false },
+      placeId: r.place_id, osmId: r.osm_id, osmType: r.osm_type,
+      formalAddress: r.display_name,
+    });
+    setQuery(""); setShowSugs(false); setEditing(false);
+  }
+
+  function pickKnown(loc) { onPickKnown && onPickKnown(loc); setQuery(""); setShowSugs(false); setEditing(false); }
+  function pickCustom() { const n = query.trim(); if (!n) return; onPickCustom && onPickCustom(n); setQuery(""); setShowSugs(false); setEditing(false); }
+
+  // Selected chip
+  if (value && !editing) {
+    return React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"8px",padding:"9px 12px",background:"rgba(200,184,154,0.12)",border:"1px solid #c8b89a",borderRadius:"3px"}},
+      React.createElement("span",{style:{flex:1,fontFamily:"'Crimson Text',serif",color:"#1a1208"}}, "📍 " + (displayValue || value)),
+      React.createElement("button",{
+        type:"button",
+        onClick:()=>{setEditing(true);setQuery("");setTimeout(()=>inputRef.current?.focus(),0);},
+        style:{background:"none",border:"1px solid #c8b89a",borderRadius:"2px",padding:"3px 9px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.82rem",color:"#6a5840"}
+      }, "Change"),
+      React.createElement("button",{
+        type:"button",
+        onClick:()=>{ if(onClear) onClear(); setEditing(true); setQuery(""); },
+        style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1.1rem",padding:"0 4px"},
+        "aria-label":"Clear location"
+      }, "×")
+    );
+  }
+
+  const showDropdown = showSugs && (localMatches.length > 0 || remoteSugs.length > 0 || searching || query.trim().length > 0);
+
+  return React.createElement("div",{style:{position:"relative"}},
+    React.createElement("input",{
+      ref: inputRef,
+      value: query,
+      onChange: e => { setQuery(e.target.value); setShowSugs(true); },
+      onFocus: () => setShowSugs(true),
+      onBlur: () => setTimeout(()=>setShowSugs(false), 200),
+      onKeyDown: e => { if (e.key === "Enter") { e.preventDefault(); if (query.trim()) pickCustom(); } else if (e.key === "Escape") setShowSugs(false); },
+      placeholder: placeholder || "Search a place — town, address, country…",
+      style: S.input,
+      autoFocus: !!autoFocus,
+    }),
+    showDropdown && React.createElement("div", {style:{position:"absolute",top:"100%",left:0,right:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.12)",maxHeight:"280px",overflowY:"auto"}},
+      localMatches.length > 0 && React.createElement("div",{style:{padding:"5px 12px",fontSize:"0.72rem",color:"#8a7460",letterSpacing:"0.05em",textTransform:"uppercase",background:"#f5ede0",borderBottom:"1px solid #ede5d4"}}, "Saved places"),
+      localMatches.map(l => React.createElement("div",{
+        key: "k:"+l.label,
+        onMouseDown: () => pickKnown(l),
+        style:{padding:"8px 12px",cursor:"pointer",fontSize:"0.9rem",color:"#2c2416",borderBottom:"1px solid #ede5d4"},
+        onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+        onMouseLeave:e=>e.currentTarget.style.background="transparent"
+      },
+        React.createElement("div",null, "📍 " + l.label),
+        (l.street||l.town||l.country) && React.createElement("div",{style:{fontSize:"0.78rem",color:"#8a7460",marginTop:"1px"}}, [l.street,l.town,l.state,l.country].filter(Boolean).join(", "))
+      )),
+      query.trim().length >= 3 && React.createElement("div",{style:{padding:"5px 12px",fontSize:"0.72rem",color:"#8a7460",letterSpacing:"0.05em",textTransform:"uppercase",background:"#f5ede0",borderBottom:"1px solid #ede5d4"}}, "Map suggestions"),
+      query.trim().length >= 3 && searching && React.createElement("div",{style:{padding:"8px 12px",fontSize:"0.86rem",color:"#8a7460",fontStyle:"italic"}}, "🌍 Searching…"),
+      query.trim().length >= 3 && !searching && remoteSugs.length === 0 && React.createElement("div",{style:{padding:"8px 12px",fontSize:"0.86rem",color:"#8a7460",fontStyle:"italic"}}, "No map matches"),
+      remoteSugs.map(r => React.createElement("div",{
+        key: "r:"+r.place_id,
+        onMouseDown: () => pickRemote(r),
+        style:{padding:"8px 12px",cursor:"pointer",fontSize:"0.9rem",color:"#2c2416",borderBottom:"1px solid #ede5d4"},
+        onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+        onMouseLeave:e=>e.currentTarget.style.background="transparent"
+      },
+        React.createElement("div",null, "🗺 " + buildLabelFromNominatim(r)),
+        React.createElement("div",{style:{fontSize:"0.76rem",color:"#8a7460",marginTop:"1px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, r.display_name||"")
+      )),
+      query.trim().length > 0 && React.createElement("div",{
+        onMouseDown: pickCustom,
+        style:{padding:"8px 12px",cursor:"pointer",fontSize:"0.86rem",color:"#6a5840",fontStyle:"italic",background:"#f9f3e6",borderTop:"1px solid #ede5d4"},
+        onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+        onMouseLeave:e=>e.currentTarget.style.background="#f9f3e6"
+      }, "+ Use \u201c" + query.trim() + "\u201d as a custom name")
+    )
+  );
+}
+
 function FieldAutocomplete({value, onChange, suggestions:allSugs, placeholder, style:customStyle}) {
   const [showSugs, setShowSugs] = React.useState(false);
   const suggestions = (allSugs||[]).filter(v=>v.toLowerCase().includes(value.toLowerCase())&&v!==value&&value.length>0);
@@ -6844,49 +6986,72 @@ function AddEditForm({
 
     // ── Location ──
     expanded.has("location")&&sec((()=>{
-      const derivedLabel = [form.locationStreet, form.locationTown, form.locationState, form.locationCountry]
-        .map(s=>(s||"").trim()).filter(Boolean).join(", ");
-      const typedLabel = (form.locationLabel||"").trim();
-      const editingLabel = form.location||"";
-      const dupExisting = typedLabel && typedLabel!==editingLabel
-        ? (knownLocations||[]).find(l=>(typeof l==="string"?l:l.label)===typedLabel)
+      // The picked place is whatever the user has chosen — either a saved place
+      // (label only) or a Nominatim result (carrying coords + structured fields).
+      // form.location holds the canonical place name; form.locationLabel is the
+      // optional display override. The Nominatim metadata is captured into form
+      // fields the moment a remote pick happens, so handleSubmit can persist it.
+      const placePicked = !!form.location;
+      const addrLine = [form.locationStreet,form.locationTown,form.locationState,form.locationCountry].filter(Boolean).join(", ");
+      const knownForPicked = placePicked
+        ? (knownLocations||[]).find(l => (typeof l==="string"?l:l.label) === form.location)
         : null;
-      return React.createElement("div",{style:{display:"grid",gap:"10px"}},
+      const knownAddrLine = knownForPicked && typeof knownForPicked === "object"
+        ? [knownForPicked.street,knownForPicked.town,knownForPicked.state,knownForPicked.country].filter(Boolean).join(", ")
+        : "";
+      const showAddrLine = addrLine || knownAddrLine;
+      return React.createElement("div",{style:{display:"grid",gap:"12px"}},
         React.createElement("div",null,
           React.createElement("label",{style:S.label},"Location"),
-          React.createElement("div",{style:{padding:"10px 12px",background:"rgba(200,184,154,0.08)",border:"1px solid #e0d4be",borderRadius:"3px",display:"grid",gap:"6px"}},
-            React.createElement(FieldAutocomplete,{value:form.locationStreet||"",onChange:v=>updateForm({locationStreet:v}),suggestions:knownLocationValues(knownLocations,"street"),placeholder:"Street address (number and name)"}),
-            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}},
-              React.createElement(FieldAutocomplete,{value:form.locationTown||"",onChange:v=>updateForm({locationTown:v}),suggestions:knownLocationValues(knownLocations,"town"),placeholder:"Town / City"}),
-              React.createElement(FieldAutocomplete,{value:form.locationState||"",onChange:v=>updateForm({locationState:v}),suggestions:knownLocationValues(knownLocations,"state"),placeholder:"State / Region"})
-            ),
-            React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}},
-              React.createElement(FieldAutocomplete,{value:form.locationCountry||"",onChange:v=>updateForm({locationCountry:v}),suggestions:knownLocationValues(knownLocations,"country"),placeholder:"Country"}),
-              React.createElement("select",{value:form.locationPrivacy||"town",onChange:e=>updateForm({locationPrivacy:e.target.value}),style:{...S.input,fontSize:"0.82rem",color:"#8a7460"},title:"Location detail to show when publishing"},
-                React.createElement("option",{value:"full"},"Publish: Full address"),
-                React.createElement("option",{value:"town"},"Publish: Town + Country"),
-                React.createElement("option",{value:"state"},"Publish: State + Country"),
-                React.createElement("option",{value:"country"},"Publish: Country only"),
-                React.createElement("option",{value:"none"},"Publish: Don\u2019t show")
-              )
-            ),
-            React.createElement("div",{style:{borderTop:"1px dashed rgba(168,136,90,0.3)",paddingTop:"8px",marginTop:"2px"}},
-              React.createElement(LocationAutocomplete,{
-                value:form.locationLabel||"",
-                onChange:v=>updateForm({locationLabel:v}),
-                knownLocations,
-                placeholder: derivedLabel
-                  ? `Label \u2014 leave blank to use: ${derivedLabel}`
-                  : "Label \u2014 e.g. Bob\u2019s house, Grandma\u2019s kitchen, or leave blank to derive from above",
-                onSelect:loc=>updateForm({locationLabel:loc.label||"",locationStreet:loc.street||"",locationTown:loc.town||"",locationState:loc.state||"",locationCountry:loc.country||""})
-              }),
-              React.createElement("p",{style:{fontSize:"0.74rem",color:"#8a7460",fontStyle:"italic",margin:"4px 0 0"}},
-                "Optional friendly name. If blank, the address fields above will be combined into a label automatically."
-              ),
-              dupExisting&&React.createElement("p",{style:{fontSize:"0.74rem",color:"#c4858a",fontStyle:"italic",marginTop:"4px"}},"\u26a0 A location called \u201c"+typedLabel+"\u201d already exists. Saving will update its address details.")
-            )
+          React.createElement(PlacePicker,{
+            value: form.location,
+            displayValue: form.locationLabel || form.location,
+            knownLocations,
+            placeholder: "Search a place — town, address, country…",
+            onClear: () => updateForm({location:"",locationLabel:"",locationStreet:"",locationTown:"",locationState:"",locationCountry:"",_locationData:null}),
+            onPickKnown: loc => updateForm({
+              location: loc.label,
+              locationLabel: form.locationLabel || "",
+              locationStreet: loc.street||"",
+              locationTown: loc.town||"",
+              locationState: loc.state||"",
+              locationCountry: loc.country||"",
+              _locationData: null,
+            }),
+            onPickRemote: place => updateForm({
+              location: place.label,
+              locationLabel: "",
+              locationStreet: place.street||"",
+              locationTown: place.town||"",
+              locationState: place.state||"",
+              locationCountry: place.country||"",
+              _locationData: { coords: place.coords, placeId: place.placeId, osmId: place.osmId, osmType: place.osmType, formalAddress: place.formalAddress },
+            }),
+            onPickCustom: name => updateForm({
+              location: name,
+              locationLabel: "",
+              locationStreet:"", locationTown:"", locationState:"", locationCountry:"",
+              _locationData: null,
+            }),
+          }),
+          showAddrLine && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"4px 0 0"}}, showAddrLine)
+        ),
+
+        placePicked && React.createElement("div",null,
+          React.createElement("label",{style:{...S.label,fontSize:"0.82rem"}},"Display name"),
+          React.createElement("input",{
+            value: form.locationLabel || "",
+            onChange: e => updateForm({locationLabel: e.target.value}),
+            placeholder: "Optional — e.g. Grandma\u2019s house. Leave blank to use the place name.",
+            style: S.input
+          }),
+          React.createElement("p",{style:{fontSize:"0.74rem",color:"#8a7460",fontStyle:"italic",margin:"3px 0 0"}},
+            (form.locationLabel||"").trim()
+              ? `Will display as \u201c${form.locationLabel.trim()}\u201d. Address kept underneath for the map.`
+              : "If blank, the place name will display as-is."
           )
         ),
+
         React.createElement("div",null,
           React.createElement("label",{style:{...S.label,fontSize:"0.78rem",color:"#8a7460"}},"Additional locations"),
           React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 5px"}},"Road trips, multi-city visits, or memories spanning several places"),
@@ -7679,29 +7844,29 @@ function App() {
   // ── Memory ops ───────────────────────────────────────────────
   function updateForm(updates) { setForm(f=>({...f,...updates})); }
 
-  function handleSubmit() {
-    if (!form.title.trim()) return;
+  // Resolve form's location state into the saved memory's location label
+  // and a knownLocations list updated with any newly-picked structured data.
+  // - form.location holds the picked place (canonical name); form.locationLabel
+  //   is the optional display override; form._locationData is Nominatim metadata
+  //   captured the moment the user picked a remote place.
+  // - The display override wins for what shows in the memory; the structured
+  //   address + coords are always attached to the knownLocations record under
+  //   that displayed name, so the map and grouping work without a second lookup.
+  function resolveLocationFromForm(f) {
+    const fStreet = (f.locationStreet||"").trim();
+    const fTown   = (f.locationTown||"").trim();
+    const fState  = (f.locationState||"").trim();
+    const fCountry= (f.locationCountry||"").trim();
+    const displayName = (f.locationLabel||"").trim();
+    const pickedName  = (f.location||"").trim();
+    const derivedName = [fStreet, fTown, fState, fCountry].filter(Boolean).join(", ");
+    const locationLabel = displayName || pickedName || derivedName;
+    const locData = f._locationData || null;
 
-    // Address fields — read once and derive a fallback label if user left it blank
-    const fStreet = (form.locationStreet||"").trim();
-    const fTown   = (form.locationTown||"").trim();
-    const fState  = (form.locationState||"").trim();
-    const fCountry= (form.locationCountry||"").trim();
-    const typedLabel = (form.locationLabel || "").trim();
-    const locationLabel = typedLabel || [fStreet, fTown, fState, fCountry].filter(Boolean).join(", ");
-    const formWithLoc = {...form, location: locationLabel, locationLabel};
-
-    const primaryId = editingId || (Date.now().toString()+Math.random().toString(36).slice(2));
-    const primary = {...formWithLoc, id:primaryId, modifiedAt:new Date().toISOString()};
-
-    // Compute updated knownLocations with structured address data (no separate persistSubject call —
-    // commitMemory will include this in its single batch save to avoid stale-closure stomping)
     let updatedKnownLocs = knownLocations;
     if (locationLabel) {
       const existingIdx = knownLocations.findIndex(l => (typeof l==='string'?l:l.label) === locationLabel);
       if (existingIdx >= 0) {
-        // Only overwrite an address field when the form has a non-empty value — this preserves
-        // existing address data when the user just changes the label without touching the address fields
         updatedKnownLocs = knownLocations.map((l, i) => {
           if (i !== existingIdx) return l;
           const base = typeof l === 'string' ? {label:l, street:"", town:"", state:"", country:""} : l;
@@ -7712,18 +7877,41 @@ function App() {
             ...(fTown    ? {town:    fTown}    : {}),
             ...(fState   ? {state:   fState}   : {}),
             ...(fCountry ? {country: fCountry} : {}),
+            // Honour fresh picker data — but never clobber a manually-set coord.
+            ...(locData?.coords && !(base.coords?.manual) ? {coords: locData.coords} : {}),
+            ...(locData?.placeId ? {placeId: locData.placeId} : {}),
+            ...(locData?.osmId ? {osmId: locData.osmId, osmType: locData.osmType} : {}),
+            ...(locData?.formalAddress ? {formalAddress: locData.formalAddress} : {}),
           };
         });
       } else {
-        const locObj = {label: locationLabel, street: fStreet, town: fTown, state: fState, country: fCountry};
+        const locObj = {
+          label: locationLabel, street: fStreet, town: fTown, state: fState, country: fCountry,
+          ...(locData?.coords ? {coords: locData.coords} : {}),
+          ...(locData?.placeId ? {placeId: locData.placeId} : {}),
+          ...(locData?.osmId ? {osmId: locData.osmId, osmType: locData.osmType} : {}),
+          ...(locData?.formalAddress ? {formalAddress: locData.formalAddress} : {}),
+        };
         updatedKnownLocs = [...knownLocations, locObj].sort((a,b) => (typeof a==='string'?a:a.label).localeCompare(typeof b==='string'?b:b.label));
       }
     }
+    // Strip the transient picker payload from the saved memory.
+    const {_locationData, ...fClean} = f;
+    const formWithLoc = {...fClean, location: locationLabel, locationLabel};
+    return { locationLabel, formWithLoc, updatedKnownLocs };
+  }
+
+  function handleSubmit() {
+    if (!form.title.trim()) return;
+    const { formWithLoc, updatedKnownLocs } = resolveLocationFromForm(form);
+
+    const primaryId = editingId || (Date.now().toString()+Math.random().toString(36).slice(2));
+    const primary = {...formWithLoc, id:primaryId, modifiedAt:new Date().toISOString()};
 
     // If there's an end date, offer to create a second memory for it
     if ((form.endFuzzy || form.endOngoing) && !editingId) {
       const secondary = {
-        ...form,
+        ...formWithLoc,
         id: Date.now().toString()+Math.random().toString(36).slice(2),
         title: form.title,
         year:  form.endOngoing ? new Date().getFullYear() : (form.endYear || form.year),
@@ -7883,10 +8071,15 @@ function App() {
   }
 
   function handleEditCandidate(c) {
-    let editForm = {...c, locationLabel:c.location||"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:c.locationPrivacy||"town"};
+    let editForm = {...c, locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:c.locationPrivacy||"town", _locationData:null};
     if (c.location) {
       const known = findKnownLocation(knownLocations, c.location);
-      if (known && typeof known === 'object') { editForm.locationLabel=known.label||c.location; editForm.locationStreet=known.street||""; editForm.locationTown=known.town||""; editForm.locationState=known.state||""; editForm.locationCountry=known.country||""; }
+      if (known && typeof known === 'object') {
+        editForm.locationStreet=known.street||""; editForm.locationTown=known.town||""; editForm.locationState=known.state||""; editForm.locationCountry=known.country||"";
+        if (known.coords || known.placeId) {
+          editForm._locationData = { coords: known.coords||null, placeId: known.placeId||null, osmId: known.osmId||null, osmType: known.osmType||null, formalAddress: known.formalAddress||null };
+        }
+      }
     }
     setForm({...newForm(),...editForm});
     setEditingId(c.id); setEditingCandidateId(c.id);
@@ -7895,50 +8088,48 @@ function App() {
 
   function handleSaveCandidateSubmit() {
     if (!form.title.trim()) return;
-    const fStreet=(form.locationStreet||"").trim(), fTown=(form.locationTown||"").trim(), fState=(form.locationState||"").trim(), fCountry=(form.locationCountry||"").trim();
-    const typedLabel = (form.locationLabel||"").trim();
-    const locationLabel = typedLabel || [fStreet, fTown, fState, fCountry].filter(Boolean).join(", ");
-    const formWithLoc = {...form, location:locationLabel, locationLabel};
+    const { formWithLoc, updatedKnownLocs } = resolveLocationFromForm(form);
     const primaryId = editingCandidateId || (Date.now().toString()+Math.random().toString(36).slice(2));
     const primary = {...formWithLoc, id:primaryId};
-    let updatedKnownLocs = knownLocations;
-    if (locationLabel) {
-      const existingIdx=knownLocations.findIndex(l=>(typeof l==='string'?l:l.label)===locationLabel);
-      if (existingIdx>=0) {
-        updatedKnownLocs=knownLocations.map((l,i)=>{ if(i!==existingIdx) return l; const base=typeof l==='string'?{label:l,street:"",town:"",state:"",country:""}:l; return {...base,label:locationLabel,...(fStreet?{street:fStreet}:{}),...(fTown?{town:fTown}:{}),...(fState?{state:fState}:{}),...(fCountry?{country:fCountry}:{})}; });
-      } else {
-        updatedKnownLocs=[...knownLocations,{label:locationLabel,street:fStreet,town:fTown,state:fState,country:fCountry}].sort((a,b)=>(typeof a==='string'?a:a.label).localeCompare(typeof b==='string'?b:b.label));
-      }
-    }
     saveCandidate(primary, updatedKnownLocs);
   }
 
   function handleAcceptFromForm() {
     if (!form.title.trim() || !editingCandidateId) return;
-    const fStreet=(form.locationStreet||"").trim(), fTown=(form.locationTown||"").trim(), fState=(form.locationState||"").trim(), fCountry=(form.locationCountry||"").trim();
-    const typedLabel = (form.locationLabel||"").trim();
-    const locationLabel = typedLabel || [fStreet, fTown, fState, fCountry].filter(Boolean).join(", ");
-    const formWithLoc = {...form, location:locationLabel, locationLabel};
+    const { formWithLoc, updatedKnownLocs } = resolveLocationFromForm(form);
     const {researchNote:_rn, candidateConfidence:_cc, ...memData} = {...formWithLoc, id:editingCandidateId};
     const newPeople = [...new Set([...knownPeople,...(memData.people||[])])].sort();
     const newOrgs   = [...new Set([...knownOrgs,...(memData.orgs||[])])].sort();
     const updated = [...memories, memData].sort((a,b)=>sortKey(a)-sortKey(b));
-    persistSubject({memories:updated, candidates:candidates.filter(c=>c.id!==editingCandidateId), knownPeople:newPeople, knownOrgs:newOrgs});
+    persistSubject({memories:updated, candidates:candidates.filter(c=>c.id!==editingCandidateId), knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:updatedKnownLocs});
     setEditingCandidateId(null); setEditingId(null); setForm(newForm()); clearDraft();
     setSelected(editingCandidateId); setView("detail");
   }
 
 function handleEdit(m) {
-    // Look up structured address from knownLocations
-    let editForm = {...m, locationLabel: m.location || "", locationStreet: "", locationTown: "", locationState: "", locationCountry: "", locationPrivacy: m.locationPrivacy || "town", addedByName: m.addedBy?.name ?? ""};
+    // Pre-fill structured address fields from the matching knownLocation so the
+    // user can edit them and the picker chip renders the saved place. The
+    // Display name field starts empty — old memories stored locationLabel === location
+    // redundantly, but treating that as a real override would make the field
+    // look pre-filled when the user hasn't actually set one.
+    let editForm = {...m, locationLabel: "", locationStreet: "", locationTown: "", locationState: "", locationCountry: "", locationPrivacy: m.locationPrivacy || "town", addedByName: m.addedBy?.name ?? "", _locationData: null};
     if (m.location) {
       const known = findKnownLocation(knownLocations, m.location);
       if (known && typeof known === 'object') {
-        editForm.locationLabel = known.label || m.location;
         editForm.locationStreet = known.street || "";
         editForm.locationTown = known.town || "";
         editForm.locationState = known.state || "";
         editForm.locationCountry = known.country || "";
+        // Carry coords/place metadata so renaming via Display name preserves the geocode.
+        if (known.coords || known.placeId) {
+          editForm._locationData = {
+            coords: known.coords || null,
+            placeId: known.placeId || null,
+            osmId: known.osmId || null,
+            osmType: known.osmType || null,
+            formalAddress: known.formalAddress || null,
+          };
+        }
       }
     }
     setForm(editForm); setEditingId(m.id); setView("edit");
