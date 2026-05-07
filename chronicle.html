@@ -5796,8 +5796,17 @@ function SharedTimelineView({ memories, subjectName, dobYear, setSelected, setVi
 // Used by both "Start Chronicle" (promoteToSubject) and "Sync from Tree" button.
 function buildMemsFromTree(tp, tpById, treeF) {
   let idx = 0;
+  const subBirth = parseInt(tp.dob)||null;
+  const subDeath = parseInt(tp.dod)||null;
+  const lifetimeUpperBound = subDeath || new Date().getFullYear();
+  function inLifetime(yr) {
+    if(!yr) return false;
+    if(subBirth && yr < subBirth) return false;
+    if(yr > lifetimeUpperBound) return false;
+    return true;
+  }
   function mkMem(title, year, loc, people, extra={}) {
-    if (!year) return null;
+    if (!inLifetime(year)) return null;
     return { id:"tp_mem_"+tp.id+"_"+(idx++), title, year, month:1, day:1,
       fuzzy:"year", season:"Early",
       location:loc||"", locations:loc?[loc]:[],
@@ -5815,15 +5824,6 @@ function buildMemsFromTree(tp, tpById, treeF) {
     });
     if(h&&w){(spousesOf[h]=spousesOf[h]||[]).push(w);(spousesOf[w]=spousesOf[w]||[]).push(h);}
   });
-
-  const subBirth = parseInt(tp.dob)||null;
-  const subDeath = parseInt(tp.dod)||null;
-  function inLifetime(yr) {
-    if(!yr) return false;
-    if(subBirth && yr < subBirth) return false;
-    if(subDeath && yr > subDeath) return false;
-    return true;
-  }
 
   // Personal events
   const personalMems = [];
