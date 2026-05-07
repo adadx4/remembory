@@ -2167,6 +2167,45 @@ export default {
       }
     }
 
+    // GET /admin/diagnose-deliveries?email=...  (TEMPORARY — remove after diagnosis)
+    // Reports what's in KV for a given recipient email so we can pin down where
+    // a missing share went (or didn't go).
+    if (request.method === "GET" && path === "/admin/diagnose-deliveries") {
+      const secret = request.headers.get("X-Admin-Secret") || "";
+      if (!secret || secret !== (env.ADMIN_SECRET || "")) return json({ error: "Forbidden" }, 403);
+      const email = (url.searchParams.get("email") || "").trim().toLowerCase();
+      if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
+      const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
+      const [deliveriesRaw, declinedRaw] = await Promise.all([
+        env.SHARES.get("deliveries:" + emailHash),
+        env.SHARES.get("inbox:declined:" + emailHash),
+      ]);
+      const stubs = deliveriesRaw ? JSON.parse(deliveriesRaw) : [];
+      const declined = declinedRaw ? JSON.parse(declinedRaw) : [];
+      const payloadStatus = await Promise.all(stubs.map(async (s) => {
+        const raw = await env.SHARES.get(s.shareId);
+        let memCount = null;
+        if (raw) { try { const p = JSON.parse(raw); memCount = (p.memories||[]).length; } catch(e){} }
+        return {
+          shareId: s.shareId,
+          fromName: s.fromName,
+          fromEmail: s.fromEmail,
+          sentAt: s.sentAt,
+          payloadExists: !!raw,
+          payloadBytes: raw ? raw.length : 0,
+          memCount,
+        };
+      }));
+      return json({
+        email,
+        emailHashPrefix: emailHash.slice(0, 12) + "…",
+        deliveriesRecordExists: !!deliveriesRaw,
+        stubCount: stubs.length,
+        declinedCount: declined.length,
+        stubs: payloadStatus,
+      });
+    }
+
     // GET /mailing/list
     if (request.method === "GET" && path === "/mailing/list") {
       const secret = request.headers.get("X-Admin-Secret") || "";
