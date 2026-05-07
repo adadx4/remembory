@@ -329,6 +329,176 @@ function eventSources(m) {
   return [];
 }
 
+// ─── Backup / sync helpers (v3 multi-subject format) ───────────────────────────
+// The sync file and full backups are v3 — each holds a `subjects` array with
+// every subject in the user's data, plus the cross-subject "top-level" fields.
+// v1/v2 backups (single subject's data flat at top level) continue to import
+// via readBackupSubjects, which wraps them as a synthetic single subject.
+
+// Restore embedded data:URL media in a subject back into IndexedDB and
+// rewrite mediaUrls to point at the new IDB ids. Idempotent — skips entries
+// that are already IDB references.
+async function restoreSubjectMedia(subject) {
+  async function restoreMems(mems) {
+    return Promise.all((mems||[]).map(async m => {
+      const mediaUrls = await Promise.all((m.mediaUrls||[]).map(async med => {
+        if (med && med.url && med.url.startsWith("data:")) {
+          const id = med.mediaId || ("media_" + Date.now() + "_" + Math.random().toString(36).slice(2));
+          const res = await fetch(med.url);
+          const blob = await res.blob();
+          await idbPut(id, blob);
+          return { mediaId: id, name: med.name || "photo" };
+        }
+        return med;
+      }));
+      return { ...m, mediaUrls };
+    }));
+  }
+  const memories = await restoreMems(subject.memories);
+  const candidates = await restoreMems(subject.candidates);
+  const entityPhotos = {};
+  await Promise.all(Object.entries(subject.entityPhotos||{}).map(async ([key, med]) => {
+    if (med && med.url && med.url.startsWith("data:")) {
+      const id = med.mediaId || ("media_" + Date.now() + "_" + Math.random().toString(36).slice(2));
+      const res = await fetch(med.url);
+      const blob = await res.blob();
+      await idbPut(id, blob);
+      entityPhotos[key] = { mediaId: id, name: med.name || "photo" };
+    } else if (med) {
+      entityPhotos[key] = med;
+    }
+  }));
+  return { ...subject, memories, candidates, entityPhotos };
+}
+
+// Normalize any backup payload (v1/v2/v3) into a list of subjects.
+// v1/v2 (no `subjects` array) is wrapped as a single synthetic subject so the
+// rest of the merge logic doesn't need to special-case it.
+function readBackupSubjects(remote) {
+  if (!remote) return [];
+  if (Array.isArray(remote.subjects)) return remote.subjects;
+  if (remote.memories) {
+    return [{
+      id: "subj_imported_" + Date.now(),
+      name: remote.subjectName || "Imported subject",
+      dob: remote.subjectDob || "",
+      notes: remote.subjectNotes || "",
+      isSelf: true, mode: null,
+      memories: remote.memories || [],
+      candidates: remote.candidates || [],
+      candidatePersons: remote.candidatePersons || [],
+      treePersons: remote.treePersons || [],
+      treeFamilies: remote.treeFamilies || [],
+      gedFocalPersonId: remote.gedFocalPersonId || null,
+      knownPeople: remote.knownPeople || [],
+      knownOrgs: remote.knownOrgs || [],
+      knownLocations: remote.knownLocations || [],
+      knownSources: remote.knownSources || [],
+      customTags: remote.customTags || [],
+      peopleEmails: remote.peopleEmails || {},
+      peopleRelationships: remote.peopleRelationships || {},
+      peopleNotes: remote.peopleNotes || {},
+      orgNotes: remote.orgNotes || {},
+      orgLocations: remote.orgLocations || {},
+      orgPeriods: remote.orgPeriods || {},
+      entityPhotos: remote.entityPhotos || {},
+      locationNotes: remote.locationNotes || {},
+      locationCoords: remote.locationCoords || {},
+      personOrgs: remote.personOrgs || {},
+      personLocations: remote.personLocations || {},
+      personGroups: remote.personGroups || {},
+      shareHistory: remote.shareHistory || [],
+      senderNameMaps: remote.senderNameMaps || {},
+      legacyMessage: remote.legacyMessage || "",
+      contributionLinks: remote.contributionLinks || [],
+    }];
+  }
+  return [];
+}
+
+// Match a remote subject to a local one — by id first, then case-insensitive
+// name (so legacy v2 imports get attached to the right local subject).
+function findMatchingLocalSubject(remote, localSubjects) {
+  if (!remote) return null;
+  let m = (localSubjects||[]).find(s => s.id === remote.id);
+  if (m) return m;
+  const rn = (remote.name||"").trim().toLowerCase();
+  if (!rn) return null;
+  return (localSubjects||[]).find(s => (s.name||"").trim().toLowerCase() === rn) || null;
+}
+
+// Merge two subjects' fields. Local wins on dictionary conflicts (so the
+// device the user is editing on takes precedence on key:value entries);
+// arrays are unioned by id where possible, otherwise sorted set-union.
+function mergeSubjects(local, remote) {
+  if (!local) return remote;
+  if (!remote) return local;
+  const sortKeyLocal = (m) => {
+    const mv = m.fuzzy === "month" || m.fuzzy === "day" ? (m.month||1)
+             : m.fuzzy === "season" ? (m.season === "Early" ? 2 : m.season === "Mid" ? 6 : 10) : 1;
+    return (m.year||0)*10000 + mv*100 + (m.fuzzy==="day" ? (m.day||1) : 1);
+  };
+  // Memories: union by id, merge perspectives by author
+  const remoteMemsById = new Map((remote.memories||[]).map(m => [m.id, m]));
+  const localIds = new Set((local.memories||[]).map(m => m.id));
+  const mergedMems = (local.memories||[]).map(m => {
+    const rem = remoteMemsById.get(m.id);
+    if (!rem) return m;
+    const existing = m.perspectives || [];
+    const newP = (rem.perspectives||[]).filter(p => !existing.some(e => e.author === p.author));
+    return newP.length ? { ...m, perspectives: [...existing, ...newP] } : m;
+  });
+  const newMems = (remote.memories||[]).filter(m => !localIds.has(m.id));
+  const memories = [...mergedMems, ...newMems].sort((a,b) => sortKeyLocal(a) - sortKeyLocal(b));
+  // ID-keyed unions (local entries kept; remote-only added)
+  const unionById = (a, b) => {
+    const seen = new Set((a||[]).map(x => x.id));
+    return [...(a||[]), ...(b||[]).filter(x => x && x.id && !seen.has(x.id))];
+  };
+  // String set-unions, sorted
+  const unionSorted = (a, b) => [...new Set([...(a||[]), ...(b||[])])].sort();
+  // knownLocations: union by label (handle both string and object form)
+  const labelOf = (l) => typeof l === 'string' ? l : (l && l.label) || "";
+  const localLocs = local.knownLocations || [];
+  const localLocLabels = new Set(localLocs.map(labelOf));
+  const newLocs = (remote.knownLocations||[]).filter(l => !localLocLabels.has(labelOf(l)));
+  const knownLocations = [...localLocs, ...newLocs].sort((a,b) => labelOf(a).localeCompare(labelOf(b)));
+  // shareHistory: union by (timestamp + memId list) signature
+  const shareSig = (h) => (h.timestamp||"") + "|" + (h.memIds||[]).join(",");
+  const localShareKeys = new Set((local.shareHistory||[]).map(shareSig));
+  const newShares = (remote.shareHistory||[]).filter(h => !localShareKeys.has(shareSig(h)));
+  return {
+    ...remote, ...local, // local wins for top-level fields like name/dob/mode/notes
+    memories,
+    candidates:        unionById(local.candidates, remote.candidates),
+    candidatePersons:  unionById(local.candidatePersons, remote.candidatePersons),
+    knownPeople:       unionSorted(local.knownPeople, remote.knownPeople),
+    knownOrgs:         unionSorted(local.knownOrgs, remote.knownOrgs),
+    customTags:        unionSorted(local.customTags, remote.customTags),
+    knownLocations,
+    knownSources:      unionById(local.knownSources, remote.knownSources),
+    treePersons:       unionById(local.treePersons, remote.treePersons),
+    treeFamilies:      unionById(local.treeFamilies, remote.treeFamilies),
+    gedFocalPersonId:  local.gedFocalPersonId || remote.gedFocalPersonId || null,
+    peopleEmails:        { ...(remote.peopleEmails||{}),         ...(local.peopleEmails||{}) },
+    peopleRelationships: { ...(remote.peopleRelationships||{}),  ...(local.peopleRelationships||{}) },
+    peopleNotes:         { ...(remote.peopleNotes||{}),          ...(local.peopleNotes||{}) },
+    orgNotes:            { ...(remote.orgNotes||{}),             ...(local.orgNotes||{}) },
+    orgLocations:        { ...(remote.orgLocations||{}),         ...(local.orgLocations||{}) },
+    orgPeriods:          { ...(remote.orgPeriods||{}),           ...(local.orgPeriods||{}) },
+    entityPhotos:        { ...(remote.entityPhotos||{}),         ...(local.entityPhotos||{}) },
+    locationNotes:       { ...(remote.locationNotes||{}),        ...(local.locationNotes||{}) },
+    locationCoords:      { ...(remote.locationCoords||{}),       ...(local.locationCoords||{}) },
+    personOrgs:          { ...(remote.personOrgs||{}),           ...(local.personOrgs||{}) },
+    personLocations:     { ...(remote.personLocations||{}),      ...(local.personLocations||{}) },
+    personGroups:        { ...(remote.personGroups||{}),         ...(local.personGroups||{}) },
+    senderNameMaps:      { ...(remote.senderNameMaps||{}),       ...(local.senderNameMaps||{}) },
+    shareHistory:      [...(local.shareHistory||[]), ...newShares],
+    legacyMessage:     local.legacyMessage || remote.legacyMessage || "",
+    contributionLinks: unionById(local.contributionLinks, remote.contributionLinks),
+  };
+}
+
 // Build a deep link to the Genealogy research tool with as much of the event
 // context prefilled as possible. m is optional — if absent, the tool opens bare.
 function genealogyResearchUrl(m, knownLocations) {
@@ -4515,7 +4685,7 @@ function SettingsView({
       React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 12px"}},"Cloud Sync"),
         hasTier("premium")
-          ? React.createElement(CloudSyncPanel,{buildBackupJson,importBackup,licenceKey,onSyncComplete:()=>{persistSubject({lastCloudSync:new Date().toISOString(),lastBackup:new Date().toISOString(),memCountAtSync:memoriesRef.current.length,memCountAtBackup:memoriesRef.current.length});}})
+          ? React.createElement(CloudSyncPanel,{buildBackupJson,importBackup,licenceKey,onSyncComplete:()=>{persistSubject({lastCloudSync:new Date().toISOString(),lastBackup:new Date().toISOString(),memCountAtSync:(memories||[]).length,memCountAtBackup:(memories||[]).length});}})
           : React.createElement("p",{style:{fontSize:"0.88rem",color:"#8a7460",fontStyle:"italic",margin:0}},"Cloud Sync is available on the Share Premium plan and above."),
         hasTier("premium")&&!isMobile&&React.createElement("div",{style:{marginTop:"16px",paddingTop:"16px",borderTop:"1px solid #ede4d4"}},
           React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",margin:"0 0 8px",fontStyle:"italic"}},"Or sync via a local cloud storage folder (desktop only):"),
@@ -7952,69 +8122,110 @@ function handleEdit(m) {
       let remote;
       try { remote = JSON.parse(text); } catch(e) { remote = null; }
 
-      // 2. Get local data as JSON
+      // 2. Build a local v3 snapshot we can compare and write
       const localJson = await buildBackupJson();
       const local = JSON.parse(localJson);
 
-      // 3. Merge: if remote has content, merge it into local
-      let mergedJson = localJson;
-      if (remote && remote.memories) {
-        // Use importBackup logic: merge by memory ID
-        const remoteIds = new Set((remote.memories||[]).map(m => m.id));
-        const localIds = new Set((local.memories||[]).map(m => m.id));
-        const toAdd = (remote.memories||[]).filter(m => !localIds.has(m.id));
-        const merged = local.memories.map(m => {
-          const rem = (remote.memories||[]).find(r => r.id === m.id);
-          if (!rem) return m;
-          // Merge perspectives
-          const existing = m.perspectives || [];
-          const newP = (rem.perspectives||[]).filter(p => !existing.some(e => e.author === p.author));
-          return newP.length ? {...m, perspectives: [...existing, ...newP]} : m;
+      // 3. Per-subject merge with the remote, normalising v1/v2 (single-subject)
+      //    files via readBackupSubjects. Embedded media in remote subjects gets
+      //    restored back into IDB so the merged subject's mediaUrls are valid.
+      let mergedSubjects = local.subjects || [];
+      let mergedTopLevel = {};
+      if (remote) {
+        const remoteSubjects = readBackupSubjects(remote);
+        const restoredRemotes = [];
+        for (const r of remoteSubjects) {
+          // Skip the active subject in-place restore: the local copy already has those
+          // memories with proper IDB references. Restoring would just duplicate ids.
+          // For all other subjects (or when local doesn't have them), restore media.
+          restoredRemotes.push(await restoreSubjectMedia(r));
+        }
+        const usedRemoteIds = new Set();
+        mergedSubjects = (local.subjects || []).map(localS => {
+          let rem = restoredRemotes.find(r => r.id === localS.id);
+          if (!rem) {
+            // Legacy v1/v2 imports won't share ids — fall back to name match
+            const ln = (localS.name||"").trim().toLowerCase();
+            if (ln) rem = restoredRemotes.find(r => (r.name||"").trim().toLowerCase() === ln && !usedRemoteIds.has(r.id));
+          }
+          if (rem) usedRemoteIds.add(rem.id);
+          return rem ? mergeSubjects(localS, rem) : localS;
         });
-        const finalMems = [...merged, ...toAdd].sort((a,b) => sortKey(a)-sortKey(b));
-        // Merge people/orgs/locations/tags
-        const mergedPeople = [...new Set([...(local.knownPeople||[]),...(remote.knownPeople||[])])].sort();
-        const mergedOrgs = [...new Set([...(local.knownOrgs||[]),...(remote.knownOrgs||[])])].sort();
-        const mergedLocs = [...new Set([...(local.knownLocations||[]),...(remote.knownLocations||[])])].sort();
-        const mergedTags = [...new Set([...(local.customTags||[]),...(remote.customTags||[])])];
-        const mergedRelationships = {...(remote.peopleRelationships||{}), ...(local.peopleRelationships||{})};
-        const mergedPeopleNotes = {...(remote.peopleNotes||{}), ...(local.peopleNotes||{})};
-        const mergedOrgNotes = {...(remote.orgNotes||{}), ...(local.orgNotes||{})};
-        const mergedOrgLocations = {...(remote.orgLocations||{}), ...(local.orgLocations||{})};
-        const mergedOrgPeriods = {...(remote.orgPeriods||{}), ...(local.orgPeriods||{})};
-        const mergedEntityPhotos = {...(remote.entityPhotos||{}), ...(local.entityPhotos||{})};
-        const mergedLocNotes = {...(remote.locationNotes||{}), ...(local.locationNotes||{})};
-        const mergedLocCoords = {...(remote.locationCoords||{}), ...(local.locationCoords||{})};
-        const mergedPersonOrgs = {...(remote.personOrgs||{}), ...(local.personOrgs||{})};
-        const mergedPersonLocs = {...(remote.personLocations||{}), ...(local.personLocations||{})};
-        const mergedPersonGroups = {...(remote.personGroups||{}), ...(local.personGroups||{})};
-        // Apply merged data to local state
-        const subjectPatch = {
-          memories: finalMems, knownPeople: mergedPeople, knownOrgs: mergedOrgs,
-          knownLocations: mergedLocs, customTags: mergedTags,
-          peopleRelationships: mergedRelationships, peopleNotes: mergedPeopleNotes,
-          orgNotes: mergedOrgNotes, orgLocations: mergedOrgLocations, orgPeriods: mergedOrgPeriods,
-          entityPhotos: mergedEntityPhotos, locationNotes: mergedLocNotes,
-          locationCoords: mergedLocCoords, personOrgs: mergedPersonOrgs,
-          personLocations: mergedPersonLocs, personGroups: mergedPersonGroups,
+        // Subjects that exist only in remote — accept them as new local subjects
+        const newRemotes = restoredRemotes.filter(r => !usedRemoteIds.has(r.id));
+        mergedSubjects = [...mergedSubjects, ...newRemotes];
+        // Cross-subject top-level fields: local wins on conflict (this device is what
+        // the user is editing), but accept remote-only values.
+        mergedTopLevel = {
+          wantPublicProfile: (typeof remote.wantPublicProfile === "boolean") ? remote.wantPublicProfile : (local.wantPublicProfile || false),
+          profileAbout:      remote.profileAbout      || local.profileAbout      || "",
+          profileImageUrl:   remote.profileImageUrl   || local.profileImageUrl   || "",
+          allowFollowers:    (typeof remote.allowFollowers === "boolean") ? remote.allowFollowers : (local.allowFollowers !== false),
+          profilePrivacy:    remote.profilePrivacy    || local.profilePrivacy    || "open",
+          profileDisplayName:remote.profileDisplayName|| local.profileDisplayName|| "",
         };
-        setData(prev => {
-          const seeded = seedSubject({...prev.subjects.find(s=>s.id===activeSubjectId), ...subjectPatch});
-          const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
-          const newData = {...prev, subjects: newSubjects};
-          if (activePassword) saveEncrypted(activePassword, newData);
-          else saveData(newData);
-          return newData;
-        });
-        // Rebuild merged JSON with the new merged data
-        mergedJson = JSON.stringify({
-          ...local, memories: finalMems, knownPeople: mergedPeople, knownOrgs: mergedOrgs,
-          knownLocations: mergedLocs, customTags: mergedTags,
-          exported: new Date().toISOString()
-        }, null, 2);
       }
 
-      // 4. Write merged result back to sync file (ensure write permission)
+      // 4. Apply merged data to local state and persist
+      setData(prev => {
+        const newData = {
+          ...prev,
+          subjects: mergedSubjects,
+          ...mergedTopLevel,
+        };
+        if (activePassword) saveEncrypted(activePassword, newData);
+        else saveData(newData);
+        return newData;
+      });
+
+      // 5. Build the v3 file content from the merged result and write back.
+      //    All mediaIds (both originally-local and just-restored-from-remote) are
+      //    valid IDB references at this point, so we can embed them as data: URLs.
+      const allMedia = await idbGetAll();
+      const dataUrl = (blob) => new Promise(res => { const r = new FileReader(); r.onload = ev => res(ev.target.result); r.readAsDataURL(blob); });
+      async function embedMemsFile(mems) {
+        return Promise.all((mems||[]).map(async m => ({
+          ...m,
+          mediaUrls: await Promise.all((m.mediaUrls||[]).map(async med => {
+            if (med && med.mediaId && allMedia[med.mediaId]) {
+              return { mediaId: med.mediaId, name: med.name, url: await dataUrl(allMedia[med.mediaId]) };
+            }
+            return med;
+          })),
+        })));
+      }
+      async function embedEntityPhotosFile(ep) {
+        const out = {};
+        await Promise.all(Object.entries(ep||{}).map(async ([key, med]) => {
+          if (med && med.mediaId && allMedia[med.mediaId]) {
+            out[key] = { mediaId: med.mediaId, name: med.name, url: await dataUrl(allMedia[med.mediaId]) };
+          } else if (med) out[key] = med;
+        }));
+        return out;
+      }
+      const subjectsForFile = await Promise.all(mergedSubjects.map(async s => ({
+        ...s,
+        memories:    await embedMemsFile(s.memories || []),
+        candidates:  await embedMemsFile(s.candidates || []),
+        entityPhotos: await embedEntityPhotosFile(s.entityPhotos || {}),
+      })));
+      const mergedJson = JSON.stringify({
+        version: 3,
+        exported: new Date().toISOString(),
+        activeSubjectId: local.activeSubjectId || null,
+        subjects: subjectsForFile,
+        wantPublicProfile: mergedTopLevel.wantPublicProfile ?? local.wantPublicProfile,
+        profileAbout:      mergedTopLevel.profileAbout      || local.profileAbout      || "",
+        profileImageUrl:   mergedTopLevel.profileImageUrl   || local.profileImageUrl   || "",
+        allowFollowers:    typeof mergedTopLevel.allowFollowers === "boolean" ? mergedTopLevel.allowFollowers : (local.allowFollowers !== false),
+        profilePrivacy:    mergedTopLevel.profilePrivacy    || local.profilePrivacy    || "open",
+        profileDisplayName:mergedTopLevel.profileDisplayName|| local.profileDisplayName|| "",
+        carerMode: local.carerMode || false,
+        carerName: local.carerName || "",
+        carerEmail: local.carerEmail || "",
+        suppressConnectRequests: local.suppressConnectRequests || [],
+        _connections: local._connections || [],
+      }, null, 2);
       if ((await h.queryPermission({mode:"readwrite"})) !== "granted") {
         await h.requestPermission({mode:"readwrite"});
       }
@@ -8056,33 +8267,65 @@ function handleEdit(m) {
   }
 
   async function buildBackupJson() {
-    // Re-embed media blobs as base64 so the backup is self-contained
-    // Use ref to get latest memories (avoids stale closure in async contexts)
-    const currentMems = memoriesRef.current;
+    // v3: every subject in the user's data is included so multi-subject sync /
+    // backup is round-trippable. Media blobs are embedded as base64 data: URLs
+    // and re-stored into IDB on import. Use the live data ref via setData to
+    // avoid stale closure if a save happened mid-build.
     const allMedia = await idbGetAll();
-    const memoriesWithMedia = await Promise.all(currentMems.map(async m => {
-      const urls = await Promise.all((m.mediaUrls||[]).map(async med => {
-        if (med.mediaId && allMedia[med.mediaId]) {
-          const blob = allMedia[med.mediaId];
-          const dataUrl = await new Promise(res=>{ const r=new FileReader(); r.onload=ev=>res(ev.target.result); r.readAsDataURL(blob); });
-          return { mediaId: med.mediaId, name: med.name, url: dataUrl };
-        }
-        return med;
+    async function embedMems(mems) {
+      return Promise.all((mems||[]).map(async m => {
+        const urls = await Promise.all((m.mediaUrls||[]).map(async med => {
+          if (med && med.mediaId && allMedia[med.mediaId]) {
+            const blob = allMedia[med.mediaId];
+            const dataUrl = await new Promise(res => { const r = new FileReader(); r.onload = ev => res(ev.target.result); r.readAsDataURL(blob); });
+            return { mediaId: med.mediaId, name: med.name, url: dataUrl };
+          }
+          return med;
+        }));
+        return { ...m, mediaUrls: urls };
       }));
-      return {...m, mediaUrls: urls};
+    }
+    async function embedEntityPhotos(ep) {
+      const out = {};
+      await Promise.all(Object.entries(ep||{}).map(async ([key, med]) => {
+        if (med && med.mediaId && allMedia[med.mediaId]) {
+          const blob = allMedia[med.mediaId];
+          const dataUrl = await new Promise(res => { const r = new FileReader(); r.onload = ev => res(ev.target.result); r.readAsDataURL(blob); });
+          out[key] = { mediaId: med.mediaId, name: med.name, url: dataUrl };
+        } else if (med) out[key] = med;
+      }));
+      return out;
+    }
+    // Use the active subject's IN-MEMORY mems (memoriesRef captures the latest in async ctx)
+    // and pull every other subject straight from data.subjects.
+    const allSubjects = data.subjects || [];
+    const subjectsWithMedia = await Promise.all(allSubjects.map(async (s) => {
+      const mems = (s.id === activeSubjectId) ? memoriesRef.current : (s.memories || []);
+      return {
+        ...s,
+        memories:    await embedMems(mems),
+        candidates:  await embedMems(s.candidates || []),
+        entityPhotos: await embedEntityPhotos(s.entityPhotos || {}),
+      };
     }));
-    const entityPhotosWithMedia = {};
-    await Promise.all(Object.entries(entityPhotos).map(async ([key, med]) => {
-      if (med?.mediaId && allMedia[med.mediaId]) {
-        const blob = allMedia[med.mediaId];
-        const dataUrl = await new Promise(res=>{ const r=new FileReader(); r.onload=ev=>res(ev.target.result); r.readAsDataURL(blob); });
-        entityPhotosWithMedia[key] = { mediaId: med.mediaId, name: med.name, url: dataUrl };
-      } else if (med) {
-        entityPhotosWithMedia[key] = med;
-      }
-    }));
-    return JSON.stringify({version:2, exported:new Date().toISOString(), subjectName:subject.name, subjectDob:subject.dob||"", subjectNotes:subject.notes||"", memories:memoriesWithMedia, candidates, treePersons, treeFamilies, gedFocalPersonId:subject.gedFocalPersonId||null, knownPeople, knownOrgs, knownLocations, knownSources, customTags, peopleEmails, peopleRelationships, peopleNotes, orgNotes, orgLocations, orgPeriods, entityPhotos:entityPhotosWithMedia, locationNotes, locationCoords, personOrgs, personLocations, personGroups, shareHistory, senderNameMaps, legacyMessage, contributionLinks, // Top-level profile & settings fields
-    wantPublicProfile:data.wantPublicProfile||false, profileAbout:data.profileAbout||"", profileImageUrl:data.profileImageUrl||"", allowFollowers:data.allowFollowers!==false, profilePrivacy:data.profilePrivacy||"open", profileDisplayName:data.profileDisplayName||"", carerMode:data.carerMode||false, carerName:data.carerName||"", carerEmail:data.carerEmail||"", suppressConnectRequests:data.suppressConnectRequests||[], _connections:(()=>{try{return JSON.parse(localStorage.getItem("chronicle-connections")||"[]");}catch(e){return[];}})()}, null, 2);
+    return JSON.stringify({
+      version: 3,
+      exported: new Date().toISOString(),
+      activeSubjectId: data.activeSubjectId || null,
+      subjects: subjectsWithMedia,
+      // Cross-subject (top-level) fields
+      wantPublicProfile: data.wantPublicProfile || false,
+      profileAbout: data.profileAbout || "",
+      profileImageUrl: data.profileImageUrl || "",
+      allowFollowers: data.allowFollowers !== false,
+      profilePrivacy: data.profilePrivacy || "open",
+      profileDisplayName: data.profileDisplayName || "",
+      carerMode: data.carerMode || false,
+      carerName: data.carerName || "",
+      carerEmail: data.carerEmail || "",
+      suppressConnectRequests: data.suppressConnectRequests || [],
+      _connections: (() => { try { return JSON.parse(localStorage.getItem("chronicle-connections")||"[]"); } catch(e) { return []; } })(),
+    }, null, 2);
   }
 
   async function buildBackupBlob(backupPassword) {
@@ -8819,6 +9062,54 @@ function handleEdit(m) {
         const plain = await decryptData(pw, raw);
         if (!plain) { alert("Incorrect password — backup could not be decrypted."); return; }
         d = JSON.parse(plain);
+      }
+      // v3 multi-subject backup — merge per-subject (matches the sync flow)
+      if (Array.isArray(d.subjects)) {
+        const remoteSubjects = readBackupSubjects(d);
+        const restored = [];
+        for (const s of remoteSubjects) restored.push(await restoreSubjectMedia(s));
+        let addedSubjects = 0, mergedSubjectsCount = 0, addedMems = 0;
+        setData(prev => {
+          const localSubjects = prev.subjects || [];
+          const used = new Set();
+          const mergedList = localSubjects.map(localS => {
+            let rem = restored.find(rr => rr.id === localS.id && !used.has(rr.id));
+            if (!rem) {
+              const ln = (localS.name||"").trim().toLowerCase();
+              if (ln) rem = restored.find(rr => (rr.name||"").trim().toLowerCase() === ln && !used.has(rr.id));
+            }
+            if (rem) {
+              used.add(rem.id);
+              mergedSubjectsCount++;
+              const localMemIds = new Set((localS.memories||[]).map(m=>m.id));
+              addedMems += (rem.memories||[]).filter(m => !localMemIds.has(m.id)).length;
+              return mergeSubjects(localS, rem);
+            }
+            return localS;
+          });
+          const newRemotes = restored.filter(rr => !used.has(rr.id));
+          addedSubjects = newRemotes.length;
+          newRemotes.forEach(rr => { addedMems += (rr.memories||[]).length; });
+          const merged = [...mergedList, ...newRemotes];
+          // Top-level fields: take local; only fill in remote-only values for things local doesn't set
+          const topLevel = {
+            wantPublicProfile: prev.wantPublicProfile ?? d.wantPublicProfile ?? false,
+            profileAbout:      prev.profileAbout      || d.profileAbout      || "",
+            profileImageUrl:   prev.profileImageUrl   || d.profileImageUrl   || "",
+            profilePrivacy:    prev.profilePrivacy    || d.profilePrivacy    || "open",
+            profileDisplayName:prev.profileDisplayName|| d.profileDisplayName|| "",
+            allowFollowers:    prev.allowFollowers !== false ? true : (d.allowFollowers !== false),
+          };
+          const newData = { ...prev, subjects: merged, ...topLevel };
+          if (activePassword) saveEncrypted(activePassword, newData); else saveData(newData);
+          return newData;
+        });
+        const parts = [];
+        if (mergedSubjectsCount > 0) parts.push(mergedSubjectsCount + " subject" + (mergedSubjectsCount===1?"":"s") + " merged");
+        if (addedSubjects > 0) parts.push(addedSubjects + " new subject" + (addedSubjects===1?"":"s") + " added");
+        if (addedMems > 0) parts.push(addedMems + " new event" + (addedMems===1?"":"s"));
+        alert("Backup imported" + (parts.length ? " \u2014 " + parts.join(", ") : "") + ".");
+        return;
       }
       if(!d.memories) { alert("Invalid backup file."); return; }
       // Restore any embedded media back into IDB
