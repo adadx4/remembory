@@ -1966,7 +1966,7 @@ export default {
 
     // ── Email verification ────────────────────────────────────────────────
 
-    // POST /email/verify/send — send a 6-digit code to an email address
+    // POST /email/verify/send — send an 8-character verification code to an email address
     if (request.method === "POST" && path === "/email/verify/send") {
       if (!await checkRateLimit(env, clientIp, "email_verify", 3, 300)) return json({ error: "Too many attempts. Try again in a few minutes." }, 429);
       try {
@@ -1974,7 +1974,14 @@ export default {
         const email = (body.email || "").trim().toLowerCase();
         if (!email || !email.includes("@")) return json({ error: "Invalid email" }, 400);
         if (!env.RESEND_API_KEY) return json({ error: "Email not configured" }, 500);
-        const code = String(Math.floor(100000 + Math.random() * 900000));
+        // 8-char alphanumeric code from a 32-char unambiguous alphabet (no 0/O/1/I/L).
+        // ~10^12 possibilities — robust against brute-forcing within the 10-minute TTL,
+        // even if the per-IP rate limit is bypassed via a botnet.
+        const ALPHA = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+        const buf = new Uint8Array(8);
+        crypto.getRandomValues(buf);
+        let code = "";
+        for (let i = 0; i < 8; i++) code += ALPHA[buf[i] % ALPHA.length];
         const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
         await env.SHARES.put("verify:" + emailHash, JSON.stringify({ code, createdAt: new Date().toISOString() }), { expirationTtl: 600 });
         await fetch("https://api.resend.com/emails", {
@@ -1999,13 +2006,20 @@ export default {
       try {
         const body = await request.json();
         const email = (body.email || "").trim().toLowerCase();
-        const code = (body.code || "").trim();
+        const code = (body.code || "").trim().toUpperCase();
         if (!email || !code) return json({ error: "Missing email or code" }, 400);
+        // Per-email rate limit on confirm too — defends against attackers spreading
+        // attempts across many IPs against a single targeted address.
+        if (!await checkRateLimit(env, "email:" + email, "email_confirm_email", 10, 600)) {
+          return json({ error: "Too many attempts for this address" }, 429);
+        }
         const emailHash = await hmacHex(env.EMAIL_HASH_SECRET, email);
         const raw = await env.SHARES.get("verify:" + emailHash);
         if (!raw) return json({ error: "Code expired or not found. Request a new one." }, 404);
         const stored = JSON.parse(raw);
-        if (stored.code !== code) return json({ error: "Incorrect code" }, 403);
+        // Case-insensitive comparison (we generate uppercase only, but tolerate the
+        // user typing lowercase or mixed; the input is uppercased above).
+        if (String(stored.code).toUpperCase() !== code) return json({ error: "Incorrect code" }, 403);
         // Generate a long-lived verification token
         const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
         await Promise.all([

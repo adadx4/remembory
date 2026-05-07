@@ -3482,9 +3482,18 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
                 const bg = sel?"rgba(122,158,138,0.15)":rt==="connected_email"||rt==="connected_no_email"?"rgba(168,136,90,0.08)":"rgba(255,252,245,0.8)";
                 const color = sel?"#4a7a5a":rt==="connected_email"||rt==="connected_no_email"?"#7a5a20":"#6a5c48";
                 const hint = rt==="connected_email"?"→ inbox":rt==="connected_no_email"?"Chronicle":rt==="has_email"?"→ inbox":"";
+                // Tooltip explaining what each delivery indicator means.
+                const tip = rt==="connected_email"
+                  ? "Already connected — your share will arrive directly in their Chronicle inbox."
+                  : rt==="connected_no_email"
+                    ? "Connected, but no email on file. They'll receive the share next time they open Chronicle."
+                    : rt==="has_email"
+                      ? "Email on file — share will be delivered to their Chronicle inbox once they verify the address."
+                      : "No email on file — you'll get a copyable link to send manually.";
                 return React.createElement("button",{
                   key:person,
                   onClick:()=>togglePerson(person),
+                  title:tip,
                   style:{padding:"5px 12px",borderRadius:"20px",border:"1px solid "+borderColor,background:bg,color,cursor:"pointer",fontSize:"0.88rem",fontWeight:sel?600:400,display:"flex",alignItems:"center",gap:"5px"}
                 },
                   person,
@@ -4386,11 +4395,11 @@ function SettingsView({
             ? React.createElement("span",{style:{fontSize:"0.82rem",color:"#4a7a5a"}},"\u2713 Email verified")
             : verifyingEmail
               ? React.createElement("div",{style:{display:"flex",gap:"6px",alignItems:"center"}},
-                  React.createElement("input",{value:verifyCode,onChange:e=>setVerifyCode(e.target.value.replace(/\D/g,"").slice(0,6)),
-                    onKeyDown:e=>{if(e.key==="Enter"&&verifyCode.length===6)confirmVerifyCode();},
-                    placeholder:"6-digit code",maxLength:6,inputMode:"numeric",
-                    style:{...S.input,width:"100px",padding:"6px 10px",fontSize:"0.95rem",letterSpacing:"0.15em",textAlign:"center"}}),
-                  React.createElement("button",{onClick:confirmVerifyCode,disabled:verifyCode.length!==6||verifyStatus==="confirming",
+                  React.createElement("input",{value:verifyCode,onChange:e=>setVerifyCode(e.target.value.replace(/[^A-Za-z0-9]/g,"").toUpperCase().slice(0,8)),
+                    onKeyDown:e=>{if(e.key==="Enter"&&verifyCode.length===8)confirmVerifyCode();},
+                    placeholder:"8-char code",maxLength:8,autoCapitalize:"characters",autoCorrect:"off",spellCheck:false,
+                    style:{...S.input,width:"130px",padding:"6px 10px",fontSize:"0.95rem",letterSpacing:"0.12em",textAlign:"center",fontFamily:"'Courier New',monospace"}}),
+                  React.createElement("button",{onClick:confirmVerifyCode,disabled:verifyCode.length!==8||verifyStatus==="confirming",
                     style:{...S.btn,padding:"6px 14px",fontSize:"0.82rem"}},verifyStatus==="confirming"?"Checking\u2026":"Verify"),
                   verifyStatus.startsWith("error:")&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#c4858a"}},verifyStatus.slice(6))
                 )
@@ -6944,15 +6953,21 @@ function App() {
   const locationNotes = subject.locationNotes || {};
   // Migrate: absorb any coords stored in the legacy label-keyed dict into the location objects.
   // After migration, coords live on knownLocations[i].coords so the label is free to change
-  // without breaking the geocode association.
-  const _legacyCoords = subject.locationCoords || {};
-  const knownLocations = (subject.knownLocations || []).map(l => {
-    const loc = typeof l === 'string' ? {label:l, street:"", town:"", state:"", country:""} : {...l};
-    if (!loc.coords && _legacyCoords[loc.label]) loc.coords = _legacyCoords[loc.label];
-    return loc;
-  });
-  // Derive the label-keyed dict from objects for MapView (and backward-compat export)
-  const locationCoords = Object.fromEntries(knownLocations.filter(l=>l.coords).map(l=>[l.label,l.coords]));
+  // without breaking the geocode association. Memoised so the migration only re-runs when
+  // either of the input fields actually changes (cheap but ran on every render before).
+  const { knownLocations, locationCoords } = React.useMemo(() => {
+    const _legacyCoords = subject.locationCoords || {};
+    const kl = (subject.knownLocations || []).map(l => {
+      const loc = typeof l === 'string' ? {label:l, street:"", town:"", state:"", country:""} : {...l};
+      if (!loc.coords && _legacyCoords[loc.label]) loc.coords = _legacyCoords[loc.label];
+      return loc;
+    });
+    return {
+      knownLocations: kl,
+      // Derive the label-keyed dict from objects for MapView (and backward-compat export)
+      locationCoords: Object.fromEntries(kl.filter(l => l.coords).map(l => [l.label, l.coords])),
+    };
+  }, [subject.knownLocations, subject.locationCoords]);
   const peopleEmails        = subject.peopleEmails || {};
   const peopleRelationships = subject.peopleRelationships || {};
   const peopleNotes         = subject.peopleNotes || {};
@@ -8184,6 +8199,9 @@ function handleEdit(m) {
       // DD MM YYYY (all numeric, space-separated: "17 12 2011")
       mr = s.match(/^(\d{1,2})\s+(\d{1,2})\s+(\d{3,4})$/);
       if (mr) return {year:parseInt(mr[3]),month:parseInt(mr[2]),day:parseInt(mr[1]),fuzzy:"day"};
+      // Could not parse — log so the user can investigate via the console.
+      // Silent skip means the resulting memory loses date info entirely.
+      console.warn("[GEDCOM] could not parse date:", JSON.stringify(raw));
       return null;
     }
 
@@ -9608,13 +9626,13 @@ function handleEdit(m) {
                         React.createElement("button",{onClick:()=>{setVerifyingEmail(true);sendVerifyCode();},disabled:verifyStatus==="sending",
                           style:{...S.btn,padding:"5px 12px",fontSize:"0.82rem"}},verifyStatus==="sending"?"Sending\u2026":"Verify")))
                   : React.createElement(React.Fragment,null,
-                      React.createElement("p",{style:{fontSize:"0.84rem",color:"#7a5a20",margin:"0 0 6px"}},"Enter the 6-digit code sent to "+(ownerEmail||carerEmail)+":"),
+                      React.createElement("p",{style:{fontSize:"0.84rem",color:"#7a5a20",margin:"0 0 6px"}},"Enter the 8-character code sent to "+(ownerEmail||carerEmail)+":"),
                       React.createElement("div",{style:{display:"flex",gap:"6px",alignItems:"center"}},
-                        React.createElement("input",{value:verifyCode,onChange:e=>setVerifyCode(e.target.value.replace(/\D/g,"").slice(0,6)),
-                          onKeyDown:e=>{if(e.key==="Enter"&&verifyCode.length===6)confirmVerifyCode();},
-                          placeholder:"000000",maxLength:6,inputMode:"numeric",
-                          style:{...S.input,width:"100px",padding:"6px 10px",fontSize:"0.95rem",letterSpacing:"0.15em",textAlign:"center"}}),
-                        React.createElement("button",{onClick:confirmVerifyCode,disabled:verifyCode.length!==6||verifyStatus==="confirming",
+                        React.createElement("input",{value:verifyCode,onChange:e=>setVerifyCode(e.target.value.replace(/[^A-Za-z0-9]/g,"").toUpperCase().slice(0,8)),
+                          onKeyDown:e=>{if(e.key==="Enter"&&verifyCode.length===8)confirmVerifyCode();},
+                          placeholder:"XXXXXXXX",maxLength:8,autoCapitalize:"characters",autoCorrect:"off",spellCheck:false,
+                          style:{...S.input,width:"130px",padding:"6px 10px",fontSize:"0.95rem",letterSpacing:"0.12em",textAlign:"center",fontFamily:"'Courier New',monospace"}}),
+                        React.createElement("button",{onClick:confirmVerifyCode,disabled:verifyCode.length!==8||verifyStatus==="confirming",
                           style:{...S.btn,padding:"5px 12px",fontSize:"0.82rem"}},verifyStatus==="confirming"?"Checking\u2026":"Confirm"),
                         verifyStatus.startsWith("error:")&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#c4858a"}},verifyStatus.slice(6))))
             ),
@@ -9646,12 +9664,14 @@ function handleEdit(m) {
                   // Auto-connect if checkbox was checked — no second prompt
                   if(pendingShareWantConnect && senderEmail && pendingShare.sharedBy) {
                     const name=pendingShare.sharedBy, email=senderEmail;
-                    const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
-                    if(!conns.find(c=>c.email===email)){
-                      conns.push({name,email,connectedAt:new Date().toISOString()});
-                      localStorage.setItem("chronicle-connections",JSON.stringify(conns));
-                      setLocalConnections([...conns]);
-                    }
+                    try {
+                      const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
+                      if(!conns.find(c=>c.email===email)){
+                        conns.push({name,email,connectedAt:new Date().toISOString()});
+                        localStorage.setItem("chronicle-connections",JSON.stringify(conns));
+                        setLocalConnections([...conns]);
+                      }
+                    } catch(e) { console.warn("[connections] save failed:", e); }
                     // Store their email in peopleEmails for sharing
                     if(name) persistSubject({peopleEmails:{...peopleEmails,[name]:email}});
                     // Notify the sender that the connection was accepted
@@ -9728,12 +9748,14 @@ function handleEdit(m) {
                 const email = pendingConnectRequest.email;
                 // Store connection locally
                 if (name && email) {
-                  const conns = JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
-                  if (!conns.find(c=>c.email===email)) {
-                    conns.push({name, email, connectedAt: new Date().toISOString()});
-                    localStorage.setItem("chronicle-connections", JSON.stringify(conns));
-                    setLocalConnections([...conns]);
-                  }
+                  try {
+                    const conns = JSON.parse(localStorage.getItem("chronicle-connections")||"[]");
+                    if (!conns.find(c=>c.email===email)) {
+                      conns.push({name, email, connectedAt: new Date().toISOString()});
+                      localStorage.setItem("chronicle-connections", JSON.stringify(conns));
+                      setLocalConnections([...conns]);
+                    }
+                  } catch(e) { console.warn("[connections] save failed:", e); }
                   persistSubject({peopleEmails:{...peopleEmails,[name]:email}});
                 }
                 // Notify the sender
