@@ -2651,6 +2651,12 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
   const [addingLoc, setAddingLoc] = React.useState(false);
   const [newLoc, setNewLoc] = React.useState("");
   const [search, setSearch] = React.useState("");
+  // Paths in `expanded` are shown; default = all collapsed so the user sees
+  // a tidy country-level overview and drills down deliberately.
+  const [expanded, setExpanded] = React.useState(() => new Set());
+  function toggle(path) {
+    setExpanded(prev => { const n = new Set(prev); if (n.has(path)) n.delete(path); else n.add(path); return n; });
+  }
   function commitAdd(){
     const v=newLoc.trim();
     if(!v)return;
@@ -2684,11 +2690,13 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
       const q=search.trim().toLowerCase();
       const visible=q?knownLocations.filter(loc=>{
         const name=typeof loc==='string'?loc:loc.label;
-        const parts=[name,loc.town,loc.state,loc.country].filter(Boolean);
+        const parts=[name,loc.street,loc.town,loc.state,loc.country].filter(Boolean);
         return parts.some(p=>p.toLowerCase().includes(q));
       }):knownLocations;
       if(q&&visible.length===0) return React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No matches.");
-      return visible.map(loc=>{
+
+      // Render a single LocationRow leaf
+      function renderLeaf(loc) {
         const name    = typeof loc === 'string' ? loc : loc.label;
         const count   = memories.filter(m=>m.location===name||m.locations?.includes(name)).length;
         const coords  = (typeof loc==='object' ? loc.coords : null) || null;
@@ -2702,7 +2710,113 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
           onRename:renameLocation,onDelete:deleteLocation,onSetNotes:setLocationNotes,
           onSetCoords:setLocationCoords,onSetAddress:setLocationAddress,
           onView:()=>setIndexFilter({type:"locations",value:name})});
+      }
+
+      // While searching, just show a flat list of matches
+      if (q) return visible.map(renderLeaf);
+
+      // ── Tree mode ──
+      // Group: country → state → town → street → leaves. Levels with no value
+      // collapse — e.g. a location with only town+country skips the state node
+      // and renders the town directly under the country.
+      const PLACEHOLDER = "—";
+      const labelOf = l => typeof l === 'string' ? l : (l.label || "");
+      function fieldOf(l, k) { return (typeof l === 'object' ? (l[k]||"") : "").trim(); }
+
+      // Build the nested tree from the location list using a chain of group-by keys.
+      function nest(list, keys) {
+        if (keys.length === 0) return list.slice().sort((a,b)=>labelOf(a).localeCompare(labelOf(b)));
+        const [k, ...rest] = keys;
+        const groups = {};
+        for (const loc of list) {
+          const v = fieldOf(loc, k) || PLACEHOLDER;
+          if (!groups[v]) groups[v] = [];
+          groups[v].push(loc);
+        }
+        const out = {};
+        const sortedKeys = Object.keys(groups).sort((a,b)=>{
+          if (a === PLACEHOLDER) return 1;  // placeholder buckets sort last
+          if (b === PLACEHOLDER) return -1;
+          return a.localeCompare(b);
+        });
+        for (const v of sortedKeys) out[v] = nest(groups[v], rest);
+        return out;
+      }
+      const tree = nest(visible, ["country","state","town","street"]);
+
+      // Count leaves (locations) under any subtree node
+      function countLeaves(node) {
+        if (Array.isArray(node)) return node.length;
+        return Object.values(node).reduce((acc,v)=>acc+countLeaves(v),0);
+      }
+
+      const headerStyle = (depth) => ({
+        display:"flex", alignItems:"center", gap:"6px",
+        background:"transparent", border:"none", cursor:"pointer",
+        padding:"4px 0", marginLeft:(depth*16)+"px",
+        fontFamily:"'Crimson Text',serif", color:"#5a4820",
+        fontSize: depth === 0 ? "0.95rem" : "0.88rem",
+        fontWeight: depth === 0 ? 600 : 500,
+        width:"100%", textAlign:"left"
       });
+
+      // Skip groups that only have a single PLACEHOLDER child — collapse them
+      // so a location with just country="USA" doesn't render as
+      // "USA > — > — > — > leaf". Walk down to the first branching node.
+      function pruneSingleChain(node) {
+        if (Array.isArray(node)) return { skipped: 0, node };
+        const keys = Object.keys(node);
+        if (keys.length === 1 && keys[0] === PLACEHOLDER) {
+          const inner = pruneSingleChain(node[PLACEHOLDER]);
+          return { skipped: inner.skipped + 1, node: inner.node };
+        }
+        return { skipped: 0, node };
+      }
+
+      function renderNode(node, path, depth, levelLabel) {
+        // Reached the leaves
+        if (Array.isArray(node)) {
+          return node.map(renderLeaf);
+        }
+        const keys = Object.keys(node);
+        return keys.map(k => {
+          const childRaw = node[k];
+          // Collapse degenerate single-PLACEHOLDER chains so we don't render
+          // "(no state)" → "(no town)" → "(no street)" stacks for sparse data.
+          const { node: child } = pruneSingleChain(childRaw);
+          const subPath = path + "/" + k;
+          const isOpen = expanded.has(subPath);
+          const leafCount = countLeaves(childRaw);
+          const isLeafGroup = Array.isArray(child);
+          const displayName = k === PLACEHOLDER
+            ? ({country:"(no country)", state:"(no state)", town:"(no town)", street:""}[levelLabel])
+            : k;
+          // Skip rendering an empty placeholder header for street level — leaves
+          // already display the name and street, so the extra row is noise.
+          if (k === PLACEHOLDER && levelLabel === "street") {
+            return React.createElement("div",{key:subPath,style:{marginLeft:((depth)*16)+"px"}},
+              renderNode(child, subPath, depth, null)
+            );
+          }
+          return React.createElement("div",{key:subPath},
+            React.createElement("button",{
+              onClick: () => toggle(subPath),
+              style: headerStyle(depth)
+            },
+              React.createElement("span",{style:{display:"inline-block",width:"10px",fontSize:"0.7rem",color:"#a89a7a"}},
+                isLeafGroup ? (isOpen ? "▼" : "▶") : (isOpen ? "▼" : "▶")
+              ),
+              React.createElement("span",null, displayName),
+              React.createElement("span",{style:{fontSize:"0.78rem",color:"#a89a7a",fontWeight:400,marginLeft:"4px"}}, "("+leafCount+")")
+            ),
+            isOpen && React.createElement("div",{style:{marginLeft:"4px"}},
+              renderNode(child, subPath, depth+1, ({country:"state",state:"town",town:"street",street:null}[levelLabel]))
+            )
+          );
+        });
+      }
+
+      return renderNode(tree, "", 0, "country");
     })()
   );
 }
@@ -3480,6 +3594,74 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
             React.createElement("button",{onClick:()=>setDropMode(null),style:{...S.btnOutline,padding:"4px 12px",fontSize:"0.82rem"}},"Cancel")
           ),
 
+          // ── Location detail panel ──
+          selectedLoc&&React.createElement("div",{style:{marginTop:"14px",border:"1px solid #c8b89a",borderRadius:"4px",background:"rgba(255,252,245,0.97)",padding:"14px 16px"}},
+            React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:"8px",marginBottom:"10px"}},
+              React.createElement("div",{style:{flex:1}},
+                React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.15rem",color:"#1a1208",margin:"0 0 3px"}},selectedLoc),
+                (()=>{const kl=knownLocMap[selectedLoc];if(!kl)return null;const parts=[kl.street,kl.town,kl.state,kl.country].filter(Boolean);return parts.length?React.createElement("p",{style:{margin:"0 0 2px",fontSize:"0.8rem",color:"#8a7460"}},parts.join(", ")):null;})(),
+                geocodeCache[selectedLoc]&&React.createElement("p",{style:{margin:"0",fontSize:"0.78rem",color:"#a89a7a",fontStyle:"italic"}},
+                  `📍 ${geocodeCache[selectedLoc].lat?.toFixed(5)}, ${geocodeCache[selectedLoc].lng?.toFixed(5)}` + (knownLocMap[selectedLoc]?.coords?.manual ? " · manually placed" : ""))
+              ),
+              React.createElement("button",{onClick:()=>{setSelectedLoc(null); if(fixingLabel===selectedLoc) setFixingLabel(null);},"aria-label":"Close",style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1.3rem",padding:"6px 10px",lineHeight:1,minWidth:"36px",minHeight:"36px",display:"flex",alignItems:"center",justifyContent:"center"}},"×")
+            ),
+            // Memory list
+            (locationMemories[selectedLoc]||[]).length===0
+              ? React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",fontSize:"0.88rem",margin:"0"}},"No memories at this location.")
+              : React.createElement("div",null,
+                  (locationMemories[selectedLoc]||[]).slice(0,7).map(m=>
+                    React.createElement("div",{key:m.id,
+                      onClick:()=>onSelectMemory&&onSelectMemory(m.id),
+                      style:{padding:"7px 0",borderTop:"1px solid #ede5d4",cursor:onSelectMemory?"pointer":"default",fontSize:"0.9rem",color:"#2c2416",display:"flex",alignItems:"baseline",gap:"8px"},
+                      onMouseEnter:e=>{ if(onSelectMemory) e.currentTarget.style.color="#a8885a"; },
+                      onMouseLeave:e=>{ e.currentTarget.style.color="#2c2416"; }
+                    },
+                      React.createElement("span",{style:{fontSize:"0.78rem",color:"#a89a7a",flexShrink:0,minWidth:"38px"}},m.date?.year||""),
+                      m.title
+                    )
+                  ),
+                  (locationMemories[selectedLoc]||[]).length>7&&React.createElement("p",{style:{margin:"6px 0 0",fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},
+                    `+ ${(locationMemories[selectedLoc]).length-7} more`)
+                ),
+            React.createElement("div",{style:{display:"flex",gap:"8px",marginTop:"12px",flexWrap:"wrap"}},
+              React.createElement("button",{onClick:()=>onSelectLocation(selectedLoc),style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem"}},"View memories →"),
+              onEditLocation&&React.createElement("button",{onClick:()=>onEditLocation(selectedLoc),style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem"}},"Edit location →"),
+              React.createElement("button",{
+                onClick:()=>setFixingLabel(fixingLabel===selectedLoc?null:selectedLoc),
+                style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem",background:fixingLabel===selectedLoc?"#f5ede0":"transparent"}
+              }, fixingLabel===selectedLoc ? "Cancel" : "🔍 Relocate"),
+              React.createElement("button",{
+                onClick:()=>{ setFixingLabel(null); setDropMode(selectedLoc); },
+                disabled: dropMode === selectedLoc,
+                style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem",opacity:dropMode===selectedLoc?0.5:1}
+              }, "📌 Drop pin")
+            ),
+            fixingLabel===selectedLoc && React.createElement("div",{style:{marginTop:"12px"}},
+              React.createElement(PlacePicker,{
+                value:"",
+                knownLocations:[],
+                placeholder:"Search the right place\u2026",
+                autoFocus:true,
+                onPickKnown:()=>{},
+                onPickRemote: place => {
+                  const lab = selectedLoc;
+                  const fnC = propsRef.current.onSetCoords;
+                  const fnA = propsRef.current.onSetAddress;
+                  if (fnC && place.coords) fnC(lab, place.coords);
+                  if (fnA && (place.street||place.town||place.state||place.country)) fnA(lab, {street:place.street||"", town:place.town||"", state:place.state||"", country:place.country||""});
+                  if (place.coords) {
+                    setGeocodeCache(c => ({...c, [lab]: { lat: place.coords.lat, lng: place.coords.lng, display: lab, fromCoords: true }}));
+                    addMarkerForRef.current && addMarkerForRef.current(lab, place.coords);
+                    if (mapInstanceRef.current) mapInstanceRef.current.panTo([place.coords.lat, place.coords.lng]);
+                  }
+                  setFixingLabel(null);
+                },
+                onPickCustom:()=>setFixingLabel(null),
+                onClear:()=>{},
+              })
+            )
+          ),
+
           // ── Unmatched locations panel ──
           (() => {
             if (!passCompleted) return null;
@@ -3542,42 +3724,7 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
                 );
               })
             );
-          })(),
-
-          // ── Location detail panel ──
-          selectedLoc&&React.createElement("div",{style:{marginTop:"14px",border:"1px solid #c8b89a",borderRadius:"4px",background:"rgba(255,252,245,0.97)",padding:"14px 16px"}},
-            React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:"8px",marginBottom:"10px"}},
-              React.createElement("div",{style:{flex:1}},
-                React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.15rem",color:"#1a1208",margin:"0 0 3px"}},selectedLoc),
-                (()=>{const kl=knownLocMap[selectedLoc];if(!kl)return null;const parts=[kl.street,kl.town,kl.state,kl.country].filter(Boolean);return parts.length?React.createElement("p",{style:{margin:"0 0 2px",fontSize:"0.8rem",color:"#8a7460"}},parts.join(", ")):null;})(),
-                geocodeCache[selectedLoc]&&React.createElement("p",{style:{margin:"0",fontSize:"0.78rem",color:"#a89a7a",fontStyle:"italic"}},
-                  `📍 ${geocodeCache[selectedLoc].lat?.toFixed(5)}, ${geocodeCache[selectedLoc].lng?.toFixed(5)}`)
-              ),
-              React.createElement("button",{onClick:()=>setSelectedLoc(null),"aria-label":"Close",style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1.3rem",padding:"6px 10px",lineHeight:1,minWidth:"36px",minHeight:"36px",display:"flex",alignItems:"center",justifyContent:"center"}},"×")
-            ),
-            // Memory list
-            (locationMemories[selectedLoc]||[]).length===0
-              ? React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",fontSize:"0.88rem",margin:"0"}},"No memories at this location.")
-              : React.createElement("div",null,
-                  (locationMemories[selectedLoc]||[]).slice(0,7).map(m=>
-                    React.createElement("div",{key:m.id,
-                      onClick:()=>onSelectMemory&&onSelectMemory(m.id),
-                      style:{padding:"7px 0",borderTop:"1px solid #ede5d4",cursor:onSelectMemory?"pointer":"default",fontSize:"0.9rem",color:"#2c2416",display:"flex",alignItems:"baseline",gap:"8px"},
-                      onMouseEnter:e=>{ if(onSelectMemory) e.currentTarget.style.color="#a8885a"; },
-                      onMouseLeave:e=>{ e.currentTarget.style.color="#2c2416"; }
-                    },
-                      React.createElement("span",{style:{fontSize:"0.78rem",color:"#a89a7a",flexShrink:0,minWidth:"38px"}},m.date?.year||""),
-                      m.title
-                    )
-                  ),
-                  (locationMemories[selectedLoc]||[]).length>7&&React.createElement("p",{style:{margin:"6px 0 0",fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},
-                    `+ ${(locationMemories[selectedLoc]).length-7} more`)
-                ),
-            React.createElement("div",{style:{display:"flex",gap:"8px",marginTop:"12px",flexWrap:"wrap"}},
-              React.createElement("button",{onClick:()=>onSelectLocation(selectedLoc),style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem"}},"View memories →"),
-              onEditLocation&&React.createElement("button",{onClick:()=>onEditLocation(selectedLoc),style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem"}},"Edit location →")
-            )
-          )
+          })()
         )
   );
 }
