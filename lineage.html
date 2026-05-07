@@ -5844,30 +5844,32 @@ function buildMemsFromTree(tp, tpById, treeF) {
   });
 
   // Relatives
-  const subParents     = parentsOf[tp.id]||[];
-  const subGrandpars   = subParents.flatMap(p=>parentsOf[p]||[]);
-  const subGreatGrands = subGrandpars.flatMap(p=>parentsOf[p]||[]);
-  const subChildren    = childrenOf[tp.id]||[];
-  const subSiblings    = subParents.flatMap(p=>childrenOf[p]||[]).filter(id=>id!==tp.id);
-  const subSpouses     = spousesOf[tp.id]||[];
-  const subAuntsUncles = subGrandpars.flatMap(g=>childrenOf[g]||[]).filter(id=>!subParents.includes(id)&&id!==tp.id);
-  const subCousins     = subAuntsUncles.flatMap(au=>childrenOf[au]||[]);
+  const subParents       = parentsOf[tp.id]||[];
+  const subGrandpars     = subParents.flatMap(p=>parentsOf[p]||[]);
+  const subGreatGrands   = subGrandpars.flatMap(p=>parentsOf[p]||[]);
+  const subChildren      = childrenOf[tp.id]||[];
+  const subSiblings      = subParents.flatMap(p=>childrenOf[p]||[]).filter(id=>id!==tp.id);
+  const subSpouses       = spousesOf[tp.id]||[];
+  const subAuntsUncles   = subGrandpars.flatMap(g=>childrenOf[g]||[]).filter(id=>!subParents.includes(id)&&id!==tp.id);
+  const subNiecesNephews = subSiblings.flatMap(s=>childrenOf[s]||[]);
+  const subCousins       = subAuntsUncles.flatMap(au=>childrenOf[au]||[]);
 
   function relLabel(id) {
-    if(subSpouses.includes(id))     return "Spouse";
-    if(subParents.includes(id))     return "Parent";
-    if(subChildren.includes(id))    return "Child";
-    if(subSiblings.includes(id))    return "Sibling";
-    if(subGrandpars.includes(id))   return "Grandparent";
-    if(subAuntsUncles.includes(id)) return "Aunt/Uncle";
-    if(subCousins.includes(id))     return "Cousin";
-    if(subGreatGrands.includes(id)) return "Great-grandparent";
+    if(subSpouses.includes(id))       return "Spouse";
+    if(subParents.includes(id))       return "Parent";
+    if(subChildren.includes(id))      return "Child";
+    if(subSiblings.includes(id))      return "Sibling";
+    if(subGrandpars.includes(id))     return "Grandparent";
+    if(subAuntsUncles.includes(id))   return "Aunt/Uncle";
+    if(subNiecesNephews.includes(id)) return "Niece/Nephew";
+    if(subCousins.includes(id))       return "Cousin";
+    if(subGreatGrands.includes(id))   return "Great-grandparent";
     return "";
   }
 
   const relativeIds = [...new Set([
-    ...subSpouses,...subParents,...subChildren,...subSiblings,
-    ...subGrandpars,...subAuntsUncles,...subCousins,...subGreatGrands,
+    ...subSpouses, ...subParents, ...subChildren, ...subSiblings,
+    ...subGrandpars, ...subAuntsUncles, ...subNiecesNephews, ...subCousins, ...subGreatGrands,
   ])].filter(id=>id!==tp.id);
 
   const contextMems = [];
