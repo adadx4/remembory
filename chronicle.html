@@ -4685,7 +4685,7 @@ function SettingsView({
       React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 12px"}},"Cloud Sync"),
         hasTier("premium")
-          ? React.createElement(CloudSyncPanel,{buildBackupJson,importBackup,licenceKey,onSyncComplete:()=>{persistSubject({lastCloudSync:new Date().toISOString(),lastBackup:new Date().toISOString(),memCountAtSync:memoriesRef.current.length,memCountAtBackup:memoriesRef.current.length});}})
+          ? React.createElement(CloudSyncPanel,{buildBackupJson,importBackup,licenceKey,onSyncComplete:()=>{persistSubject({lastCloudSync:new Date().toISOString(),lastBackup:new Date().toISOString(),memCountAtSync:(memories||[]).length,memCountAtBackup:(memories||[]).length});}})
           : React.createElement("p",{style:{fontSize:"0.88rem",color:"#8a7460",fontStyle:"italic",margin:0}},"Cloud Sync is available on the Share Premium plan and above."),
         hasTier("premium")&&!isMobile&&React.createElement("div",{style:{marginTop:"16px",paddingTop:"16px",borderTop:"1px solid #ede4d4"}},
           React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",margin:"0 0 8px",fontStyle:"italic"}},"Or sync via a local cloud storage folder (desktop only):"),
