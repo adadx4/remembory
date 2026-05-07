@@ -531,13 +531,17 @@ function genealogyResearchUrl(m, knownLocations) {
 function migrateKnownLocation(loc) {
   // Already an object with label? Return as-is
   if (loc && typeof loc === 'object' && loc.label) return loc;
-  // String → parse into object
+  // String → parse into object. Be conservative: 2-part labels like
+  // "Melbourne, Victoria" are ambiguous (city/state vs city/country) so we
+  // only fill in the leading town and leave the rest blank rather than
+  // guess country=Victoria. The user can fix structured fields via the
+  // Locations tree or the Map-view editor.
   if (typeof loc !== 'string' || !loc.trim()) return null;
   const s = loc.trim();
   const parts = s.split(",").map(p => p.trim());
   if (parts.length >= 4) return { label: s, street: parts[0], town: parts[1], state: parts[2], country: parts[parts.length-1] };
   if (parts.length === 3) return { label: s, town: parts[0], state: parts[1], country: parts[2] };
-  if (parts.length === 2) return { label: s, town: parts[0], country: parts[1] };
+  if (parts.length === 2) return { label: s, town: parts[0], state: "", country: "", street: "" };
   return { label: s, street: "", town: "", state: "", country: "" };
 }
 
@@ -3401,7 +3405,7 @@ async function geocode(name, cache) {
 }
 
 // ── MapView component ──────────────────────────────────────────
-function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, locationCoords, onSaveCoords, onSetCoords, onSetAddress, knownLocations, filter, onFilterChange }) {
+function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, locationCoords, onSaveCoords, onSetCoords, onSetAddress, onRenameLocation, knownLocations, filter, onFilterChange }) {
   // Build a map from label → structured address for better geocoding
   const knownLocMap = React.useMemo(() => {
     const m = {};
@@ -3419,12 +3423,94 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
   const [passCompleted, setPassCompleted] = useState(false);
   const [dropMode, setDropMode] = useState(null); // label being placed via map-click
   const [fixingLabel, setFixingLabel] = useState(null); // label whose search row is open
+  const [editingFieldsLabel, setEditingFieldsLabel] = useState(null); // label whose ✎ field-editor is open
+  const [editFields, setEditFields] = useState({label:"", country:"", state:"", town:"", street:""});
+
+  function openFieldsEditor(label) {
+    const kl = knownLocMap[label] || {};
+    setEditFields({
+      label,
+      country: kl.country || "",
+      state: kl.state || "",
+      town: kl.town || "",
+      street: kl.street || "",
+    });
+    setEditingFieldsLabel(label);
+    setFixingLabel(null);
+  }
+  function closeFieldsEditor() { setEditingFieldsLabel(null); }
+
+  async function saveFieldsEditor() {
+    const lab = editingFieldsLabel;
+    if (!lab) return;
+    const fields = {
+      street: (editFields.street||"").trim(),
+      town: (editFields.town||"").trim(),
+      state: (editFields.state||"").trim(),
+      country: (editFields.country||"").trim(),
+    };
+    const newLabel = (editFields.label||"").trim();
+    const fnA = propsRef.current.onSetAddress;
+    if (fnA) fnA(lab, fields);
+    // Rename via prop if changed (cascades to memories using this label).
+    const fnR = propsRef.current.onRenameLocation;
+    let effLabel = lab;
+    if (fnR && newLabel && newLabel !== lab) { fnR(lab, newLabel); effLabel = newLabel; }
+    closeFieldsEditor();
+    // Re-attempt geocoding using the now-cleaner structured address — if the
+    // entry was previously unmatched and the user just added country/state,
+    // there's a good chance Nominatim can place it now.
+    const parts = [fields.town, fields.state, fields.country].filter(Boolean);
+    const fallback = [fields.street, fields.town, fields.state, fields.country].filter(Boolean);
+    const query = parts.length >= 2 ? parts.join(", ") : (fallback.length ? fallback.join(", ") : effLabel);
+    const cache = loadGeocodeCache();
+    // Drop any prior null so the geocode actually re-runs.
+    delete cache[effLabel];
+    const result = await geocode(query, cache);
+    if (result) {
+      const coords = { lat: result.lat, lng: result.lng, manual: false };
+      const fnC = propsRef.current.onSetCoords;
+      if (fnC) fnC(effLabel, coords);
+      setGeocodeCache(c => ({...c, [effLabel]: result}));
+      addMarkerForRef.current && addMarkerForRef.current(effLabel, coords);
+      if (mapInstanceRef.current) mapInstanceRef.current.panTo([coords.lat, coords.lng]);
+    }
+  }
+
+  // Inline editor rendered both in the detail panel and the unmatched list
+  function renderFieldsEditor() {
+    if (!editingFieldsLabel) return null;
+    const FIELD = { country:"Country", state:"State / Region", town:"Town / City / Suburb", street:"Street" };
+    return React.createElement("div",{
+      style:{marginTop:"10px",padding:"10px 12px",background:"rgba(168,136,90,0.08)",border:"1px solid rgba(168,136,90,0.3)",borderRadius:"3px"}
+    },
+      React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 8px"}},
+        "Edit address fields for this location. Saving will retry the map placement using the new details."
+      ),
+      React.createElement("div",{style:{marginBottom:"6px"}},
+        React.createElement("label",{style:{fontSize:"0.76rem",color:"#8a7460",display:"block",marginBottom:"2px"}}, "Display name"),
+        React.createElement("input",{value:editFields.label||"",onChange:e=>setEditFields(f=>({...f,label:e.target.value})),style:{...S.input,fontSize:"0.86rem",padding:"5px 9px"}})
+      ),
+      ["country","state","town","street"].map(k => React.createElement("div",{key:k,style:{marginBottom:"6px"}},
+        React.createElement("label",{style:{fontSize:"0.76rem",color:"#8a7460",display:"block",marginBottom:"2px"}}, FIELD[k]),
+        React.createElement("input",{
+          value: editFields[k]||"",
+          onChange: e => setEditFields(f => ({...f, [k]: e.target.value})),
+          style:{...S.input, fontSize:"0.86rem", padding:"5px 9px"}
+        })
+      )),
+      React.createElement("div",{style:{display:"flex",gap:"6px",marginTop:"8px"}},
+        React.createElement("button",{onClick:saveFieldsEditor,style:{...S.btn,padding:"5px 12px",fontSize:"0.84rem"}},"Save & retry"),
+        React.createElement("button",{onClick:closeFieldsEditor,style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.84rem"}},"Cancel")
+      )
+    );
+  }
   const tileLayers = React.useRef({});
 
   // Keep marker handlers fresh across re-renders (they're attached inside the
   // mount-once effect and would otherwise capture the first render's callbacks).
   const propsRef = useRef({});
-  propsRef.current = { onSetCoords, onSetAddress, onSelectMemory };
+  propsRef.current = { onSetCoords, onSetAddress, onSelectMemory, onRenameLocation };
 
   // Apply filters
   const filtered = React.useMemo(() => {
@@ -3701,7 +3787,10 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
                 ),
             React.createElement("div",{style:{display:"flex",gap:"8px",marginTop:"12px",flexWrap:"wrap"}},
               React.createElement("button",{onClick:()=>onSelectLocation(selectedLoc),style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem"}},"View memories →"),
-              onEditLocation&&React.createElement("button",{onClick:()=>onEditLocation(selectedLoc),style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem"}},"Edit location →"),
+              React.createElement("button",{
+                onClick:()=>editingFieldsLabel===selectedLoc?closeFieldsEditor():openFieldsEditor(selectedLoc),
+                style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem",background:editingFieldsLabel===selectedLoc?"#f5ede0":"transparent"}
+              }, editingFieldsLabel===selectedLoc?"Cancel edit":"\u270e Edit fields"),
               React.createElement("button",{
                 onClick:()=>setFixingLabel(fixingLabel===selectedLoc?null:selectedLoc),
                 style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem",background:fixingLabel===selectedLoc?"#f5ede0":"transparent"}
@@ -3712,6 +3801,7 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
                 style:{...S.btnOutline,padding:"6px 14px",fontSize:"0.84rem",opacity:dropMode===selectedLoc?0.5:1}
               }, "📌 Drop pin")
             ),
+            editingFieldsLabel===selectedLoc && renderFieldsEditor(),
             fixingLabel===selectedLoc && React.createElement("div",{style:{marginTop:"12px"}},
               React.createElement(PlacePicker,{
                 value:"",
@@ -3765,6 +3855,10 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
                     ),
                     React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap"}},
                       React.createElement("button",{
+                        onClick:()=>editingFieldsLabel===label?closeFieldsEditor():openFieldsEditor(label),
+                        style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.82rem",background:editingFieldsLabel===label?"#f5ede0":"transparent"}
+                      }, editingFieldsLabel===label?"Cancel edit":"\u270e Edit fields"),
+                      React.createElement("button",{
                         onClick:()=>setFixingLabel(isOpen?null:label),
                         style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.82rem",background:isOpen?"#f5ede0":"transparent"}
                       }, isOpen ? "Cancel search" : "🔍 Search"),
@@ -3775,6 +3869,7 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
                       }, "📌 Drop pin")
                     )
                   ),
+                  editingFieldsLabel===label && renderFieldsEditor(),
                   isOpen && React.createElement("div",{style:{marginTop:"10px"}},
                     React.createElement(PlacePicker,{
                       value:"",
@@ -11052,6 +11147,7 @@ function handleEdit(m) {
           },
           onSetCoords: setLocationCoords,
           onSetAddress: setLocationAddress,
+          onRenameLocation: renameLocation,
           onSelectLocation: loc => {
             setIndexFilter({type:"locations",value:loc});
             setIndexTab("locations");
