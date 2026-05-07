@@ -1530,7 +1530,7 @@ function buildPrompt(memories, knownPeople, knownOrgs, knownLocations, seen=new 
 }
 
 // ── LifeTimeline ─────────────────────────────────────────────
-function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, isMobile}) {
+function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, onAddTagged, onEditTagged, isMobile}) {
   const now = new Date();
   const currentFrac = now.getFullYear() + now.getMonth()/12 + now.getDate()/365;
 
@@ -1706,8 +1706,14 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, isMobile
     ),
 
     // Tab bar
-    React.createElement("div",{style:{display:"flex",borderBottom:"1px solid #e0d4be",marginBottom:"16px",marginTop:"8px"}},
-      tabs.map(function(t){return React.createElement("button",{key:t.id,onClick:function(){setActiveTab(t.id);},style:tab===t.id?tabActive:tabInactive},t.label);})
+    React.createElement("div",{style:{display:"flex",borderBottom:"1px solid #e0d4be",marginBottom:"16px",marginTop:"8px",alignItems:"flex-end",justifyContent:"space-between",gap:"8px",flexWrap:"wrap"}},
+      React.createElement("div",{style:{display:"flex"}},
+        tabs.map(function(t){return React.createElement("button",{key:t.id,onClick:function(){setActiveTab(t.id);},style:tab===t.id?tabActive:tabInactive},t.label);})
+      ),
+      active && onAddTagged && React.createElement("button",{
+        onClick:function(){onAddTagged(active.tag);},
+        style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"5px 12px",marginBottom:"4px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.85rem",color:"#6a5840"}
+      }, "+ Add "+active.label.toLowerCase())
     ),
 
     // Detail list for active tab
@@ -1740,7 +1746,13 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, isMobile
                 cursor:"pointer",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"underline",
                 textDecorationColor:"rgba(168,136,90,0.4)",textUnderlineOffset:"2px"}
             },"When did this end? \u2192"),
-            r.isCurrent&&React.createElement("span",{style:{display:"inline-block",fontSize:"0.78rem",background:"rgba(74,122,90,0.12)",color:"#3a6b4a",border:"1px solid rgba(74,122,90,0.3)",borderRadius:"20px",padding:"0 7px",marginTop:"3px"}},"current")
+            r.isCurrent&&React.createElement("span",{style:{display:"inline-block",fontSize:"0.78rem",background:"rgba(74,122,90,0.12)",color:"#3a6b4a",border:"1px solid rgba(74,122,90,0.3)",borderRadius:"20px",padding:"0 7px",marginTop:"3px",marginRight:"8px"}},"current"),
+            onEditTagged&&React.createElement("button",{
+              onClick:function(){onEditTagged(r.label, active.tag);},
+              style:{background:"none",border:"none",padding:"0",marginTop:"4px",fontSize:"0.78rem",color:"#8a7460",
+                cursor:"pointer",fontFamily:"'Crimson Text',serif",textDecoration:"underline",
+                textDecorationColor:"rgba(138,116,96,0.4)",textUnderlineOffset:"2px"}
+            },"\u270e Edit")
           )
         );
       })
@@ -10429,6 +10441,18 @@ function handleEdit(m) {
           onMissingEnd:(label, tag)=>{
             const m = memories.find(mem=>mem.year&&(mem.tags||[]).includes(tag)&&(((mem.orgs||[])[0]||mem.location)===label));
             if(m){ handleEdit(m); setForm(f=>({...f, _expandEndDate:true})); }
+          },
+          onAddTagged:(tag)=>{
+            setForm({...newForm(), tags:[tag]});
+            setEditingId(null); setEditingCandidateId(null); setView("add");
+          },
+          onEditTagged:(label, tag)=>{
+            const matches = memories.filter(mem=>mem.year&&(mem.tags||[]).includes(tag)&&(((mem.orgs||[])[0]||mem.location)===label));
+            if(matches.length===1){ handleEdit(matches[0]); }
+            else if(matches.length>1){
+              const fType = matches[0].orgs?.[0] ? "orgs" : "locations";
+              setIndexFilter({type:fType, value:label}); setView("index");
+            }
           }
         })
       )),
