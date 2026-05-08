@@ -29,6 +29,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<!-- Genealogy research catalogue. Sources can pick a known collection from
+     here rather than recreating it from scratch on every Lineage subject. -->
+<script src="/resources/genealogy-free-resources.js"></script>
 
 <link rel="stylesheet" href="chronicle.css">
 </head>
@@ -7400,22 +7403,47 @@ function CandidatesPanel({candidates, memories, knownSources, isMobile, onEdit, 
 
 function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) {
   const [editing, setEditing] = React.useState(null);
-  const [form, setForm] = React.useState({title:"", type:"other", repository:"", year:"", url:"", notes:""});
+  const [form, setForm] = React.useState({title:"", type:"other", repository:"", year:"", url:"", notes:"", researchResourceId:""});
+  const [showCatalogue, setShowCatalogue] = React.useState(false);
+  const [catalogueSearch, setCatalogueSearch] = React.useState("");
+  // The Research catalogue is loaded as a global by the script tag in <head>.
+  // It's the same list users see in the Research tool, surfaced here so they
+  // can pick a known collection rather than re-typing FreeBMD / Ancestry / etc.
+  // every time they cite a source on a new Lineage subject.
+  const allResources = (typeof window !== "undefined" && Array.isArray(window.GENEALOGY_RESOURCES)) ? window.GENEALOGY_RESOURCES : [];
 
-  function startAdd() { setForm({title:"", type:"other", repository:"", year:"", url:"", notes:""}); setEditing("new"); }
-  function startEdit(src) { setForm({title:src.title||"", type:src.type||"other", repository:src.repository||"", year:src.year?String(src.year):"", url:src.url||"", notes:src.notes||""}); setEditing(src.id); }
+  function startAdd() { setForm({title:"", type:"other", repository:"", year:"", url:"", notes:"", researchResourceId:""}); setShowCatalogue(false); setEditing("new"); }
+  function startEdit(src) { setForm({title:src.title||"", type:src.type||"other", repository:src.repository||"", year:src.year?String(src.year):"", url:src.url||"", notes:src.notes||"", researchResourceId:src.researchResourceId||""}); setShowCatalogue(false); setEditing(src.id); }
+
+  function pickFromCatalogue(r) {
+    // Fold the research resource into the source form. Title/repository default
+    // to the resource name; users typically refine the title with the specific
+    // record (e.g. "FreeBMD" → "1881 England Census via FreeBMD") before saving.
+    setForm(f => ({
+      ...f,
+      title: f.title || r.resourceName || "",
+      repository: r.resourceName || f.repository,
+      url: r.homeUrl || r.url || f.url,
+      notes: f.notes || r.bestFor || r.notes || "",
+      researchResourceId: r.id,
+    }));
+    setShowCatalogue(false);
+    setCatalogueSearch("");
+  }
+  function clearCatalogueLink() { setForm(f => ({...f, researchResourceId: ""})); }
 
   function saveSource() {
     if (!form.title.trim()) return;
+    const cleanForm = {...form, year: form.year ? +form.year : null};
+    // Drop researchResourceId from the saved record if it's empty
+    if (!cleanForm.researchResourceId) delete cleanForm.researchResourceId;
     if (editing === "new") {
-      const s = {id:"src_"+Date.now(), ...form, year:form.year?+form.year:null};
-      persistSubject({knownSources:[...knownSources, s]});
+      persistSubject({knownSources:[...knownSources, {id:"src_"+Date.now(), ...cleanForm}]});
     } else {
       persistSubject({knownSources: knownSources.map(s=>{
         if (s.id!==editing) return s;
-        // Drop the legacy `confidence` field if it survives on an existing collection
-        const {confidence:_legacyConf, ...rest} = s;
-        return {...rest, ...form, year:form.year?+form.year:null};
+        const {confidence:_legacyConf, researchResourceId:_oldRRI, ...rest} = s;
+        return {...rest, ...cleanForm};
       })});
     }
     setEditing(null);
@@ -7430,9 +7458,76 @@ function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) 
   const countCitations = id => memories.reduce((n,m)=>n+eventSources(m).filter(s=>s.sourceId===id).length, 0);
   const cardStyle = {background:"rgba(255,252,245,0.9)", border:"1px solid #d4c4a8", borderRadius:"4px", padding:"14px 16px", marginBottom:"10px"};
 
-  const editForm = () => React.createElement("div",{style:{...cardStyle, border:"1px solid #a8885a", marginBottom:"18px"}},
-    React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",margin:"0 0 14px",color:"#1a1208"}}, editing==="new"?"New Source Collection":"Edit Source Collection"),
-    React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 14px",lineHeight:1.5}},"A source collection is a body of records (a census, a parish register, a family bible). When you cite this collection on an event, you\u2019ll add the specific record details there."),
+  const editForm = () => {
+    const linkedResource = form.researchResourceId
+      ? allResources.find(r => r.id === form.researchResourceId)
+      : null;
+    const q = catalogueSearch.trim().toLowerCase();
+    const matches = (showCatalogue && allResources.length > 0)
+      ? (q
+          ? allResources.filter(r => {
+              const hay = [
+                r.resourceName, r.bestFor, r.notes,
+                ...(r.scope?.countries||[]),
+                ...(r.scope?.alsoCovers||[]),
+                ...(r.coverage||[]).flatMap(c=>c.events||[])
+              ].filter(Boolean).join(" ").toLowerCase();
+              return hay.includes(q);
+            })
+          : allResources.slice()
+        ).slice(0, 30)
+      : [];
+    return React.createElement("div",{style:{...cardStyle, border:"1px solid #a8885a", marginBottom:"18px"}},
+    React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",margin:"0 0 8px",color:"#1a1208"}}, editing==="new"?"New Source Collection":"Edit Source Collection"),
+    React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 12px",lineHeight:1.5}},"A source collection is a body of records (a census, a parish register, a family bible). When you cite this collection on an event, you\u2019ll add the specific record details there."),
+
+    // ── Research catalogue picker ──
+    allResources.length > 0 && React.createElement("div",{style:{marginBottom:"14px",padding:"10px 12px",background:"rgba(196,169,98,0.07)",border:"1px solid rgba(196,169,98,0.25)",borderRadius:"3px"}},
+      linkedResource
+        ? React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap"}},
+            React.createElement("span",{style:{fontSize:"0.84rem",color:"#5a4820"}}, "\ud83d\uddc2 Linked to research collection: "),
+            React.createElement("strong",{style:{fontSize:"0.92rem",color:"#1a1208"}}, linkedResource.resourceName),
+            (linkedResource.scope?.countries||[]).length>0 && React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}}, "(" + (linkedResource.scope.countries.join(", ")) + ")"),
+            React.createElement("button",{onClick:clearCatalogueLink,style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.78rem",marginLeft:"auto"}}, "Unlink")
+          )
+        : !showCatalogue
+          ? React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
+              React.createElement("span",{style:{fontSize:"0.82rem",color:"#5a4820"}}, "\ud83d\uddc2 Pick from the Research catalogue (" + allResources.length + " collections) to skip retyping common sources like FreeBMD, FindMyPast, FamilySearch\u2026"),
+              React.createElement("button",{onClick:()=>setShowCatalogue(true),style:{...S.btn,padding:"5px 12px",fontSize:"0.82rem",marginLeft:"auto"}}, "Browse catalogue \u2192")
+            )
+          : React.createElement("div",null,
+              React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"8px"}},
+                React.createElement("input",{
+                  autoFocus:true, value:catalogueSearch,
+                  onChange:e=>setCatalogueSearch(e.target.value),
+                  placeholder:"Search catalogue \u2014 name, country, event type\u2026",
+                  style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",flex:1}
+                }),
+                React.createElement("button",{onClick:()=>{setShowCatalogue(false);setCatalogueSearch("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.82rem"}}, "Cancel")
+              ),
+              React.createElement("div",{style:{maxHeight:"260px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px",background:"#fffcf5"}},
+                matches.length === 0
+                  ? React.createElement("p",{style:{padding:"10px 12px",margin:0,fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic"}}, q ? "No matches." : "Catalogue not loaded.")
+                  : matches.map(r => {
+                      const countries = (r.scope?.countries||[]).join(", ");
+                      const evts = [...new Set((r.coverage||[]).flatMap(c=>c.events||[]))].slice(0,4);
+                      return React.createElement("div",{
+                        key:r.id, onClick:()=>pickFromCatalogue(r),
+                        style:{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #ede4d4"},
+                        onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+                        onMouseLeave:e=>e.currentTarget.style.background="transparent"
+                      },
+                        React.createElement("div",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.94rem",color:"#1a1208",fontWeight:600}}, r.resourceName),
+                        React.createElement("div",{style:{fontSize:"0.78rem",color:"#7a6a58",marginTop:"1px"}},
+                          [countries, r.accessType, evts.join("/")].filter(Boolean).join(" \u00b7 ")
+                        ),
+                        r.bestFor && React.createElement("div",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, r.bestFor)
+                      );
+                    })
+              )
+            )
+    ),
+
     React.createElement("div",{style:{display:"grid",gap:"10px"}},
       React.createElement("div",null,
         React.createElement("label",{style:S.label},"Title *"),
@@ -7468,6 +7563,7 @@ function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) 
       React.createElement("button",{onClick:()=>setEditing(null),style:S.btnOutline},"Cancel")
     )
   );
+  };
 
   return React.createElement("div",null,
     React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"18px"}},
@@ -7485,13 +7581,15 @@ function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) 
       : knownSources.map(src=>{
           const ti=typeInfo(src.type);
           const cc=countCitations(src.id);
+          const linkedRes = src.researchResourceId ? allResources.find(r => r.id === src.researchResourceId) : null;
           return React.createElement("div",{key:src.id,style:cardStyle},
             React.createElement("div",{style:{display:"flex",alignItems:"flex-start",gap:"10px"}},
               React.createElement("span",{style:{fontSize:"1.3rem",lineHeight:1,flexShrink:0,marginTop:"2px"}},ti.icon),
               React.createElement("div",{style:{flex:1,minWidth:0}},
                 React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap"}},
                   React.createElement("span",{style:{fontFamily:"'Crimson Text',serif",fontSize:"1rem",color:"#1a1208",fontWeight:600}},src.title),
-                  src.year&&React.createElement("span",{style:{fontSize:"0.8rem",color:"#8a7460",fontStyle:"italic"}},src.year)
+                  src.year&&React.createElement("span",{style:{fontSize:"0.8rem",color:"#8a7460",fontStyle:"italic"}},src.year),
+                  linkedRes && React.createElement("span",{title:"Linked to Research catalogue: "+linkedRes.resourceName,style:{fontSize:"0.72rem",padding:"1px 8px",borderRadius:"20px",background:"rgba(196,169,98,0.18)",color:"#5a4820",border:"1px solid rgba(196,169,98,0.4)"}}, "\ud83d\uddc2 "+linkedRes.resourceName)
                 ),
                 React.createElement("div",{style:{fontSize:"0.8rem",color:"#7a6a58",marginTop:"2px"}},ti.label),
                 src.repository&&React.createElement("div",{style:{fontSize:"0.78rem",color:"#7a6a58",marginTop:"3px"}},"\ud83c\udfdb "+src.repository),
