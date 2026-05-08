@@ -332,6 +332,28 @@ function eventSources(m) {
   return [];
 }
 
+// Classify a Lineage event by how well-sourced it is. Used to colour event
+// rows in history mode so unsourced gaps look obviously different from
+// locked-in primary-source facts.
+//   strong   — at least one citation marked primary
+//   medium   — at least one secondary citation, no primary
+//   weak     — only derivative or unknown citations
+//   unsourced — no citation has a sourceId yet
+function eventConfidence(m) {
+  const cits = eventSources(m).filter(s => s && s.sourceId);
+  if (cits.length === 0) return "unsourced";
+  const confs = cits.map(s => s.confidence || "unknown");
+  if (confs.includes("primary"))   return "strong";
+  if (confs.includes("secondary")) return "medium";
+  return "weak";
+}
+const EVENT_CONFIDENCE_STYLE = {
+  strong:    { color: "#3a6b4a", bg: "rgba(122,158,138,0.12)", label: "✓ primary" },
+  medium:    { color: "#3a4a7a", bg: "rgba(139,157,195,0.12)", label: "secondary" },
+  weak:      { color: "#7a5820", bg: "rgba(196,169,98,0.14)",  label: "derivative" },
+  unsourced: { color: "#a04050", bg: "rgba(196,133,138,0.10)", label: "? unsourced" },
+};
+
 // ─── Backup / sync helpers (v3 multi-subject format) ───────────────────────────
 // The sync file and full backups are v3 — each holds a `subjects` array with
 // every subject in the user's data, plus the cross-subject "top-level" fields.
@@ -12861,10 +12883,26 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
                   (() => { const age = ageAtYear(+yr); return age != null && age >= 0 ? React.createElement("span",{style:{fontSize:"0.74rem",color:"#a8885a",fontStyle:"italic"}},"· age "+age) : null; })(),
                   React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}},byYear[yr].length===1?"1 memory":byYear[yr].length+" memories")
                 ),
-                byYear[yr].map(m=>React.createElement("div",{key:m.id,onClick:()=>{setSelected(m.id);setView("detail");},style:{display:"flex",gap:"10px",marginBottom:"10px",paddingBottom:"10px",borderBottom:"1px solid #ede4d4",cursor:"pointer"}},
-                  React.createElement("div",{style:{width:"9px",height:"9px",borderRadius:"50%",background:m.tags[0]?TAG_COLORS[m.tags[0]]:"#c8b89a",flexShrink:0,marginTop:"6px"}}),
+                byYear[yr].map(m=>{
+                  const conf = isHistoryMode ? eventConfidence(m) : null;
+                  const cs = conf ? EVENT_CONFIDENCE_STYLE[conf] : null;
+                  return React.createElement("div",{key:m.id,onClick:()=>{setSelected(m.id);setView("detail");},
+                    style:{
+                      display:"flex",gap:"10px",marginBottom:"10px",padding:cs?"6px 8px 10px":"0 0 10px",
+                      borderBottom:"1px solid #ede4d4",
+                      borderLeft: cs ? "3px solid "+cs.color : "none",
+                      background: cs && conf!=="strong" ? cs.bg : "transparent",
+                      borderRadius: cs ? "3px" : 0,
+                      opacity: conf==="unsourced" ? 0.8 : 1,
+                      cursor:"pointer"
+                    }
+                  },
+                  React.createElement("div",{style:{width:"9px",height:"9px",borderRadius:"50%",background:cs?cs.color:(m.tags[0]?TAG_COLORS[m.tags[0]]:"#c8b89a"),flexShrink:0,marginTop:"6px"}}),
                   React.createElement("div",{style:{flex:1,minWidth:0}},
-                    React.createElement("div",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",lineHeight:1.3,marginBottom:"2px"}},m.title),
+                    React.createElement("div",{style:{display:"flex",alignItems:"baseline",gap:"8px",flexWrap:"wrap",marginBottom:"2px"}},
+                      React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",lineHeight:1.3}},m.title),
+                      cs && React.createElement("span",{title:"Sourcing confidence — set on each citation",style:{fontSize:"0.7rem",letterSpacing:"0.04em",textTransform:"uppercase",padding:"1px 7px",borderRadius:"20px",border:"1px solid "+cs.color+"55",color:cs.color,background:cs.bg,fontFamily:"'Crimson Text',serif",fontWeight:600}}, cs.label)
+                    ),
                     (()=>{ const a=ageAtYear(m.year); return React.createElement("div",{style:{fontSize:"0.78rem",color:"#a89a7a",fontStyle:"italic",marginBottom:m.content?"4px":"2px"}}, fuzzyDateLabel(m) + (a!=null && a>=0 ? " · age "+a : "")); })(),
                     m.content&&React.createElement("p",{style:{fontSize:"0.9rem",color:"#5a4838",lineHeight:1.65,margin:"0 0 4px",whiteSpace:"pre-wrap"}},m.content),
                     (()=>{
@@ -12882,7 +12920,8 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
                       m.mediaUrls.slice(0,3).map((med,i)=>React.createElement(MediaImg,{key:i,med,alt:"",style:{width:"60px",height:"60px",objectFit:"cover",borderRadius:"3px",border:"1px solid #d4c4a8"}}))
                     )
                   )
-                ))
+                );
+                })
               ))
             )
           );
