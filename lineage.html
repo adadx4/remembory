@@ -7697,7 +7697,7 @@ function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) 
 // Lineage research workspace: a manual to-do list plus six rule-based
 // suggestions that surface gaps in the subject's evidence (unsourced
 // events, missing dates, impossible cycles, etc.).
-function TodoView({subject, memories, knownSources, knownPeople, todos, todoDismissals, persistSubject, setSelected, setView, setIndexFilter, dobYear}) {
+function TodoView({subject, memories, knownSources, knownPeople, todos, todoDismissals, persistSubject, setSelected, setView, setIndexFilter, dobYear, dodYear}) {
   const [draft, setDraft] = React.useState("");
   const [linkedTo, setLinkedTo] = React.useState(null);
 
@@ -7754,12 +7754,10 @@ function TodoView({subject, memories, knownSources, knownPeople, todos, todoDism
   // fixed (because the rule no longer matches).
   const thisYear = new Date().getFullYear();
   const subjDob = dobYear || null;
-  const subjDod = (() => {
-    const m = (subject?.dod || subject?.deatYear || "").toString().match(/\d{4}/);
-    if (!m) return null;
-    const y = parseInt(m[0],10);
-    return (y >= 1500 && y <= thisYear) ? y : null;
-  })();
+  // dodYear mirrors dobYear's behaviour: prefer subject.dod, fall back to
+  // any memory titled "Died" / "My death". Resolved at the App level so
+  // every view sees the same value.
+  const subjDod = dodYear || null;
 
   const suggestions = [];
 
@@ -11249,6 +11247,22 @@ function handleEdit(m) {
     const bornMem = (memories||[]).find(mem => mem.year && mem.year >= 1500 && mem.year <= thisYear && bornRe.test(mem.title||""));
     return bornMem ? bornMem.year : null;
   })();
+  // Mirror of dobYear for date-of-death. subject.dod isn't currently a
+  // first-class field on Personal/Legacy subjects, so we also scan memories
+  // for a "Died" / "I died" / "My death" title — that way the To-Do gap
+  // checks know when to stop counting and don't flag "92-year gap to today"
+  // on a subject who has actually been recorded as deceased.
+  const dodYear = (() => {
+    const thisYear = new Date().getFullYear();
+    const m = (subject?.dod || "").toString().match(/\d{4}/);
+    if (m) {
+      const y = parseInt(m[0], 10);
+      if (y >= 1500 && y <= thisYear) return y;
+    }
+    const diedRe = /^\s*(i\s+died|died|my\s+death|death\s+of\s+me)\b/i;
+    const diedMem = (memories||[]).find(mem => mem.year && mem.year >= 1500 && mem.year <= thisYear && diedRe.test(mem.title||""));
+    return diedMem ? diedMem.year : null;
+  })();
   const ageAtYear = (yr) => (dobYear && yr && yr >= dobYear) ? yr - dobYear : null;
   const allDecades=[...new Set(ownMems.map(m=>Math.floor(m.year/10)*10))].sort();
   const memsForDec=dec=>ownMems.filter(m=>Math.floor(m.year/10)*10===dec).sort((a,b)=>sortKey(a)-sortKey(b));
@@ -12936,7 +12950,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
       // ── PROMPTER ──
       view==="todo"&&React.createElement(TodoView,{
         subject, memories, knownSources, knownPeople, todos, todoDismissals,
-        persistSubject, setSelected, setView, setIndexFilter, dobYear,
+        persistSubject, setSelected, setView, setIndexFilter, dobYear, dodYear,
       }),
 
       view==="prompt"&&React.createElement(PrompterView,{
