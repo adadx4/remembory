@@ -11235,6 +11235,14 @@ function handleEdit(m) {
   }
 
   function commitGedTreeImport(focalGedId) {
+    try {
+      return _doCommitGedTreeImport(focalGedId);
+    } catch (e) {
+      console.error("commitGedTreeImport failed:", e);
+      alert("Tree import failed: " + (e && e.message ? e.message : "unknown error") + ". The browser console has the full stack trace.");
+    }
+  }
+  function _doCommitGedTreeImport(focalGedId) {
     if (!gedPersons) return;
     const { treePersons: newPersons, treeFamilies: newFamilies } = gedPersons.buildTreeData();
 
@@ -13052,14 +13060,23 @@ function handleEdit(m) {
             ),
             React.createElement("button",{
               onClick:()=>{
-                const tpById = Object.fromEntries(treePersons.map(p=>[p.id,p]));
-                const { allMems, rels } = buildMemsFromTree(linkedTp, tpById, treeFamilies);
-                const manualMems = memories.filter(m=>!m.fromGedcom&&!m.gedcomContext);
-                const merged = [...manualMems, ...allMems].sort((a,b)=>(a.year||0)-(b.year||0));
-                const allKnownPeople = [...new Set([...knownPeople,...merged.flatMap(m=>m.people||[])])].sort();
-                const allKnownLocs   = [...new Set([...knownLocations.map(l=>typeof l==="string"?l:l.label),...merged.map(m=>m.location).filter(Boolean)])].sort();
-                const mergedRels = {...rels,...(subject.peopleRelationships||{})};
-                persistSubject({memories:merged, knownPeople:allKnownPeople, knownLocations:allKnownLocs, peopleRelationships:mergedRels});
+                try {
+                  if (!linkedTp) { alert("No tree person is linked to this Chronicle yet — open the Tree view and click \u201cStart Chronicle\u201d on the right person first."); return; }
+                  const tpById = Object.fromEntries(treePersons.map(p=>[p.id,p]));
+                  const { allMems, rels } = buildMemsFromTree(linkedTp, tpById, treeFamilies);
+                  const manualMems = memories.filter(m=>!m.fromGedcom&&!m.gedcomContext);
+                  const merged = [...manualMems, ...allMems].sort((a,b)=>(a.year||0)-(b.year||0));
+                  const allKnownPeople = [...new Set([...knownPeople,...merged.flatMap(m=>m.people||[])])].sort();
+                  const allKnownLocs   = [...new Set([...knownLocations.map(l=>typeof l==="string"?l:l.label),...merged.map(m=>m.location).filter(Boolean)])].sort();
+                  const mergedRels = {...rels,...(subject.peopleRelationships||{})};
+                  const eventCount = allMems.length;
+                  const memBefore = memories.length;
+                  persistSubject({memories:merged, knownPeople:allKnownPeople, knownLocations:allKnownLocs, peopleRelationships:mergedRels});
+                  alert("Re-sync complete: "+eventCount+" event"+(eventCount===1?"":"s")+" from the tree merged with "+manualMems.length+" manual memor"+(manualMems.length===1?"y":"ies")+" \u2014 "+memBefore+" \u2192 "+merged.length+" memories total.");
+                } catch (e) {
+                  console.error("Re-sync failed:", e);
+                  alert("Re-sync failed: " + (e && e.message ? e.message : "unknown error") + ". The browser console has the full stack trace.");
+                }
               },
               style:{...S.btn,padding:"7px 16px",fontSize:"0.88rem"}
             }, hasGedcomMems ? "\u21bb Re-sync from tree" : "Pull in events")
