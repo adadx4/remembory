@@ -6466,9 +6466,10 @@ function ImportView({
     React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"22px",fontSize:"0.95rem"}},"Bring in old photos or emails and turn them into memories."),
     importSaved>0&&React.createElement("div",{style:{background:"#e8f4e8",border:"1px solid #89b08a",borderRadius:"3px",padding:"12px 16px",marginBottom:"18px",color:"#3a6b3a",fontSize:"0.95rem"}},"\u2713 "+importSaved+" "+(importSaved===1?"memory":"memories")+" saved."),
 
-    // ── Tabs ──
+    // ── Tabs ── (Email tab retired; the panel is still rendered below if
+    // someone hits importTab=="email" via an old link, but it's not shown.)
     React.createElement("div",{style:{display:"flex",borderBottom:"1px solid #c8b89a",marginBottom:"24px"}},
-      [["photos","\ud83d\udcf7  Photos"],["email","\u2709\ufe0f  Email"],["gedcom","\ud83c\udf33  Family Tree"]].filter(([t])=>IS_STAGING||t!=="gedcom").map(([tab,label])=>React.createElement("button",{key:tab,onClick:()=>setImportTab(tab),style:{padding:"10px 20px",border:"none",borderBottom:importTab===tab?"2px solid #2c2416":"2px solid transparent",background:"transparent",color:importTab===tab?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"1rem",marginBottom:"-1px"}},label))
+      [["photos","\ud83d\udcf7  Photos"],["gedcom","\ud83c\udf33  Family Tree"]].filter(([t])=>IS_STAGING||t!=="gedcom").map(([tab,label])=>React.createElement("button",{key:tab,onClick:()=>setImportTab(tab),style:{padding:"10px 20px",border:"none",borderBottom:importTab===tab?"2px solid #2c2416":"2px solid transparent",background:"transparent",color:importTab===tab?"#1a1208":"#8a7460",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"1rem",marginBottom:"-1px"}},label))
     ),
 
     // ══════════════ PHOTOS TAB ══════════════
@@ -10858,15 +10859,86 @@ function handleEdit(m) {
   function commitGedTreeImport(focalGedId) {
     if (!gedPersons) return;
     const { treePersons: newPersons, treeFamilies: newFamilies } = gedPersons.buildTreeData();
-    // Merge: preserve any existing records (matched by gedId), keep subjectId links
-    const existingById = Object.fromEntries((treePersons||[]).map(p=>[p.gedId,p]));
-    const merged = newPersons.map(p => existingById[p.gedId]
-      ? {...p, subjectId: existingById[p.gedId].subjectId}
-      : p
-    );
-    // Mark focal person
-    const gedFocalPersonId = focalGedId ? ("tp_"+focalGedId.replace(/@/g,"")) : (merged[0]?.id||null);
-    persistSubject({treePersons:merged, treeFamilies:newFamilies, gedFocalPersonId});
+
+    // Fresh import — no existing tree to worry about.
+    if (!treePersons || treePersons.length === 0) {
+      const gedFocalPersonId = focalGedId ? ("tp_"+focalGedId.replace(/@/g,"")) : (newPersons[0]?.id || null);
+      persistSubject({treePersons: newPersons, treeFamilies: newFamilies, gedFocalPersonId});
+      setGedPersons(null); setGedPicked(null); setGedPreview(null);
+      setGedContext([]); setGedContextSel(new Set());
+      setGedTreeImportDone(true);
+      setTimeout(()=>setGedTreeImportDone(false), 4000);
+      setView("tree");
+      return;
+    }
+
+    // Adding to an existing tree. Detect overlap by GEDCOM @id@ — heavy
+    // overlap suggests a re-export of the same family, so we update those
+    // records in place. New IDs (a sibling branch / different family) get
+    // namespaced with a 4-char batch prefix so they can't collide with
+    // anything already in the tree.
+    const existingByGedId = Object.fromEntries((treePersons||[]).map(p=>[p.gedId, p]));
+    const newGedIds = newPersons.map(p => p.gedId);
+    const overlap = newGedIds.filter(id => existingByGedId[id]).length;
+    const sameFamily = overlap > 0 && (overlap / newGedIds.length) > 0.5;
+
+    let mode;
+    if (sameFamily) {
+      const proceed = window.confirm(
+        "This GEDCOM looks like an updated export of your existing family ("
+        + overlap + " of " + newGedIds.length + " people match by ID).\n\n"
+        + "OK \u2014 update matching people with the new data, keep their Chronicle links, and add any new people.\n\n"
+        + "Cancel \u2014 add as a separate branch instead (existing data left untouched)."
+      );
+      mode = proceed ? "update" : "append";
+    } else {
+      const proceed = window.confirm(
+        "You already have " + treePersons.length + " people in your family tree.\n\n"
+        + "OK \u2014 add this GEDCOM as a separate branch. Existing people are preserved; new IDs are namespaced so nothing collides.\n\n"
+        + "Cancel \u2014 abort the import."
+      );
+      if (!proceed) return;
+      mode = "append";
+    }
+
+    let merged, mergedFamilies, gedFocalPersonId;
+    if (mode === "update") {
+      // Refresh data on matching gedIds, preserving subjectId links.
+      const newByGedId = Object.fromEntries(newPersons.map(p => [p.gedId, p]));
+      const updatedExisting = (treePersons||[]).map(p => {
+        const fresh = newByGedId[p.gedId];
+        return fresh ? {...fresh, subjectId: p.subjectId} : p;
+      });
+      const existingGedIds = new Set((treePersons||[]).map(p => p.gedId));
+      const brandNew = newPersons.filter(p => !existingGedIds.has(p.gedId));
+      merged = [...updatedExisting, ...brandNew];
+      // Families are rebuilt from the new GEDCOM (it's authoritative for who-is-married-to-whom)
+      mergedFamilies = newFamilies;
+      gedFocalPersonId = focalGedId ? ("tp_"+focalGedId.replace(/@/g,"")) : (merged[0]?.id || null);
+    } else {
+      // Append with namespace.
+      const batch = Math.random().toString(36).slice(2, 6);
+      const idMap = {};
+      const namespacedPersons = newPersons.map(p => {
+        const newId = "tp_" + batch + "_" + p.gedId.replace(/@/g, "");
+        idMap[p.id] = newId;
+        return {...p, id: newId};
+      });
+      const namespacedFamilies = newFamilies.map(f => ({
+        ...f,
+        id: "tf_" + batch + "_" + f.gedId.replace(/@/g, ""),
+        husbandId: f.husbandId ? (idMap[f.husbandId] || null) : null,
+        wifeId: f.wifeId ? (idMap[f.wifeId] || null) : null,
+        childIds: (f.childIds||[]).map(cid => idMap[cid] || cid),
+      }));
+      merged = [...(treePersons||[]), ...namespacedPersons];
+      mergedFamilies = [...(treeFamilies||[]), ...namespacedFamilies];
+      gedFocalPersonId = focalGedId
+        ? (idMap["tp_"+focalGedId.replace(/@/g,"")] || namespacedPersons[0]?.id)
+        : (namespacedPersons[0]?.id || null);
+    }
+
+    persistSubject({treePersons: merged, treeFamilies: mergedFamilies, gedFocalPersonId});
     setGedPersons(null); setGedPicked(null); setGedPreview(null);
     setGedContext([]); setGedContextSel(new Set());
     setGedTreeImportDone(true);
