@@ -7492,15 +7492,15 @@ function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) 
     // entry. Two sources, in order:
     //   1. `collections[]` — named, curated entries (preferred where present)
     //   2. `coverage[]` — older shape: events × year span, name derived
+    // Each named collection's startYear may be flat or nested under coverage[0].
     const namedCollections = linkedResource ? (linkedResource.collections||[]) : [];
     const coverageSuggestions = linkedResource
       ? [
-          ...namedCollections.map(c => ({
-            label: c.name,
-            year: c.startYear || null,
-            url: c.url || "",
-            collId: c.id,
-          })),
+          ...namedCollections.map(c => {
+            const cov = (c.coverage && c.coverage[0]) || {};
+            const startYear = c.startYear != null ? c.startYear : cov.startYear;
+            return { label: c.name, year: startYear || null, url: c.url || "", collId: c.id };
+          }),
           ...(namedCollections.length === 0 ? (linkedResource.coverage||[]).slice(0, 6).map(c => {
             const evts = (c.events||[]).join(" / ");
             const span = (c.startYear && c.endYear) ? c.startYear + "\u2013" + c.endYear
@@ -8308,13 +8308,14 @@ function AddEditForm({
           updateCitation(idx, {sourceId: existing.id, _repoFilter: undefined});
           return;
         }
+        const meta = collMeta(coll);
         const newId = "src_"+Date.now()+Math.random().toString(36).slice(2,5);
         const newSrc = {
           id: newId,
           title: coll.name || repoEntry.resourceName,
           type: coll.type || "other",
           repository: repoEntry.resourceName,
-          year: coll.startYear || null,
+          year: meta.startYear || null,
           url: coll.url || repoEntry.url || repoEntry.homeUrl || "",
           notes: coll.notes || "",
           researchResourceId: repoEntry.id,
@@ -8323,10 +8324,23 @@ function AddEditForm({
         persistSubject({knownSources: [...(knownSources||[]), newSrc].sort((a,b)=>(a.title||"").localeCompare(b.title||""))});
         updateCitation(idx, {sourceId: newId, _repoFilter: undefined});
       }
+      // Catalogue collections come in two shapes:
+      //   flat — { id, name, events, startYear, endYear, url, notes }
+      //   nested — { id, name, coverage: [{events, startYear, endYear}], url, notes }
+      // Read either through this helper so the cascade works against both.
+      function collMeta(c) {
+        const cov = (c.coverage && c.coverage[0]) || {};
+        return {
+          startYear: c.startYear != null ? c.startYear : cov.startYear,
+          endYear: c.endYear != null ? c.endYear : cov.endYear,
+          events: c.events || cov.events || null,
+        };
+      }
       function fmtSpan(c) {
-        if (c.startYear && c.endYear) return c.startYear+"\u2013"+c.endYear;
-        if (c.startYear) return "from "+c.startYear;
-        if (c.endYear) return "to "+c.endYear;
+        const {startYear, endYear} = collMeta(c);
+        if (startYear && endYear) return startYear+"\u2013"+endYear;
+        if (startYear) return "from "+startYear;
+        if (endYear) return "to "+endYear;
         return "";
       }
       return React.createElement("div",null,

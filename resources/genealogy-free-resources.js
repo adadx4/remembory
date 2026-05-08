@@ -1555,7 +1555,26 @@ window.GENEALOGY_RESOURCES = [
           }
         ],
         "notes": "Chinese Genealogies (jiapu) — clan and lineage books — plus some 19th- and 20th-century civil records. Coverage for surnames varies enormously."
-      }
+      },
+      { "id": "fs-us-1850", "name": "United States Federal Census, 1850", "url": "https://www.familysearch.org/search/collection/1401638", "coverage": [{ "events": ["census","residence"], "startYear": 1850, "endYear": 1850 }], "notes": "First US census to list every household member by name." },
+      { "id": "fs-us-1860", "name": "United States Federal Census, 1860", "url": "https://www.familysearch.org/search/collection/1473181", "coverage": [{ "events": ["census","residence"], "startYear": 1860, "endYear": 1860 }] },
+      { "id": "fs-us-1870", "name": "United States Federal Census, 1870", "url": "https://www.familysearch.org/search/collection/1438024", "coverage": [{ "events": ["census","residence"], "startYear": 1870, "endYear": 1870 }] },
+      { "id": "fs-us-1880", "name": "United States Federal Census, 1880", "url": "https://www.familysearch.org/search/collection/1417683", "coverage": [{ "events": ["census","residence"], "startYear": 1880, "endYear": 1880 }] },
+      { "id": "fs-us-1900", "name": "United States Federal Census, 1900", "url": "https://www.familysearch.org/search/collection/1325221", "coverage": [{ "events": ["census","residence"], "startYear": 1900, "endYear": 1900 }] },
+      { "id": "fs-us-1910", "name": "United States Federal Census, 1910", "url": "https://www.familysearch.org/search/collection/1727033", "coverage": [{ "events": ["census","residence"], "startYear": 1910, "endYear": 1910 }] },
+      { "id": "fs-us-1920", "name": "United States Federal Census, 1920", "url": "https://www.familysearch.org/search/collection/1488411", "coverage": [{ "events": ["census","residence"], "startYear": 1920, "endYear": 1920 }] },
+      { "id": "fs-us-1930", "name": "United States Federal Census, 1930", "url": "https://www.familysearch.org/search/collection/1810731", "coverage": [{ "events": ["census","residence"], "startYear": 1930, "endYear": 1930 }] },
+      { "id": "fs-us-1940", "name": "United States Federal Census, 1940", "url": "https://www.familysearch.org/search/collection/2000219", "coverage": [{ "events": ["census","residence"], "startYear": 1940, "endYear": 1940 }] },
+      { "id": "fs-us-1950", "name": "United States Federal Census, 1950", "url": "https://www.familysearch.org/search/collection/4464515", "coverage": [{ "events": ["census","residence"], "startYear": 1950, "endYear": 1950 }] },
+      { "id": "fs-us-ssdi", "name": "United States Social Security Death Index", "url": "https://www.familysearch.org/search/collection/1202535", "coverage": [{ "events": ["death"], "startYear": 1935, "endYear": 2014 }], "notes": "Index of deaths reported to the US Social Security Administration." },
+      { "id": "fs-find-a-grave", "name": "Find A Grave Index", "url": "https://www.familysearch.org/search/collection/2221801", "coverage": [{ "events": ["death","burial"], "startYear": 1600, "endYear": null }], "notes": "Volunteer-contributed cemetery and headstone index, worldwide." },
+      { "id": "fs-ellis-island", "name": "New York Passenger Arrival Lists (Ellis Island), 1820-1957", "url": "https://www.familysearch.org/search/collection/1916074", "coverage": [{ "events": ["travel","residence"], "startYear": 1820, "endYear": 1957 }], "notes": "Inbound passenger manifests for the Port of New York (Ellis Island and Castle Garden)." },
+      { "id": "fs-uk-1851", "name": "England, Wales & Scotland Census, 1851", "url": "https://www.familysearch.org/search/collection/2338569", "coverage": [{ "events": ["census","residence"], "startYear": 1851, "endYear": 1851 }] },
+      { "id": "fs-uk-1861", "name": "England, Wales & Scotland Census, 1861", "url": "https://www.familysearch.org/search/collection/1493745", "coverage": [{ "events": ["census","residence"], "startYear": 1861, "endYear": 1861 }] },
+      { "id": "fs-uk-1871", "name": "England, Wales & Scotland Census, 1871", "url": "https://www.familysearch.org/search/collection/1538354", "coverage": [{ "events": ["census","residence"], "startYear": 1871, "endYear": 1871 }] },
+      { "id": "fs-uk-1891", "name": "England, Wales & Scotland Census, 1891", "url": "https://www.familysearch.org/search/collection/1865747", "coverage": [{ "events": ["census","residence"], "startYear": 1891, "endYear": 1891 }] },
+      { "id": "fs-uk-1901", "name": "England, Wales & Scotland Census, 1901", "url": "https://www.familysearch.org/search/collection/1888129", "coverage": [{ "events": ["census","residence"], "startYear": 1901, "endYear": 1901 }] },
+      { "id": "fs-uk-1911", "name": "England, Wales & Scotland Census, 1911", "url": "https://www.familysearch.org/search/collection/2046756", "coverage": [{ "events": ["census","residence"], "startYear": 1911, "endYear": 1911 }] }
     ]
   },
   {
@@ -2030,7 +2049,21 @@ window.GENEALOGY_RESOURCES = [
           }
         ],
         "notes": "Board of Trade BT 27 — passenger lists for ships departing British ports. Free name-index via TNA Discovery; Findmypast has the searchable images."
-      }
+      },
+      { "id": "fmp-1841-census", "name": "1841 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1841-census", "coverage": [{ "events": ["census","residence"], "startYear": 1841, "endYear": 1841 }] },
+      { "id": "fmp-1851-census", "name": "1851 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1851-census", "coverage": [{ "events": ["census","residence"], "startYear": 1851, "endYear": 1851 }] },
+      { "id": "fmp-1861-census", "name": "1861 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1861-census", "coverage": [{ "events": ["census","residence"], "startYear": 1861, "endYear": 1861 }] },
+      { "id": "fmp-1871-census", "name": "1871 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1871-census", "coverage": [{ "events": ["census","residence"], "startYear": 1871, "endYear": 1871 }] },
+      { "id": "fmp-1881-census", "name": "1881 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1881-census", "coverage": [{ "events": ["census","residence"], "startYear": 1881, "endYear": 1881 }] },
+      { "id": "fmp-1891-census", "name": "1891 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1891-census", "coverage": [{ "events": ["census","residence"], "startYear": 1891, "endYear": 1891 }] },
+      { "id": "fmp-1901-census", "name": "1901 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1901-census", "coverage": [{ "events": ["census","residence"], "startYear": 1901, "endYear": 1901 }] },
+      { "id": "fmp-1911-census", "name": "1911 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1911-census", "coverage": [{ "events": ["census","residence"], "startYear": 1911, "endYear": 1911 }] },
+      { "id": "fmp-bna", "name": "British Newspaper Archive (Findmypast linked)", "url": "https://www.findmypast.co.uk/articles/world-records/full-list-of-united-kingdom-records/historical-newspapers", "coverage": [{ "events": ["other","residence","death","marriage","birth"], "startYear": 1700, "endYear": 2000 }], "notes": "Searchable index of British and Irish newspapers from 1700 onwards — partner site to British Newspaper Archive." },
+      { "id": "fmp-catholic-heritage", "name": "Catholic Heritage Archive", "url": "https://www.findmypast.co.uk/articles/world-records/search-all-uk-records/church-records/catholic-heritage-archive", "coverage": [{ "events": ["baptism","marriage","burial"], "startYear": 1600, "endYear": 1950 }], "notes": "Catholic parish registers from England, Scotland and the United States." },
+      { "id": "fmp-uk-wwi", "name": "British Army Service Records 1914-1920", "url": "https://www.findmypast.co.uk/articles/world-records/search-all-uk-records/military-armed-forces-and-conflict/british-army-service-records-1914-1920", "coverage": [{ "events": ["military"], "startYear": 1914, "endYear": 1920 }], "notes": "Surviving British Army WWI service records (so-called \"burnt documents\")." },
+      { "id": "fmp-uk-wwii", "name": "British Army Officer Service Records 1939-1945", "url": "https://www.findmypast.co.uk/articles/world-records/search-all-uk-records/military-armed-forces-and-conflict", "coverage": [{ "events": ["military"], "startYear": 1939, "endYear": 1945 }] },
+      { "id": "fmp-petty-sessions", "name": "Ireland Petty Sessions Court Registers", "url": "https://www.findmypast.co.uk/articles/world-records/search-all-uk-records/institutions-and-organisations/ireland-petty-sessions-court-registers", "coverage": [{ "events": ["legal"], "startYear": 1828, "endYear": 1912 }], "notes": "Local court records — petty crimes, debts, neighbour disputes. A common port of call for tracing Irish ancestors." },
+      { "id": "fmp-pa", "name": "Periodical Source Index (PERSI)", "url": "https://www.findmypast.com/articles/world-records/full-list-of-the-united-states-records/directories-and-social-history/periodical-source-index", "coverage": [{ "events": ["other"], "startYear": 1800, "endYear": 2010 }], "notes": "Subject index to genealogical articles in over 11,000 periodicals." }
     ]
   },
   {
