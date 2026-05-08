@@ -4703,7 +4703,7 @@ function PerspectivesPanel({memory, onSave, peopleEmails, senderName, ownerName=
 
 
 // ── PrintView ──────────────────────────────────────────────────
-function PrintView({memories, ownerName, allDecades}) {
+function PrintView({memories, ownerName, allDecades, peopleRelationships}) {
   const [detail, setDetail] = useState("full"); // full | headings | toc
   const [scope, setScope] = useState("all");
   const [scopeDecade, setScopeDecade] = useState(null);
@@ -4712,6 +4712,12 @@ function PrintView({memories, ownerName, allDecades}) {
   const [showPeople, setShowPeople] = useState(true);
   const [showTags, setShowTags] = useState(false);
   const [showLocations, setShowLocations] = useState(true);
+  // People index at the back of the print is customised separately from the
+  // inline people-on-each-memory display above. mode "titles" keeps the old
+  // behaviour; "off" hides it; "names" / "count" are tidier alternatives.
+  const [peopleIndexMode, setPeopleIndexMode] = useState("titles"); // off | names | count | titles
+  const [peopleIndexCols, setPeopleIndexCols] = useState(2);
+  const [peopleIndexShowRel, setPeopleIndexShowRel] = useState(false);
   // Cover customisation. Default subtitle reads "Memories from X to Y" so the
   // year range is unambiguous — the bare "1971 – 2025" was reading like a
   // birth–death lifespan even when the subject is alive.
@@ -4875,6 +4881,41 @@ function PrintView({memories, ownerName, allDecades}) {
         )
       ),
 
+      // People index controls
+      React.createElement("div",{style:{borderTop:"1px solid #ede4d4",paddingTop:"14px",marginTop:"4px",display:"flex",flexWrap:"wrap",gap:"20px"}},
+        React.createElement("div",{style:{flex:"1 1 240px",minWidth:"220px"}},
+          React.createElement("label",{style:S.label},"People index (back of book)"),
+          React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"6px",marginTop:"4px"}},
+            [["off","Off — don\u2019t print a people index"],
+             ["names","Names only"],
+             ["count","Names + memory count"],
+             ["titles","Names + memory titles"]].map(([v,label])=>
+              React.createElement("label",{key:v,style:{display:"flex",alignItems:"center",gap:"8px",cursor:"pointer",fontSize:"0.92rem",color:peopleIndexMode===v?"#1a1208":"#6a5c48"}},
+                React.createElement("input",{type:"radio",name:"peopleIndexMode",value:v,checked:peopleIndexMode===v,onChange:()=>setPeopleIndexMode(v)}),
+                label
+              )
+            )
+          )
+        ),
+        peopleIndexMode!=="off"&&React.createElement("div",{style:{flex:"1 1 200px",minWidth:"180px"}},
+          React.createElement("label",{style:S.label},"People index layout"),
+          React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"6px",marginTop:"4px"}},
+            React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"8px",fontSize:"0.92rem"}},
+              React.createElement("span",{style:{minWidth:"60px",color:"#8a7460"}},"Columns:"),
+              React.createElement("select",{value:peopleIndexCols,onChange:e=>setPeopleIndexCols(+e.target.value),style:{...S.select,fontSize:"0.92rem",padding:"4px 8px"}},
+                React.createElement("option",{value:1},"1"),
+                React.createElement("option",{value:2},"2"),
+                React.createElement("option",{value:3},"3")
+              )
+            ),
+            React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"8px",cursor:"pointer",fontSize:"0.92rem"}},
+              React.createElement("input",{type:"checkbox",checked:peopleIndexShowRel,onChange:e=>setPeopleIndexShowRel(e.target.checked)}),
+              "Include relationships (where known)"
+            )
+          )
+        )
+      ),
+
       React.createElement("button",{onClick:doPrint,style:{...S.btn,padding:"11px 28px",fontSize:"1rem",marginTop:"16px"}},
         "🖨 Print / Save as PDF"
       ),
@@ -4952,18 +4993,22 @@ function PrintView({memories, ownerName, allDecades}) {
         )
       )),
 
-      // People index
-      showPeople&&detail!=="toc"&&Object.keys(peopleIndex).length>0&&React.createElement("div",{style:{marginTop:"48px",borderTop:"2px solid #c8b89a",paddingTop:"28px",pageBreakBefore:"always"}},
+      // People index — controlled separately from the per-memory people line.
+      peopleIndexMode!=="off"&&detail!=="toc"&&Object.keys(peopleIndex).length>0&&React.createElement("div",{style:{marginTop:"48px",borderTop:"2px solid #c8b89a",paddingTop:"28px",pageBreakBefore:"always"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.6rem",margin:"0 0 20px",color:"#1a1208"}},"People"),
-        React.createElement("div",{style:{columns:"2",columnGap:"28px"}},
-          Object.keys(peopleIndex).sort().map(person=>
-            React.createElement("div",{key:person,style:{breakInside:"avoid",marginBottom:"10px"}},
-              React.createElement("span",{style:{fontWeight:600,fontSize:"0.95rem"}},person),
-              React.createElement("span",{style:{fontSize:"0.82rem",color:"#8a7460",marginLeft:"8px"}},
-                peopleIndex[person].map(m=>`${m.title} (${m.year})`).join(", ")
+        React.createElement("div",{style:{columns:String(peopleIndexCols),columnGap:"28px"}},
+          Object.keys(peopleIndex).sort().map(person=>{
+            const rel = peopleIndexShowRel ? (peopleRelationships?.[person]||"") : "";
+            const ms = peopleIndex[person];
+            return React.createElement("div",{key:person,style:{breakInside:"avoid",marginBottom:peopleIndexMode==="titles"?"10px":"4px"}},
+              React.createElement("span",{style:{fontWeight:600,fontSize:"0.95rem"}}, person),
+              rel && React.createElement("span",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginLeft:"6px"}}, "\u2014 "+rel),
+              peopleIndexMode==="count" && React.createElement("span",{style:{fontSize:"0.82rem",color:"#8a7460",marginLeft:"8px"}}, "("+ms.length+")"),
+              peopleIndexMode==="titles" && React.createElement("span",{style:{fontSize:"0.82rem",color:"#8a7460",marginLeft:"8px"}},
+                ms.map(m=>`${m.title} (${m.year})`).join(", ")
               )
-            )
-          )
+            );
+          })
         )
       )
     )
@@ -11861,7 +11906,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
           )
         );
       })(),
-      view==="print"&&React.createElement(PrintView,{memories,ownerName,allDecades}),
+      view==="print"&&React.createElement(PrintView,{memories,ownerName,allDecades,peopleRelationships}),
 
       // ── CONTACT FORM ──
       view==="contact"&&React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"600px"}},
