@@ -11276,7 +11276,6 @@ function handleEdit(m) {
 
     let merged, mergedFamilies, gedFocalPersonId;
     if (mode === "update") {
-      // Refresh data on matching gedIds, preserving subjectId links.
       const newByGedId = Object.fromEntries(newPersons.map(p => [p.gedId, p]));
       const updatedExisting = (treePersons||[]).map(p => {
         const fresh = newByGedId[p.gedId];
@@ -11285,11 +11284,9 @@ function handleEdit(m) {
       const existingGedIds = new Set((treePersons||[]).map(p => p.gedId));
       const brandNew = newPersons.filter(p => !existingGedIds.has(p.gedId));
       merged = [...updatedExisting, ...brandNew];
-      // Families are rebuilt from the new GEDCOM (it's authoritative for who-is-married-to-whom)
       mergedFamilies = newFamilies;
       gedFocalPersonId = focalGedId ? ("tp_"+focalGedId.replace(/@/g,"")) : (merged[0]?.id || null);
     } else {
-      // Append with namespace.
       const batch = Math.random().toString(36).slice(2, 6);
       const idMap = {};
       const namespacedPersons = newPersons.map(p => {
@@ -11311,11 +11308,56 @@ function handleEdit(m) {
         : (namespacedPersons[0]?.id || null);
     }
 
-    persistSubject({treePersons: merged, treeFamilies: mergedFamilies, gedFocalPersonId});
+    // Cascade the refreshed tree into chronicled subjects: any subject whose
+    // tree-person record was updated gets its memories rebuilt from the new
+    // events, while preserving manually-added (non-GEDCOM) memories. Without
+    // this step a user re-importing a richer GEDCOM saw no new events on
+    // their existing Chronicle subjects — only the underlying tree changed.
+    const treeHostId = (subjects.find(s => (s.treePersons||[]).length > 0) || subject)?.id;
+    const tpById = Object.fromEntries(merged.map(p => [p.id, p]));
+    const refreshedNames = [];
+    const updatedSubjectsForData = subjects.map(s => {
+      let next = s;
+      if (s.id === treeHostId) {
+        next = {...next, treePersons: merged, treeFamilies: mergedFamilies, gedFocalPersonId};
+      }
+      // Only refresh chronicled subjects in update mode — append mode adds
+      // namespaced people that aren't linked to any existing subject yet.
+      if (mode === "update") {
+        const linkedTp = merged.find(p => p.subjectId === s.id);
+        if (linkedTp) {
+          const { allMems, rels } = buildMemsFromTree(linkedTp, tpById, mergedFamilies);
+          const manualMems = (next.memories||[]).filter(m => !m.fromGedcom && !m.gedcomContext);
+          const memBefore = (next.memories||[]).length;
+          const newMemories = [...manualMems, ...allMems].sort((a,b)=>(a.year||0)-(b.year||0));
+          const newKnownPeople = [...new Set([...(next.knownPeople||[]), ...newMemories.flatMap(m=>m.people||[])])].sort();
+          const existingLocLabels = new Set((next.knownLocations||[]).map(l => typeof l==="string" ? l : (l.label||"")));
+          const addedLocs = [...new Set(newMemories.map(m=>m.location).filter(Boolean))]
+            .filter(l => !existingLocLabels.has(l))
+            .map(l => ({label:l, street:"", town:"", state:"", country:""}));
+          const newRels = {...rels, ...(next.peopleRelationships||{})};
+          next = {
+            ...next,
+            memories: newMemories,
+            knownPeople: newKnownPeople,
+            knownLocations: [...(next.knownLocations||[]), ...addedLocs],
+            peopleRelationships: newRels,
+          };
+          refreshedNames.push({ name: s.name, before: memBefore, after: newMemories.length });
+        }
+      }
+      return next;
+    });
+
+    persistTop({subjects: updatedSubjectsForData});
     setGedPersons(null); setGedPicked(null); setGedPreview(null);
     setGedContext([]); setGedContextSel(new Set());
     setGedTreeImportDone(true);
     setTimeout(()=>setGedTreeImportDone(false), 4000);
+    if (refreshedNames.length > 0) {
+      const lines = refreshedNames.map(r => "\u2022 " + r.name + " (" + r.before + " \u2192 " + r.after + " events)");
+      alert("Tree updated. Refreshed " + refreshedNames.length + " linked Chronicle" + (refreshedNames.length===1?"":"s") + " with the new events:\n\n" + lines.join("\n"));
+    }
     setView("tree");
   }
 
