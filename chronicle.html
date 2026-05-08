@@ -12589,7 +12589,7 @@ function handleEdit(m) {
               {label:"📚 Source",action:()=>{setIndexFilter({type:"sources"});setView("index");},active:view==="index"&&indexFilter?.type==="sources"},
               {label:"🔍 Candidate",action:()=>{setIndexFilter({type:"candidatePersons"});setView("index");},active:view==="index"&&indexFilter?.type==="candidatePersons"},
               {label:"👤 Person",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
-              {label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
+              {label:"📷 Photo",action:()=>{setImportTab&&setImportTab("photos");setView("import");}},
               {label:"🔎 Research",action:()=>window.open(genealogyResearchUrl(null, knownLocations),"_blank","noopener")},
             ]:[
               {label:"+ Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
@@ -12678,7 +12678,7 @@ function handleEdit(m) {
           {label:"📚 Source",action:()=>{setIndexFilter({type:"sources"});setView("index");},active:view==="index"&&indexFilter?.type==="sources"},
           {label:"🔍 Candidate",action:()=>{setIndexFilter({type:"candidatePersons"});setView("index");},active:view==="index"&&indexFilter?.type==="candidatePersons"},
           {label:"👤 Person",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
-          {label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
+          {label:"📷 Photo",action:()=>{setImportTab&&setImportTab("photos");setView("import");}},
           {label:"🔎 Research",action:()=>window.open(genealogyResearchUrl(null, knownLocations),"_blank","noopener")},
         ]:[
           {label:"+ Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
