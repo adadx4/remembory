@@ -2681,26 +2681,104 @@ function RelationshipRow({rel, people, memCount, onView, onRename}) {
   );
 }
 
+// Group a relationship label into a broad category for the tree view.
+// Match against keywords rather than exact strings so free-text labels like
+// "Childhood best friend" still land in the right bucket.
+const RELATIONSHIP_CATEGORIES = [
+  { key:"family",   label:"\ud83d\udc6a Family",  patterns:["father","mother","parent","son","daughter","child","sister","brother","sibling","grandparent","grandmother","grandfather","grandchild","granddaughter","grandson","aunt","uncle","niece","nephew","cousin","in-law","in law","spouse","partner","wife","husband","ex-","step"] },
+  { key:"friends",  label:"\ud83d\udc6b Friends", patterns:["friend","mate","girlfriend","boyfriend","companion"] },
+  { key:"work",     label:"\ud83d\udcbc Work",    patterns:["colleague","coworker","co-worker","manager","employer","employee","boss","mentor","mentee","teammate","supervisor","client","business"] },
+  { key:"education",label:"\ud83c\udf93 Education",patterns:["teacher","tutor","student","classmate","professor","schoolmate","lecturer"] },
+  { key:"care",     label:"\ud83c\udfe5 Healthcare",patterns:["doctor","therapist","coach","nurse","psychiatrist","psychologist","counsellor","counselor","carer","caregiver","midwife","gp"] },
+  { key:"community",label:"\ud83c\udfd8 Community",patterns:["neighbour","neighbor","flatmate","housemate","roommate"] },
+];
+function categoriseRelationship(rel) {
+  const r = (rel||"").toLowerCase();
+  for (const c of RELATIONSHIP_CATEGORIES) {
+    if (c.patterns.some(p => r.includes(p))) return c;
+  }
+  return { key:"other", label:"\ud83d\udcce Other" };
+}
+
 function RelationshipIndex({memories, peopleRelationships, onView, onRenameRelationship}) {
   const [search, setSearch] = React.useState("");
+  // Paths in `expanded` are shown; default all collapsed so the user gets a
+  // tidy category-level overview matching the Locations tree's behaviour.
+  const [expanded, setExpanded] = React.useState(() => new Set());
+  function toggle(path) {
+    setExpanded(prev => { const n = new Set(prev); if (n.has(path)) n.delete(path); else n.add(path); return n; });
+  }
   const allRels=[...new Set(Object.values(peopleRelationships).map(r=>(r||"").trim()).filter(Boolean))].sort();
   if(allRels.length===0) return React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No relationships tagged yet.");
   const q = search.trim().toLowerCase();
-  const filtered = q ? allRels.filter(rel => {
-    if(rel.toLowerCase().includes(q)) return true;
-    const people=Object.entries(peopleRelationships).filter(([,r])=>(r||"").trim()===rel).map(([n])=>n);
-    return people.some(p=>p.toLowerCase().includes(q));
-  }) : allRels;
+
+  // Filter relationships, keeping the ones whose name OR people match the search
+  const peopleByRel = {};
+  for (const rel of allRels) peopleByRel[rel] = Object.entries(peopleRelationships).filter(([,r])=>(r||"").trim()===rel).map(([n])=>n);
+  const filtered = q
+    ? allRels.filter(rel => rel.toLowerCase().includes(q) || peopleByRel[rel].some(p=>p.toLowerCase().includes(q)))
+    : allRels;
+
+  // While searching, fall back to a flat list for predictable results
+  if (q) {
+    return React.createElement("div",null,
+      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"12px",gap:"12px"}},
+        React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},allRels.length+" relationship type"+(allRels.length===1?"":"s")+" \u00b7 click a name to see memories \u00b7 rename to merge types"),
+      ),
+      React.createElement("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Search relationships or people\u2026",style:{...S.input,marginBottom:"14px",padding:"7px 11px",fontSize:"0.88rem"}}),
+      filtered.length===0&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No matches."),
+      filtered.map(rel=>{
+        const people = peopleByRel[rel];
+        const mc=memories.filter(m=>m.people?.some(p=>people.includes(p))).length;
+        return React.createElement(RelationshipRow,{key:rel,rel,people,memCount:mc,onView,onRename:onRenameRelationship});
+      })
+    );
+  }
+
+  // Tree mode: bucket each relationship into its category, then render
+  // category → relationship type → people.
+  const buckets = {};
+  for (const rel of allRels) {
+    const cat = categoriseRelationship(rel);
+    if (!buckets[cat.key]) buckets[cat.key] = { label: cat.label, rels: [] };
+    buckets[cat.key].rels.push(rel);
+  }
+  const ORDER = ["family","friends","work","education","care","community","other"];
+  const orderedKeys = ORDER.filter(k => buckets[k]);
+
   return React.createElement("div",null,
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"12px",gap:"12px"}},
-      React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},allRels.length+" relationship type"+(allRels.length===1?"":"s")+" · click a name to see memories · rename to merge types"),
+      React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},allRels.length+" relationship type"+(allRels.length===1?"":"s")+" \u00b7 click a name to see memories \u00b7 rename to merge types"),
     ),
-    React.createElement("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Search relationships or people…",style:{...S.input,marginBottom:"14px",padding:"7px 11px",fontSize:"0.88rem"}}),
-    filtered.length===0&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No matches."),
-    filtered.map(rel=>{
-      const people=Object.entries(peopleRelationships).filter(([,r])=>(r||"").trim()===rel).map(([n])=>n);
-      const mc=memories.filter(m=>m.people?.some(p=>people.includes(p))).length;
-      return React.createElement(RelationshipRow,{key:rel,rel,people,memCount:mc,onView,onRename:onRenameRelationship});
+    React.createElement("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Search relationships or people\u2026",style:{...S.input,marginBottom:"14px",padding:"7px 11px",fontSize:"0.88rem"}}),
+    orderedKeys.map(catKey => {
+      const bucket = buckets[catKey];
+      const catPath = "c:"+catKey;
+      const catOpen = expanded.has(catPath);
+      const catRelCount = bucket.rels.length;
+      const catPeopleCount = new Set(bucket.rels.flatMap(r=>peopleByRel[r])).size;
+      return React.createElement("div",{key:catKey,style:{borderBottom:"1px solid #ede4d4"}},
+        React.createElement("button",{
+          onClick:()=>toggle(catPath),
+          style:{
+            width:"100%",display:"flex",alignItems:"center",gap:"8px",
+            background:"transparent",border:"none",cursor:"pointer",
+            padding:"8px 0",fontFamily:"'Crimson Text',serif",
+            color:"#5a4820",fontSize:"0.98rem",fontWeight:600,textAlign:"left"
+          }
+        },
+          React.createElement("span",{style:{display:"inline-block",width:"10px",fontSize:"0.7rem",color:"#a89a7a"}}, catOpen?"\u25bc":"\u25b6"),
+          React.createElement("span",null, bucket.label),
+          React.createElement("span",{style:{fontSize:"0.78rem",color:"#a89a7a",fontWeight:400,marginLeft:"4px"}}, catRelCount+" type"+(catRelCount===1?"":"s")+" \u00b7 "+catPeopleCount+" people")
+        ),
+        catOpen && React.createElement("div",{style:{paddingLeft:"22px",paddingBottom:"6px"}},
+          bucket.rels.map(rel => {
+            const people = peopleByRel[rel];
+            const mc = memories.filter(m=>m.people?.some(p=>people.includes(p))).length;
+            return React.createElement(RelationshipRow,{key:rel,rel,people,memCount:mc,onView,onRename:onRenameRelationship});
+          })
+        )
+      );
     })
   );
 }
@@ -2751,7 +2829,13 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
       if (!editLabels.has(l.label)) return l;
       return {...l, ...changes};
     });
-    persistSubject({knownLocations: updated});
+    // Cascade structured-field changes into the per-memory snapshots so
+    // memories at these labels carry the same address values as the
+    // knownLocations record.
+    const memUpdates = {};
+    for (const k of Object.keys(changes)) memUpdates["location"+k.charAt(0).toUpperCase()+k.slice(1)] = changes[k];
+    const updMems = memories.map(m => editLabels.has(m.location) ? {...m, ...memUpdates} : m);
+    persistSubject({knownLocations: updated, memories: updMems});
     closeEditor();
   }
   function commitAdd(){
@@ -8381,7 +8465,16 @@ function App() {
   }
   function setLocationAddress(name, {street, town, state, country}) {
     const updated = knownLocations.map(l => l.label===name ? {...l, street, town, state, country} : l);
-    persistSubject({knownLocations: updated});
+    // Push the change into every memory that uses this label so the per-memory
+    // address snapshot stays consistent with the canonical knownLocations
+    // record. Otherwise structured fields on memories drift after edits made
+    // here and surface stale data on share/export.
+    const updMems = memories.map(m =>
+      m.location === name
+        ? {...m, locationStreet:street||"", locationTown:town||"", locationState:state||"", locationCountry:country||""}
+        : m
+    );
+    persistSubject({knownLocations: updated, memories: updMems});
   }
   function renameLocation(oldName, newName) {
     const n=newName.trim(); if(!n||n===oldName) return;
