@@ -7412,8 +7412,8 @@ function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) 
   // every time they cite a source on a new Lineage subject.
   const allResources = (typeof window !== "undefined" && Array.isArray(window.GENEALOGY_RESOURCES)) ? window.GENEALOGY_RESOURCES : [];
 
-  function startAdd() { setForm({title:"", type:"other", repository:"", year:"", url:"", notes:"", researchResourceId:""}); setShowCatalogue(false); setEditing("new"); }
-  function startEdit(src) { setForm({title:src.title||"", type:src.type||"other", repository:src.repository||"", year:src.year?String(src.year):"", url:src.url||"", notes:src.notes||"", researchResourceId:src.researchResourceId||""}); setShowCatalogue(false); setEditing(src.id); }
+  function startAdd() { setForm({title:"", type:"other", repository:"", year:"", url:"", notes:"", researchResourceId:"", researchCollectionId:""}); setShowCatalogue(false); setEditing("new"); }
+  function startEdit(src) { setForm({title:src.title||"", type:src.type||"other", repository:src.repository||"", year:src.year?String(src.year):"", url:src.url||"", notes:src.notes||"", researchResourceId:src.researchResourceId||"", researchCollectionId:src.researchCollectionId||""}); setShowCatalogue(false); setEditing(src.id); }
 
   function pickFromCatalogue(r) {
     // Picker only fills the Repository tier — not the Collection title — so the
@@ -7430,23 +7430,30 @@ function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) 
     setCatalogueSearch("");
   }
   function clearCatalogueLink() { setForm(f => ({...f, researchResourceId: "", repository: ""})); }
-  // Apply a coverage-based suggestion (e.g. "Births 1837–1983") from the
-  // linked repository as the Collection title and year fields.
-  function applyCoverageSuggestion(label, year) {
-    setForm(f => ({...f, title: label, year: year ? String(year) : f.year}));
+  // Apply a coverage- or catalogue-collection suggestion to the Collection
+  // tier. Named catalogue collections also pass an id and url so we link the
+  // saved source back to that catalogue collection cleanly.
+  function applyCoverageSuggestion(suggestion) {
+    setForm(f => ({
+      ...f,
+      title: suggestion.label,
+      year: suggestion.year ? String(suggestion.year) : f.year,
+      url: suggestion.url || f.url,
+      researchCollectionId: suggestion.collId || f.researchCollectionId || "",
+    }));
   }
 
   function saveSource() {
     if (!form.title.trim()) return;
     const cleanForm = {...form, year: form.year ? +form.year : null};
-    // Drop researchResourceId from the saved record if it's empty
     if (!cleanForm.researchResourceId) delete cleanForm.researchResourceId;
+    if (!cleanForm.researchCollectionId) delete cleanForm.researchCollectionId;
     if (editing === "new") {
       persistSubject({knownSources:[...knownSources, {id:"src_"+Date.now(), ...cleanForm}]});
     } else {
       persistSubject({knownSources: knownSources.map(s=>{
         if (s.id!==editing) return s;
-        const {confidence:_legacyConf, researchResourceId:_oldRRI, ...rest} = s;
+        const {confidence:_legacyConf, researchResourceId:_oldRRI, researchCollectionId:_oldRCI, ...rest} = s;
         return {...rest, ...cleanForm};
       })});
     }
@@ -7481,18 +7488,28 @@ function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) 
           : allResources.slice()
         ).slice(0, 30)
       : [];
-    // Build coverage suggestions from the linked repository's catalogue entry.
-    // Each one becomes a quick-fill button that drops a sensible Collection
-    // title + year into the form (e.g. "Marriages 1837 – 1983").
+    // Build quick-fill suggestions from the linked repository's catalogue
+    // entry. Two sources, in order:
+    //   1. `collections[]` — named, curated entries (preferred where present)
+    //   2. `coverage[]` — older shape: events × year span, name derived
+    const namedCollections = linkedResource ? (linkedResource.collections||[]) : [];
     const coverageSuggestions = linkedResource
-      ? (linkedResource.coverage||[]).slice(0, 6).map(c => {
-          const evts = (c.events||[]).join(" / ");
-          const span = (c.startYear && c.endYear) ? c.startYear + "\u2013" + c.endYear
-                      : c.startYear ? "from "+c.startYear
-                      : c.endYear ? "to "+c.endYear : "";
-          const label = [evts, span].filter(Boolean).join(" ").trim() || "Collection";
-          return { label, year: c.startYear || null };
-        })
+      ? [
+          ...namedCollections.map(c => ({
+            label: c.name,
+            year: c.startYear || null,
+            url: c.url || "",
+            collId: c.id,
+          })),
+          ...(namedCollections.length === 0 ? (linkedResource.coverage||[]).slice(0, 6).map(c => {
+            const evts = (c.events||[]).join(" / ");
+            const span = (c.startYear && c.endYear) ? c.startYear + "\u2013" + c.endYear
+                        : c.startYear ? "from "+c.startYear
+                        : c.endYear ? "to "+c.endYear : "";
+            const label = [evts, span].filter(Boolean).join(" ").trim() || "Collection";
+            return { label, year: c.startYear || null };
+          }) : [])
+        ]
       : [];
 
     return React.createElement("div",{style:{...cardStyle, border:"1px solid #a8885a", marginBottom:"18px"}},
@@ -7573,7 +7590,7 @@ function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) 
         coverageSuggestions.length > 0 && React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"5px",marginTop:"6px"}},
           React.createElement("span",{style:{fontSize:"0.74rem",color:"#8a7460",fontStyle:"italic",marginRight:"2px"}}, "Quick-fill from " + linkedResource.resourceName + ":"),
           coverageSuggestions.map((s,i) => React.createElement("button",{
-            key:i, onClick:()=>applyCoverageSuggestion(s.label, s.year),
+            key:i, onClick:()=>applyCoverageSuggestion(s),
             style:{padding:"2px 9px",borderRadius:"20px",border:"1px solid #c8b89a",background:"transparent",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.78rem",color:"#6a5840"}
           }, s.label))
         ),
@@ -8274,17 +8291,52 @@ function AddEditForm({
         if (m && m.mediaId) idbDelete(m.mediaId);
         setSources(cur => cur.map((s,i)=>i===citIdx?{...s, mediaUrls:(s.mediaUrls||[]).filter((_,j)=>j!==medIdx)}:s));
       }
-      // Distinct repository names across all known source collections, used by
-      // the Repository dropdown on each citation. Sorted alphabetically.
-      const knownRepos = [...new Set((knownSources||[]).map(s=>(s.repository||"").trim()).filter(Boolean))].sort();
+      // Repository universe: union of repos the user already has saved
+      // collections in AND every Repository in the curated catalogue. The
+      // catalogue feeds names so users can pick e.g. Ancestry without
+      // having to add a stub knownSource first. Auto-created on collection-pick.
+      const allCatalogueRepos = (typeof window !== "undefined" && Array.isArray(window.GENEALOGY_RESOURCES)) ? window.GENEALOGY_RESOURCES : [];
+      const userRepoNames = [...new Set((knownSources||[]).map(s=>(s.repository||"").trim()).filter(Boolean))];
+      const catalogueRepoNames = allCatalogueRepos.map(r => r.resourceName).filter(Boolean);
+      const knownRepos = [...new Set([...userRepoNames, ...catalogueRepoNames])].sort();
+      // Lazy-create a knownSources entry the first time a user cites a
+      // catalogue collection; reuse the same id on subsequent citations of
+      // the same collection so the source list doesn't grow per-citation.
+      function pickCatalogueCollection(idx, repoEntry, coll) {
+        const existing = (knownSources||[]).find(s => s.researchCollectionId === coll.id);
+        if (existing) {
+          updateCitation(idx, {sourceId: existing.id, _repoFilter: undefined});
+          return;
+        }
+        const newId = "src_"+Date.now()+Math.random().toString(36).slice(2,5);
+        const newSrc = {
+          id: newId,
+          title: coll.name || repoEntry.resourceName,
+          type: coll.type || "other",
+          repository: repoEntry.resourceName,
+          year: coll.startYear || null,
+          url: coll.url || repoEntry.url || repoEntry.homeUrl || "",
+          notes: coll.notes || "",
+          researchResourceId: repoEntry.id,
+          researchCollectionId: coll.id,
+        };
+        persistSubject({knownSources: [...(knownSources||[]), newSrc].sort((a,b)=>(a.title||"").localeCompare(b.title||""))});
+        updateCitation(idx, {sourceId: newId, _repoFilter: undefined});
+      }
+      function fmtSpan(c) {
+        if (c.startYear && c.endYear) return c.startYear+"\u2013"+c.endYear;
+        if (c.startYear) return "from "+c.startYear;
+        if (c.endYear) return "to "+c.endYear;
+        return "";
+      }
       return React.createElement("div",null,
         React.createElement("label",{style:S.label},"Source Citations"),
         React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 10px",lineHeight:1.5}},
           "Pick a Repository, then a Collection within it, then add the specific Record details (URL, page reference, transcript, confidence)."
         ),
-        (knownSources||[]).length===0
+        knownRepos.length === 0
           ? React.createElement("div",{style:{background:"rgba(196,169,98,0.07)",border:"1px dashed rgba(196,169,98,0.4)",borderRadius:"3px",padding:"10px 14px",fontSize:"0.84rem",color:"#7a6a58"}},
-              "No source collections yet. Add one in ",
+              "No repositories yet. Add one in ",
               React.createElement("strong",null,"Index \u2192 Sources"),
               " before citing it on an event."
             )
@@ -8297,9 +8349,16 @@ function AddEditForm({
                 // so they can change repos mid-edit without dangling state.
                 const repoDerived = src ? (src.repository||"") : "";
                 const repoPicked = (cit._repoFilter !== undefined && cit._repoFilter !== null) ? cit._repoFilter : repoDerived;
-                const collectionsInRepo = repoPicked
+                const userCollectionsInRepo = repoPicked
                   ? (knownSources||[]).filter(s => (s.repository||"") === repoPicked)
                   : [];
+                const catalogueRepoEntry = repoPicked
+                  ? allCatalogueRepos.find(r => r.resourceName === repoPicked)
+                  : null;
+                // Collections in catalogue for this repo, minus ones the user
+                // has already linked (so the dropdown doesn't show duplicates).
+                const linkedCollIds = new Set(userCollectionsInRepo.map(s => s.researchCollectionId).filter(Boolean));
+                const cataloguedColls = (catalogueRepoEntry?.collections||[]).filter(c => c.id && !linkedCollIds.has(c.id));
                 return React.createElement("div",{key:idx,style:{background:"rgba(255,252,245,0.65)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px",marginBottom:"10px"}},
                   React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px",marginBottom:"10px"}},
                     React.createElement("strong",{style:{fontSize:"0.82rem",letterSpacing:"0.06em",textTransform:"uppercase",color:"#8a7460"}}, "Citation " + (idx+1)),
@@ -8314,23 +8373,41 @@ function AddEditForm({
                       onChange: e => updateCitation(idx, {_repoFilter: e.target.value, sourceId: ""}),
                       style: S.select
                     },
-                      React.createElement("option",{value:""}, knownRepos.length===0 ? "\u2014 no repositories saved yet \u2014" : "\u2014 pick repository \u2014"),
+                      React.createElement("option",{value:""}, "\u2014 pick repository \u2014"),
                       knownRepos.map(r => React.createElement("option",{key:r,value:r}, r))
                     )
                   ),
 
-                  // Step 2 — Collection (only after a repository is picked)
+                  // Step 2 — Collection (only after a repository is picked).
+                  // Two optgroups: user-saved collections in this repo, and
+                  // catalogue collections (which lazy-create knownSources on pick).
                   repoPicked && React.createElement("div",{style:{marginBottom:"10px"}},
                     React.createElement("label",{style:{...S.label,fontSize:"0.76rem",letterSpacing:"0.08em",textTransform:"uppercase"}}, "2 \u00b7 Collection"),
                     React.createElement("select",{
                       value: cit.sourceId || "",
-                      onChange: e => updateCitation(idx, {sourceId: e.target.value, _repoFilter: undefined}),
+                      onChange: e => {
+                        const v = e.target.value;
+                        if (v.startsWith("cat:") && catalogueRepoEntry) {
+                          const collId = v.slice(4);
+                          const coll = (catalogueRepoEntry.collections||[]).find(c => c.id === collId);
+                          if (coll) pickCatalogueCollection(idx, catalogueRepoEntry, coll);
+                        } else {
+                          updateCitation(idx, {sourceId: v, _repoFilter: undefined});
+                        }
+                      },
                       style: S.select
                     },
                       React.createElement("option",{value:""}, "\u2014 pick collection \u2014"),
-                      collectionsInRepo.map(s => React.createElement("option",{key:s.id,value:s.id}, s.title + (s.year ? " ("+s.year+")" : "")))
+                      userCollectionsInRepo.length > 0 && React.createElement("optgroup",{label:"Your collections"},
+                        userCollectionsInRepo.map(s => React.createElement("option",{key:s.id,value:s.id}, s.title + (s.year ? " ("+s.year+")" : "")))
+                      ),
+                      cataloguedColls.length > 0 && React.createElement("optgroup",{label:"From the Research catalogue"},
+                        cataloguedColls.map(c => React.createElement("option",{key:"cat:"+c.id,value:"cat:"+c.id},
+                          c.name + (fmtSpan(c) ? " \u00b7 "+fmtSpan(c) : "")
+                        ))
+                      )
                     ),
-                    collectionsInRepo.length === 0 && React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",margin:"4px 0 0"}},
+                    userCollectionsInRepo.length === 0 && cataloguedColls.length === 0 && React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",margin:"4px 0 0"}},
                       "No collections yet inside this repository. Add one in Index \u2192 Sources."
                     )
                   ),
