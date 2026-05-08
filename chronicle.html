@@ -7416,21 +7416,25 @@ function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) 
   function startEdit(src) { setForm({title:src.title||"", type:src.type||"other", repository:src.repository||"", year:src.year?String(src.year):"", url:src.url||"", notes:src.notes||"", researchResourceId:src.researchResourceId||""}); setShowCatalogue(false); setEditing(src.id); }
 
   function pickFromCatalogue(r) {
-    // Fold the research resource into the source form. Title/repository default
-    // to the resource name; users typically refine the title with the specific
-    // record (e.g. "FreeBMD" → "1881 England Census via FreeBMD") before saving.
+    // Picker only fills the Repository tier — not the Collection title — so the
+    // user is left to name the specific dataset they're citing within that
+    // repository (e.g. pick FreeBMD as repository, then type "England & Wales
+    // BMD, Deaths 1916–2007" as the collection).
     setForm(f => ({
       ...f,
-      title: f.title || r.resourceName || "",
       repository: r.resourceName || f.repository,
-      url: r.homeUrl || r.url || f.url,
-      notes: f.notes || r.bestFor || r.notes || "",
+      url: f.url || r.homeUrl || r.url || "",
       researchResourceId: r.id,
     }));
     setShowCatalogue(false);
     setCatalogueSearch("");
   }
-  function clearCatalogueLink() { setForm(f => ({...f, researchResourceId: ""})); }
+  function clearCatalogueLink() { setForm(f => ({...f, researchResourceId: "", repository: ""})); }
+  // Apply a coverage-based suggestion (e.g. "Births 1837–1983") from the
+  // linked repository as the Collection title and year fields.
+  function applyCoverageSuggestion(label, year) {
+    setForm(f => ({...f, title: label, year: year ? String(year) : f.year}));
+  }
 
   function saveSource() {
     if (!form.title.trim()) return;
@@ -7477,85 +7481,122 @@ function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) 
           : allResources.slice()
         ).slice(0, 30)
       : [];
+    // Build coverage suggestions from the linked repository's catalogue entry.
+    // Each one becomes a quick-fill button that drops a sensible Collection
+    // title + year into the form (e.g. "Marriages 1837 – 1983").
+    const coverageSuggestions = linkedResource
+      ? (linkedResource.coverage||[]).slice(0, 6).map(c => {
+          const evts = (c.events||[]).join(" / ");
+          const span = (c.startYear && c.endYear) ? c.startYear + "\u2013" + c.endYear
+                      : c.startYear ? "from "+c.startYear
+                      : c.endYear ? "to "+c.endYear : "";
+          const label = [evts, span].filter(Boolean).join(" ").trim() || "Collection";
+          return { label, year: c.startYear || null };
+        })
+      : [];
+
     return React.createElement("div",{style:{...cardStyle, border:"1px solid #a8885a", marginBottom:"18px"}},
     React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",margin:"0 0 8px",color:"#1a1208"}}, editing==="new"?"New Source Collection":"Edit Source Collection"),
-    React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 12px",lineHeight:1.5}},"A source collection is a body of records (a census, a parish register, a family bible). When you cite this collection on an event, you\u2019ll add the specific record details there."),
-
-    // ── Research catalogue picker ──
-    allResources.length > 0 && React.createElement("div",{style:{marginBottom:"14px",padding:"10px 12px",background:"rgba(196,169,98,0.07)",border:"1px solid rgba(196,169,98,0.25)",borderRadius:"3px"}},
-      linkedResource
-        ? React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap"}},
-            React.createElement("span",{style:{fontSize:"0.84rem",color:"#5a4820"}}, "\ud83d\uddc2 Linked to research collection: "),
-            React.createElement("strong",{style:{fontSize:"0.92rem",color:"#1a1208"}}, linkedResource.resourceName),
-            (linkedResource.scope?.countries||[]).length>0 && React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}}, "(" + (linkedResource.scope.countries.join(", ")) + ")"),
-            React.createElement("button",{onClick:clearCatalogueLink,style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.78rem",marginLeft:"auto"}}, "Unlink")
-          )
-        : !showCatalogue
-          ? React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
-              React.createElement("span",{style:{fontSize:"0.82rem",color:"#5a4820"}}, "\ud83d\uddc2 Pick from the Research catalogue (" + allResources.length + " collections) to skip retyping common sources like FreeBMD, FindMyPast, FamilySearch\u2026"),
-              React.createElement("button",{onClick:()=>setShowCatalogue(true),style:{...S.btn,padding:"5px 12px",fontSize:"0.82rem",marginLeft:"auto"}}, "Browse catalogue \u2192")
-            )
-          : React.createElement("div",null,
-              React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"8px"}},
-                React.createElement("input",{
-                  autoFocus:true, value:catalogueSearch,
-                  onChange:e=>setCatalogueSearch(e.target.value),
-                  placeholder:"Search catalogue \u2014 name, country, event type\u2026",
-                  style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",flex:1}
-                }),
-                React.createElement("button",{onClick:()=>{setShowCatalogue(false);setCatalogueSearch("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.82rem"}}, "Cancel")
-              ),
-              React.createElement("div",{style:{maxHeight:"260px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px",background:"#fffcf5"}},
-                matches.length === 0
-                  ? React.createElement("p",{style:{padding:"10px 12px",margin:0,fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic"}}, q ? "No matches." : "Catalogue not loaded.")
-                  : matches.map(r => {
-                      const countries = (r.scope?.countries||[]).join(", ");
-                      const evts = [...new Set((r.coverage||[]).flatMap(c=>c.events||[]))].slice(0,4);
-                      return React.createElement("div",{
-                        key:r.id, onClick:()=>pickFromCatalogue(r),
-                        style:{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #ede4d4"},
-                        onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
-                        onMouseLeave:e=>e.currentTarget.style.background="transparent"
-                      },
-                        React.createElement("div",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.94rem",color:"#1a1208",fontWeight:600}}, r.resourceName),
-                        React.createElement("div",{style:{fontSize:"0.78rem",color:"#7a6a58",marginTop:"1px"}},
-                          [countries, r.accessType, evts.join("/")].filter(Boolean).join(" \u00b7 ")
-                        ),
-                        r.bestFor && React.createElement("div",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, r.bestFor)
-                      );
-                    })
-              )
-            )
+    React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 14px",lineHeight:1.5}},
+      "Three levels: pick or type a ",
+      React.createElement("strong",null,"Repository"), " (where the records live \u2014 Ancestry, Trove, FreeBMD\u2026), name the ",
+      React.createElement("strong",null,"Collection"), " inside it (e.g. \u201cEngland & Wales BMD, Deaths 1916\u20132007\u201d), then add ",
+      React.createElement("strong",null,"Record"), " details when you cite this collection on individual events."
     ),
 
-    React.createElement("div",{style:{display:"grid",gap:"10px"}},
+    React.createElement("div",{style:{display:"grid",gap:"12px"}},
+
+      // ── Tier 1: Repository ──
       React.createElement("div",null,
-        React.createElement("label",{style:S.label},"Title *"),
-        React.createElement("input",{value:form.title,onChange:e=>setForm(f=>({...f,title:e.target.value})),placeholder:"e.g. 1881 England Census, Smith family bible, Manchester Cathedral parish records",style:S.input,autoFocus:true})
+        React.createElement("label",{style:{...S.label,letterSpacing:"0.1em",textTransform:"uppercase",fontSize:"0.74rem",color:"#8a7460"}}, "1 \u00b7 Repository"),
+        linkedResource
+          ? React.createElement("div",{style:{padding:"8px 10px",background:"rgba(196,169,98,0.1)",border:"1px solid rgba(196,169,98,0.4)",borderRadius:"3px",display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap"}},
+              React.createElement("span",{style:{fontSize:"0.78rem",color:"#5a4820"}}, "\ud83d\uddc2 From catalogue: "),
+              React.createElement("strong",{style:{fontSize:"0.95rem",color:"#1a1208"}}, linkedResource.resourceName),
+              (linkedResource.scope?.countries||[]).length>0 && React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic"}}, "(" + linkedResource.scope.countries.join(", ") + ")"),
+              React.createElement("button",{onClick:clearCatalogueLink,style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.78rem",marginLeft:"auto"}}, "Change")
+            )
+          : React.createElement("div",null,
+              React.createElement("div",{style:{display:"flex",gap:"6px"}},
+                React.createElement("input",{
+                  value:form.repository,
+                  onChange:e=>setForm(f=>({...f,repository:e.target.value})),
+                  placeholder:"e.g. Ancestry, Trove, PROV, family bible\u2026",
+                  style:{...S.input,flex:1}
+                }),
+                allResources.length > 0 && !showCatalogue && React.createElement("button",{onClick:()=>setShowCatalogue(true),style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.86rem",whiteSpace:"nowrap"}}, "\ud83d\uddc2 Browse \u2026")
+              ),
+              showCatalogue && React.createElement("div",{style:{marginTop:"6px",border:"1px solid #d4c4a8",borderRadius:"3px",background:"#fffcf5"}},
+                React.createElement("div",{style:{display:"flex",gap:"6px",padding:"8px 10px",borderBottom:"1px solid #ede4d4"}},
+                  React.createElement("input",{
+                    autoFocus:true, value:catalogueSearch,
+                    onChange:e=>setCatalogueSearch(e.target.value),
+                    placeholder:"Search catalogue \u2014 name, country, event type\u2026",
+                    style:{...S.input,padding:"5px 10px",fontSize:"0.88rem",flex:1}
+                  }),
+                  React.createElement("button",{onClick:()=>{setShowCatalogue(false);setCatalogueSearch("");},style:{...S.btnOutline,padding:"4px 10px",fontSize:"0.82rem"}}, "Cancel")
+                ),
+                React.createElement("div",{style:{maxHeight:"220px",overflowY:"auto"}},
+                  matches.length === 0
+                    ? React.createElement("p",{style:{padding:"10px 12px",margin:0,fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic"}}, q ? "No matches." : "Catalogue not loaded.")
+                    : matches.map(r => {
+                        const countries = (r.scope?.countries||[]).join(", ");
+                        const evts = [...new Set((r.coverage||[]).flatMap(c=>c.events||[]))].slice(0,4);
+                        return React.createElement("div",{
+                          key:r.id, onClick:()=>pickFromCatalogue(r),
+                          style:{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #ede4d4"},
+                          onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+                          onMouseLeave:e=>e.currentTarget.style.background="transparent"
+                        },
+                          React.createElement("div",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.94rem",color:"#1a1208",fontWeight:600}}, r.resourceName),
+                          React.createElement("div",{style:{fontSize:"0.78rem",color:"#7a6a58",marginTop:"1px"}},
+                            [countries, r.accessType, evts.join("/")].filter(Boolean).join(" \u00b7 ")
+                          ),
+                          r.bestFor && React.createElement("div",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",marginTop:"2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, r.bestFor)
+                        );
+                      })
+                )
+              )
+            )
       ),
-      React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 100px",gap:"8px"}},
-        React.createElement("div",null,
-          React.createElement("label",{style:S.label},"Type"),
-          React.createElement("select",{value:form.type,onChange:e=>setForm(f=>({...f,type:e.target.value})),style:S.select},
-            SOURCE_TYPES.map(t=>React.createElement("option",{key:t.id,value:t.id},t.icon+" "+t.label))
+
+      // ── Tier 2: Collection ──
+      React.createElement("div",null,
+        React.createElement("label",{style:{...S.label,letterSpacing:"0.1em",textTransform:"uppercase",fontSize:"0.74rem",color:"#8a7460"}}, "2 \u00b7 Collection \u2731"),
+        React.createElement("input",{value:form.title,onChange:e=>setForm(f=>({...f,title:e.target.value})),placeholder:"e.g. England & Wales BMD, Deaths 1916\u20132007",style:S.input,autoFocus:!form.title}),
+        coverageSuggestions.length > 0 && React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"5px",marginTop:"6px"}},
+          React.createElement("span",{style:{fontSize:"0.74rem",color:"#8a7460",fontStyle:"italic",marginRight:"2px"}}, "Quick-fill from " + linkedResource.resourceName + ":"),
+          coverageSuggestions.map((s,i) => React.createElement("button",{
+            key:i, onClick:()=>applyCoverageSuggestion(s.label, s.year),
+            style:{padding:"2px 9px",borderRadius:"20px",border:"1px solid #c8b89a",background:"transparent",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.78rem",color:"#6a5840"}
+          }, s.label))
+        ),
+        React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginTop:"10px"}},
+          React.createElement("div",null,
+            React.createElement("label",{style:{...S.label,fontSize:"0.78rem"}}, "Collection type"),
+            React.createElement("select",{value:form.type,onChange:e=>setForm(f=>({...f,type:e.target.value})),style:S.select},
+              SOURCE_TYPES.map(t=>React.createElement("option",{key:t.id,value:t.id},t.icon+" "+t.label))
+            )
+          ),
+          React.createElement("div",null,
+            React.createElement("label",{style:{...S.label,fontSize:"0.78rem"}}, "Collection year (optional)"),
+            React.createElement("input",{type:"text",inputMode:"numeric",value:form.year,onChange:e=>setForm(f=>({...f,year:e.target.value.replace(/[^0-9]/g,"")})),placeholder:"e.g. 1881",style:S.input})
           )
         ),
-        React.createElement("div",null,
-          React.createElement("label",{style:S.label},"Year"),
-          React.createElement("input",{type:"text",inputMode:"numeric",value:form.year,onChange:e=>setForm(f=>({...f,year:e.target.value.replace(/[^0-9]/g,"")})),placeholder:"opt.",style:S.input})
+        React.createElement("div",{style:{marginTop:"10px"}},
+          React.createElement("label",{style:{...S.label,fontSize:"0.78rem"}}, "Collection URL (search page)"),
+          React.createElement("input",{type:"url",value:form.url,onChange:e=>setForm(f=>({...f,url:e.target.value})),placeholder:"https://\u2026",style:S.input})
+        ),
+        React.createElement("div",{style:{marginTop:"10px"}},
+          React.createElement("label",{style:{...S.label,fontSize:"0.78rem"}}, "Notes"),
+          React.createElement("textarea",{value:form.notes,onChange:e=>setForm(f=>({...f,notes:e.target.value})),placeholder:"Coverage period, quirks, things to remember about this collection\u2026",rows:2,style:{...S.input,resize:"vertical"}})
         )
       ),
-      React.createElement("div",null,
-        React.createElement("label",{style:S.label},"Repository / Where to find it"),
-        React.createElement("input",{value:form.repository,onChange:e=>setForm(f=>({...f,repository:e.target.value})),placeholder:"e.g. Manchester Central Library, FindMyPast, Aunt Sue\u2019s house",style:S.input})
-      ),
-      React.createElement("div",null,
-        React.createElement("label",{style:S.label},"URL"),
-        React.createElement("input",{type:"url",value:form.url,onChange:e=>setForm(f=>({...f,url:e.target.value})),placeholder:"https://\u2026",style:S.input})
-      ),
-      React.createElement("div",null,
-        React.createElement("label",{style:S.label},"Notes"),
-        React.createElement("textarea",{value:form.notes,onChange:e=>setForm(f=>({...f,notes:e.target.value})),placeholder:"Description of the collection, coverage period, any quirks\u2026",rows:2,style:{...S.input,resize:"vertical"}})
+
+      // ── Tier 3 reminder ──
+      React.createElement("p",{style:{margin:0,padding:"8px 12px",background:"rgba(168,136,90,0.08)",border:"1px dashed rgba(168,136,90,0.35)",borderRadius:"3px",fontSize:"0.78rem",color:"#6a5840",lineHeight:1.5}},
+        React.createElement("strong",null,"3 \u00b7 Records"),
+        " \u2014 The specific record (page, transcript, person ID, exact URL) belongs on the event citation, not here. After you save this collection, open any event and click \u201cCite a source\u201d to attach a record."
       )
     ),
     React.createElement("div",{style:{display:"flex",gap:"8px",marginTop:"12px"}},
