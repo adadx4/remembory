@@ -4623,6 +4623,17 @@ function PrintView({memories, ownerName, allDecades}) {
   const [showPhotos, setShowPhotos] = useState(true);
   const [showPeople, setShowPeople] = useState(true);
   const [showTags, setShowTags] = useState(false);
+  const [showLocations, setShowLocations] = useState(true);
+  // Cover customisation. Default subtitle reads "Memories from X to Y" so the
+  // year range is unambiguous — the bare "1971 – 2025" was reading like a
+  // birth–death lifespan even when the subject is alive.
+  const defaultTitle = ownerName ? `${ownerName}'s Chronicle` : "Chronicle";
+  const [coverTitle, setCoverTitle] = useState(defaultTitle);
+  const [subtitleMode, setSubtitleMode] = useState("range"); // range | custom | none
+  const [customSubtitle, setCustomSubtitle] = useState("");
+  const [showCount, setShowCount] = useState(true);
+  const [order, setOrder] = useState("asc"); // asc | desc
+  const [pageBreakPerDecade, setPageBreakPerDecade] = useState(false);
 
   const decades = allDecades;
   const yearsInScope = scopeDecade ? Array.from({length:10},(_,i)=>scopeDecade+i).filter(y=>memories.some(m=>m.year===y)) : [];
@@ -4631,7 +4642,10 @@ function PrintView({memories, ownerName, allDecades}) {
     if (scope==="decade" && scopeDecade) return Math.floor(m.year/10)*10 === scopeDecade;
     if (scope==="year" && scopeYear) return m.year === scopeYear;
     return true;
-  }).sort((a,b)=>a.year!==b.year?a.year-b.year:(a.month||0)-(b.month||0));
+  }).sort((a,b)=>{
+    const k = (a.year!==b.year ? a.year-b.year : (a.month||0)-(b.month||0));
+    return order==="desc" ? -k : k;
+  });
 
   // Build people index: person → [memory titles]
   const peopleIndex = {};
@@ -4644,7 +4658,10 @@ function PrintView({memories, ownerName, allDecades}) {
     window.print();
   }
 
-  const decsByScope = [...new Set(scopedMems.map(m=>Math.floor(m.year/10)*10))].sort();
+  const decsByScope = [...new Set(scopedMems.map(m=>Math.floor(m.year/10)*10))].sort((a,b)=>order==="desc"?b-a:a-b);
+  const yearsAsc = [...new Set(scopedMems.map(m=>m.year))].sort((a,b)=>a-b);
+  const firstYear = yearsAsc[0] || "";
+  const lastYear  = yearsAsc[yearsAsc.length-1] || "";
 
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
 
@@ -4707,17 +4724,70 @@ function PrintView({memories, ownerName, allDecades}) {
               "People & orgs"
             ),
             React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"8px",cursor:"pointer",fontSize:"0.95rem"}},
+              React.createElement("input",{type:"checkbox",checked:showLocations,onChange:e=>setShowLocations(e.target.checked)}),
+              "Locations"
+            ),
+            React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"8px",cursor:"pointer",fontSize:"0.95rem"}},
               React.createElement("input",{type:"checkbox",checked:showTags,onChange:e=>setShowTags(e.target.checked)}),
               "Tags"
-            ),
-            detail!=="toc"&&React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"8px",cursor:"pointer",fontSize:"0.95rem"}},
-              React.createElement("input",{type:"checkbox",checked:detail==="full"&&showPeople,disabled:true,style:{opacity:0}}),null
             )
           )
         )
       ),
 
-      React.createElement("button",{onClick:doPrint,style:{...S.btn,padding:"11px 28px",fontSize:"1rem"}},
+      // Cover and ordering
+      React.createElement("div",{style:{borderTop:"1px solid #ede4d4",paddingTop:"14px",marginTop:"4px",display:"flex",flexWrap:"wrap",gap:"20px"}},
+        React.createElement("div",{style:{flex:"1 1 240px",minWidth:"220px"}},
+          React.createElement("label",{style:S.label},"Cover title"),
+          React.createElement("input",{
+            value: coverTitle,
+            onChange: e => setCoverTitle(e.target.value),
+            placeholder: defaultTitle,
+            style:{...S.input, marginTop:"4px"}
+          })
+        ),
+        React.createElement("div",{style:{flex:"1 1 240px",minWidth:"220px"}},
+          React.createElement("label",{style:S.label},"Cover subtitle"),
+          React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"6px",marginTop:"4px"}},
+            [["range","Year range — \u201cMemories from "+(firstYear||"\u2026")+" to "+(lastYear||"\u2026")+"\u201d"],
+             ["custom","Custom text"],
+             ["none","None"]].map(([v,label])=>
+              React.createElement("label",{key:v,style:{display:"flex",alignItems:"center",gap:"8px",cursor:"pointer",fontSize:"0.92rem",color:subtitleMode===v?"#1a1208":"#6a5c48"}},
+                React.createElement("input",{type:"radio",name:"subtitleMode",value:v,checked:subtitleMode===v,onChange:()=>setSubtitleMode(v)}),
+                label
+              )
+            ),
+            subtitleMode==="custom"&&React.createElement("input",{
+              value: customSubtitle,
+              onChange: e => setCustomSubtitle(e.target.value),
+              placeholder: "Subtitle that prints under the title",
+              style:{...S.input,fontSize:"0.92rem"}
+            })
+          ),
+          React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"8px",cursor:"pointer",fontSize:"0.9rem",marginTop:"6px"}},
+            React.createElement("input",{type:"checkbox",checked:showCount,onChange:e=>setShowCount(e.target.checked)}),
+            "Show \u201cN memories\u201d count under the subtitle"
+          )
+        ),
+        React.createElement("div",{style:{flex:"1 1 200px",minWidth:"180px"}},
+          React.createElement("label",{style:S.label},"Layout"),
+          React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"6px",marginTop:"4px"}},
+            React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"8px",fontSize:"0.92rem"}},
+              React.createElement("span",{style:{minWidth:"60px",color:"#8a7460"}},"Order:"),
+              React.createElement("select",{value:order,onChange:e=>setOrder(e.target.value),style:{...S.select,fontSize:"0.92rem",padding:"4px 8px"}},
+                React.createElement("option",{value:"asc"},"Oldest first"),
+                React.createElement("option",{value:"desc"},"Most recent first")
+              )
+            ),
+            React.createElement("label",{style:{display:"flex",alignItems:"center",gap:"8px",cursor:"pointer",fontSize:"0.92rem"}},
+              React.createElement("input",{type:"checkbox",checked:pageBreakPerDecade,onChange:e=>setPageBreakPerDecade(e.target.checked)}),
+              "Start each decade on a new page"
+            )
+          )
+        )
+      ),
+
+      React.createElement("button",{onClick:doPrint,style:{...S.btn,padding:"11px 28px",fontSize:"1rem",marginTop:"16px"}},
         "🖨 Print / Save as PDF"
       ),
       React.createElement("p",{style:{fontSize:"0.8rem",color:"#8a7460",fontStyle:"italic",marginTop:"8px"}},"Use your browser's print dialog — choose 'Save as PDF' to export a file.")
@@ -4727,19 +4797,23 @@ function PrintView({memories, ownerName, allDecades}) {
     React.createElement("div",{className:"chronicle-print-root",style:{background:"#fff",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"32px 40px",fontFamily:"'Crimson Text',Georgia,serif",color:"#1a1208"}},
 
       // Cover
-      React.createElement("div",{style:{textAlign:"center",paddingBottom:"32px",marginBottom:"32px",borderBottom:"2px solid #c8b89a"}},
-        React.createElement("h1",{style:{fontFamily:"'Playfair Display',serif",fontSize:"2.4rem",fontWeight:700,margin:"0 0 8px",color:"#1a1208"}},
-          ownerName ? `${ownerName}'s Chronicle` : "Chronicle"
-        ),
-        React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",fontSize:"1rem",margin:0}},
-          scope==="decade"&&scopeDecade ? `The ${scopeDecade}s` :
-          scope==="year"&&scopeYear ? String(scopeYear) :
-          `${scopedMems[0]?.year||""} – ${scopedMems[scopedMems.length-1]?.year||""}`
-        ),
-        React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",marginTop:"6px"}},
-          `${scopedMems.length} ${scopedMems.length===1?"memory":"memories"}`
-        )
-      ),
+      (() => {
+        const titleText = (coverTitle||"").trim() || defaultTitle;
+        let subtitleText = "";
+        if (subtitleMode === "custom") subtitleText = (customSubtitle||"").trim();
+        else if (subtitleMode === "range") {
+          if (scope==="decade" && scopeDecade) subtitleText = `The ${scopeDecade}s`;
+          else if (scope==="year" && scopeYear) subtitleText = String(scopeYear);
+          else if (firstYear && lastYear) subtitleText = firstYear === lastYear ? `Memories from ${firstYear}` : `Memories from ${firstYear} to ${lastYear}`;
+        }
+        return React.createElement("div",{style:{textAlign:"center",paddingBottom:"32px",marginBottom:"32px",borderBottom:"2px solid #c8b89a"}},
+          React.createElement("h1",{style:{fontFamily:"'Playfair Display',serif",fontSize:"2.4rem",fontWeight:700,margin:"0 0 8px",color:"#1a1208"}}, titleText),
+          subtitleText && React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",fontSize:"1rem",margin:0}}, subtitleText),
+          showCount && React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",marginTop:"6px"}},
+            `${scopedMems.length} ${scopedMems.length===1?"memory":"memories"}`
+          )
+        );
+      })(),
 
       // Table of contents mode
       detail==="toc"&&React.createElement("div",null,
@@ -4758,13 +4832,13 @@ function PrintView({memories, ownerName, allDecades}) {
       ),
 
       // Headings or Full mode
-      detail!=="toc"&&decsByScope.map(dec=>React.createElement("div",{key:dec,style:{marginBottom:"36px"}},
+      detail!=="toc"&&decsByScope.map((dec, di)=>React.createElement("div",{key:dec,style:{marginBottom:"36px",pageBreakBefore:(pageBreakPerDecade && di>0)?"always":"auto"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",color:"#1a1208",margin:"0 0 20px",borderBottom:"2px solid #c8a87a",paddingBottom:"8px"}},`${dec}s`),
         scopedMems.filter(m=>Math.floor(m.year/10)*10===dec).map(m=>
           React.createElement("div",{key:m.id,style:{marginBottom:detail==="full"?"36px":"14px",pageBreakInside:detail==="full"?"avoid":"auto"}},
             // Memory heading
             React.createElement("div",{style:{display:"flex",alignItems:"baseline",gap:"14px",marginBottom:detail==="full"?"8px":"0"}},
-              React.createElement("span",{style:{fontSize:"0.82rem",color:"#8a7460",whiteSpace:"nowrap",minWidth:"80px"}},fuzzyDateLabel(m),(m.location?` · ${m.location}`:"")),
+              React.createElement("span",{style:{fontSize:"0.82rem",color:"#8a7460",whiteSpace:"nowrap",minWidth:"80px"}},fuzzyDateLabel(m),(showLocations&&m.location?` · ${m.location}`:"")),
               React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:detail==="full"?"1.3rem":"1.05rem",margin:0,color:"#1a1208",flex:1,fontWeight:700}},m.title)
             ),
             // Full detail
