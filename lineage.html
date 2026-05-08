@@ -2783,6 +2783,113 @@ function RelationshipIndex({memories, peopleRelationships, onView, onRenameRelat
   );
 }
 
+function PetsPanel({pets, memories, entityPhotos, onSetEntityPhoto, persistSubject, setIndexFilter, renamePerson, deletePerson, knownPeople}) {
+  const [adding, setAdding] = React.useState(false);
+  const [draftName, setDraftName] = React.useState("");
+  const [draftSpecies, setDraftSpecies] = React.useState("");
+  const [search, setSearch] = React.useState("");
+  function commitAdd() {
+    const n = draftName.trim();
+    if (!n) return;
+    if (pets.some(p => p.name === n)) { setAdding(false); setDraftName(""); setDraftSpecies(""); return; }
+    const id = "pet_"+Date.now()+Math.random().toString(36).slice(2,6);
+    const next = [...pets, { id, name: n, species: draftSpecies.trim(), breed: "", dob: "", dod: "", notes: "" }]
+      .sort((a,b)=>a.name.localeCompare(b.name));
+    persistSubject({ pets: next, knownPeople: [...new Set([...knownPeople, n])].sort() });
+    setAdding(false); setDraftName(""); setDraftSpecies("");
+  }
+  function setPet(id, patch) {
+    const next = pets.map(p => p.id === id ? { ...p, ...patch } : p);
+    persistSubject({ pets: next });
+  }
+  function renamePet(id, newName) {
+    const n = newName.trim();
+    if (!n) return;
+    const old = pets.find(p => p.id === id);
+    if (!old || old.name === n) return;
+    // Reuse renamePerson to cascade through memory.people, peopleRelationships, etc.
+    if (renamePerson) renamePerson(old.name, n);
+    const next = pets.map(p => p.id === id ? { ...p, name: n } : p).sort((a,b)=>a.name.localeCompare(b.name));
+    persistSubject({ pets: next });
+  }
+  function deletePet(id) {
+    const old = pets.find(p => p.id === id);
+    if (!old) return;
+    if (!window.confirm(`Remove "${old.name}" from your Chronicle? This will detach the pet from any memories using its name.`)) return;
+    const next = pets.filter(p => p.id !== id);
+    if (deletePerson) deletePerson(old.name);
+    persistSubject({ pets: next });
+  }
+  const q = search.trim().toLowerCase();
+  const visible = q
+    ? pets.filter(p => [p.name,p.species,p.breed,p.notes].some(s => (s||"").toLowerCase().includes(q)))
+    : pets;
+  return React.createElement("div", null,
+    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px",gap:"8px",flexWrap:"wrap"}},
+      React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},
+        pets.length+" pet"+(pets.length===1?"":"s")+" \u00b7 click a name to see memories"),
+      !adding && React.createElement("button",{onClick:()=>{setDraftName("");setDraftSpecies("");setAdding(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add pet")
+    ),
+    adding && React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"12px",flexWrap:"wrap"}},
+      React.createElement("input",{autoFocus:true,value:draftName,onChange:e=>setDraftName(e.target.value),
+        onKeyDown:e=>{if(e.key==="Enter")commitAdd();if(e.key==="Escape"){setAdding(false);setDraftName("");setDraftSpecies("");}},
+        placeholder:"Pet name (e.g. Rex)",style:{...S.input,padding:"5px 9px",fontSize:"0.92rem",flex:"1 1 160px"}}),
+      React.createElement("input",{value:draftSpecies,onChange:e=>setDraftSpecies(e.target.value),
+        onKeyDown:e=>{if(e.key==="Enter")commitAdd();},
+        placeholder:"Species (dog, cat\u2026)",style:{...S.input,padding:"5px 9px",fontSize:"0.92rem",flex:"1 1 140px"}}),
+      React.createElement("button",{onClick:commitAdd,style:{...S.btn,padding:"5px 12px",fontSize:"0.86rem"}},"Add"),
+      React.createElement("button",{onClick:()=>{setAdding(false);setDraftName("");setDraftSpecies("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.86rem"}},"Cancel")
+    ),
+    pets.length === 0 && !adding && React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No pets recorded yet."),
+    pets.length > 0 && React.createElement("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Search pets\u2026",style:{...S.input,marginBottom:"10px",padding:"7px 11px",fontSize:"0.88rem"}}),
+    q && visible.length === 0 && React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No matches."),
+    visible.map(p => React.createElement(PetRow,{key:p.id, pet:p,
+      memCount: memories.filter(m => (m.people||[]).includes(p.name)).length,
+      photo: (entityPhotos||{})["pet:"+p.name] || null,
+      onSetPhoto: med => onSetEntityPhoto("pet:"+p.name, med||null),
+      onSetField: (k,v) => setPet(p.id, {[k]: v}),
+      onRename: nn => renamePet(p.id, nn),
+      onDelete: () => deletePet(p.id),
+      onView: () => setIndexFilter({type:"people", value:p.name})
+    }))
+  );
+}
+
+function PetRow({pet, memCount, photo, onSetPhoto, onSetField, onRename, onDelete, onView}) {
+  const [renaming, setRenaming] = React.useState(false);
+  const [draft, setDraft] = React.useState(pet.name);
+  const [editing, setEditing] = React.useState(false);
+  const lifeYears = [pet.dob, pet.dod].filter(Boolean).join("\u2013");
+  function commitRename() { if (draft.trim() && draft.trim() !== pet.name) onRename(draft.trim()); setRenaming(false); }
+  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"12px 0",display:"flex",gap:"12px",alignItems:"flex-start"}},
+    React.createElement(EntityPhotoUpload,{photo,size:48,onSet:onSetPhoto,onClear:()=>onSetPhoto(null)}),
+    React.createElement("div",{style:{flex:1,minWidth:0}},
+      React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
+        renaming
+          ? React.createElement("input",{autoFocus:true,value:draft,onChange:e=>setDraft(e.target.value),
+              onKeyDown:e=>{if(e.key==="Enter")commitRename();if(e.key==="Escape"){setDraft(pet.name);setRenaming(false);}},
+              onBlur:commitRename,style:{...S.input,padding:"5px 9px",fontSize:"1rem",flex:1,minWidth:"140px"}})
+          : React.createElement("button",{onClick:onView,style:{flex:1,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",padding:0}},"\ud83d\udc3e "+pet.name),
+        (pet.species||pet.breed) && React.createElement("span",{style:{fontSize:"0.82rem",color:"#7a6a58",fontStyle:"italic"}},[pet.species,pet.breed].filter(Boolean).join(" \u00b7 ")),
+        lifeYears && React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},lifeYears),
+        React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}}, memCount+" "+(memCount===1?"memory":"memories")),
+        React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px",flexWrap:"wrap"}},
+          !renaming && React.createElement("button",{onClick:()=>{setDraft(pet.name);setRenaming(true);},style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem"}},"Rename"),
+          React.createElement("button",{onClick:()=>setEditing(s=>!s),style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:editing?"#a8885a":"#6a5840"}},editing?"Close":"Details"),
+          React.createElement("button",{onClick:onDelete,style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove")
+        )
+      ),
+      editing && React.createElement("div",{style:{background:"rgba(168,136,90,0.06)",border:"1px solid rgba(168,136,90,0.2)",borderRadius:"3px",padding:"10px 14px",margin:"8px 0",display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px"}},
+        React.createElement("input",{value:pet.species||"",onChange:e=>onSetField("species",e.target.value),placeholder:"Species (dog, cat, horse\u2026)",style:{...S.input,fontSize:"0.86rem"}}),
+        React.createElement("input",{value:pet.breed||"",onChange:e=>onSetField("breed",e.target.value),placeholder:"Breed",style:{...S.input,fontSize:"0.86rem"}}),
+        React.createElement("input",{value:pet.dob||"",onChange:e=>onSetField("dob",e.target.value),placeholder:"Year acquired / born",style:{...S.input,fontSize:"0.86rem"}}),
+        React.createElement("input",{value:pet.dod||"",onChange:e=>onSetField("dod",e.target.value),placeholder:"Year passed (if any)",style:{...S.input,fontSize:"0.86rem"}}),
+        React.createElement("textarea",{value:pet.notes||"",onChange:e=>onSetField("notes",e.target.value),placeholder:"Notes \u2014 personality, where they came from, anything you'd like to remember\u2026",rows:2,style:{...S.input,fontSize:"0.86rem",gridColumn:"1 / -1",resize:"vertical"}})
+      )
+    )
+  );
+}
+
 function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setLocationAddress,entityPhotos,onSetEntityPhoto,setIndexFilter,persistSubject}) {
   const [addingLoc, setAddingLoc] = React.useState(false);
   const [newLoc, setNewLoc] = React.useState("");
@@ -7551,7 +7658,7 @@ function DetailView({
 function AddEditForm({
   view, form, updateForm, editingId,
   handleSubmit, handleMedia, fileInputRef,
-  knownPeople, knownOrgs, knownLocations, knownSources,
+  knownPeople, knownPeopleOnly, pets, petNames, knownOrgs, knownLocations, knownSources,
   candidatePersons, addCandidatePerson, setIndexFilter,
   peopleEmails, peopleRelationships, personGroups,
   customTags, addCustomTag, removeCustomTag,
@@ -7563,11 +7670,14 @@ function AddEditForm({
   // Auto-expand first populated section (accordion: only one open at a time)
   const [expanded, setExpanded] = React.useState(() => {
     if (form._expandEndDate) return new Set(["enddate"]);
+    const peopleNames = (form.people||[]).filter(n => !(petNames && petNames.has(n)));
+    const petsOnMem   = (form.people||[]).filter(n => petNames && petNames.has(n));
     const checks = [
       ["enddate",    form.endFuzzy || form.endOngoing],
       ["location",   (form.locationLabel||"").trim() || (form.locations||[]).length],
       ["tags",       (form.tags||[]).length],
-      ["people",     (form.people||[]).length],
+      ["people",     peopleNames.length],
+      ["pets",       petsOnMem.length],
       ["orgs",       (form.orgs||[]).length],
       ["photos",     (form.mediaUrls||[]).length],
       ["sources",    (form.sources||[]).length || (form.sourceIds||[]).length],
@@ -7708,6 +7818,7 @@ function AddEditForm({
       secToggle("location",  "Location",     "\ud83d\udccd"),
       secToggle("tags",      "Tags",          "\ud83c\udff7"),
       secToggle("people",    "People",        "\ud83d\udc64"),
+      secToggle("pets",      "Pets",          "\ud83d\udc3e"),
       secToggle("orgs",      "Organisation",  "\ud83c\udfdb"),
       secToggle("photos",    "Photos",        "\ud83d\uddbc"),
       isHistoryMode&&secToggle("sources", "Sources", "\ud83d\udcda"),
@@ -7811,10 +7922,50 @@ function AddEditForm({
     )),
 
     // ── People ──
-    expanded.has("people")&&sec(React.createElement("div",null,
-      React.createElement("label",{style:S.label},"People"),
-      React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:form.people||[],allValues:knownPeople,onChange:v=>updateForm({people:v}),placeholder:"Add a person or group\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails,[name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships,[name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean),groups:personGroups||{}})
-    )),
+    expanded.has("people")&&sec((()=>{
+      // Names already tagged as pets shouldn't appear in the people field —
+      // both as suggestions and as currently-selected values. Keep the field's
+      // value list filtered so a memory doesn't show the same name in both
+      // sections after a person was promoted to a pet.
+      const personValues = (form.people||[]).filter(n => !(petNames && petNames.has(n)));
+      return React.createElement("div",null,
+        React.createElement("label",{style:S.label},"People"),
+        React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:personValues,allValues:knownPeopleOnly||knownPeople,onChange:v=>{
+          // Preserve any pet entries already on the memory that we hid above.
+          const pets = (form.people||[]).filter(n => petNames && petNames.has(n));
+          updateForm({people: [...new Set([...v, ...pets])]});
+        },placeholder:"Add a person or group\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails,[name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships,[name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean),groups:personGroups||{}})
+      );
+    })()),
+
+    // ── Pets ──
+    expanded.has("pets")&&sec((()=>{
+      const knownPetNames = (pets||[]).map(p => p.name);
+      const petValues = (form.people||[]).filter(n => petNames && petNames.has(n));
+      return React.createElement("div",null,
+        React.createElement("label",{style:S.label},"Pets"),
+        React.createElement(PeopleOrgField,{icon:"\ud83d\udc3e", values: petValues, allValues: knownPetNames, placeholder:"Add a pet\u2026",
+          onChange: v => {
+            // Preserve people entries we hid above; merge pet selections back in.
+            const personOnly = (form.people||[]).filter(n => !(petNames && petNames.has(n)));
+            updateForm({people: [...new Set([...personOnly, ...v])]});
+            // Auto-register any new pet names into subject.pets so they show up
+            // in the Pets index without an extra step.
+            const existing = new Set((pets||[]).map(p => p.name));
+            const newPetEntries = v.filter(n => !existing.has(n)).map(n => ({
+              id: "pet_"+Date.now()+Math.random().toString(36).slice(2,6),
+              name: n, species:"", breed:"", dob:"", dod:"", notes:""
+            }));
+            if (newPetEntries.length > 0) {
+              persistSubject({pets: [...(pets||[]), ...newPetEntries].sort((a,b)=>a.name.localeCompare(b.name))});
+            }
+          }
+        }),
+        React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"6px 0 0"}},
+          "Edit species, breed and dates from the Pets index."
+        )
+      );
+    })()),
 
     // ── Organisations ──
     expanded.has("orgs")&&sec(React.createElement("div",null,
@@ -8066,6 +8217,11 @@ function App() {
   const gedFocalPersonId    = activeLinkedTpId || treeHost.gedFocalPersonId || null;
   const customTags          = subject.customTags || [];
   const knownPeople         = subject.knownPeople || [];
+  const pets                = subject.pets || [];
+  // Names that belong to pets — used to filter People-only views and to render
+  // the 🐾 icon next to pet mentions inside the memory list.
+  const petNames            = React.useMemo(() => new Set(pets.map(p => p.name)), [pets]);
+  const knownPeopleOnly     = React.useMemo(() => knownPeople.filter(n => !petNames.has(n)), [knownPeople, petNames]);
   const knownOrgs           = subject.knownOrgs || [];
   const knownSources        = subject.knownSources || [];
   const candidatePersons    = subject.candidatePersons || [];
@@ -11489,7 +11645,8 @@ function handleEdit(m) {
           return a.localeCompare(b);
         });
         const tabs = [
-          {id:"people", label:"👤 People", items:knownPeople, getCount:v=>memories.filter(m=>m.people?.includes(v)).length},
+          {id:"people", label:"👤 People", items:knownPeopleOnly, getCount:v=>memories.filter(m=>m.people?.includes(v)).length},
+          {id:"pets", label:"🐾 Pets", items:[], getCount:()=>0},
           {id:"orgs", label:"🏛 Orgs", items:knownOrgs, getCount:v=>memories.filter(m=>m.orgs?.includes(v)).length},
           {id:"locations", label:"📍 Locations", items:allLocations, getCount:v=>memories.filter(m=>m.location===v||m.locations?.includes(v)).length},
           {id:"relationships", label:"🔗 Relationships", items:[], getCount:()=>0},
@@ -11527,7 +11684,7 @@ function handleEdit(m) {
         }
 
         // Index listing
-        const tabLabels={people:"People",orgs:"Organisations",locations:"Places",relationships:"Relationships",groups:"Groups",tags:"Tags",sources:"Sources",candidatePersons:"Candidates"};
+        const tabLabels={people:"People",pets:"Pets",orgs:"Organisations",locations:"Places",relationships:"Relationships",groups:"Groups",tags:"Tags",sources:"Sources",candidatePersons:"Candidates"};
         return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
           React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 20px",color:"#1a1208"}},tabLabels[indexTab]||"Index"),
           // Tabs
@@ -11540,7 +11697,7 @@ function handleEdit(m) {
           ),
           // People tab renders the full manager inline
           indexTab==="people"
-            ? React.createElement(PeopleOrgsManager,{knownPeople,knownOrgs:[],knownLocations,memories,peopleRelationships,personOrgs,personLocations,entityPhotos,onSetEntityPhoto:setEntityPhoto,
+            ? React.createElement(PeopleOrgsManager,{knownPeople:knownPeopleOnly,knownOrgs:[],knownLocations,memories,peopleRelationships,personOrgs,personLocations,entityPhotos,onSetEntityPhoto:setEntityPhoto,
                 onSetPersonOrgs:setPersonOrgs,onSetPersonLocations:setPersonLocations,
                 onRenamePerson:renamePerson,onDeletePerson:deletePerson,
                 onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetRelationship:setPersonRelationship,onSetPersonNotes:setPersonNotes,onSetOrgNotes:setOrgNotes,peopleNotes,orgNotes,
@@ -11548,6 +11705,8 @@ function handleEdit(m) {
                 onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},
                 onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},
                 peopleEmails,onSetEmail:(pName,em)=>persistSubject({peopleEmails:{...peopleEmails,[pName]:em}}),})
+            : indexTab==="pets"
+            ? React.createElement(PetsPanel,{pets,memories,entityPhotos,onSetEntityPhoto:setEntityPhoto,persistSubject,setIndexFilter,renamePerson,deletePerson,knownPeople})
             : indexTab==="orgs"
             ? React.createElement(OrgsPanel,{knownOrgs,knownLocations,memories,orgNotes,orgLocations,orgPeriods,personOrgs,entityPhotos,onSetEntityPhoto:setEntityPhoto,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetOrgNotes:setOrgNotes,onSetOrgLocations:setOrgLocations,onSetOrgPeriods:setOrgPeriods,setIndexFilter,persistSubject})
             : indexTab==="locations"
@@ -12245,12 +12404,17 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
                     React.createElement("div",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",lineHeight:1.3,marginBottom:"2px"}},m.title),
                     React.createElement("div",{style:{fontSize:"0.78rem",color:"#a89a7a",fontStyle:"italic",marginBottom:m.content?"4px":"2px"}},fuzzyDateLabel(m)),
                     m.content&&React.createElement("p",{style:{fontSize:"0.9rem",color:"#5a4838",lineHeight:1.65,margin:"0 0 4px",whiteSpace:"pre-wrap"}},m.content),
-                    (m.location||(m.people||[]).length>0||(m.orgs||[]).length>0||(m.tags||[]).length>0)&&React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap",marginTop:"4px",alignItems:"center"}},
-                      m.location&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},"📍 "+m.location),
-                      (m.people||[]).length>0&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},"👤 "+m.people.join(", ")),
-                      (m.orgs||[]).length>0&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},"🏛 "+m.orgs.join(", ")),
-                      (m.tags||[]).map(t=>React.createElement("span",{key:t,style:{fontSize:"0.72rem",padding:"1px 7px",borderRadius:"10px",background:(TAG_COLORS[t]||"#9a8a7a")+"22",color:TAG_COLORS[t]||"#9a8a7a",border:"1px solid "+(TAG_COLORS[t]||"#9a8a7a")+"44"}},t))
-                    ),
+                    (()=>{
+                      const peopleOnly = (m.people||[]).filter(n => !petNames.has(n));
+                      const petsOnMem  = (m.people||[]).filter(n => petNames.has(n));
+                      return (m.location||peopleOnly.length>0||petsOnMem.length>0||(m.orgs||[]).length>0||(m.tags||[]).length>0) && React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap",marginTop:"4px",alignItems:"center"}},
+                        m.location&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},"📍 "+m.location),
+                        peopleOnly.length>0&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},"👤 "+peopleOnly.join(", ")),
+                        petsOnMem.length>0&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},"🐾 "+petsOnMem.join(", ")),
+                        (m.orgs||[]).length>0&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460"}},"🏛 "+m.orgs.join(", ")),
+                        (m.tags||[]).map(t=>React.createElement("span",{key:t,style:{fontSize:"0.72rem",padding:"1px 7px",borderRadius:"10px",background:(TAG_COLORS[t]||"#9a8a7a")+"22",color:TAG_COLORS[t]||"#9a8a7a",border:"1px solid "+(TAG_COLORS[t]||"#9a8a7a")+"44"}},t))
+                      );
+                    })(),
                     m.mediaUrls&&m.mediaUrls.length>0&&React.createElement("div",{style:{display:"flex",gap:"6px",marginTop:"6px"}},
                       m.mediaUrls.slice(0,3).map((med,i)=>React.createElement(MediaImg,{key:i,med,alt:"",style:{width:"60px",height:"60px",objectFit:"cover",borderRadius:"3px",border:"1px solid #d4c4a8"}}))
                     )
@@ -12291,7 +12455,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
       (view==="add"||view==="edit")&&React.createElement(AddEditForm,{
         view, form, updateForm, editingId,
         handleSubmit, handleMedia, fileInputRef,
-        knownPeople, knownOrgs, knownLocations, knownSources,
+        knownPeople, knownPeopleOnly, pets, petNames, knownOrgs, knownLocations, knownSources,
         candidatePersons, addCandidatePerson, setIndexFilter,
         peopleEmails, peopleRelationships, personGroups,
         customTags, addCustomTag, removeCustomTag,
