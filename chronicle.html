@@ -2315,7 +2315,9 @@ function SubjectManager({subjects, activeSubjectId, carerName, carerEmail, onSwi
   const [adding, setAdding] = React.useState(false);
   const [carerDraft, setCarerDraft] = React.useState({name:carerName, email:carerEmail});
 
-  function startAdd() { setDraft({name:"",dob:"",notes:"",mode:null}); setAdding(true); setEditingId(null); }
+  // In Lineage there's only one chronicle type — pre-pick "history" so the
+  // mode picker can be hidden and the Add button isn't blocked on selection.
+  function startAdd() { setDraft({name:"",dob:"",notes:"",mode: PRODUCT==="lineage" ? "history" : null}); setAdding(true); setEditingId(null); }
   function startEdit(s) { setDraft({name:s.name,dob:s.dob||"",notes:s.notes||"",mode:s.mode||null}); setEditingId(s.id); setAdding(false); }
   function commitAdd() {
     if (!draft.name.trim() || !draft.mode) return;
@@ -2354,9 +2356,9 @@ function SubjectManager({subjects, activeSubjectId, carerName, carerEmail, onSwi
               React.createElement("input",{value:draft.name,onChange:e=>setDraft(d=>({...d,name:e.target.value})),placeholder:"Name *",style:inputStyle,autoFocus:true}),
               React.createElement("input",{value:draft.dob,onChange:e=>setDraft(d=>({...d,dob:e.target.value})),placeholder:"Year of birth (optional)",style:inputStyle}),
               React.createElement("textarea",{value:draft.notes,onChange:e=>setDraft(d=>({...d,notes:e.target.value})),placeholder:"Notes (optional — family, context, etc.)",style:{...inputStyle,resize:"vertical",minHeight:"60px"}}),
-              React.createElement("div",{style:{marginTop:"4px"}},
+              PRODUCT !== "lineage" && React.createElement("div",{style:{marginTop:"4px"}},
                 React.createElement("p",{style:{fontSize:"0.8rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"6px"}},"Chronicle type"),
-                Object.values(MODES).filter(m=>PRODUCT==="lineage"?m.id==="history":m.id!=="history").map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:draft.mode===m.id,onSelect:v=>setDraft(d=>({...d,mode:v}))}))
+                Object.values(MODES).filter(m=>m.id!=="history").map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:draft.mode===m.id,onSelect:v=>setDraft(d=>({...d,mode:v}))}))
               ),
               React.createElement("div",{style:{display:"flex",gap:"8px"}},
                 React.createElement("button",{onClick:commitEdit,style:btnStyle},"Save"),
@@ -2388,9 +2390,9 @@ function SubjectManager({subjects, activeSubjectId, carerName, carerEmail, onSwi
           React.createElement("input",{value:draft.name,onChange:e=>setDraft(d=>({...d,name:e.target.value})),placeholder:"Name *",style:inputStyle,autoFocus:true}),
           React.createElement("input",{value:draft.dob,onChange:e=>setDraft(d=>({...d,dob:e.target.value})),placeholder:"Year of birth (optional)",style:inputStyle}),
           React.createElement("textarea",{value:draft.notes,onChange:e=>setDraft(d=>({...d,notes:e.target.value})),placeholder:"Notes (optional)",style:{...inputStyle,resize:"vertical",minHeight:"60px"}}),
-          React.createElement("div",{style:{marginTop:"4px"}},
+          PRODUCT !== "lineage" && React.createElement("div",{style:{marginTop:"4px"}},
             React.createElement("p",{style:{fontSize:"0.8rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#a8885a",fontWeight:600,marginBottom:"8px"}},"Chronicle type"),
-            Object.values(MODES).filter(m=>PRODUCT==="lineage"?m.id==="history":m.id!=="history").map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:draft.mode===m.id,onSelect:v=>setDraft(d=>({...d,mode:v}))}))
+            Object.values(MODES).filter(m=>m.id!=="history").map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:draft.mode===m.id,onSelect:v=>setDraft(d=>({...d,mode:v}))}))
           ),
           React.createElement("div",{style:{display:"flex",gap:"8px"}},
             React.createElement("button",{onClick:commitAdd,disabled:!draft.name.trim()||!draft.mode,style:{...btnStyle,opacity:(!draft.name.trim()||!draft.mode)?0.45:1}},"Add"),
@@ -5726,9 +5728,12 @@ function SettingsView({
                   verifyStatus==="sending"?"Sending code\u2026":"Verify this email")
           )
         ),
-        React.createElement("p",{style:{fontSize:"0.8rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#a8885a",fontWeight:600,margin:"0 0 8px"}},"Chronicle type"),
-        React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
-          Object.values(MODES).filter(m=>PRODUCT==="lineage"?m.id==="history":m.id!=="history").map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:subject.mode===m.id,onSelect:v=>persistSubject({mode:v,isSelf:MODES[v]?.isSelf||false})}))
+        // Chronicle-type picker is meaningless in Lineage — there's only one
+        // mode available — so we hide it entirely there. In the main app it
+        // still lets users flip between Personal / Legacy.
+        PRODUCT !== "lineage" && React.createElement("p",{style:{fontSize:"0.8rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#a8885a",fontWeight:600,margin:"0 0 8px"}},"Chronicle type"),
+        PRODUCT !== "lineage" && React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
+          Object.values(MODES).filter(m=>m.id!=="history").map(m=>React.createElement(ModeCard,{key:m.id,mode:m.id,selected:subject.mode===m.id,onSelect:v=>persistSubject({mode:v,isSelf:MODES[v]?.isSelf||false})}))
         )
       ),
 
