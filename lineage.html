@@ -7693,6 +7693,270 @@ function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) 
   );
 }
 
+// ── TodoView ─────────────────────────────────────────────────
+// Lineage research workspace: a manual to-do list plus six rule-based
+// suggestions that surface gaps in the subject's evidence (unsourced
+// events, missing dates, impossible cycles, etc.).
+function TodoView({subject, memories, knownSources, knownPeople, todos, todoDismissals, persistSubject, setSelected, setView, setIndexFilter, dobYear}) {
+  const [draft, setDraft] = React.useState("");
+  const [linkedTo, setLinkedTo] = React.useState(null);
+
+  const open = (todos||[]).filter(t => !t.done);
+  const done = (todos||[]).filter(t => t.done);
+
+  function persistTodos(next) { persistSubject({todos: next}); }
+  function persistDismissals(next) { persistSubject({todoDismissals: next}); }
+
+  function addManual() {
+    const text = draft.trim();
+    if (!text) return;
+    const t = {
+      id: "todo_" + Date.now() + Math.random().toString(36).slice(2,6),
+      text, linkedTo, done: false, createdAt: new Date().toISOString(), source: "manual",
+    };
+    persistTodos([...(todos||[]), t]);
+    setDraft(""); setLinkedTo(null);
+  }
+  function toggleDone(id) {
+    persistTodos((todos||[]).map(t => t.id===id ? {...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : null} : t));
+  }
+  function deleteTodo(id) {
+    persistTodos((todos||[]).filter(t => t.id !== id));
+  }
+  function promoteSuggestion(s) {
+    // Skip if already promoted
+    if ((todos||[]).some(t => t.suggestionKey === s.key)) return;
+    const t = {
+      id: "todo_" + Date.now() + Math.random().toString(36).slice(2,6),
+      text: s.text, linkedTo: s.linkedTo || null, done: false,
+      createdAt: new Date().toISOString(),
+      source: "check:" + s.rule,
+      suggestionKey: s.key,
+    };
+    persistTodos([...(todos||[]), t]);
+  }
+  function dismissSuggestion(s) {
+    persistDismissals({...(todoDismissals||{}), [s.key]: new Date().toISOString()});
+  }
+
+  function navigateLink(linkedTo) {
+    if (!linkedTo) return;
+    if (linkedTo.type === "memory") { setSelected(linkedTo.id); setView("detail"); }
+    else if (linkedTo.type === "person") { setIndexFilter({type:"people", value: linkedTo.value}); setView("index"); }
+    else if (linkedTo.type === "source") { setIndexFilter({type:"sources", value: linkedTo.value, sourceId: linkedTo.id}); setView("index"); }
+    else if (linkedTo.type === "subject") { setView("settings"); }
+  }
+
+  // ── Suggestion rules ──────────────────────────────────────────
+  // Each returns an array of {rule, key, text, linkedTo}. key uniquely
+  // identifies the suggestion so dismissals + dedupe-against-promoted-todos
+  // both work. Suggestions auto-disappear once the underlying issue is
+  // fixed (because the rule no longer matches).
+  const thisYear = new Date().getFullYear();
+  const subjDob = dobYear || null;
+  const subjDod = (() => {
+    const m = (subject?.dod || subject?.deatYear || "").toString().match(/\d{4}/);
+    if (!m) return null;
+    const y = parseInt(m[0],10);
+    return (y >= 1500 && y <= thisYear) ? y : null;
+  })();
+
+  const suggestions = [];
+
+  // 1. Unsourced events
+  memories.forEach(m => {
+    if (m.gedcomContext) return; // skip events that are about other people
+    if (eventConfidence(m) !== "unsourced") return;
+    suggestions.push({
+      rule: "unsourced",
+      key: "unsourced|"+m.id,
+      text: 'Find a source for: "' + (m.title||"untitled") + '"' + (m.year ? " ("+m.year+")" : ""),
+      linkedTo: {type:"memory", id:m.id},
+      severity: "warn",
+    });
+  });
+
+  // 2. Weak-source events (only derivative or unknown)
+  memories.forEach(m => {
+    if (m.gedcomContext) return;
+    if (eventConfidence(m) !== "weak") return;
+    suggestions.push({
+      rule: "weak",
+      key: "weak|"+m.id,
+      text: 'Upgrade source confidence for: "' + (m.title||"untitled") + '" (find a primary or secondary record)',
+      linkedTo: {type:"memory", id:m.id},
+      severity: "info",
+    });
+  });
+
+  // 3. Missing birth year on the subject
+  if (!subjDob) {
+    suggestions.push({
+      rule: "missing-dob",
+      key: "missing-dob|subject",
+      text: "Set the subject's year of birth (Settings \u2192 Account)",
+      linkedTo: {type:"subject"},
+      severity: "warn",
+    });
+  }
+
+  // 4. Missing death year on a long-lived subject
+  if (subjDob && (thisYear - subjDob) > 110 && !subjDod) {
+    suggestions.push({
+      rule: "missing-dod",
+      key: "missing-dod|subject",
+      text: "Subject would be over 110 by now \u2014 add a year of death (or mark as living if still alive)",
+      linkedTo: {type:"subject"},
+      severity: "warn",
+    });
+  }
+
+  // 5. Long unaccounted gaps in the timeline (>20 years between events
+  //    while the subject was plausibly alive)
+  if (subjDob) {
+    const own = memories
+      .filter(m => !m.gedcomContext && m.year && m.year >= subjDob && m.year <= (subjDod || thisYear))
+      .map(m => m.year)
+      .sort((a,b) => a-b);
+    const lifeStart = subjDob;
+    const lifeEnd = subjDod || thisYear;
+    const points = [lifeStart, ...own, lifeEnd];
+    for (let i = 1; i < points.length; i++) {
+      const gap = points[i] - points[i-1];
+      if (gap >= 20) {
+        suggestions.push({
+          rule: "gap",
+          key: "gap|"+points[i-1]+"-"+points[i],
+          text: gap + "-year gap between " + points[i-1] + " and " + points[i] + " \u2014 research life events during this period",
+          severity: "info",
+        });
+      }
+    }
+  }
+
+  // 6. Impossible / cyclic dates: events outside subject's lifetime
+  if (subjDob) {
+    memories.forEach(m => {
+      if (m.gedcomContext || !m.year) return;
+      if (m.year < subjDob - 1) {
+        suggestions.push({
+          rule: "before-birth",
+          key: "before-birth|"+m.id,
+          text: '"'+ (m.title||"untitled") + '" dated ' + m.year + ' \u2014 before subject\u2019s birth in ' + subjDob,
+          linkedTo: {type:"memory", id:m.id},
+          severity: "error",
+        });
+      }
+      if (subjDod && m.year > subjDod + 1) {
+        suggestions.push({
+          rule: "after-death",
+          key: "after-death|"+m.id,
+          text: '"'+ (m.title||"untitled") + '" dated ' + m.year + ' \u2014 after subject\u2019s death in ' + subjDod,
+          linkedTo: {type:"memory", id:m.id},
+          severity: "error",
+        });
+      }
+    });
+  }
+
+  // Filter out promoted (already a manual todo) and dismissed
+  const promotedKeys = new Set((todos||[]).map(t => t.suggestionKey).filter(Boolean));
+  const dismissed = todoDismissals || {};
+  const visible = suggestions.filter(s => !promotedKeys.has(s.key) && !dismissed[s.key]);
+
+  // Order by severity
+  const sevOrder = { error: 0, warn: 1, info: 2 };
+  visible.sort((a,b) => (sevOrder[a.severity]||3) - (sevOrder[b.severity]||3));
+
+  const sevColor = (s) => s === "error" ? "#a04050" : s === "warn" ? "#a8885a" : "#5a7a8a";
+
+  function buildLinkLabel(linkedTo) {
+    if (!linkedTo) return "";
+    if (linkedTo.type === "memory") {
+      const m = memories.find(mm => mm.id === linkedTo.id);
+      return m ? "\u2192 " + (m.title||"event") + (m.year ? " ("+m.year+")" : "") : "";
+    }
+    if (linkedTo.type === "person") return "\u2192 " + linkedTo.value;
+    if (linkedTo.type === "source") return "\u2192 " + linkedTo.value;
+    if (linkedTo.type === "subject") return "\u2192 Settings";
+    return "";
+  }
+
+  return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"760px"}},
+    React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"To-Do"),
+    React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"22px",fontSize:"0.92rem"}},
+      "Research tasks for this Lineage. Add your own and review auto-detected gaps below."
+    ),
+
+    // ── Manual list ──
+    React.createElement("h3",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",letterSpacing:"0.1em",textTransform:"uppercase",color:"#8a7460",margin:"0 0 10px"}},
+      "Open tasks (" + open.length + ")"
+    ),
+    React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"16px"}},
+      React.createElement("input",{
+        value:draft, onChange:e=>setDraft(e.target.value),
+        onKeyDown:e=>{ if(e.key==="Enter") addManual(); },
+        placeholder:"Add a research task\u2026",
+        style:{...S.input,flex:1,padding:"8px 12px"}
+      }),
+      React.createElement("button",{onClick:addManual,disabled:!draft.trim(),style:{...S.btn,padding:"8px 18px",fontSize:"0.9rem",opacity:draft.trim()?1:0.45}},"+ Add")
+    ),
+    open.length === 0 && done.length === 0 && React.createElement("p",{style:{color:"#a89a7a",fontStyle:"italic",fontSize:"0.88rem",margin:"0 0 16px"}},"No tasks yet. Add one above, or promote a suggestion below."),
+    open.map(t => React.createElement("div",{key:t.id,style:{display:"flex",alignItems:"flex-start",gap:"10px",padding:"10px 12px",background:"rgba(255,252,245,0.85)",border:"1px solid #d4c4a8",borderRadius:"3px",marginBottom:"8px"}},
+      React.createElement("input",{type:"checkbox",checked:false,onChange:()=>toggleDone(t.id),style:{marginTop:"3px",cursor:"pointer"}}),
+      React.createElement("div",{style:{flex:1,minWidth:0}},
+        React.createElement("div",{style:{fontSize:"0.95rem",color:"#1a1208"}}, t.text),
+        t.linkedTo && React.createElement("button",{
+          onClick:()=>navigateLink(t.linkedTo),
+          style:{background:"none",border:"none",padding:"2px 0",cursor:"pointer",color:"#a8885a",fontFamily:"'Crimson Text',serif",fontSize:"0.78rem",textDecoration:"underline",textUnderlineOffset:"2px"}
+        }, buildLinkLabel(t.linkedTo)),
+        t.source && t.source.startsWith("check:") && React.createElement("span",{style:{display:"inline-block",fontSize:"0.7rem",color:"#8a7460",marginLeft:t.linkedTo?"10px":"0",fontStyle:"italic"}}, "auto-detected")
+      ),
+      React.createElement("button",{onClick:()=>deleteTodo(t.id),title:"Delete",style:{background:"none",border:"none",cursor:"pointer",color:"#c4858a",fontSize:"1rem",padding:"2px 6px"}},"\u00d7")
+    )),
+    done.length > 0 && React.createElement("details",{style:{marginTop:"12px"}},
+      React.createElement("summary",{style:{cursor:"pointer",fontSize:"0.84rem",color:"#8a7460",fontFamily:"'Crimson Text',serif"}}, "Completed (" + done.length + ")"),
+      React.createElement("div",{style:{marginTop:"8px"}},
+        done.map(t => React.createElement("div",{key:t.id,style:{display:"flex",alignItems:"flex-start",gap:"10px",padding:"7px 12px",opacity:0.6}},
+          React.createElement("input",{type:"checkbox",checked:true,onChange:()=>toggleDone(t.id),style:{marginTop:"3px",cursor:"pointer"}}),
+          React.createElement("span",{style:{fontSize:"0.9rem",color:"#5a4838",textDecoration:"line-through",flex:1}}, t.text),
+          React.createElement("button",{onClick:()=>deleteTodo(t.id),style:{background:"none",border:"none",cursor:"pointer",color:"#c4858a",fontSize:"0.92rem",padding:"2px 6px"}},"\u00d7")
+        ))
+      )
+    ),
+
+    // ── Suggestions ──
+    React.createElement("div",{style:{marginTop:"34px",borderTop:"1px solid #d4c4a8",paddingTop:"22px"}},
+      React.createElement("div",{style:{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:"10px",flexWrap:"wrap",gap:"8px"}},
+        React.createElement("h3",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",letterSpacing:"0.1em",textTransform:"uppercase",color:"#8a7460",margin:0}},
+          "\ud83d\udd0e Suggestions (" + visible.length + ")"
+        ),
+        Object.keys(dismissed).length > 0 && React.createElement("button",{
+          onClick: () => persistDismissals({}),
+          style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"3px",padding:"4px 10px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.78rem",color:"#6a5840"}
+        }, "Restore " + Object.keys(dismissed).length + " dismissed")
+      ),
+      visible.length === 0
+        ? React.createElement("p",{style:{color:"#7a9e7a",fontStyle:"italic",fontSize:"0.88rem",margin:"6px 0 0"}}, "Nothing flagged \u2014 every event in this lineage looks consistent and at least minimally sourced. Nice work.")
+        : visible.map(s => React.createElement("div",{key:s.key,
+            style:{display:"flex",alignItems:"flex-start",gap:"10px",padding:"10px 12px",background:"rgba(255,252,245,0.5)",borderLeft:"3px solid "+sevColor(s.severity),borderRadius:"3px",marginBottom:"6px"}
+          },
+            React.createElement("div",{style:{flex:1,minWidth:0}},
+              React.createElement("div",{style:{fontSize:"0.92rem",color:"#1a1208"}}, s.text),
+              s.linkedTo && React.createElement("button",{
+                onClick:()=>navigateLink(s.linkedTo),
+                style:{background:"none",border:"none",padding:"2px 0",cursor:"pointer",color:"#a8885a",fontFamily:"'Crimson Text',serif",fontSize:"0.78rem",textDecoration:"underline",textUnderlineOffset:"2px"}
+              }, buildLinkLabel(s.linkedTo))
+            ),
+            React.createElement("div",{style:{display:"flex",gap:"4px",flexShrink:0}},
+              React.createElement("button",{onClick:()=>promoteSuggestion(s),title:"Add to my to-do list",style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"3px",padding:"3px 9px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.78rem",color:"#5a4820"}}, "+ To-do"),
+              React.createElement("button",{onClick:()=>dismissSuggestion(s),title:"Dismiss this suggestion",style:{background:"transparent",border:"none",cursor:"pointer",color:"#8a7460",fontSize:"1rem",padding:"2px 6px"}}, "\u00d7")
+            )
+          ))
+    )
+  );
+}
+
 function CandidatePersonsPanel({candidatePersons, memories, knownPeople, subjectName, persistSubject, setIndexFilter, onMerge, onDiscard}) {
   const [editing, setEditing] = React.useState(null); // id | "new" | null
   const [form, setForm] = React.useState({name:"", notes:""});
@@ -8636,6 +8900,8 @@ function App() {
   const knownOrgs           = subject.knownOrgs || [];
   const knownSources        = subject.knownSources || [];
   const candidatePersons    = subject.candidatePersons || [];
+  const todos               = subject.todos || [];
+  const todoDismissals      = subject.todoDismissals || {};
   const isHistoryMode       = subject?.mode === "history";
   const subjectLinks        = data.subjectLinks || [];
   const locationNotes = subject.locationNotes || {};
@@ -11816,7 +12082,7 @@ function handleEdit(m) {
         // ── Desktop nav ──
         !isMobile&&!["add","edit"].includes(view)&&(()=>{
           const exploreUrl=(()=>{const base=WORKER_URL+"/";const p=[];if(socialKey)p.push("key="+encodeURIComponent(socialKey));if(profileState?.identifier)p.push("id="+profileState.identifier);return p.length?base+"?"+p.join("&"):base;})();
-          const lifeActive=["life","timeline","life-timeline","shared-timeline","decade","year","index","map","photos","tree"].includes(view);
+          const lifeActive=["life","timeline","life-timeline","shared-timeline","decade","year","index","map","photos","tree","todo"].includes(view);
           const socialActive=["sharing","public-profile","legacy"].includes(view);
           const addActive=["add","prompt","import"].includes(view);
           const settingsActive=["settings","backup","print","gedcom"].includes(view);
@@ -11850,6 +12116,7 @@ function handleEdit(m) {
               {label:"🖼 Photos",action:()=>setView("photos"),active:view==="photos"},
               {label:"🗺 Map",action:()=>setView("map"),active:view==="map"},
               isHistoryMode&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
+              isHistoryMode&&{label:"\u2705 To-Do",action:()=>setView("todo"),active:view==="todo",badge:(todos||[]).filter(t=>!t.done).length},
             ].filter(Boolean)}),
             !isHistoryMode&&React.createElement(NavDropdown,{label:"Share",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,items:[
               {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing",badge:shareBadgeCount},
@@ -11905,7 +12172,7 @@ function handleEdit(m) {
 // ── MOBILE BOTTOM NAV ──
     isMobile&&!["add","edit"].includes(view)&&(()=>{
       const exploreUrl=(()=>{const base=WORKER_URL+"/";const p=[];if(socialKey)p.push("key="+encodeURIComponent(socialKey));if(profileState?.identifier)p.push("id="+profileState.identifier);return p.length?base+"?"+p.join("&"):base;})();
-      const lifeActive=["life","timeline","decade","year","index","map","tree"].includes(view);
+      const lifeActive=["life","timeline","decade","year","index","map","tree","todo"].includes(view);
       const socialActive=["sharing","public-profile","legacy"].includes(view);
       const addActive=["add","prompt","import"].includes(view);
       const settingsActive=["settings","backup","print","gedcom"].includes(view);
@@ -12667,6 +12934,11 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
       ),
 
       // ── PROMPTER ──
+      view==="todo"&&React.createElement(TodoView,{
+        subject, memories, knownSources, knownPeople, todos, todoDismissals,
+        persistSubject, setSelected, setView, setIndexFilter, dobYear,
+      }),
+
       view==="prompt"&&React.createElement(PrompterView,{
         memories, knownPeople:knownPeople.filter(p=>p!==ownerName), knownOrgs, knownLocations,
         peopleRelationships, orgLocations, personOrgs,
