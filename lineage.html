@@ -1964,7 +1964,7 @@ const TYPE_ICON = { person:"👤", place:"📍", org:"🏛", tag:"🏷", decade:
 const TYPE_COLOR = { person:"rgba(100,120,160,0.1)", place:"rgba(122,158,138,0.1)", org:"rgba(160,140,100,0.1)", tag:"rgba(196,170,130,0.1)", decade:"rgba(140,130,160,0.1)" };
 const TYPE_BORDER = { person:"rgba(100,120,160,0.3)", place:"rgba(122,158,138,0.3)", org:"rgba(160,140,100,0.3)", tag:"rgba(196,170,130,0.3)", decade:"rgba(140,130,160,0.3)" };
 
-function PrompterView({memories, knownPeople, knownOrgs, knownLocations, peopleRelationships, orgLocations, personOrgs, onAddWithContext, onSetRelationship, onSetCoords, onSetOrgLocations, onSetOrgPeople}) {
+function PrompterView({memories, knownPeople, knownOrgs, knownLocations, peopleRelationships, orgLocations, personOrgs, onAddWithContext, onSetRelationship, onSetCoords, onSetOrgLocations, onSetOrgPeople, onEditEntity}) {
   const extras = { peopleRelationships, orgLocations, personOrgs };
   const [seen, setSeen] = React.useState(()=>new Set());
   const [prompt, setPrompt] = React.useState(()=>buildPrompt(memories,knownPeople,knownOrgs,knownLocations,new Set(),extras));
@@ -1999,12 +1999,27 @@ function PrompterView({memories, knownPeople, knownOrgs, knownLocations, peopleR
     if (prompt) {
       nextSeen.add(prompt.entity + "||" + prompt.text);
       setSeen(nextSeen);
-      setHistory(h=>[prompt,...h].slice(0,10));
+      setHistory(h=>[prompt,...h].slice(0,20));
     }
     resetInline();
     const p = buildPrompt(memories,knownPeople,knownOrgs,knownLocations,nextSeen,extras);
     setPrompt(p);
     setDismissed(d=>d+1);
+  }
+  function previous() {
+    if (history.length === 0) return;
+    const [prev, ...rest] = history;
+    // Keep the current prompt available to come back to via Skip — we drop it
+    // from the seen set so buildPrompt can serve it again, otherwise the user
+    // would be unable to return to "now" once they've gone back.
+    if (prompt) {
+      const k = prompt.entity + "||" + prompt.text;
+      const nextSeen = new Set(seen); nextSeen.delete(k); setSeen(nextSeen);
+    }
+    resetInline();
+    setHistory(rest);
+    setPrompt(prev);
+    setDismissed(d => Math.max(0, d - 1));
   }
 
   function respond() { onAddWithContext(prompt); }
@@ -2150,16 +2165,30 @@ function PrompterView({memories, knownPeople, knownOrgs, knownLocations, peopleR
           lineHeight:1.55,color:"#1a1208",margin:"0 0 24px"
         }}, prompt.text),
         renderInlineAction(prompt),
-        React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap",marginTop:"20px"}},
+        React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap",marginTop:"20px",alignItems:"center"}},
           React.createElement("button",{onClick:respond,style:{
             background:"#2c2416",color:"#f5f0e8",border:"none",padding:"10px 22px",
             borderRadius:"2px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"1rem"
           }},"✍ "+prompt.action),
+          history.length>0 && React.createElement("button",{onClick:previous,title:"Back to the previous prompt",style:{
+            background:"transparent",border:"1px solid #c8b89a",color:"#6a5c48",
+            padding:"10px 18px",borderRadius:"2px",cursor:"pointer",
+            fontFamily:"'Crimson Text',serif",fontSize:"1rem"
+          }},"\u2190 Previous"),
           React.createElement("button",{onClick:next,style:{
             background:"transparent",border:"1px solid #c8b89a",color:"#6a5c48",
             padding:"10px 18px",borderRadius:"2px",cursor:"pointer",
             fontFamily:"'Crimson Text',serif",fontSize:"1rem"
-          }},"Skip →")
+          }},"Skip \u2192"),
+          onEditEntity && (prompt.type==="person"||prompt.type==="place"||prompt.type==="org") && React.createElement("button",{
+            onClick:()=>onEditEntity(prompt.type, prompt.entity),
+            title: "Open this "+(prompt.type==="place"?"location":prompt.type)+" in the Index to edit its details",
+            style:{
+              background:"transparent",border:"1px solid #c8b89a",color:"#6a5c48",
+              padding:"10px 18px",borderRadius:"2px",cursor:"pointer",marginLeft:"auto",
+              fontFamily:"'Crimson Text',serif",fontSize:"0.92rem"
+            }
+          }, "\u270e Edit "+(prompt.type==="place"?"location":prompt.type==="org"?"organisation":"person")+" \u2197")
         )
       ),
 
@@ -2499,7 +2528,7 @@ function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, kno
   function commitRel() { onSetRelationship(name, relDraft.trim()); setEditingRel(false); setShowRelSugs(false); }
   function commitNotes() { onSetNotes(name, notesDraft); }
 
-  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"14px 0",display:"flex",gap:"12px",alignItems:"flex-start"}},
+  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"12px 0",display:"flex",gap:"12px",alignItems:"flex-start"}},
     React.createElement(EntityPhotoUpload,{photo,size:48,onSet:med=>onSetPhoto("person:"+name,med),onClear:()=>onSetPhoto("person:"+name,null)}),
     React.createElement("div",{style:{flex:1,minWidth:0}},
     // Name row
@@ -2661,7 +2690,7 @@ function RelationshipRow({rel, people, memCount, onView, onRename}) {
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(rel);
   function commitRename() { const v=draft.trim(); if(v&&v!==rel) onRename(rel,v); setEditing(false); }
-  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"10px 0"}},
+  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"12px 0"}},
     React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
       editing
         ? React.createElement("input",{autoFocus:true,value:draft,onChange:e=>setDraft(e.target.value),
@@ -2783,11 +2812,14 @@ function RelationshipIndex({memories, peopleRelationships, onView, onRenameRelat
   );
 }
 
-function PetsPanel({pets, memories, entityPhotos, onSetEntityPhoto, persistSubject, setIndexFilter, renamePerson, deletePerson, knownPeople}) {
+function PetsPanel({pets, memories, entityPhotos, onSetEntityPhoto, persistSubject, setIndexFilter, renamePerson, deletePerson, knownPeople, pendingPanelAdd, clearPendingPanelAdd}) {
   const [adding, setAdding] = React.useState(false);
   const [draftName, setDraftName] = React.useState("");
   const [draftSpecies, setDraftSpecies] = React.useState("");
   const [search, setSearch] = React.useState("");
+  React.useEffect(() => {
+    if (pendingPanelAdd === "pet") { setDraftName(""); setDraftSpecies(""); setAdding(true); clearPendingPanelAdd?.(); }
+  }, [pendingPanelAdd]);
   function commitAdd() {
     const n = draftName.trim();
     if (!n) return;
@@ -2828,7 +2860,7 @@ function PetsPanel({pets, memories, entityPhotos, onSetEntityPhoto, persistSubje
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px",gap:"8px",flexWrap:"wrap"}},
       React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},
         pets.length+" pet"+(pets.length===1?"":"s")+" \u00b7 click a name to see memories"),
-      !adding && React.createElement("button",{onClick:()=>{setDraftName("");setDraftSpecies("");setAdding(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add pet")
+      !adding && React.createElement("button",{onClick:()=>{setDraftName("");setDraftSpecies("");setAdding(true);},style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.84rem"}},"+ Add pet")
     ),
     adding && React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"12px",flexWrap:"wrap"}},
       React.createElement("input",{autoFocus:true,value:draftName,onChange:e=>setDraftName(e.target.value),
@@ -2890,10 +2922,16 @@ function PetRow({pet, memCount, photo, onSetPhoto, onSetField, onRename, onDelet
   );
 }
 
-function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setLocationAddress,entityPhotos,onSetEntityPhoto,setIndexFilter,persistSubject}) {
+function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setLocationAddress,entityPhotos,onSetEntityPhoto,setIndexFilter,persistSubject,pendingPanelAdd,clearPendingPanelAdd,pendingPanelOpen,clearPendingPanelOpen}) {
   const [addingLoc, setAddingLoc] = React.useState(false);
   const [newLoc, setNewLoc] = React.useState("");
   const [search, setSearch] = React.useState("");
+  React.useEffect(() => {
+    if (pendingPanelAdd === "location") { setNewLoc(""); setAddingLoc(true); clearPendingPanelAdd?.(); }
+  }, [pendingPanelAdd]);
+  React.useEffect(() => {
+    if (pendingPanelOpen) { setSearch(pendingPanelOpen); clearPendingPanelOpen?.(); }
+  }, [pendingPanelOpen]);
   // Paths in `expanded` are shown; default = all collapsed so the user sees
   // a tidy country-level overview and drills down deliberately.
   const [expanded, setExpanded] = React.useState(() => new Set());
@@ -2991,7 +3029,7 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
           title: "Parse comma-separated labels into Country / State / Town fields where they're missing",
           style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"3px",padding:"3px 10px",cursor:"pointer",color:"#5a4820",fontFamily:"'Crimson Text',serif",fontSize:"0.82rem"}
         }, "Auto-classify "+classifiable.length+" from labels"),
-        !addingLoc&&React.createElement("button",{onClick:()=>{setNewLoc("");setAddingLoc(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add location")
+        !addingLoc&&React.createElement("button",{onClick:()=>{setNewLoc("");setAddingLoc(true);},style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.84rem"}},"+ Add location")
       )
     ),
     addingLoc&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"12px"}},
@@ -3376,10 +3414,16 @@ function OrgRow({name, count, notes, connectedPeople, locs, knownLocations, peri
   );
 }
 
-function OrgsPanel({knownOrgs,knownLocations,memories,orgNotes,orgLocations,orgPeriods,personOrgs,entityPhotos,onSetEntityPhoto,onRenameOrg,onDeleteOrg,onSetOrgNotes,onSetOrgLocations,onSetOrgPeriods,setIndexFilter,persistSubject}) {
+function OrgsPanel({knownOrgs,knownLocations,memories,orgNotes,orgLocations,orgPeriods,personOrgs,entityPhotos,onSetEntityPhoto,onRenameOrg,onDeleteOrg,onSetOrgNotes,onSetOrgLocations,onSetOrgPeriods,setIndexFilter,persistSubject,pendingPanelAdd,clearPendingPanelAdd,pendingPanelOpen,clearPendingPanelOpen}) {
   const [search, setSearch] = React.useState("");
   const [adding, setAdding] = React.useState(false);
   const [newName, setNewName] = React.useState("");
+  React.useEffect(() => {
+    if (pendingPanelAdd === "org") { setNewName(""); setAdding(true); clearPendingPanelAdd?.(); }
+  }, [pendingPanelAdd]);
+  React.useEffect(() => {
+    if (pendingPanelOpen) { setSearch(pendingPanelOpen); clearPendingPanelOpen?.(); }
+  }, [pendingPanelOpen]);
   const q = search.trim().toLowerCase();
   const filtered = q ? knownOrgs.filter(n=>n.toLowerCase().includes(q)) : knownOrgs;
   // Precompute counts once per memories change. Avoids O(orgs × memories) per render.
@@ -3403,7 +3447,7 @@ function OrgsPanel({knownOrgs,knownLocations,memories,orgNotes,orgLocations,orgP
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px"}},
       React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},
         filtered.length+" "+(filtered.length===1?"organisation":"organisations")),
-      !adding&&React.createElement("button",{onClick:()=>{setNewName("");setAdding(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add org")
+      !adding&&React.createElement("button",{onClick:()=>{setNewName("");setAdding(true);},style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.84rem"}},"+ Add organisation")
     ),
     adding&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"12px"}},
       React.createElement("input",{autoFocus:true,value:newName,onChange:e=>setNewName(e.target.value),
@@ -3428,7 +3472,7 @@ function OrgsPanel({knownOrgs,knownLocations,memories,orgNotes,orgLocations,orgP
   );
 }
 
-function GroupRow({groupName, members, notes, onRename, onDelete, onSetNotes, onSetMembers, knownPeople, onView}) {
+function GroupRow({groupName, members, notes, onRename, onDelete, onSetNotes, onSetMembers, knownPeople, onView, isOpen, onToggle, onPickMember}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(groupName);
   const [showNotes, setShowNotes] = React.useState(false);
@@ -3440,51 +3484,78 @@ function GroupRow({groupName, members, notes, onRename, onDelete, onSetNotes, on
   function commitRename(){if(draft.trim()&&draft.trim()!==groupName)onRename(groupName,draft.trim());setRenaming(false);}
   function commitNotes(){onSetNotes(groupName,notesDraft);}
 
-  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"14px 0"}},
-    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
+  return React.createElement("div",{style:{borderBottom:"1px solid #ede4d4",padding:"12px 0"}},
+    React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap"}},
+      React.createElement("button",{
+        onClick: onToggle,
+        title: isOpen ? "Collapse" : "Expand",
+        style:{background:"transparent",border:"none",cursor:"pointer",color:"#a89a7a",padding:"2px 4px",fontSize:"0.78rem"}
+      }, isOpen ? "\u25bc" : "\u25b6"),
       renaming
         ? React.createElement("input",{autoFocus:true,value:draft,onChange:e=>setDraft(e.target.value),
             onKeyDown:e=>{if(e.key==="Enter")commitRename();if(e.key==="Escape"){setDraft(groupName);setRenaming(false);}},
             onBlur:commitRename,style:{...S.input,padding:"5px 9px",fontSize:"1rem",flex:1,minWidth:"140px"}})
-        : React.createElement("button",{onClick:onView,style:{flex:1,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",padding:0,fontWeight:600}},groupName),
-      React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},(members||[]).length+" "+(members||[]).length===1?"member":"members"),
-      React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px"}},
+        : React.createElement("button",{onClick:onView,style:{flex:1,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:"#1a1208",padding:0}},groupName),
+      React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic"}},(members||[]).length+" "+((members||[]).length===1?"member":"members")),
+      React.createElement("div",{style:{marginLeft:"auto",display:"flex",gap:"6px",flexWrap:"wrap"}},
         !renaming&&React.createElement("button",{onClick:()=>{setDraft(groupName);setRenaming(true);},style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem"}},"Rename"),
-        React.createElement("button",{onClick:()=>setShowNotes(s=>!s),style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:notes?"#4a7a5a":"#8a7460",borderColor:notes?"#7a9e8a":"#c8b89a"}},showNotes?"Hide notes":(notes?"✓ Notes":"+ Notes")),
-        React.createElement("button",{onClick:()=>{if(window.confirm("Delete group “"+groupName+"”? Members won’t be affected."))onDelete(groupName);},style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Delete")
+        React.createElement("button",{onClick:()=>setShowNotes(s=>!s),style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:notes?"#4a7a5a":"#8a7460",borderColor:notes?"#7a9e8a":"#c8b89a"}},showNotes?"Hide notes":(notes?"\u2713 Notes":"+ Notes")),
+        React.createElement("button",{onClick:()=>{if(window.confirm("Delete group \u201c"+groupName+"\u201d? Members won\u2019t be affected."))onDelete(groupName);},style:{...S.btnOutline,padding:"3px 10px",fontSize:"0.8rem",color:"#c4858a",borderColor:"#e0c8c8"}},"Delete")
       )
     ),
-    React.createElement("div",{style:{marginTop:"8px",display:"flex",flexWrap:"wrap",gap:"5px",alignItems:"center"}},
-      (members||[]).map(m=>React.createElement("span",{key:m,style:{display:"inline-flex",alignItems:"center",gap:"3px",fontSize:"0.82rem",color:"#4a5a7a",background:"rgba(100,110,140,0.1)",border:"1px solid rgba(100,110,140,0.2)",borderRadius:"20px",padding:"2px 9px"}},
-        "👤 ",m,
-        React.createElement("button",{onClick:()=>onSetMembers(groupName,(members||[]).filter(x=>x!==m)),style:{background:"none",border:"none",cursor:"pointer",color:"#8a7460",fontSize:"0.78rem",padding:"0 0 0 2px",lineHeight:1}},"x")
-      )),
-      addingMember
-        ? React.createElement("div",{style:{position:"relative",display:"inline-flex",gap:"5px",alignItems:"center"}},
-            React.createElement("input",{autoFocus:true,value:memberSearch,onChange:e=>setMemberSearch(e.target.value),
-              onKeyDown:e=>{if(e.key==="Escape"){setAddingMember(false);setMemberSearch("");}},
-              onBlur:()=>setTimeout(()=>{setAddingMember(false);setMemberSearch("");},200),
-              placeholder:"Search people…",style:{...S.input,padding:"3px 8px",fontSize:"0.8rem",width:"130px"}}),
-            memberSugs.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,minWidth:"160px",background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)"}},
-              memberSugs.map(p=>React.createElement("div",{key:p,onMouseDown:()=>{onSetMembers(groupName,[...(members||[]),p]);setMemberSearch("");setAddingMember(false);},
-                style:{padding:"6px 12px",cursor:"pointer",fontSize:"0.86rem",color:"#2c2416"},
-                onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
-                onMouseLeave:e=>e.currentTarget.style.background="transparent"},p))
+    isOpen && React.createElement("div",{style:{paddingLeft:"22px",paddingTop:"8px"}},
+      (members||[]).length === 0 && !addingMember && React.createElement("p",{style:{margin:"0 0 6px",fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic"}},"No members yet."),
+      React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"4px"}},
+        (members||[]).map(m=>React.createElement("div",{key:m,style:{display:"flex",alignItems:"center",gap:"6px",fontSize:"0.9rem",color:"#2c2416"}},
+          React.createElement("span",{style:{color:"#a89a7a",fontSize:"0.78rem"}}, "\u2022"),
+          React.createElement("button",{
+            onClick: () => onPickMember && onPickMember(m),
+            style:{background:"transparent",border:"none",cursor:"pointer",textAlign:"left",fontSize:"0.92rem",color:"#1a1208",padding:0,textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px"}
+          }, "\ud83d\udc64 " + m),
+          React.createElement("button",{
+            onClick:()=>onSetMembers(groupName,(members||[]).filter(x=>x!==m)),
+            title:"Remove from group",
+            style:{background:"none",border:"none",cursor:"pointer",color:"#8a7460",fontSize:"0.78rem",padding:"0 4px",lineHeight:1}
+          },"\u00d7")
+        ))
+      ),
+      React.createElement("div",{style:{marginTop:"8px"}},
+        addingMember
+          ? React.createElement("div",{style:{position:"relative",display:"inline-flex",gap:"5px",alignItems:"center"}},
+              React.createElement("input",{autoFocus:true,value:memberSearch,onChange:e=>setMemberSearch(e.target.value),
+                onKeyDown:e=>{if(e.key==="Escape"){setAddingMember(false);setMemberSearch("");}},
+                onBlur:()=>setTimeout(()=>{setAddingMember(false);setMemberSearch("");},200),
+                placeholder:"Search people\u2026",style:{...S.input,padding:"3px 8px",fontSize:"0.8rem",width:"160px"}}),
+              memberSugs.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,minWidth:"180px",background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)"}},
+                memberSugs.map(p=>React.createElement("div",{key:p,onMouseDown:()=>{onSetMembers(groupName,[...(members||[]),p]);setMemberSearch("");setAddingMember(false);},
+                  style:{padding:"6px 12px",cursor:"pointer",fontSize:"0.86rem",color:"#2c2416"},
+                  onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
+                  onMouseLeave:e=>e.currentTarget.style.background="transparent"},p))
+              )
             )
-          )
-        : React.createElement("button",{onClick:()=>setAddingMember(true),style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline",padding:"0 4px"}},"+ add member")
-    ),
-    showNotes&&React.createElement("div",{style:{marginTop:"8px"}},
-      React.createElement("textarea",{value:notesDraft,onChange:e=>setNotesDraft(e.target.value),onBlur:commitNotes,placeholder:"Notes about this group…",rows:2,style:{...S.input,width:"100%",resize:"vertical",fontSize:"0.88rem",lineHeight:1.6}}),
-      React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",marginTop:"3px"}},"Saved automatically when you click away")
+          : React.createElement("button",{onClick:()=>setAddingMember(true),style:{...S.btnOutline,padding:"4px 11px",fontSize:"0.82rem"}},"+ Add member")
+      ),
+      showNotes&&React.createElement("div",{style:{marginTop:"10px"}},
+        React.createElement("textarea",{value:notesDraft,onChange:e=>setNotesDraft(e.target.value),onBlur:commitNotes,placeholder:"Notes about this group\u2026",rows:2,style:{...S.input,width:"100%",resize:"vertical",fontSize:"0.88rem",lineHeight:1.6}}),
+        React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",marginTop:"3px"}},"Saved automatically when you click away")
+      )
     )
   );
 }
 
-function GroupsManager({personGroups, knownPeople, memories, onSetGroups, onViewGroup}) {
+function GroupsManager({personGroups, knownPeople, memories, onSetGroups, onViewGroup, pendingPanelAdd, clearPendingPanelAdd}) {
   const [adding, setAdding] = React.useState(false);
   const [newGroupName, setNewGroupName] = React.useState("");
   const [search, setSearch] = React.useState("");
+  // Default-collapsed expansion set, matching the Locations / Relationships
+  // tree pattern so users see a tidy group-level overview first.
+  const [expanded, setExpanded] = React.useState(() => new Set());
+  function toggleGroup(name) {
+    setExpanded(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; });
+  }
+  React.useEffect(() => {
+    if (pendingPanelAdd === "group") { setNewGroupName(""); setAdding(true); clearPendingPanelAdd?.(); }
+  }, [pendingPanelAdd]);
   const groups = Object.entries(personGroups||{}).sort((a,b)=>a[0].localeCompare(b[0]));
 
   function commitAdd(){
@@ -3506,7 +3577,7 @@ function GroupsManager({personGroups, knownPeople, memories, onSetGroups, onView
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"4px"}},
       React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},
         groups.length+" "+(groups.length===1?"group":"groups")+" · click a group name to see all member memories"),
-      !adding&&React.createElement("button",{onClick:()=>{setNewGroupName("");setAdding(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ new group")
+      !adding&&React.createElement("button",{onClick:()=>{setNewGroupName("");setAdding(true);},style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.84rem"}},"+ Add group")
     ),
     adding&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"12px"}},
       React.createElement("input",{autoFocus:true,value:newGroupName,onChange:e=>setNewGroupName(e.target.value),
@@ -3524,27 +3595,46 @@ function GroupsManager({personGroups, knownPeople, memories, onSetGroups, onView
       return visible.map(([name,data])=>React.createElement(GroupRow,{key:name,groupName:name,
         members:data.members||[],notes:data.notes||"",knownPeople,
         onRename:renameGroup,onDelete:deleteGroup,onSetNotes:setGroupNotes,onSetMembers:setGroupMembers,
-        onView:()=>onViewGroup(name,data.members||[])}));
+        onView:()=>onViewGroup(name,data.members||[]),
+        isOpen: q ? true : expanded.has(name),
+        onToggle: () => toggleGroup(name),
+        onPickMember: pName => onViewGroup(pName, [pName])}));
     })()
   );
 }
 
-function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,peopleNotes,orgNotes,personOrgs,personLocations,entityPhotos,onSetEntityPhoto,localConnections,onSetConnection,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onSetPersonOrgs,onSetPersonLocations,onViewPerson,onAddPerson,onAddOrg,peopleEmails={},onSetEmail}) {
+function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,peopleRelationships,peopleNotes,orgNotes,personOrgs,personLocations,entityPhotos,onSetEntityPhoto,localConnections,onSetConnection,onRenamePerson,onDeletePerson,onRenameOrg,onDeleteOrg,onSetRelationship,onSetPersonNotes,onSetOrgNotes,onSetPersonOrgs,onSetPersonLocations,onViewPerson,onAddPerson,onAddOrg,peopleEmails={},onSetEmail,pendingPanelAdd,clearPendingPanelAdd,pendingPanelOpen,clearPendingPanelOpen}) {
   const [search, setSearch] = React.useState("");
   const [filterRel, setFilterRel] = React.useState(null);
   const [filterOrg, setFilterOrg] = React.useState(null);
   const [filterLoc, setFilterLoc] = React.useState(null);
   const [filterConnected, setFilterConnected] = React.useState(false);
+  const [sortMode, setSortMode] = React.useState("alpha"); // alpha | memories | chrono
   const connectedNames = React.useMemo(()=>new Set((localConnections||[]).map(c=>c.name.toLowerCase())),[localConnections]);
   const [openDrop, setOpenDrop] = React.useState(null);
   const [addingPerson, setAddingPerson] = React.useState(false);
   const [addingOrg, setAddingOrg] = React.useState(false);
   const [newName, setNewName] = React.useState("");
+  React.useEffect(() => {
+    if (pendingPanelAdd === "person") { setNewName(""); setAddingPerson(true); clearPendingPanelAdd?.(); }
+  }, [pendingPanelAdd]);
+  React.useEffect(() => {
+    if (pendingPanelOpen) { setSearch(pendingPanelOpen); clearPendingPanelOpen?.(); }
+  }, [pendingPanelOpen]);
   // Precompute counts once per memories change. Avoids O(people × memories) per render.
   const personCounts = React.useMemo(() => {
     const c = new Map();
     (memories||[]).forEach(m => (m.people||[]).forEach(p => c.set(p, (c.get(p)||0) + 1)));
     return c;
+  }, [memories]);
+  // Earliest memory year per person — used by the chronological sort.
+  const personFirstYear = React.useMemo(() => {
+    const m = new Map();
+    (memories||[]).forEach(mem => (mem.people||[]).forEach(p => {
+      const y = mem.year || 0;
+      if (y && (!m.has(p) || y < m.get(p))) m.set(p, y);
+    }));
+    return m;
   }, [memories]);
   const orgCounts = React.useMemo(() => {
     const c = new Map();
@@ -3565,8 +3655,20 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
     if(filterConnected&&!connectedNames.has(n.toLowerCase())) return false;
     return true;
   });
-  filteredPeople = filteredPeople.sort((a,b)=>a.localeCompare(b));
-  filteredPeople=[...filteredPeople].sort((a,b)=>a.localeCompare(b));
+  filteredPeople = filteredPeople.sort((a,b) => {
+    if (sortMode === "memories") {
+      const cd = personCount(b) - personCount(a);
+      if (cd !== 0) return cd;
+      return a.localeCompare(b);
+    }
+    if (sortMode === "chrono") {
+      const ya = personFirstYear.get(a) || Infinity;
+      const yb = personFirstYear.get(b) || Infinity;
+      if (ya !== yb) return ya - yb;
+      return a.localeCompare(b);
+    }
+    return a.localeCompare(b);
+  });
   const filteredOrgs = q ? knownOrgs.filter(n=>n.toLowerCase().includes(q)) : knownOrgs;
   const activeFilters=[filterRel,filterOrg,filterLoc].filter(Boolean);
   const chipStyle=(active)=>({display:"inline-flex",alignItems:"center",gap:"4px",padding:"3px 10px",borderRadius:"20px",fontSize:"0.78rem",cursor:"pointer",border:"1px solid",fontFamily:"'Crimson Text',serif",background:active?"#2c2416":"transparent",color:active?"#f5f0e8":"#6a5840",borderColor:active?"#2c2416":"#c8b89a"});
@@ -3602,25 +3704,30 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
           )
         ),
         (localConnections||[]).length>0&&!filterConnected&&React.createElement("button",{onClick:()=>setFilterConnected(true),style:{...chipStyle(false),fontSize:"0.74rem"}},"✓ Connected"),
-        (filterRel||filterOrg||filterLoc||filterConnected)&&React.createElement("span",{onClick:()=>{setFilterRel(null);setFilterOrg(null);setFilterLoc(null);setFilterConnected(false);setOpenDrop(null);},style:{...chipStyle(false),color:"#c4858a",borderColor:"#e0c8c8",cursor:"pointer"}},"clear all")
+        (filterRel||filterOrg||filterLoc||filterConnected)&&React.createElement("span",{onClick:()=>{setFilterRel(null);setFilterOrg(null);setFilterLoc(null);setFilterConnected(false);setOpenDrop(null);},style:{...chipStyle(false),color:"#c4858a",borderColor:"#e0c8c8",cursor:"pointer"}},"clear all"),
+        React.createElement("span",{style:{marginLeft:"auto",display:"inline-flex",alignItems:"center",gap:"6px"}},
+          React.createElement("span",{style:{fontSize:"0.74rem",color:"#8a7460",fontFamily:"'Crimson Text',serif"}}, "Sort:"),
+          React.createElement("select",{value:sortMode,onChange:e=>setSortMode(e.target.value),style:{...S.select,fontSize:"0.78rem",padding:"3px 8px",fontFamily:"'Crimson Text',serif"}},
+            React.createElement("option",{value:"alpha"},"Alphabetical"),
+            React.createElement("option",{value:"memories"},"Most memories"),
+            React.createElement("option",{value:"chrono"},"Earliest memory")
+          )
+        )
       )
     ),
     React.createElement("div",{style:{marginBottom:"36px"}},
-      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"4px"}},
-        knownPeople.length>0&&React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:0}},"People"),
-        knownOrgs.length===0&&!addingPerson&&React.createElement("button",{onClick:()=>{setNewName("");setAddingPerson(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add person")
+      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px",gap:"8px",flexWrap:"wrap"}},
+        React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},
+          filteredPeople.length+" "+(filteredPeople.length===1?"person":"people")+(activeFilters.length>0?" (filtered)":"")+" \u00b7 click a name to see their memories"+(filteredPeople.some(n=>personCount(n)===0)?" \u00b7 \u25b2 no memories yet":"")
+        ),
+        knownOrgs.length===0&&!addingPerson&&React.createElement("button",{onClick:()=>{setNewName("");setAddingPerson(true);},style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.84rem"}},"+ Add person")
       ),
       addingPerson&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"10px"}},
         React.createElement("input",{autoFocus:true,value:newName,onChange:e=>setNewName(e.target.value),
           onKeyDown:e=>{if(e.key==="Enter")commitAdd("person");if(e.key==="Escape"){setAddingPerson(false);setNewName("");}},
-          placeholder:"Person’s name…",style:{...S.input,padding:"5px 9px",fontSize:"0.92rem",flex:1}}),
+          placeholder:"Person\u2019s name\u2026",style:{...S.input,padding:"5px 9px",fontSize:"0.92rem",flex:1}}),
         React.createElement("button",{onClick:()=>commitAdd("person"),style:{...S.btn,padding:"5px 12px",fontSize:"0.86rem"}},"Add"),
         React.createElement("button",{onClick:()=>{setAddingPerson(false);setNewName("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.86rem"}},"Cancel")
-      ),
-      filteredPeople.length>0&&React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 2px"}},
-        filteredPeople.length," ",filteredPeople.length===1?"person":"people",activeFilters.length>0?" (filtered)":"",
-        " · click a name to see their memories",
-        filteredPeople.some(n=>personCount(n)===0)?" · ▲ no memories yet":""
       ),
       filteredPeople.map(name=>React.createElement(PersonRow,{key:name,name,count:personCount(name),
         relationship:peopleRelationships?.[name],notes:peopleNotes?.[name],
@@ -3636,9 +3743,11 @@ function PeopleOrgsManager({knownPeople,knownOrgs,knownLocations,memories,people
       knownOrgs.length===0&&knownPeople.length===0&&!addingPerson&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No people recorded yet.")
     ),
     (knownOrgs.length>0||addingOrg)&&React.createElement("div",null,
-      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"4px"}},
-        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:0}},"Organisations"),
-        !addingOrg&&React.createElement("button",{onClick:()=>{setNewName("");setAddingOrg(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add org")
+      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px",gap:"8px",flexWrap:"wrap",borderTop:"1px solid #ede4d4",paddingTop:"16px",marginTop:"24px"}},
+        React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},
+          filteredOrgs.length+" "+(filteredOrgs.length===1?"organisation":"organisations")+" \u00b7 click a name to see their memories"
+        ),
+        !addingOrg&&React.createElement("button",{onClick:()=>{setNewName("");setAddingOrg(true);},style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.84rem"}},"+ Add organisation")
       ),
       addingOrg&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"10px"}},
         React.createElement("input",{autoFocus:true,value:newName,onChange:e=>setNewName(e.target.value),
@@ -5571,7 +5680,8 @@ function SettingsView({
         ),
         React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",margin:"0 0 12px"}},
           subject.isSelf ? "Your name is shown when you share memories with others." : "The person whose story is being recorded."),
-        React.createElement("input",{value:ownerName,onChange:e=>persistSubject({name:e.target.value}),placeholder:subject.isSelf?"Your name":"Their name",style:{...S.input,marginBottom:subject.isSelf?"10px":"16px"}}),
+        React.createElement("input",{value:ownerName,onChange:e=>persistSubject({name:e.target.value}),placeholder:subject.isSelf?"Your name":"Their name",style:{...S.input,marginBottom:"10px"}}),
+        React.createElement("input",{value:subject.dob||"",onChange:e=>persistSubject({dob:e.target.value}),placeholder:subject.isSelf?"Year of birth (optional, e.g. 1980) \u2014 used to show your age on each memory":"Year of birth (optional)",style:{...S.input,marginBottom:subject.isSelf?"10px":"16px"}}),
         subject.isSelf&&React.createElement("div",{style:{marginBottom:"16px"}},
           React.createElement("input",{type:"email",value:carerEmail,onChange:e=>{persistTop({carerEmail:e.target.value});},placeholder:"your@email.com (used for sharing)",style:{...S.input,marginBottom:"6px"}}),
           carerEmail&&carerEmail.includes("@")&&(emailVerified
@@ -8483,6 +8593,16 @@ function App() {
   const [iabBannerDismissed, setIabBannerDismissed] = useState(false);
   const iabOnLoad = React.useMemo(()=>isInAppBrowser(),[]);
   const [indexTab, setIndexTab] = useState("people");
+  // One-shot signal that the Add menu has navigated to an Index tab and the
+  // panel should jump straight into "add new" mode rather than showing the
+  // list. Each panel watches it and clears it via clearPendingPanelAdd.
+  const [pendingPanelAdd, setPendingPanelAdd] = useState(null);
+  const clearPendingPanelAdd = React.useCallback(() => setPendingPanelAdd(null), []);
+  // One-shot signal naming an existing entity to focus on. Panels respond by
+  // pre-filling their search input with this value so the user lands on that
+  // single row ready to edit. Cleared after consumption.
+  const [pendingPanelOpen, setPendingPanelOpen] = useState(null);
+  const clearPendingPanelOpen = React.useCallback(() => setPendingPanelOpen(null), []);
   const [indexFilter, setIndexFilter] = useState(null); // {type, value}
   // Sync index tab from filter type (when navigating from menu)
   React.useEffect(() => {
@@ -10543,12 +10663,19 @@ function handleEdit(m) {
   const ownMems = memories.filter(m => !m.gedcomContext);
   // Subject's birth year (for "age N" display). dob may be a 4-digit year alone or a full date.
   // Reject implausible values: must be in [1500, current year]. Otherwise age renders nonsense.
+  // If subject.dob is unset, fall back to scanning memories for a title like
+  // "Born", "I was born" or "My birth" — most users record one as their first
+  // memory and shouldn't need to set dob explicitly to see ages.
   const dobYear = (() => {
-    const m = (subject?.dob || "").match(/\d{4}/);
-    if (!m) return null;
-    const y = parseInt(m[0], 10);
     const thisYear = new Date().getFullYear();
-    return (y >= 1500 && y <= thisYear) ? y : null;
+    const m = (subject?.dob || "").match(/\d{4}/);
+    if (m) {
+      const y = parseInt(m[0], 10);
+      if (y >= 1500 && y <= thisYear) return y;
+    }
+    const bornRe = /^\s*(i\s+was\s+born|born|my\s+birth|birth\s+of\s+me)\b/i;
+    const bornMem = (memories||[]).find(mem => mem.year && mem.year >= 1500 && mem.year <= thisYear && bornRe.test(mem.title||""));
+    return bornMem ? bornMem.year : null;
   })();
   const ageAtYear = (yr) => (dobYear && yr && yr >= dobYear) ? yr - dobYear : null;
   const allDecades=[...new Set(ownMems.map(m=>Math.floor(m.year/10)*10))].sort();
@@ -11387,6 +11514,21 @@ function handleEdit(m) {
           const socialActive=["sharing","public-profile","legacy"].includes(view);
           const addActive=["add","prompt","import"].includes(view);
           const settingsActive=["settings","backup","print","gedcom"].includes(view);
+          // Inline icon button used to break Settings out of a dropdown.
+          const iconBtn = (icon, title, active, onClick, badgeCount) =>
+            React.createElement("button",{
+              onClick, title,
+              style:{
+                position:"relative",background:active?"#f5ede0":"transparent",border:"1px solid "+(active?"#c8b89a":"transparent"),
+                borderRadius:"3px",padding:"6px 9px",cursor:"pointer",fontSize:"1.05rem",color:"#2c2416",
+                lineHeight:1
+              },
+              onMouseEnter:e=>{ if(!active) e.currentTarget.style.background="#f5ede0"; },
+              onMouseLeave:e=>{ if(!active) e.currentTarget.style.background="transparent"; }
+            },
+              icon,
+              badgeCount>0 && React.createElement("span",{style:{position:"absolute",top:"-2px",right:"-2px",background:"#c4858a",color:"#fff",fontSize:"0.65rem",fontFamily:"sans-serif",borderRadius:"10px",padding:"1px 5px",lineHeight:1}}, badgeCount)
+            );
           return React.createElement(React.Fragment,null,
             React.createElement(NavDropdown,{label:"Life",isActive:lifeActive,items:[
               {label:"◉ Overview",action:()=>setView("life"),active:view==="life"},
@@ -11396,17 +11538,14 @@ function handleEdit(m) {
               {divider:true},
               {label:"👤 People",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
               {label:"📍 Places",action:()=>{setIndexFilter({type:"locations"});setView("index");},active:view==="index"&&indexFilter?.type==="locations"},
-              {label:"🏛 Organisations",action:()=>{setIndexFilter({type:"orgs"});setView("index");},active:view==="index"&&indexFilter?.type==="orgs"},
-              {label:"👥 Groups",action:()=>{setIndexFilter({type:"groups"});setView("index");},active:view==="index"&&indexFilter?.type==="groups"},
-              {label:"🔗 Relationships",action:()=>{setIndexFilter({type:"relationships"});setView("index");},active:view==="index"&&indexFilter?.type==="relationships"},
-              {label:"🏷 Tags",action:()=>{setIndexFilter({type:"tags"});setView("index");},active:view==="index"&&indexFilter?.type==="tags"},
+              {label:"🗂 Index",action:()=>{setIndexFilter(null);setIndexTab("orgs");setView("index");},active:view==="index"&&!indexFilter},
               isHistoryMode&&{label:"📚 Sources",action:()=>{setIndexFilter({type:"sources"});setView("index");},active:view==="index"&&indexFilter?.type==="sources"},
               {divider:true},
               {label:"🖼 Photos",action:()=>setView("photos"),active:view==="photos"},
               {label:"🗺 Map",action:()=>setView("map"),active:view==="map"},
               isHistoryMode&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
             ].filter(Boolean)}),
-            !isHistoryMode&&React.createElement(NavDropdown,{label:"Social",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,items:[
+            !isHistoryMode&&React.createElement(NavDropdown,{label:"Share",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,items:[
               {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing",badge:shareBadgeCount},
               IS_STAGING&&wantPublicProfile&&{label:"◎ Profile",action:()=>setView("public-profile"),active:view==="public-profile",subOnly:true,disabled:!isSubscriber},
               IS_STAGING&&{label:"Explore ↗",href:exploreUrl,external:true,subOnly:true,disabled:!isSubscriber},
@@ -11421,17 +11560,24 @@ function handleEdit(m) {
               {label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
               {label:"🔎 Research",action:()=>window.open(genealogyResearchUrl(null, knownLocations),"_blank","noopener")},
             ]:[
-              {label:"+ From Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
+              {label:"+ Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
+              {label:"💼 Job",action:()=>{setForm({...newForm(),tags:["work"],_expandEndDate:true});setEditingId(null);setView("add");}},
+              {label:"🎓 Study",action:()=>{setForm({...newForm(),tags:["education"],_expandEndDate:true});setEditingId(null);setView("add");}},
+              {label:"✈ Travel",action:()=>{setForm({...newForm(),tags:["travel"],_expandEndDate:true});setEditingId(null);setView("add");}},
+              {divider:true},
+              {label:"👤 Person",action:()=>{setIndexFilter(null);setIndexTab("people");setPendingPanelAdd("person");setView("index");}},
+              {label:"🐾 Pet",action:()=>{setIndexFilter(null);setIndexTab("pets");setPendingPanelAdd("pet");setView("index");}},
+              {label:"📍 Location",action:()=>{setIndexFilter(null);setIndexTab("locations");setPendingPanelAdd("location");setView("index");}},
+              {label:"🏛 Organisation",action:()=>{setIndexFilter(null);setIndexTab("orgs");setPendingPanelAdd("org");setView("index");}},
+              {label:"👥 Group",action:()=>{setIndexFilter(null);setIndexTab("groups");setPendingPanelAdd("group");setView("index");}},
+              {divider:true},
               {label:"📷 From Photo",action:()=>{setImportTab&&setImportTab("photos");setView("import");},active:view==="import"},
               {label:"✦ Get Prompt",action:()=>setView("prompt"),active:view==="prompt"},
             ]).filter(Boolean)}),
-            React.createElement(NavDropdown,{label:"Settings",isActive:settingsActive,badge:notifications.length>0?notifications.length:0,items:[
-              {label:"Account",action:()=>setView("settings"),active:view==="settings"},
-              {label:"Backup & Restore",action:()=>setView("backup"),active:view==="backup"},
-              isHistoryMode&&{label:"🌳 GEDCOM",action:()=>setView("gedcom"),active:view==="gedcom"},
-              {divider:true},
-              {label:"🖨 Print & Export",action:()=>setView("print"),active:view==="print"},
-            ].filter(Boolean)}),
+            iconBtn("⚙","Account & settings",view==="settings",()=>setView("settings"),notifications.length),
+            iconBtn("💾","Backup & restore",view==="backup",()=>setView("backup")),
+            iconBtn("🖨","Print & export",view==="print",()=>setView("print")),
+            isHistoryMode&&iconBtn("🌳","GEDCOM",view==="gedcom",()=>setView("gedcom")),
             React.createElement(NavDropdown,{label:"Help",isActive:false,items:[
               {label:"Manual",href:"https://remembory.net/manual.html",external:true},
               {label:"Tips",href:"https://remembory.net/tips.html",external:true},
@@ -11457,6 +11603,21 @@ function handleEdit(m) {
       const socialActive=["sharing","public-profile","legacy"].includes(view);
       const addActive=["add","prompt","import"].includes(view);
       const settingsActive=["settings","backup","print","gedcom"].includes(view);
+      // Inline icon-button matching the desktop iconBtn but sized for the bottom bar.
+      const mobileIconBtn = (icon, title, active, onClick, badgeCount) =>
+        React.createElement("button",{
+          onClick, title, "aria-label": title,
+          style:{
+            position:"relative",flex:1,minWidth:0,
+            background:active?"rgba(196,169,98,0.15)":"transparent",
+            border:"none",borderTop:"2px solid "+(active?"#c8a87a":"transparent"),
+            cursor:"pointer",fontSize:"1.05rem",color:"#2c2416",
+            padding:"10px 4px",lineHeight:1
+          }
+        },
+          icon,
+          badgeCount>0 && React.createElement("span",{style:{position:"absolute",top:"4px",right:"calc(50% - 16px)",background:"#c4858a",color:"#fff",fontSize:"0.62rem",fontFamily:"sans-serif",borderRadius:"10px",padding:"1px 5px",lineHeight:1}}, badgeCount)
+        );
       return React.createElement("nav",{style:{position:"fixed",bottom:0,left:0,right:0,zIndex:200,background:"rgba(245,240,232,0.97)",borderTop:"1px solid #c8b89a",display:"flex",backdropFilter:"blur(8px)",paddingBottom:"env(safe-area-inset-bottom, 0px)"}},
         React.createElement(NavDropdown,{label:"Life",icon:"◉",isActive:lifeActive,variant:"mobile",direction:"up",menuAlign:"left",items:[
           {label:"◉ Overview",action:()=>setView("life"),active:view==="life"},
@@ -11466,17 +11627,14 @@ function handleEdit(m) {
           {divider:true},
           {label:"👤 People",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
           {label:"📍 Places",action:()=>{setIndexFilter({type:"locations"});setView("index");},active:view==="index"&&indexFilter?.type==="locations"},
-          {label:"🏛 Organisations",action:()=>{setIndexFilter({type:"orgs"});setView("index");},active:view==="index"&&indexFilter?.type==="orgs"},
-          {label:"👥 Groups",action:()=>{setIndexFilter({type:"groups"});setView("index");},active:view==="index"&&indexFilter?.type==="groups"},
-          {label:"🔗 Relationships",action:()=>{setIndexFilter({type:"relationships"});setView("index");},active:view==="index"&&indexFilter?.type==="relationships"},
-          {label:"🏷 Tags",action:()=>{setIndexFilter({type:"tags"});setView("index");},active:view==="index"&&indexFilter?.type==="tags"},
+          {label:"🗂 Index",action:()=>{setIndexFilter(null);setIndexTab("orgs");setView("index");},active:view==="index"&&!indexFilter},
           isHistoryMode&&{label:"📚 Sources",action:()=>{setIndexFilter({type:"sources"});setView("index");},active:view==="index"&&indexFilter?.type==="sources"},
           {divider:true},
           {label:"🖼 Photos",action:()=>setView("photos"),active:view==="photos"},
           {label:"🗺 Map",action:()=>setView("map"),active:view==="map"},
           isHistoryMode&&{label:"🌳 Tree",action:()=>setView("tree"),active:view==="tree",subOnly:true,disabled:!isSubscriber},
         ].filter(Boolean)}),
-        !isHistoryMode&&React.createElement(NavDropdown,{label:"Social",icon:"⇌",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,variant:"mobile",direction:"up",menuAlign:"left",items:[
+        !isHistoryMode&&React.createElement(NavDropdown,{label:"Share",icon:"⇌",isActive:socialActive,badge:shareBadgeCount>0?shareBadgeCount:0,variant:"mobile",direction:"up",menuAlign:"left",items:[
           {label:"⇌ Sharing",action:()=>setView("sharing"),active:view==="sharing",badge:shareBadgeCount},
           IS_STAGING&&wantPublicProfile&&{label:"◎ Profile",action:()=>setView("public-profile"),active:view==="public-profile",subOnly:true,disabled:!isSubscriber},
           IS_STAGING&&{label:"Explore ↗",href:exploreUrl,external:true,subOnly:true,disabled:!isSubscriber},
@@ -11491,17 +11649,23 @@ function handleEdit(m) {
           {label:"🌳 GEDCOM",action:()=>setView("import"),subOnly:true,disabled:!isSubscriber},
           {label:"🔎 Research",action:()=>window.open(genealogyResearchUrl(null, knownLocations),"_blank","noopener")},
         ]:[
-          {label:"+ From Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
+          {label:"+ Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
+          {label:"💼 Job",action:()=>{setForm({...newForm(),tags:["work"]});setEditingId(null);setView("add");}},
+          {label:"🎓 Study",action:()=>{setForm({...newForm(),tags:["education"]});setEditingId(null);setView("add");}},
+          {divider:true},
+          {label:"👤 Person",action:()=>{setIndexFilter(null);setIndexTab("people");setView("index");}},
+          {label:"🐾 Pet",action:()=>{setIndexFilter(null);setIndexTab("pets");setView("index");}},
+          {label:"📍 Location",action:()=>{setIndexFilter(null);setIndexTab("locations");setView("index");}},
+          {label:"🏛 Organisation",action:()=>{setIndexFilter(null);setIndexTab("orgs");setView("index");}},
+          {label:"👥 Group",action:()=>{setIndexFilter(null);setIndexTab("groups");setView("index");}},
+          {divider:true},
           {label:"📷 From Photo",action:()=>{setImportTab&&setImportTab("photos");setView("import");},active:view==="import"},
           {label:"✦ Get Prompt",action:()=>setView("prompt"),active:view==="prompt"},
         ]).filter(Boolean)}),
-        React.createElement(NavDropdown,{label:"Settings",icon:"⚙",isActive:settingsActive,badge:notifications.length>0?notifications.length:0,variant:"mobile",direction:"up",items:[
-          {label:"Account",action:()=>setView("settings"),active:view==="settings"},
-          {label:"Backup & Restore",action:()=>setView("backup"),active:view==="backup"},
-          isHistoryMode&&{label:"🌳 GEDCOM",action:()=>setView("gedcom"),active:view==="gedcom"},
-          {divider:true},
-          {label:"🖨 Print & Export",action:()=>setView("print"),active:view==="print"},
-        ].filter(Boolean)}),
+        mobileIconBtn("⚙","Account & settings",view==="settings",()=>setView("settings"),notifications.length),
+        mobileIconBtn("💾","Backup & restore",view==="backup",()=>setView("backup")),
+        mobileIconBtn("🖨","Print & export",view==="print",()=>setView("print")),
+        isHistoryMode&&mobileIconBtn("🌳","GEDCOM",view==="gedcom",()=>setView("gedcom")),
         React.createElement(NavDropdown,{label:"Help",icon:"?",isActive:false,variant:"mobile",direction:"up",items:[
           {label:"Manual",href:"https://remembory.net/manual.html",external:true},
           {label:"Tips",href:"https://remembory.net/tips.html",external:true},
@@ -11704,20 +11868,21 @@ function handleEdit(m) {
                 onViewPerson:name=>setIndexFilter({type:"people",value:name}),
                 onAddPerson:n=>{if(!knownPeople.includes(n))persistSubject({knownPeople:[...knownPeople,n].sort()});},
                 onAddOrg:n=>{if(!knownOrgs.includes(n))persistSubject({knownOrgs:[...knownOrgs,n].sort()});},localConnections:localConnections,onSetConnection:(pName,email)=>{const conns=JSON.parse(localStorage.getItem("chronicle-connections")||"[]");if(email===null){  const updated=conns.filter(c=>c.name!==pName);  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);} else if(!conns.find(c=>c.name===pName)){  const updated=[...conns,{name:pName,email,preConnected:true,connectedAt:new Date().toISOString()}];  localStorage.setItem("chronicle-connections",JSON.stringify(updated));  setLocalConnections(updated);}},
-                peopleEmails,onSetEmail:(pName,em)=>persistSubject({peopleEmails:{...peopleEmails,[pName]:em}}),})
+                peopleEmails,onSetEmail:(pName,em)=>persistSubject({peopleEmails:{...peopleEmails,[pName]:em}}),pendingPanelAdd,clearPendingPanelAdd,pendingPanelOpen,clearPendingPanelOpen})
             : indexTab==="pets"
-            ? React.createElement(PetsPanel,{pets,memories,entityPhotos,onSetEntityPhoto:setEntityPhoto,persistSubject,setIndexFilter,renamePerson,deletePerson,knownPeople})
+            ? React.createElement(PetsPanel,{pets,memories,entityPhotos,onSetEntityPhoto:setEntityPhoto,persistSubject,setIndexFilter,renamePerson,deletePerson,knownPeople,pendingPanelAdd,clearPendingPanelAdd})
             : indexTab==="orgs"
-            ? React.createElement(OrgsPanel,{knownOrgs,knownLocations,memories,orgNotes,orgLocations,orgPeriods,personOrgs,entityPhotos,onSetEntityPhoto:setEntityPhoto,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetOrgNotes:setOrgNotes,onSetOrgLocations:setOrgLocations,onSetOrgPeriods:setOrgPeriods,setIndexFilter,persistSubject})
+            ? React.createElement(OrgsPanel,{knownOrgs,knownLocations,memories,orgNotes,orgLocations,orgPeriods,personOrgs,entityPhotos,onSetEntityPhoto:setEntityPhoto,onRenameOrg:renameOrg,onDeleteOrg:deleteOrg,onSetOrgNotes:setOrgNotes,onSetOrgLocations:setOrgLocations,onSetOrgPeriods:setOrgPeriods,setIndexFilter,persistSubject,pendingPanelAdd,clearPendingPanelAdd,pendingPanelOpen,clearPendingPanelOpen})
             : indexTab==="locations"
-            ? React.createElement(LocationsPanel,{knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setLocationAddress,entityPhotos,onSetEntityPhoto:setEntityPhoto,setIndexFilter,persistSubject})
+            ? React.createElement(LocationsPanel,{knownLocations,memories,locationNotes,renameLocation,deleteLocation,setLocationNotes,setLocationCoords,setLocationAddress,entityPhotos,onSetEntityPhoto:setEntityPhoto,setIndexFilter,persistSubject,pendingPanelAdd,clearPendingPanelAdd,pendingPanelOpen,clearPendingPanelOpen})
             : indexTab==="relationships"
             ? React.createElement(RelationshipIndex,{memories,peopleRelationships,
                 onView:(rel,people)=>setIndexFilter({type:"relationships",value:rel,people}),onRenameRelationship:renameRelationship})
             : indexTab==="groups"
             ? React.createElement(GroupsManager,{personGroups,knownPeople,memories,
                 onSetGroups:setPersonGroups,
-                onViewGroup:(name,people)=>setIndexFilter({type:"groups",value:name,people})})
+                onViewGroup:(name,people)=>setIndexFilter({type:"groups",value:name,people}),
+                pendingPanelAdd,clearPendingPanelAdd})
             : indexTab==="sources"
             ? React.createElement(SourcesPanel,{knownSources,memories,persistSubject,setIndexFilter})
             : indexTab==="candidatePersons"
@@ -12219,6 +12384,20 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
           setForm(pre);
           setEditingId(null);
           setView("add");
+        },
+        onEditEntity: (type, entity) => {
+          // Open the entity in the Index so the user can edit its details
+          // (relationship, address, notes, members, etc.) directly. We set
+          // pendingPanelOpen so the destination panel pre-fills its search
+          // box with the name — the user lands on that single row ready to
+          // edit, rather than having to scroll/search for it themselves.
+          const tabByType = { person:"people", place:"locations", org:"orgs" };
+          const tab = tabByType[type];
+          if (!tab) return;
+          setIndexFilter(null);
+          setIndexTab(tab);
+          setPendingPanelOpen(entity);
+          setView("index");
         }
       }),
 
@@ -12402,7 +12581,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
                   React.createElement("div",{style:{width:"9px",height:"9px",borderRadius:"50%",background:m.tags[0]?TAG_COLORS[m.tags[0]]:"#c8b89a",flexShrink:0,marginTop:"6px"}}),
                   React.createElement("div",{style:{flex:1,minWidth:0}},
                     React.createElement("div",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#1a1208",lineHeight:1.3,marginBottom:"2px"}},m.title),
-                    React.createElement("div",{style:{fontSize:"0.78rem",color:"#a89a7a",fontStyle:"italic",marginBottom:m.content?"4px":"2px"}},fuzzyDateLabel(m)),
+                    (()=>{ const a=ageAtYear(m.year); return React.createElement("div",{style:{fontSize:"0.78rem",color:"#a89a7a",fontStyle:"italic",marginBottom:m.content?"4px":"2px"}}, fuzzyDateLabel(m) + (a!=null && a>=0 ? " · age "+a : "")); })(),
                     m.content&&React.createElement("p",{style:{fontSize:"0.9rem",color:"#5a4838",lineHeight:1.65,margin:"0 0 4px",whiteSpace:"pre-wrap"}},m.content),
                     (()=>{
                       const peopleOnly = (m.people||[]).filter(n => !petNames.has(n));
