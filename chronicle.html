@@ -5910,7 +5910,7 @@ function SettingsView({
           "Add memories from your photo library. Chronicle can read dates and locations from photo metadata."
         ),
         React.createElement("button",{
-          onClick:()=>setView("import"),
+          onClick:()=>{setImportTab&&setImportTab("photos");setView("import");},
           style:{...S.btn,padding:"10px 16px",fontSize:"0.88rem"}
         },"↑ Import from photos")
       )
@@ -7079,7 +7079,7 @@ function buildMemsFromTree(tp, tpById, treeF) {
 }
 
 function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, onSwitch,
-  treePersons, treeFamilies, gedFocalPersonId, isHistoryMode, persistSubject, setView}) {
+  treePersons, treeFamilies, gedFocalPersonId, isHistoryMode, persistSubject, setView, setImportTab}) {
   const [tpSearch, setTpSearch] = React.useState("");
   const [focalId, setFocalId] = React.useState(()=>gedFocalPersonId||treePersons[0]?.id||null);
   const [personDetail, setPersonDetail] = React.useState(null); // tpId for detail panel
@@ -7660,7 +7660,7 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       "Import a GEDCOM file to bring in an existing tree, or build one from scratch by adding people one at a time."
     ),
     React.createElement("div",{style:{display:"flex",gap:"10px",justifyContent:"center",flexWrap:"wrap"}},
-      React.createElement("button",{onClick:()=>setView("import"),style:{...S.btn,padding:"9px 22px",fontSize:"0.95rem"}},
+      React.createElement("button",{onClick:()=>{setImportTab && setImportTab("gedcom");setView("import");},style:{...S.btn,padding:"9px 22px",fontSize:"0.95rem"}},
         "Import GEDCOM \u2192"
       ),
       React.createElement("button",{onClick:startFirstPerson,style:{...S.btnOutline,padding:"9px 22px",fontSize:"0.95rem"}},
@@ -12825,7 +12825,7 @@ function handleEdit(m) {
       // ── FAMILY TREE VIEW ──
       view==="tree"&&React.createElement(FamilyTreeView,{
         subjects, activeSubjectId, subjectLinks,
-        persistTop, persistSubject, setView,
+        persistTop, persistSubject, setView, setImportTab,
         treePersons, treeFamilies, gedFocalPersonId, isHistoryMode,
         onSwitch: id=>{ switchSubject(id); setView("life"); }
       }),
@@ -12977,7 +12977,7 @@ function handleEdit(m) {
             ? React.createElement("div",{style:{background:"rgba(196,169,98,0.08)",border:"1px solid rgba(196,169,98,0.35)",borderRadius:"4px",padding:"14px 18px",marginBottom:"18px"}},
                 React.createElement("p",{style:{margin:"0 0 10px",fontSize:"0.92rem",color:"#5a4820",lineHeight:1.55}},"\ud83c\udf33 No family tree imported yet."),
                 React.createElement("p",{style:{margin:"0 0 12px",fontSize:"0.86rem",color:"#7a6a58",lineHeight:1.55}},"Export a GEDCOM file from Ancestry, MyHeritage, FamilySearch or any genealogy app, then import it here to populate the tree and prefill events."),
-                React.createElement("button",{onClick:()=>setView("import"),style:{...S.btn,padding:"7px 18px"}},"Import a GEDCOM file")
+                React.createElement("button",{onClick:()=>{setImportTab("gedcom");setView("import");},style:{...S.btn,padding:"7px 18px"}},"Import a GEDCOM file")
               )
             : React.createElement("div",{style:{background:"rgba(196,169,98,0.08)",border:"1px solid rgba(196,169,98,0.35)",borderRadius:"4px",padding:"14px 18px",marginBottom:"18px"}},
                 React.createElement("p",{style:{margin:"0 0 4px",fontSize:"0.92rem",color:"#5a4820",fontWeight:600}},"\ud83c\udf33 Family tree imported"),
@@ -12987,7 +12987,7 @@ function handleEdit(m) {
                 ),
                 React.createElement("div",{style:{display:"flex",gap:"8px",flexWrap:"wrap"}},
                   React.createElement("button",{onClick:()=>setView("tree"),style:{...S.btnOutline,padding:"5px 14px",fontSize:"0.86rem"}},"\ud83c\udf33 View tree"),
-                  React.createElement("button",{onClick:()=>setView("import"),style:{...S.btnOutline,padding:"5px 14px",fontSize:"0.86rem"}},"Import another GEDCOM")
+                  React.createElement("button",{onClick:()=>{setImportTab("gedcom");setView("import");},style:{...S.btnOutline,padding:"5px 14px",fontSize:"0.86rem"}},"Import another GEDCOM")
                 )
               ),
 
