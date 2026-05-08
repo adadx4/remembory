@@ -31,7 +31,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "England and Wales civil registration index 1837 onward",
-    "notes": "First stop for any England/Wales birth, marriage or death from 1837. Index only — order certificates from the GRO."
+    "notes": "First stop for any England/Wales birth, marriage or death from 1837. Index only — order certificates from the GRO.",
+    "collections": [
+      {
+        "id": "uk-freebmd-default",
+        "name": "Births, Marriages, Deaths 1837–1992",
+        "url": "https://www.freebmd.org.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death"
+            ],
+            "startYear": 1837,
+            "endYear": 1992
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-freereg",
@@ -63,7 +82,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Parish registers — baptisms, marriages and burials, especially pre-1837",
-    "notes": "Volunteer transcriptions; parish coverage is uneven, so a missing record does not mean it does not exist."
+    "notes": "Volunteer transcriptions; parish coverage is uneven, so a missing record does not mean it does not exist.",
+    "collections": [
+      {
+        "id": "uk-freereg-default",
+        "name": "Baptisms, Marriages, Burials 1538–1900",
+        "url": "https://www.freereg.org.uk/search_queries/new",
+        "coverage": [
+          {
+            "events": [
+              "baptism",
+              "marriage",
+              "burial"
+            ],
+            "startYear": 1538,
+            "endYear": 1900
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-freecen",
@@ -93,7 +131,24 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free transcribed UK census 1841-1911",
-    "notes": "Coverage is uneven by county and year; combine with FamilySearch census collections."
+    "notes": "Coverage is uneven by county and year; combine with FamilySearch census collections.",
+    "collections": [
+      {
+        "id": "uk-freecen-default",
+        "name": "Residence 1841–1911",
+        "url": "https://www.freecen.org.uk/search_queries/new",
+        "coverage": [
+          {
+            "events": [
+              "residence"
+            ],
+            "startYear": 1841,
+            "endYear": 1911
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-gro-index",
@@ -129,7 +184,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free GRO index lookups including mother's maiden name (births) and age at death",
-    "notes": "Requires a free GRO account. The index includes data not present in FreeBMD (mother's maiden surname pre-1911, age at death pre-1865)."
+    "notes": "Requires a free GRO account. The index includes data not present in FreeBMD (mother's maiden surname pre-1911, age at death pre-1865).",
+    "collections": [
+      {
+        "id": "uk-gro-index-default",
+        "name": "Births 1837–1923",
+        "url": "https://www.gro.gov.uk/gro/content/certificates/login.asp",
+        "coverage": [
+          {
+            "events": [
+              "birth"
+            ],
+            "startYear": 1837,
+            "endYear": 1923
+          },
+          {
+            "events": [
+              "death"
+            ],
+            "startYear": 1837,
+            "endYear": 1957
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-ukbmd",
@@ -162,7 +241,28 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Hub linking to free county and district BMD transcription sites",
-    "notes": "Use this when you know the English or Welsh county — it points you to the local volunteer-run index."
+    "notes": "Use this when you know the English or Welsh county — it points you to the local volunteer-run index.",
+    "collections": [
+      {
+        "id": "uk-ukbmd-default",
+        "name": "Births, Marriages, Deaths 1538–2000",
+        "url": "https://www.ukbmd.org.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial"
+            ],
+            "startYear": 1538,
+            "endYear": 2000
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-lancashirebmd",
@@ -192,7 +292,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free Lancashire civil registration district transcriptions",
-    "notes": "Includes registration districts in modern Greater Manchester and Merseyside as well as historic Lancashire."
+    "notes": "Includes registration districts in modern Greater Manchester and Merseyside as well as historic Lancashire.",
+    "collections": [
+      {
+        "id": "uk-lancashirebmd-default",
+        "name": "Births, Marriages, Deaths from 1837",
+        "url": "https://www.lancashirebmd.org.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death"
+            ],
+            "startYear": 1837,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-cheshirebmd",
@@ -222,7 +341,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free Cheshire civil registration district transcriptions",
-    "notes": "Volunteer-transcribed; includes Stockport and Wirral districts."
+    "notes": "Volunteer-transcribed; includes Stockport and Wirral districts.",
+    "collections": [
+      {
+        "id": "uk-cheshirebmd-default",
+        "name": "Births, Marriages, Deaths from 1837",
+        "url": "https://www.cheshirebmd.org.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death"
+            ],
+            "startYear": 1837,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-yorkshirebmd",
@@ -252,7 +390,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free Yorkshire civil registration district transcriptions",
-    "notes": "Coverage spans the historic ridings of Yorkshire."
+    "notes": "Coverage spans the historic ridings of Yorkshire.",
+    "collections": [
+      {
+        "id": "uk-yorkshirebmd-default",
+        "name": "Births, Marriages, Deaths from 1837",
+        "url": "https://www.yorkshirebmd.org.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death"
+            ],
+            "startYear": 1837,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-genuki",
@@ -295,7 +452,35 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Reference guide pointing to the right archive for any UK or Irish parish",
-    "notes": "Not an index itself — use it to find which record office, transcription site, or microfilm holds the records you need."
+    "notes": "Not an index itself — use it to find which record office, transcription site, or microfilm holds the records you need.",
+    "collections": [
+      {
+        "id": "uk-genuki-default",
+        "name": "All records",
+        "url": "https://www.genuki.org.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "residence",
+              "employment",
+              "education",
+              "travel",
+              "military",
+              "legal",
+              "other"
+            ],
+            "startYear": null,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-tna-discovery",
@@ -335,7 +520,35 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Catalogue of UK national and local archive holdings, plus some digitised collections",
-    "notes": "Discovery indexes records held by TNA and 2,500+ other UK archives — use it to find which physical archive holds a parish or estate record."
+    "notes": "Discovery indexes records held by TNA and 2,500+ other UK archives — use it to find which physical archive holds a parish or estate record.",
+    "collections": [
+      {
+        "id": "uk-tna-discovery-default",
+        "name": "All records",
+        "url": "https://discovery.nationalarchives.gov.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "residence",
+              "military",
+              "legal",
+              "travel",
+              "employment",
+              "education",
+              "other"
+            ],
+            "startYear": null,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-welsh-newspapers",
@@ -365,7 +578,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Welsh newspaper birth, marriage and death notices",
-    "notes": "Useful for events that pre-date or supplement civil registration. Hosted by the National Library of Wales."
+    "notes": "Useful for events that pre-date or supplement civil registration. Hosted by the National Library of Wales.",
+    "collections": [
+      {
+        "id": "uk-welsh-newspapers-default",
+        "name": "Births, Marriages, Deaths 1804–1919",
+        "url": "https://newspapers.library.wales/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death"
+            ],
+            "startYear": 1804,
+            "endYear": 1919
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-scotlandspeople",
@@ -411,7 +643,42 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Official Scottish statutory and Old Parish Register indexes",
-    "notes": "Index search is free with an account; downloading record images requires credits."
+    "notes": "Index search is free with an account; downloading record images requires credits.",
+    "collections": [
+      {
+        "id": "uk-scotlandspeople-default",
+        "name": "Births, Marriages, Deaths from 1855",
+        "url": "https://www.scotlandspeople.gov.uk/search-records",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death"
+            ],
+            "startYear": 1855,
+            "endYear": null
+          },
+          {
+            "events": [
+              "baptism",
+              "marriage",
+              "burial"
+            ],
+            "startYear": 1553,
+            "endYear": 1854
+          },
+          {
+            "events": [
+              "residence"
+            ],
+            "startYear": 1841,
+            "endYear": 1921
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-nrscotland",
@@ -450,7 +717,35 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Guides and finding aids for Scottish records",
-    "notes": "Not an index — use it to plan a search and understand what survives for a given parish or period."
+    "notes": "Not an index — use it to plan a search and understand what survives for a given parish or period.",
+    "collections": [
+      {
+        "id": "uk-nrscotland-default",
+        "name": "All records",
+        "url": "https://www.nrscotland.gov.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "residence",
+              "military",
+              "legal",
+              "travel",
+              "employment",
+              "education",
+              "other"
+            ],
+            "startYear": null,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-proni",
@@ -483,7 +778,29 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Northern Ireland church, will, and land record indexes",
-    "notes": "Includes will calendars 1858-1965 and church records for many parishes."
+    "notes": "Includes will calendars 1858-1965 and church records for many parishes.",
+    "collections": [
+      {
+        "id": "uk-proni-default",
+        "name": "All records 1700–1922",
+        "url": "https://www.proni.gov.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "legal"
+            ],
+            "startYear": 1700,
+            "endYear": 1922
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-groni",
@@ -524,7 +841,38 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Official Northern Ireland civil birth, marriage, and death index",
-    "notes": "Index search is free; full record images require credits."
+    "notes": "Index search is free; full record images require credits.",
+    "collections": [
+      {
+        "id": "uk-groni-default",
+        "name": "Births from 1864",
+        "url": "https://geni.nidirect.gov.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth"
+            ],
+            "startYear": 1864,
+            "endYear": null
+          },
+          {
+            "events": [
+              "marriage"
+            ],
+            "startYear": 1845,
+            "endYear": null
+          },
+          {
+            "events": [
+              "death"
+            ],
+            "startYear": 1864,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ie-irishgenealogy",
@@ -575,7 +923,47 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free Irish civil records and a growing set of church records",
-    "notes": "One of the best free genealogy sites anywhere — full register images for civil events within the rolling cutoff windows."
+    "notes": "One of the best free genealogy sites anywhere — full register images for civil events within the rolling cutoff windows.",
+    "collections": [
+      {
+        "id": "ie-irishgenealogy-default",
+        "name": "Births 1864–1923",
+        "url": "https://civilrecords.irishgenealogy.ie/churchrecords/civil-search.jsp",
+        "coverage": [
+          {
+            "events": [
+              "birth"
+            ],
+            "startYear": 1864,
+            "endYear": 1923
+          },
+          {
+            "events": [
+              "marriage"
+            ],
+            "startYear": 1845,
+            "endYear": 1948
+          },
+          {
+            "events": [
+              "death"
+            ],
+            "startYear": 1871,
+            "endYear": 1973
+          },
+          {
+            "events": [
+              "baptism",
+              "marriage",
+              "burial"
+            ],
+            "startYear": 1700,
+            "endYear": 1900
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ie-nli-parishes",
@@ -605,7 +993,25 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Digitised Irish Catholic parish baptism and marriage registers",
-    "notes": "Browse-only by parish — no name search. Pair with IrishGenealogy.ie or Ancestry indexes for name lookup."
+    "notes": "Browse-only by parish — no name search. Pair with IrishGenealogy.ie or Ancestry indexes for name lookup.",
+    "collections": [
+      {
+        "id": "ie-nli-parishes-default",
+        "name": "Baptisms, Marriages 1740–1881",
+        "url": "https://registers.nli.ie/",
+        "coverage": [
+          {
+            "events": [
+              "baptism",
+              "marriage"
+            ],
+            "startYear": 1740,
+            "endYear": 1881
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ie-naidotie-census",
@@ -634,7 +1040,24 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free 1901 and 1911 Ireland census, plus census fragments and the 1926 release",
-    "notes": "The 1901 and 1911 censuses are the two surviving complete pre-1922 censuses for Ireland."
+    "notes": "The 1901 and 1911 censuses are the two surviving complete pre-1922 censuses for Ireland.",
+    "collections": [
+      {
+        "id": "ie-naidotie-census-default",
+        "name": "Residence 1901–1911",
+        "url": "https://www.census.nationalarchives.ie/",
+        "coverage": [
+          {
+            "events": [
+              "residence"
+            ],
+            "startYear": 1901,
+            "endYear": 1911
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-trove",
@@ -671,7 +1094,33 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Australian newspaper birth, marriage and death notices",
-    "notes": "Often the only free source for events before state civil registration was complete; Family Notices columns are searchable by name."
+    "notes": "Often the only free source for events before state civil registration was complete; Family Notices columns are searchable by name.",
+    "collections": [
+      {
+        "id": "au-trove-default",
+        "name": "All records 1803–1990",
+        "url": "https://trove.nla.gov.au/search/category/newspapers",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "travel",
+              "military",
+              "employment",
+              "legal",
+              "other"
+            ],
+            "startYear": 1803,
+            "endYear": 1990
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-nsw-bdm",
@@ -716,7 +1165,38 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "NSW historical births, marriages and deaths",
-    "notes": "Includes early church records (pre-1856) re-indexed as part of the state register."
+    "notes": "Includes early church records (pre-1856) re-indexed as part of the state register.",
+    "collections": [
+      {
+        "id": "au-nsw-bdm-default",
+        "name": "Births 1788–1923",
+        "url": "https://familyhistory.bdm.nsw.gov.au/lifelink/familyhistory/search",
+        "coverage": [
+          {
+            "events": [
+              "birth"
+            ],
+            "startYear": 1788,
+            "endYear": 1923
+          },
+          {
+            "events": [
+              "marriage"
+            ],
+            "startYear": 1788,
+            "endYear": 1973
+          },
+          {
+            "events": [
+              "death"
+            ],
+            "startYear": 1788,
+            "endYear": 1993
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-vic-bdm",
@@ -762,7 +1242,38 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Victoria historical births, marriages and deaths",
-    "notes": "Pioneer index entries before 1853 also appear and were transcribed from early church records."
+    "notes": "Pioneer index entries before 1853 also appear and were transcribed from early church records.",
+    "collections": [
+      {
+        "id": "au-vic-bdm-default",
+        "name": "Births 1853–1922",
+        "url": "https://www.bdm.vic.gov.au/research-and-family-history/search-your-family-history",
+        "coverage": [
+          {
+            "events": [
+              "birth"
+            ],
+            "startYear": 1853,
+            "endYear": 1922
+          },
+          {
+            "events": [
+              "marriage"
+            ],
+            "startYear": 1853,
+            "endYear": 1947
+          },
+          {
+            "events": [
+              "death"
+            ],
+            "startYear": 1853,
+            "endYear": 1992
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-qld-bdm",
@@ -808,7 +1319,38 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Queensland historical births, marriages and deaths",
-    "notes": "Pre-1856 events are from the New South Wales colony, since Queensland separated in 1859."
+    "notes": "Pre-1856 events are from the New South Wales colony, since Queensland separated in 1859.",
+    "collections": [
+      {
+        "id": "au-qld-bdm-default",
+        "name": "Births 1829–1923",
+        "url": "https://www.familyhistory.bdm.qld.gov.au/",
+        "coverage": [
+          {
+            "events": [
+              "birth"
+            ],
+            "startYear": 1829,
+            "endYear": 1923
+          },
+          {
+            "events": [
+              "marriage"
+            ],
+            "startYear": 1829,
+            "endYear": 1948
+          },
+          {
+            "events": [
+              "death"
+            ],
+            "startYear": 1829,
+            "endYear": 1988
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-wa-bdm",
@@ -853,7 +1395,38 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Western Australia historical pioneer index for births, marriages and deaths",
-    "notes": "Free index search; certificates are paid through the WA registry."
+    "notes": "Free index search; certificates are paid through the WA registry.",
+    "collections": [
+      {
+        "id": "au-wa-bdm-default",
+        "name": "Births 1841–1932",
+        "url": "https://bdm.justice.wa.gov.au/_apps/PioneersIndex/default.aspx",
+        "coverage": [
+          {
+            "events": [
+              "birth"
+            ],
+            "startYear": 1841,
+            "endYear": 1932
+          },
+          {
+            "events": [
+              "marriage"
+            ],
+            "startYear": 1841,
+            "endYear": 1942
+          },
+          {
+            "events": [
+              "death"
+            ],
+            "startYear": 1841,
+            "endYear": 1971
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-sa-familyhistory",
@@ -899,7 +1472,38 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "South Australia historical births, marriages and deaths via Genealogy SA",
-    "notes": "Genealogy SA hosts the searchable historical index in cooperation with the SA registry."
+    "notes": "Genealogy SA hosts the searchable historical index in cooperation with the SA registry.",
+    "collections": [
+      {
+        "id": "au-sa-familyhistory-default",
+        "name": "Births 1842–1928",
+        "url": "https://www.genealogysa.org.au/resources/online-database-search",
+        "coverage": [
+          {
+            "events": [
+              "birth"
+            ],
+            "startYear": 1842,
+            "endYear": 1928
+          },
+          {
+            "events": [
+              "marriage"
+            ],
+            "startYear": 1842,
+            "endYear": 1947
+          },
+          {
+            "events": [
+              "death"
+            ],
+            "startYear": 1842,
+            "endYear": 1972
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-tas-names",
@@ -953,7 +1557,46 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Tasmania births, marriages, deaths, convicts, immigrants and divorces",
-    "notes": "One of the most generous free state indexes in Australia — full record images for many entries."
+    "notes": "One of the most generous free state indexes in Australia — full record images for many entries.",
+    "collections": [
+      {
+        "id": "au-tas-names-default",
+        "name": "Births, Baptisms, Court 1803–1933",
+        "url": "https://librariestas.ent.sirsidynix.net.au/client/en_AU/names",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "legal",
+              "travel"
+            ],
+            "startYear": 1803,
+            "endYear": 1933
+          },
+          {
+            "events": [
+              "marriage",
+              "legal",
+              "travel"
+            ],
+            "startYear": 1803,
+            "endYear": 1933
+          },
+          {
+            "events": [
+              "death",
+              "burial",
+              "legal",
+              "travel"
+            ],
+            "startYear": 1803,
+            "endYear": 1933
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-nt-bdm",
@@ -999,7 +1642,38 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Northern Territory historical births, marriages and deaths",
-    "notes": "Earlier NT events may also appear in SA indexes (NT was administered from SA until 1911)."
+    "notes": "Earlier NT events may also appear in SA indexes (NT was administered from SA until 1911).",
+    "collections": [
+      {
+        "id": "au-nt-bdm-default",
+        "name": "Births 1870–1919",
+        "url": "https://nt.gov.au/law/bdm",
+        "coverage": [
+          {
+            "events": [
+              "birth"
+            ],
+            "startYear": 1870,
+            "endYear": 1919
+          },
+          {
+            "events": [
+              "marriage"
+            ],
+            "startYear": 1870,
+            "endYear": 1944
+          },
+          {
+            "events": [
+              "death"
+            ],
+            "startYear": 1870,
+            "endYear": 1969
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-nsw-archives",
@@ -1039,7 +1713,32 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Convict, immigrant, probate, school and church indexes for colonial NSW",
-    "notes": "Hosted by Museums of History NSW (formerly NSW State Archives & Records)."
+    "notes": "Hosted by Museums of History NSW (formerly NSW State Archives & Records).",
+    "collections": [
+      {
+        "id": "au-nsw-archives-default",
+        "name": "All records 1788–1900",
+        "url": "https://mhnsw.au/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "legal",
+              "travel",
+              "education",
+              "employment"
+            ],
+            "startYear": 1788,
+            "endYear": 1900
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-familysearch",
@@ -1556,25 +2255,294 @@ window.GENEALOGY_RESOURCES = [
         ],
         "notes": "Chinese Genealogies (jiapu) — clan and lineage books — plus some 19th- and 20th-century civil records. Coverage for surnames varies enormously."
       },
-      { "id": "fs-us-1850", "name": "United States Federal Census, 1850", "url": "https://www.familysearch.org/search/collection/1401638", "coverage": [{ "events": ["census","residence"], "startYear": 1850, "endYear": 1850 }], "notes": "First US census to list every household member by name." },
-      { "id": "fs-us-1860", "name": "United States Federal Census, 1860", "url": "https://www.familysearch.org/search/collection/1473181", "coverage": [{ "events": ["census","residence"], "startYear": 1860, "endYear": 1860 }] },
-      { "id": "fs-us-1870", "name": "United States Federal Census, 1870", "url": "https://www.familysearch.org/search/collection/1438024", "coverage": [{ "events": ["census","residence"], "startYear": 1870, "endYear": 1870 }] },
-      { "id": "fs-us-1880", "name": "United States Federal Census, 1880", "url": "https://www.familysearch.org/search/collection/1417683", "coverage": [{ "events": ["census","residence"], "startYear": 1880, "endYear": 1880 }] },
-      { "id": "fs-us-1900", "name": "United States Federal Census, 1900", "url": "https://www.familysearch.org/search/collection/1325221", "coverage": [{ "events": ["census","residence"], "startYear": 1900, "endYear": 1900 }] },
-      { "id": "fs-us-1910", "name": "United States Federal Census, 1910", "url": "https://www.familysearch.org/search/collection/1727033", "coverage": [{ "events": ["census","residence"], "startYear": 1910, "endYear": 1910 }] },
-      { "id": "fs-us-1920", "name": "United States Federal Census, 1920", "url": "https://www.familysearch.org/search/collection/1488411", "coverage": [{ "events": ["census","residence"], "startYear": 1920, "endYear": 1920 }] },
-      { "id": "fs-us-1930", "name": "United States Federal Census, 1930", "url": "https://www.familysearch.org/search/collection/1810731", "coverage": [{ "events": ["census","residence"], "startYear": 1930, "endYear": 1930 }] },
-      { "id": "fs-us-1940", "name": "United States Federal Census, 1940", "url": "https://www.familysearch.org/search/collection/2000219", "coverage": [{ "events": ["census","residence"], "startYear": 1940, "endYear": 1940 }] },
-      { "id": "fs-us-1950", "name": "United States Federal Census, 1950", "url": "https://www.familysearch.org/search/collection/4464515", "coverage": [{ "events": ["census","residence"], "startYear": 1950, "endYear": 1950 }] },
-      { "id": "fs-us-ssdi", "name": "United States Social Security Death Index", "url": "https://www.familysearch.org/search/collection/1202535", "coverage": [{ "events": ["death"], "startYear": 1935, "endYear": 2014 }], "notes": "Index of deaths reported to the US Social Security Administration." },
-      { "id": "fs-find-a-grave", "name": "Find A Grave Index", "url": "https://www.familysearch.org/search/collection/2221801", "coverage": [{ "events": ["death","burial"], "startYear": 1600, "endYear": null }], "notes": "Volunteer-contributed cemetery and headstone index, worldwide." },
-      { "id": "fs-ellis-island", "name": "New York Passenger Arrival Lists (Ellis Island), 1820-1957", "url": "https://www.familysearch.org/search/collection/1916074", "coverage": [{ "events": ["travel","residence"], "startYear": 1820, "endYear": 1957 }], "notes": "Inbound passenger manifests for the Port of New York (Ellis Island and Castle Garden)." },
-      { "id": "fs-uk-1851", "name": "England, Wales & Scotland Census, 1851", "url": "https://www.familysearch.org/search/collection/2338569", "coverage": [{ "events": ["census","residence"], "startYear": 1851, "endYear": 1851 }] },
-      { "id": "fs-uk-1861", "name": "England, Wales & Scotland Census, 1861", "url": "https://www.familysearch.org/search/collection/1493745", "coverage": [{ "events": ["census","residence"], "startYear": 1861, "endYear": 1861 }] },
-      { "id": "fs-uk-1871", "name": "England, Wales & Scotland Census, 1871", "url": "https://www.familysearch.org/search/collection/1538354", "coverage": [{ "events": ["census","residence"], "startYear": 1871, "endYear": 1871 }] },
-      { "id": "fs-uk-1891", "name": "England, Wales & Scotland Census, 1891", "url": "https://www.familysearch.org/search/collection/1865747", "coverage": [{ "events": ["census","residence"], "startYear": 1891, "endYear": 1891 }] },
-      { "id": "fs-uk-1901", "name": "England, Wales & Scotland Census, 1901", "url": "https://www.familysearch.org/search/collection/1888129", "coverage": [{ "events": ["census","residence"], "startYear": 1901, "endYear": 1901 }] },
-      { "id": "fs-uk-1911", "name": "England, Wales & Scotland Census, 1911", "url": "https://www.familysearch.org/search/collection/2046756", "coverage": [{ "events": ["census","residence"], "startYear": 1911, "endYear": 1911 }] }
+      {
+        "id": "fs-us-1850",
+        "name": "United States Federal Census, 1850",
+        "url": "https://www.familysearch.org/search/collection/1401638",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1850,
+            "endYear": 1850
+          }
+        ],
+        "notes": "First US census to list every household member by name."
+      },
+      {
+        "id": "fs-us-1860",
+        "name": "United States Federal Census, 1860",
+        "url": "https://www.familysearch.org/search/collection/1473181",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1860,
+            "endYear": 1860
+          }
+        ]
+      },
+      {
+        "id": "fs-us-1870",
+        "name": "United States Federal Census, 1870",
+        "url": "https://www.familysearch.org/search/collection/1438024",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1870,
+            "endYear": 1870
+          }
+        ]
+      },
+      {
+        "id": "fs-us-1880",
+        "name": "United States Federal Census, 1880",
+        "url": "https://www.familysearch.org/search/collection/1417683",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1880,
+            "endYear": 1880
+          }
+        ]
+      },
+      {
+        "id": "fs-us-1900",
+        "name": "United States Federal Census, 1900",
+        "url": "https://www.familysearch.org/search/collection/1325221",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1900,
+            "endYear": 1900
+          }
+        ]
+      },
+      {
+        "id": "fs-us-1910",
+        "name": "United States Federal Census, 1910",
+        "url": "https://www.familysearch.org/search/collection/1727033",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1910,
+            "endYear": 1910
+          }
+        ]
+      },
+      {
+        "id": "fs-us-1920",
+        "name": "United States Federal Census, 1920",
+        "url": "https://www.familysearch.org/search/collection/1488411",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1920,
+            "endYear": 1920
+          }
+        ]
+      },
+      {
+        "id": "fs-us-1930",
+        "name": "United States Federal Census, 1930",
+        "url": "https://www.familysearch.org/search/collection/1810731",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1930,
+            "endYear": 1930
+          }
+        ]
+      },
+      {
+        "id": "fs-us-1940",
+        "name": "United States Federal Census, 1940",
+        "url": "https://www.familysearch.org/search/collection/2000219",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1940,
+            "endYear": 1940
+          }
+        ]
+      },
+      {
+        "id": "fs-us-1950",
+        "name": "United States Federal Census, 1950",
+        "url": "https://www.familysearch.org/search/collection/4464515",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1950,
+            "endYear": 1950
+          }
+        ]
+      },
+      {
+        "id": "fs-us-ssdi",
+        "name": "United States Social Security Death Index",
+        "url": "https://www.familysearch.org/search/collection/1202535",
+        "coverage": [
+          {
+            "events": [
+              "death"
+            ],
+            "startYear": 1935,
+            "endYear": 2014
+          }
+        ],
+        "notes": "Index of deaths reported to the US Social Security Administration."
+      },
+      {
+        "id": "fs-find-a-grave",
+        "name": "Find A Grave Index",
+        "url": "https://www.familysearch.org/search/collection/2221801",
+        "coverage": [
+          {
+            "events": [
+              "death",
+              "burial"
+            ],
+            "startYear": 1600,
+            "endYear": null
+          }
+        ],
+        "notes": "Volunteer-contributed cemetery and headstone index, worldwide."
+      },
+      {
+        "id": "fs-ellis-island",
+        "name": "New York Passenger Arrival Lists (Ellis Island), 1820-1957",
+        "url": "https://www.familysearch.org/search/collection/1916074",
+        "coverage": [
+          {
+            "events": [
+              "travel",
+              "residence"
+            ],
+            "startYear": 1820,
+            "endYear": 1957
+          }
+        ],
+        "notes": "Inbound passenger manifests for the Port of New York (Ellis Island and Castle Garden)."
+      },
+      {
+        "id": "fs-uk-1851",
+        "name": "England, Wales & Scotland Census, 1851",
+        "url": "https://www.familysearch.org/search/collection/2338569",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1851,
+            "endYear": 1851
+          }
+        ]
+      },
+      {
+        "id": "fs-uk-1861",
+        "name": "England, Wales & Scotland Census, 1861",
+        "url": "https://www.familysearch.org/search/collection/1493745",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1861,
+            "endYear": 1861
+          }
+        ]
+      },
+      {
+        "id": "fs-uk-1871",
+        "name": "England, Wales & Scotland Census, 1871",
+        "url": "https://www.familysearch.org/search/collection/1538354",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1871,
+            "endYear": 1871
+          }
+        ]
+      },
+      {
+        "id": "fs-uk-1891",
+        "name": "England, Wales & Scotland Census, 1891",
+        "url": "https://www.familysearch.org/search/collection/1865747",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1891,
+            "endYear": 1891
+          }
+        ]
+      },
+      {
+        "id": "fs-uk-1901",
+        "name": "England, Wales & Scotland Census, 1901",
+        "url": "https://www.familysearch.org/search/collection/1888129",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1901,
+            "endYear": 1901
+          }
+        ]
+      },
+      {
+        "id": "fs-uk-1911",
+        "name": "England, Wales & Scotland Census, 1911",
+        "url": "https://www.familysearch.org/search/collection/2046756",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1911,
+            "endYear": 1911
+          }
+        ]
+      }
     ]
   },
   {
@@ -1608,7 +2576,29 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "County-level US transcriptions maintained by volunteers",
-    "notes": "Best when you know the state and county; coverage and indexing depth vary widely."
+    "notes": "Best when you know the state and county; coverage and indexing depth vary widely.",
+    "collections": [
+      {
+        "id": "us-usgenweb-default",
+        "name": "All records",
+        "url": "http://usgenweb.org/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "residence"
+            ],
+            "startYear": null,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ca-lac",
@@ -1641,7 +2631,29 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Canadian federal census, immigration, and military records",
-    "notes": "For provincial vital records, combine with the relevant provincial archive."
+    "notes": "For provincial vital records, combine with the relevant provincial archive.",
+    "collections": [
+      {
+        "id": "ca-lac-default",
+        "name": "All records 1666–1935",
+        "url": "https://www.canada.ca/en/library-archives/collection/research-help/genealogy-family-history.html",
+        "coverage": [
+          {
+            "events": [
+              "residence",
+              "birth",
+              "marriage",
+              "death",
+              "military",
+              "travel"
+            ],
+            "startYear": 1666,
+            "endYear": 1935
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "nz-archives",
@@ -1676,7 +2688,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "New Zealand passenger lists, probate and military records",
-    "notes": "NZ historical BDM indexes are searched separately via the Department of Internal Affairs site."
+    "notes": "NZ historical BDM indexes are searched separately via the Department of Internal Affairs site.",
+    "collections": [
+      {
+        "id": "nz-archives-default",
+        "name": "All records from 1840",
+        "url": "https://collections.archives.govt.nz/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "military",
+              "travel",
+              "legal"
+            ],
+            "startYear": 1840,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "nz-bdm-historical",
@@ -1718,7 +2754,38 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Official New Zealand historical BDM index",
-    "notes": "Free index search; certificates are paid through Department of Internal Affairs."
+    "notes": "Free index search; certificates are paid through Department of Internal Affairs.",
+    "collections": [
+      {
+        "id": "nz-bdm-historical-default",
+        "name": "Births 1840–1923",
+        "url": "https://www.bdmhistoricalrecords.dia.govt.nz/",
+        "coverage": [
+          {
+            "events": [
+              "birth"
+            ],
+            "startYear": 1840,
+            "endYear": 1923
+          },
+          {
+            "events": [
+              "marriage"
+            ],
+            "startYear": 1840,
+            "endYear": 1948
+          },
+          {
+            "events": [
+              "death"
+            ],
+            "startYear": 1840,
+            "endYear": 1973
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "de-matricula",
@@ -1755,7 +2822,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Catholic parish registers across the German-speaking world and beyond",
-    "notes": "Browse by diocese and parish; no global name search. Great for German, Austrian and Galician research."
+    "notes": "Browse by diocese and parish; no global name search. Great for German, Austrian and Galician research.",
+    "collections": [
+      {
+        "id": "de-matricula-default",
+        "name": "Baptisms, Marriages, Burials 1500–1900",
+        "url": "https://data.matricula-online.eu/en/",
+        "coverage": [
+          {
+            "events": [
+              "baptism",
+              "marriage",
+              "burial"
+            ],
+            "startYear": 1500,
+            "endYear": 1900
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "global-jewishgen",
@@ -1785,7 +2871,28 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Jewish town databases, cemetery indexes and the Family Finder",
-    "notes": "Indispensable for Eastern European Jewish research. Use the All Country Database to search across regions."
+    "notes": "Indispensable for Eastern European Jewish research. Use the All Country Database to search across regions.",
+    "collections": [
+      {
+        "id": "global-jewishgen-default",
+        "name": "Births, Marriages, Deaths 1700–1945",
+        "url": "https://www.jewishgen.org/databases/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "burial",
+              "residence"
+            ],
+            "startYear": 1700,
+            "endYear": 1945
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "global-findagrave",
@@ -1812,7 +2919,25 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Worldwide cemetery and headstone index",
-    "notes": "Volunteer-driven; cemetery and headstone photo coverage varies. Best for confirming death dates and burial places."
+    "notes": "Volunteer-driven; cemetery and headstone photo coverage varies. Best for confirming death dates and burial places.",
+    "collections": [
+      {
+        "id": "global-findagrave-default",
+        "name": "Deaths, Burials from 1600",
+        "url": "https://www.findagrave.com/",
+        "coverage": [
+          {
+            "events": [
+              "death",
+              "burial"
+            ],
+            "startYear": 1600,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "global-billiongraves",
@@ -1839,7 +2964,25 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "GPS-tagged headstone photographs and burial index",
-    "notes": "Complementary to Find a Grave — sometimes a cemetery is on one site but not the other."
+    "notes": "Complementary to Find a Grave — sometimes a cemetery is on one site but not the other.",
+    "collections": [
+      {
+        "id": "global-billiongraves-default",
+        "name": "Deaths, Burials from 1600",
+        "url": "https://billiongraves.com/",
+        "coverage": [
+          {
+            "events": [
+              "death",
+              "burial"
+            ],
+            "startYear": 1600,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "paid-ancestry",
@@ -1878,41 +3021,345 @@ window.GENEALOGY_RESOURCES = [
     "bestFor": "Comprehensive global records — often holds parish, census and immigration sets unavailable elsewhere",
     "notes": "Subscription required for record images. Many libraries offer free in-library access to Ancestry Library Edition.",
     "collections": [
-      { "id": "ancestry-uk-1841", "name": "1841 England, Wales & Scotland Census", "events": ["census","residence"], "startYear": 1841, "endYear": 1841 },
-      { "id": "ancestry-uk-1851", "name": "1851 England, Wales & Scotland Census", "events": ["census","residence"], "startYear": 1851, "endYear": 1851 },
-      { "id": "ancestry-uk-1861", "name": "1861 England, Wales & Scotland Census", "events": ["census","residence"], "startYear": 1861, "endYear": 1861 },
-      { "id": "ancestry-uk-1871", "name": "1871 England, Wales & Scotland Census", "events": ["census","residence"], "startYear": 1871, "endYear": 1871 },
-      { "id": "ancestry-uk-1881", "name": "1881 England, Wales & Scotland Census", "events": ["census","residence"], "startYear": 1881, "endYear": 1881 },
-      { "id": "ancestry-uk-1891", "name": "1891 England, Wales & Scotland Census", "events": ["census","residence"], "startYear": 1891, "endYear": 1891 },
-      { "id": "ancestry-uk-1901", "name": "1901 England, Wales & Scotland Census", "events": ["census","residence"], "startYear": 1901, "endYear": 1901 },
-      { "id": "ancestry-uk-1911", "name": "1911 England Census", "events": ["census","residence"], "startYear": 1911, "endYear": 1911 },
-      { "id": "ancestry-uk-1921", "name": "1921 Census of England & Wales", "events": ["census","residence"], "startYear": 1921, "endYear": 1921 },
-      { "id": "ancestry-uk-bmd-births", "name": "England & Wales, Civil Registration Birth Index, 1837–2008", "events": ["birth"], "startYear": 1837, "endYear": 2008 },
-      { "id": "ancestry-uk-bmd-marriages", "name": "England & Wales, Civil Registration Marriage Index, 1837–2008", "events": ["marriage"], "startYear": 1837, "endYear": 2008 },
-      { "id": "ancestry-uk-bmd-deaths", "name": "England & Wales, Civil Registration Death Index, 1837–2007", "events": ["death"], "startYear": 1837, "endYear": 2007 },
-      { "id": "ancestry-uk-births-christenings", "name": "England, Select Births and Christenings, 1538–1975", "events": ["birth","baptism"], "startYear": 1538, "endYear": 1975 },
-      { "id": "ancestry-uk-marriages", "name": "England, Select Marriages, 1538–1973", "events": ["marriage"], "startYear": 1538, "endYear": 1973 },
-      { "id": "ancestry-uk-wwi-service", "name": "UK, WWI Service Records, 1914–1920", "events": ["military"], "startYear": 1914, "endYear": 1920 },
-      { "id": "ancestry-uk-phonebooks", "name": "UK Phone Books, 1880–1984", "events": ["residence"], "startYear": 1880, "endYear": 1984 },
-      { "id": "ancestry-ireland-civreg", "name": "Ireland, Civil Registration Indexes, 1845–1958", "events": ["birth","marriage","death"], "startYear": 1845, "endYear": 1958 },
-      { "id": "ancestry-us-1850", "name": "1850 United States Federal Census", "events": ["census","residence"], "startYear": 1850, "endYear": 1850 },
-      { "id": "ancestry-us-1860", "name": "1860 United States Federal Census", "events": ["census","residence"], "startYear": 1860, "endYear": 1860 },
-      { "id": "ancestry-us-1880", "name": "1880 United States Federal Census", "events": ["census","residence"], "startYear": 1880, "endYear": 1880 },
-      { "id": "ancestry-us-1900", "name": "1900 United States Federal Census", "events": ["census","residence"], "startYear": 1900, "endYear": 1900 },
-      { "id": "ancestry-us-1910", "name": "1910 United States Federal Census", "events": ["census","residence"], "startYear": 1910, "endYear": 1910 },
-      { "id": "ancestry-us-1920", "name": "1920 United States Federal Census", "events": ["census","residence"], "startYear": 1920, "endYear": 1920 },
-      { "id": "ancestry-us-1930", "name": "1930 United States Federal Census", "events": ["census","residence"], "startYear": 1930, "endYear": 1930 },
-      { "id": "ancestry-us-1940", "name": "1940 United States Federal Census", "events": ["census","residence"], "startYear": 1940, "endYear": 1940 },
-      { "id": "ancestry-us-1950", "name": "1950 United States Federal Census", "events": ["census","residence"], "startYear": 1950, "endYear": 1950 },
-      { "id": "ancestry-us-ssdi", "name": "U.S., Social Security Death Index, 1935–2014", "events": ["death"], "startYear": 1935, "endYear": 2014 },
-      { "id": "ancestry-us-findagrave", "name": "U.S., Find a Grave Index, 1600s–Current", "events": ["death","burial"], "startYear": 1600, "endYear": null },
-      { "id": "ancestry-us-ellis-island", "name": "New York Passenger Arrival Lists (Ellis Island), 1892–1957", "events": ["travel","residence"], "startYear": 1892, "endYear": 1957 },
-      { "id": "ancestry-aus-convict-indents", "name": "Australia, Convict Indents, 1788–1842", "events": ["legal","residence"], "startYear": 1788, "endYear": 1842 },
-      { "id": "ancestry-aus-electoral", "name": "Australia, Electoral Rolls, 1903–1980", "events": ["residence"], "startYear": 1903, "endYear": 1980 },
-      { "id": "ancestry-aus-nsw-births", "name": "New South Wales, Australia, Birth Index, 1788–1923", "events": ["birth"], "startYear": 1788, "endYear": 1923 },
-      { "id": "ancestry-aus-vic-births", "name": "Victoria, Australia, Birth Index, 1837–1925", "events": ["birth"], "startYear": 1837, "endYear": 1925 },
-      { "id": "ancestry-aus-vic-marriages", "name": "Victoria, Australia, Marriage Index, 1837–1942", "events": ["marriage"], "startYear": 1837, "endYear": 1942 },
-      { "id": "ancestry-aus-vic-deaths", "name": "Victoria, Australia, Death Index, 1836–1985", "events": ["death"], "startYear": 1836, "endYear": 1985 }
+      {
+        "id": "ancestry-uk-1841",
+        "name": "1841 England, Wales & Scotland Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1841,
+        "endYear": 1841
+      },
+      {
+        "id": "ancestry-uk-1851",
+        "name": "1851 England, Wales & Scotland Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1851,
+        "endYear": 1851
+      },
+      {
+        "id": "ancestry-uk-1861",
+        "name": "1861 England, Wales & Scotland Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1861,
+        "endYear": 1861
+      },
+      {
+        "id": "ancestry-uk-1871",
+        "name": "1871 England, Wales & Scotland Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1871,
+        "endYear": 1871
+      },
+      {
+        "id": "ancestry-uk-1881",
+        "name": "1881 England, Wales & Scotland Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1881,
+        "endYear": 1881
+      },
+      {
+        "id": "ancestry-uk-1891",
+        "name": "1891 England, Wales & Scotland Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1891,
+        "endYear": 1891
+      },
+      {
+        "id": "ancestry-uk-1901",
+        "name": "1901 England, Wales & Scotland Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1901,
+        "endYear": 1901
+      },
+      {
+        "id": "ancestry-uk-1911",
+        "name": "1911 England Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1911,
+        "endYear": 1911
+      },
+      {
+        "id": "ancestry-uk-1921",
+        "name": "1921 Census of England & Wales",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1921,
+        "endYear": 1921
+      },
+      {
+        "id": "ancestry-uk-bmd-births",
+        "name": "England & Wales, Civil Registration Birth Index, 1837–2008",
+        "events": [
+          "birth"
+        ],
+        "startYear": 1837,
+        "endYear": 2008
+      },
+      {
+        "id": "ancestry-uk-bmd-marriages",
+        "name": "England & Wales, Civil Registration Marriage Index, 1837–2008",
+        "events": [
+          "marriage"
+        ],
+        "startYear": 1837,
+        "endYear": 2008
+      },
+      {
+        "id": "ancestry-uk-bmd-deaths",
+        "name": "England & Wales, Civil Registration Death Index, 1837–2007",
+        "events": [
+          "death"
+        ],
+        "startYear": 1837,
+        "endYear": 2007
+      },
+      {
+        "id": "ancestry-uk-births-christenings",
+        "name": "England, Select Births and Christenings, 1538–1975",
+        "events": [
+          "birth",
+          "baptism"
+        ],
+        "startYear": 1538,
+        "endYear": 1975
+      },
+      {
+        "id": "ancestry-uk-marriages",
+        "name": "England, Select Marriages, 1538–1973",
+        "events": [
+          "marriage"
+        ],
+        "startYear": 1538,
+        "endYear": 1973
+      },
+      {
+        "id": "ancestry-uk-wwi-service",
+        "name": "UK, WWI Service Records, 1914–1920",
+        "events": [
+          "military"
+        ],
+        "startYear": 1914,
+        "endYear": 1920
+      },
+      {
+        "id": "ancestry-uk-phonebooks",
+        "name": "UK Phone Books, 1880–1984",
+        "events": [
+          "residence"
+        ],
+        "startYear": 1880,
+        "endYear": 1984
+      },
+      {
+        "id": "ancestry-ireland-civreg",
+        "name": "Ireland, Civil Registration Indexes, 1845–1958",
+        "events": [
+          "birth",
+          "marriage",
+          "death"
+        ],
+        "startYear": 1845,
+        "endYear": 1958
+      },
+      {
+        "id": "ancestry-us-1850",
+        "name": "1850 United States Federal Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1850,
+        "endYear": 1850
+      },
+      {
+        "id": "ancestry-us-1860",
+        "name": "1860 United States Federal Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1860,
+        "endYear": 1860
+      },
+      {
+        "id": "ancestry-us-1880",
+        "name": "1880 United States Federal Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1880,
+        "endYear": 1880
+      },
+      {
+        "id": "ancestry-us-1900",
+        "name": "1900 United States Federal Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1900,
+        "endYear": 1900
+      },
+      {
+        "id": "ancestry-us-1910",
+        "name": "1910 United States Federal Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1910,
+        "endYear": 1910
+      },
+      {
+        "id": "ancestry-us-1920",
+        "name": "1920 United States Federal Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1920,
+        "endYear": 1920
+      },
+      {
+        "id": "ancestry-us-1930",
+        "name": "1930 United States Federal Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1930,
+        "endYear": 1930
+      },
+      {
+        "id": "ancestry-us-1940",
+        "name": "1940 United States Federal Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1940,
+        "endYear": 1940
+      },
+      {
+        "id": "ancestry-us-1950",
+        "name": "1950 United States Federal Census",
+        "events": [
+          "census",
+          "residence"
+        ],
+        "startYear": 1950,
+        "endYear": 1950
+      },
+      {
+        "id": "ancestry-us-ssdi",
+        "name": "U.S., Social Security Death Index, 1935–2014",
+        "events": [
+          "death"
+        ],
+        "startYear": 1935,
+        "endYear": 2014
+      },
+      {
+        "id": "ancestry-us-findagrave",
+        "name": "U.S., Find a Grave Index, 1600s–Current",
+        "events": [
+          "death",
+          "burial"
+        ],
+        "startYear": 1600,
+        "endYear": null
+      },
+      {
+        "id": "ancestry-us-ellis-island",
+        "name": "New York Passenger Arrival Lists (Ellis Island), 1892–1957",
+        "events": [
+          "travel",
+          "residence"
+        ],
+        "startYear": 1892,
+        "endYear": 1957
+      },
+      {
+        "id": "ancestry-aus-convict-indents",
+        "name": "Australia, Convict Indents, 1788–1842",
+        "events": [
+          "legal",
+          "residence"
+        ],
+        "startYear": 1788,
+        "endYear": 1842
+      },
+      {
+        "id": "ancestry-aus-electoral",
+        "name": "Australia, Electoral Rolls, 1903–1980",
+        "events": [
+          "residence"
+        ],
+        "startYear": 1903,
+        "endYear": 1980
+      },
+      {
+        "id": "ancestry-aus-nsw-births",
+        "name": "New South Wales, Australia, Birth Index, 1788–1923",
+        "events": [
+          "birth"
+        ],
+        "startYear": 1788,
+        "endYear": 1923
+      },
+      {
+        "id": "ancestry-aus-vic-births",
+        "name": "Victoria, Australia, Birth Index, 1837–1925",
+        "events": [
+          "birth"
+        ],
+        "startYear": 1837,
+        "endYear": 1925
+      },
+      {
+        "id": "ancestry-aus-vic-marriages",
+        "name": "Victoria, Australia, Marriage Index, 1837–1942",
+        "events": [
+          "marriage"
+        ],
+        "startYear": 1837,
+        "endYear": 1942
+      },
+      {
+        "id": "ancestry-aus-vic-deaths",
+        "name": "Victoria, Australia, Death Index, 1836–1985",
+        "events": [
+          "death"
+        ],
+        "startYear": 1836,
+        "endYear": 1985
+      }
     ]
   },
   {
@@ -2050,20 +3497,221 @@ window.GENEALOGY_RESOURCES = [
         ],
         "notes": "Board of Trade BT 27 — passenger lists for ships departing British ports. Free name-index via TNA Discovery; Findmypast has the searchable images."
       },
-      { "id": "fmp-1841-census", "name": "1841 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1841-census", "coverage": [{ "events": ["census","residence"], "startYear": 1841, "endYear": 1841 }] },
-      { "id": "fmp-1851-census", "name": "1851 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1851-census", "coverage": [{ "events": ["census","residence"], "startYear": 1851, "endYear": 1851 }] },
-      { "id": "fmp-1861-census", "name": "1861 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1861-census", "coverage": [{ "events": ["census","residence"], "startYear": 1861, "endYear": 1861 }] },
-      { "id": "fmp-1871-census", "name": "1871 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1871-census", "coverage": [{ "events": ["census","residence"], "startYear": 1871, "endYear": 1871 }] },
-      { "id": "fmp-1881-census", "name": "1881 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1881-census", "coverage": [{ "events": ["census","residence"], "startYear": 1881, "endYear": 1881 }] },
-      { "id": "fmp-1891-census", "name": "1891 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1891-census", "coverage": [{ "events": ["census","residence"], "startYear": 1891, "endYear": 1891 }] },
-      { "id": "fmp-1901-census", "name": "1901 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1901-census", "coverage": [{ "events": ["census","residence"], "startYear": 1901, "endYear": 1901 }] },
-      { "id": "fmp-1911-census", "name": "1911 England, Wales & Scotland Census", "url": "https://www.findmypast.co.uk/1911-census", "coverage": [{ "events": ["census","residence"], "startYear": 1911, "endYear": 1911 }] },
-      { "id": "fmp-bna", "name": "British Newspaper Archive (Findmypast linked)", "url": "https://www.findmypast.co.uk/articles/world-records/full-list-of-united-kingdom-records/historical-newspapers", "coverage": [{ "events": ["other","residence","death","marriage","birth"], "startYear": 1700, "endYear": 2000 }], "notes": "Searchable index of British and Irish newspapers from 1700 onwards — partner site to British Newspaper Archive." },
-      { "id": "fmp-catholic-heritage", "name": "Catholic Heritage Archive", "url": "https://www.findmypast.co.uk/articles/world-records/search-all-uk-records/church-records/catholic-heritage-archive", "coverage": [{ "events": ["baptism","marriage","burial"], "startYear": 1600, "endYear": 1950 }], "notes": "Catholic parish registers from England, Scotland and the United States." },
-      { "id": "fmp-uk-wwi", "name": "British Army Service Records 1914-1920", "url": "https://www.findmypast.co.uk/articles/world-records/search-all-uk-records/military-armed-forces-and-conflict/british-army-service-records-1914-1920", "coverage": [{ "events": ["military"], "startYear": 1914, "endYear": 1920 }], "notes": "Surviving British Army WWI service records (so-called \"burnt documents\")." },
-      { "id": "fmp-uk-wwii", "name": "British Army Officer Service Records 1939-1945", "url": "https://www.findmypast.co.uk/articles/world-records/search-all-uk-records/military-armed-forces-and-conflict", "coverage": [{ "events": ["military"], "startYear": 1939, "endYear": 1945 }] },
-      { "id": "fmp-petty-sessions", "name": "Ireland Petty Sessions Court Registers", "url": "https://www.findmypast.co.uk/articles/world-records/search-all-uk-records/institutions-and-organisations/ireland-petty-sessions-court-registers", "coverage": [{ "events": ["legal"], "startYear": 1828, "endYear": 1912 }], "notes": "Local court records — petty crimes, debts, neighbour disputes. A common port of call for tracing Irish ancestors." },
-      { "id": "fmp-pa", "name": "Periodical Source Index (PERSI)", "url": "https://www.findmypast.com/articles/world-records/full-list-of-the-united-states-records/directories-and-social-history/periodical-source-index", "coverage": [{ "events": ["other"], "startYear": 1800, "endYear": 2010 }], "notes": "Subject index to genealogical articles in over 11,000 periodicals." }
+      {
+        "id": "fmp-1841-census",
+        "name": "1841 England, Wales & Scotland Census",
+        "url": "https://www.findmypast.co.uk/1841-census",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1841,
+            "endYear": 1841
+          }
+        ]
+      },
+      {
+        "id": "fmp-1851-census",
+        "name": "1851 England, Wales & Scotland Census",
+        "url": "https://www.findmypast.co.uk/1851-census",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1851,
+            "endYear": 1851
+          }
+        ]
+      },
+      {
+        "id": "fmp-1861-census",
+        "name": "1861 England, Wales & Scotland Census",
+        "url": "https://www.findmypast.co.uk/1861-census",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1861,
+            "endYear": 1861
+          }
+        ]
+      },
+      {
+        "id": "fmp-1871-census",
+        "name": "1871 England, Wales & Scotland Census",
+        "url": "https://www.findmypast.co.uk/1871-census",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1871,
+            "endYear": 1871
+          }
+        ]
+      },
+      {
+        "id": "fmp-1881-census",
+        "name": "1881 England, Wales & Scotland Census",
+        "url": "https://www.findmypast.co.uk/1881-census",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1881,
+            "endYear": 1881
+          }
+        ]
+      },
+      {
+        "id": "fmp-1891-census",
+        "name": "1891 England, Wales & Scotland Census",
+        "url": "https://www.findmypast.co.uk/1891-census",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1891,
+            "endYear": 1891
+          }
+        ]
+      },
+      {
+        "id": "fmp-1901-census",
+        "name": "1901 England, Wales & Scotland Census",
+        "url": "https://www.findmypast.co.uk/1901-census",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1901,
+            "endYear": 1901
+          }
+        ]
+      },
+      {
+        "id": "fmp-1911-census",
+        "name": "1911 England, Wales & Scotland Census",
+        "url": "https://www.findmypast.co.uk/1911-census",
+        "coverage": [
+          {
+            "events": [
+              "census",
+              "residence"
+            ],
+            "startYear": 1911,
+            "endYear": 1911
+          }
+        ]
+      },
+      {
+        "id": "fmp-bna",
+        "name": "British Newspaper Archive (Findmypast linked)",
+        "url": "https://www.findmypast.co.uk/articles/world-records/full-list-of-united-kingdom-records/historical-newspapers",
+        "coverage": [
+          {
+            "events": [
+              "other",
+              "residence",
+              "death",
+              "marriage",
+              "birth"
+            ],
+            "startYear": 1700,
+            "endYear": 2000
+          }
+        ],
+        "notes": "Searchable index of British and Irish newspapers from 1700 onwards — partner site to British Newspaper Archive."
+      },
+      {
+        "id": "fmp-catholic-heritage",
+        "name": "Catholic Heritage Archive",
+        "url": "https://www.findmypast.co.uk/articles/world-records/search-all-uk-records/church-records/catholic-heritage-archive",
+        "coverage": [
+          {
+            "events": [
+              "baptism",
+              "marriage",
+              "burial"
+            ],
+            "startYear": 1600,
+            "endYear": 1950
+          }
+        ],
+        "notes": "Catholic parish registers from England, Scotland and the United States."
+      },
+      {
+        "id": "fmp-uk-wwi",
+        "name": "British Army Service Records 1914-1920",
+        "url": "https://www.findmypast.co.uk/articles/world-records/search-all-uk-records/military-armed-forces-and-conflict/british-army-service-records-1914-1920",
+        "coverage": [
+          {
+            "events": [
+              "military"
+            ],
+            "startYear": 1914,
+            "endYear": 1920
+          }
+        ],
+        "notes": "Surviving British Army WWI service records (so-called \"burnt documents\")."
+      },
+      {
+        "id": "fmp-uk-wwii",
+        "name": "British Army Officer Service Records 1939-1945",
+        "url": "https://www.findmypast.co.uk/articles/world-records/search-all-uk-records/military-armed-forces-and-conflict",
+        "coverage": [
+          {
+            "events": [
+              "military"
+            ],
+            "startYear": 1939,
+            "endYear": 1945
+          }
+        ]
+      },
+      {
+        "id": "fmp-petty-sessions",
+        "name": "Ireland Petty Sessions Court Registers",
+        "url": "https://www.findmypast.co.uk/articles/world-records/search-all-uk-records/institutions-and-organisations/ireland-petty-sessions-court-registers",
+        "coverage": [
+          {
+            "events": [
+              "legal"
+            ],
+            "startYear": 1828,
+            "endYear": 1912
+          }
+        ],
+        "notes": "Local court records — petty crimes, debts, neighbour disputes. A common port of call for tracing Irish ancestors."
+      },
+      {
+        "id": "fmp-pa",
+        "name": "Periodical Source Index (PERSI)",
+        "url": "https://www.findmypast.com/articles/world-records/full-list-of-the-united-states-records/directories-and-social-history/periodical-source-index",
+        "coverage": [
+          {
+            "events": [
+              "other"
+            ],
+            "startYear": 1800,
+            "endYear": 2010
+          }
+        ],
+        "notes": "Subject index to genealogical articles in over 11,000 periodicals."
+      }
     ]
   },
   {
@@ -2095,7 +3743,29 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Strong European coverage and DNA matching",
-    "notes": "Paid subscription. Particularly useful for Scandinavian, German and Eastern European records."
+    "notes": "Paid subscription. Particularly useful for Scandinavian, German and Eastern European records.",
+    "collections": [
+      {
+        "id": "paid-myheritage-default",
+        "name": "All records",
+        "url": "https://www.myheritage.com/research",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "residence",
+              "travel",
+              "military"
+            ],
+            "startYear": null,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "paid-thegenealogist",
@@ -2131,7 +3801,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "UK parish registers, tithe maps and headstone transcripts",
-    "notes": "Paid UK-focused site with strong pre-1837 parish coverage and unusual map-based collections."
+    "notes": "Paid UK-focused site with strong pre-1837 parish coverage and unusual map-based collections.",
+    "collections": [
+      {
+        "id": "paid-thegenealogist-default",
+        "name": "All records from 1538",
+        "url": "https://www.thegenealogist.co.uk/search/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "residence",
+              "military",
+              "legal"
+            ],
+            "startYear": 1538,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-bna",
@@ -2170,7 +3864,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Searchable images of UK and Irish newspapers — birth, marriage and death notices, obituaries",
-    "notes": "Paid (or included with a Findmypast Pro subscription). Often the only way to find pre-civil-registration BMD evidence in print."
+    "notes": "Paid (or included with a Findmypast Pro subscription). Often the only way to find pre-civil-registration BMD evidence in print.",
+    "collections": [
+      {
+        "id": "uk-bna-default",
+        "name": "All records 1700–1980",
+        "url": "https://www.britishnewspaperarchive.co.uk/search/results",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "employment",
+              "education",
+              "military",
+              "legal",
+              "other"
+            ],
+            "startYear": 1700,
+            "endYear": 1980
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-ryerson",
@@ -2199,7 +3917,25 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free index to Australian newspaper death notices, funeral notices and obituaries",
-    "notes": "Volunteer-maintained; updated weekly. Especially useful for recent deaths not yet in BDM historical indexes."
+    "notes": "Volunteer-maintained; updated weekly. Especially useful for recent deaths not yet in BDM historical indexes.",
+    "collections": [
+      {
+        "id": "au-ryerson-default",
+        "name": "Deaths, Burials from 1803",
+        "url": "https://www.ryersonindex.org/search.php",
+        "coverage": [
+          {
+            "events": [
+              "death",
+              "burial"
+            ],
+            "startYear": 1803,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-cemeteries",
@@ -2228,7 +3964,25 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free Australian cemetery and headstone index",
-    "notes": "Volunteer-driven; coverage varies by state and cemetery. Good complement to Find a Grave and BillionGraves."
+    "notes": "Volunteer-driven; coverage varies by state and cemetery. Good complement to Find a Grave and BillionGraves.",
+    "collections": [
+      {
+        "id": "au-cemeteries-default",
+        "name": "Deaths, Burials from 1788",
+        "url": "https://austcemindex.com/",
+        "coverage": [
+          {
+            "events": [
+              "death",
+              "burial"
+            ],
+            "startYear": 1788,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "global-wikitree",
@@ -2258,7 +4012,28 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Single shared collaborative family tree with cited sources",
-    "notes": "Not a record set in itself, but profiles often cite or transcribe records that are otherwise hard to find. Free signup required to edit; reading is open."
+    "notes": "Not a record set in itself, but profiles often cite or transcribe records that are otherwise hard to find. Free signup required to edit; reading is open.",
+    "collections": [
+      {
+        "id": "global-wikitree-default",
+        "name": "Births, Marriages, Deaths",
+        "url": "https://www.wikitree.com/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial"
+            ],
+            "startYear": null,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-deceased-online",
@@ -2290,7 +4065,25 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "UK burial and cremation records — official council and crematorium registers",
-    "notes": "Pay-per-view (no subscription). Holds many records not duplicated on Find a Grave or BillionGraves."
+    "notes": "Pay-per-view (no subscription). Holds many records not duplicated on Find a Grave or BillionGraves.",
+    "collections": [
+      {
+        "id": "uk-deceased-online-default",
+        "name": "Deaths, Burials from 1820",
+        "url": "https://www.deceasedonline.com/",
+        "coverage": [
+          {
+            "events": [
+              "death",
+              "burial"
+            ],
+            "startYear": 1820,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "global-cyndis-list",
@@ -2530,7 +4323,24 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Australian military service records, nominal rolls, and unit histories",
-    "notes": "Free name search across First and Second AIF, Boer War, Vietnam and other conflict rolls."
+    "notes": "Free name search across First and Second AIF, Boer War, Vietnam and other conflict rolls.",
+    "collections": [
+      {
+        "id": "au-awm-default",
+        "name": "Military from 1885",
+        "url": "https://www.awm.gov.au/",
+        "coverage": [
+          {
+            "events": [
+              "military"
+            ],
+            "startYear": 1885,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-old-bailey",
@@ -2558,7 +4368,24 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Searchable proceedings of the Old Bailey criminal court, London",
-    "notes": "Full-text search of every trial heard at the Old Bailey 1674-1913 — defendants, victims, witnesses all named."
+    "notes": "Full-text search of every trial heard at the Old Bailey 1674-1913 — defendants, victims, witnesses all named.",
+    "collections": [
+      {
+        "id": "uk-old-bailey-default",
+        "name": "Court 1674–1913",
+        "url": "https://www.oldbaileyonline.org/search.jsp",
+        "coverage": [
+          {
+            "events": [
+              "legal"
+            ],
+            "startYear": 1674,
+            "endYear": 1913
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "global-theshipslist",
@@ -2584,7 +4411,24 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free passenger lists and ship arrival records across the English-speaking world",
-    "notes": "Volunteer-transcribed; particularly strong for UK→Australia, UK→Canada and UK→US voyages."
+    "notes": "Volunteer-transcribed; particularly strong for UK→Australia, UK→Canada and UK→US voyages.",
+    "collections": [
+      {
+        "id": "global-theshipslist-default",
+        "name": "Travel 1700–1955",
+        "url": "https://www.theshipslist.com/",
+        "coverage": [
+          {
+            "events": [
+              "travel"
+            ],
+            "startYear": 1700,
+            "endYear": 1955
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-durhambmd",
@@ -2614,7 +4458,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free County Durham civil registration district transcriptions",
-    "notes": "Volunteer-transcribed; part of the UKBMD network."
+    "notes": "Volunteer-transcribed; part of the UKBMD network.",
+    "collections": [
+      {
+        "id": "uk-durhambmd-default",
+        "name": "Births, Marriages, Deaths from 1837",
+        "url": "https://www.durhambmd.org.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death"
+            ],
+            "startYear": 1837,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-staffordshirebmd",
@@ -2644,7 +4507,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free Staffordshire civil registration district transcriptions",
-    "notes": "Volunteer-transcribed; part of the UKBMD network. Also indexes some pre-1837 parish baptisms."
+    "notes": "Volunteer-transcribed; part of the UKBMD network. Also indexes some pre-1837 parish baptisms.",
+    "collections": [
+      {
+        "id": "uk-staffordshirebmd-default",
+        "name": "Births, Marriages, Deaths from 1837",
+        "url": "https://www.staffordshirebmd.org.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death"
+            ],
+            "startYear": 1837,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-berkshirebmd",
@@ -2674,7 +4556,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free Berkshire civil registration district transcriptions",
-    "notes": "Volunteer-transcribed; part of the UKBMD network."
+    "notes": "Volunteer-transcribed; part of the UKBMD network.",
+    "collections": [
+      {
+        "id": "uk-berkshirebmd-default",
+        "name": "Births, Marriages, Deaths from 1837",
+        "url": "https://www.berkshirebmd.org.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death"
+            ],
+            "startYear": 1837,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-wiltshirebmd",
@@ -2704,7 +4605,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free Wiltshire civil registration district transcriptions",
-    "notes": "Volunteer-transcribed; part of the UKBMD network."
+    "notes": "Volunteer-transcribed; part of the UKBMD network.",
+    "collections": [
+      {
+        "id": "uk-wiltshirebmd-default",
+        "name": "Births, Marriages, Deaths from 1837",
+        "url": "https://www.wiltshirebmd.org.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death"
+            ],
+            "startYear": 1837,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-northwalesbmd",
@@ -2734,7 +4654,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free North Wales civil registration district transcriptions",
-    "notes": "Covers Anglesey, Caernarfonshire, Denbighshire, Flintshire, Merionethshire and Montgomeryshire. Part of the UKBMD network."
+    "notes": "Covers Anglesey, Caernarfonshire, Denbighshire, Flintshire, Merionethshire and Montgomeryshire. Part of the UKBMD network.",
+    "collections": [
+      {
+        "id": "uk-northwalesbmd-default",
+        "name": "Births, Marriages, Deaths from 1837",
+        "url": "https://www.northwalesbmd.org.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death"
+            ],
+            "startYear": 1837,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-naa",
@@ -2766,7 +4705,28 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Australian federal records — military service, immigration, naturalisation, government employment",
-    "notes": "RecordSearch is the free public catalogue. Most digitised files are free to view online."
+    "notes": "RecordSearch is the free public catalogue. Most digitised files are free to view online.",
+    "collections": [
+      {
+        "id": "au-naa-default",
+        "name": "Military, Travel, Court from 1788",
+        "url": "https://www.naa.gov.au/",
+        "coverage": [
+          {
+            "events": [
+              "military",
+              "travel",
+              "legal",
+              "employment",
+              "other"
+            ],
+            "startYear": 1788,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-prov",
@@ -2803,7 +4763,29 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Victorian state records — wills/probate, inquests, immigration, education, prison",
-    "notes": "Free name-search; many indexes and digitised images online. Pair with Victoria BDM for vital events."
+    "notes": "Free name-search; many indexes and digitised images online. Pair with Victoria BDM for vital events.",
+    "collections": [
+      {
+        "id": "au-prov-default",
+        "name": "Court, Travel, Employment from 1837",
+        "url": "https://prov.vic.gov.au/explore-collection/explore-topic/family-history",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "travel",
+              "employment",
+              "education",
+              "burial",
+              "other"
+            ],
+            "startYear": 1837,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-qsa",
@@ -2839,7 +4821,28 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Queensland state records — convicts (post-1859), shipping, wills, schools",
-    "notes": "Free indexes and digitised images. ArchivesSearch is the public catalogue."
+    "notes": "Free indexes and digitised images. ArchivesSearch is the public catalogue.",
+    "collections": [
+      {
+        "id": "au-qsa-default",
+        "name": "Court, Travel, Employment from 1859",
+        "url": "https://www.qld.gov.au/recreation/arts/heritage/archives",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "travel",
+              "employment",
+              "education",
+              "other"
+            ],
+            "startYear": 1859,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-srowa",
@@ -2874,7 +4877,28 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "WA state records — convicts, wills, immigration, schools",
-    "notes": "Free online catalogue and digital archive (AEON)."
+    "notes": "Free online catalogue and digital archive (AEON).",
+    "collections": [
+      {
+        "id": "au-srowa-default",
+        "name": "Court, Travel, Employment from 1829",
+        "url": "https://archive.sro.wa.gov.au/",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "travel",
+              "employment",
+              "education",
+              "other"
+            ],
+            "startYear": 1829,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-srsa",
@@ -2910,7 +4934,28 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "South Australian state records — wills, immigration, schools, government",
-    "notes": "Free indexes; many records require a visit but the catalogue is searchable online."
+    "notes": "Free indexes; many records require a visit but the catalogue is searchable online.",
+    "collections": [
+      {
+        "id": "au-srsa-default",
+        "name": "Court, Travel, Employment from 1836",
+        "url": "https://archives.sa.gov.au/",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "travel",
+              "employment",
+              "education",
+              "other"
+            ],
+            "startYear": 1836,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-probate-calendar",
@@ -2940,7 +4985,25 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Official England & Wales probate calendar 1858 onward",
-    "notes": "Free index search. Will images cost £1.50 each. Replaces the pre-1858 ecclesiastical court system."
+    "notes": "Free index search. Will images cost £1.50 each. Replaces the pre-1858 ecclesiastical court system.",
+    "collections": [
+      {
+        "id": "uk-probate-calendar-default",
+        "name": "Court, Deaths from 1858",
+        "url": "https://probatesearch.service.gov.uk/",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "death"
+            ],
+            "startYear": 1858,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-nlw",
@@ -2974,7 +5037,30 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Welsh wills, parish registers, tithe maps and newspapers",
-    "notes": "Hosts Welsh Newspapers Online, Welsh Tithe Maps and Welsh Wills 1521-1858."
+    "notes": "Hosts Welsh Newspapers Online, Welsh Tithe Maps and Welsh Wills 1521-1858.",
+    "collections": [
+      {
+        "id": "uk-nlw-default",
+        "name": "All records from 1500",
+        "url": "https://www.library.wales/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "legal",
+              "other"
+            ],
+            "startYear": 1500,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-scottish-indexes",
@@ -3007,7 +5093,29 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free Scottish parish, mental health, paternity and prison record indexes",
-    "notes": "Run by Graham Maxwell. Particularly strong for asylum records and Sasines (land registers)."
+    "notes": "Run by Graham Maxwell. Particularly strong for asylum records and Sasines (land registers).",
+    "collections": [
+      {
+        "id": "uk-scottish-indexes-default",
+        "name": "All records 1500–1925",
+        "url": "https://www.scottishindexes.com/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "legal"
+            ],
+            "startYear": 1500,
+            "endYear": 1925
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "uk-sog",
@@ -3045,7 +5153,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Indexed UK and Commonwealth pedigrees, parish records, apprenticeships",
-    "notes": "Membership unlocks SoG indexes including Apprenticeships of Great Britain and the Boyd Marriage Index."
+    "notes": "Membership unlocks SoG indexes including Apprenticeships of Great Britain and the Boyd Marriage Index.",
+    "collections": [
+      {
+        "id": "uk-sog-default",
+        "name": "All records from 1500",
+        "url": "https://sog.org.uk/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "legal",
+              "employment",
+              "other"
+            ],
+            "startYear": 1500,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "global-cwgc",
@@ -3073,7 +5205,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free index to Commonwealth war dead from WW1 and WW2",
-    "notes": "Authoritative source for British, Australian, Canadian, Indian, NZ, South African and other Commonwealth military deaths 1914-1921 and 1939-1947."
+    "notes": "Authoritative source for British, Australian, Canadian, Indian, NZ, South African and other Commonwealth military deaths 1914-1921 and 1939-1947.",
+    "collections": [
+      {
+        "id": "global-cwgc-default",
+        "name": "Military, Deaths, Burials 1914–1947",
+        "url": "https://www.cwgc.org/",
+        "coverage": [
+          {
+            "events": [
+              "military",
+              "death",
+              "burial"
+            ],
+            "startYear": 1914,
+            "endYear": 1947
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "paid-fold3",
@@ -3105,7 +5256,24 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Comprehensive military records — US Civil War, WW1, WW2, plus UK service records",
-    "notes": "Owned by Ancestry. Some collections are free; full access requires subscription."
+    "notes": "Owned by Ancestry. Some collections are free; full access requires subscription.",
+    "collections": [
+      {
+        "id": "paid-fold3-default",
+        "name": "Military from 1750",
+        "url": "https://www.fold3.com/search/",
+        "coverage": [
+          {
+            "events": [
+              "military"
+            ],
+            "startYear": 1750,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "paid-forces-war-records",
@@ -3137,7 +5305,24 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "British and Commonwealth military records — Boer War to WW2",
-    "notes": "Specialised paid site, now owned by Findmypast; some overlap with FMP military collections."
+    "notes": "Specialised paid site, now owned by Findmypast; some overlap with FMP military collections.",
+    "collections": [
+      {
+        "id": "paid-forces-war-records-default",
+        "name": "Military from 1700",
+        "url": "https://uk.forceswarrecords.com/search",
+        "coverage": [
+          {
+            "events": [
+              "military"
+            ],
+            "startYear": 1700,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-uscis-genealogy",
@@ -3166,7 +5351,25 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "US naturalization, alien registration and immigration files",
-    "notes": "Index search is free; record copies cost a fee. Holds A-Files, naturalization C-Files and visa files."
+    "notes": "Index search is free; record copies cost a fee. Holds A-Files, naturalization C-Files and visa files.",
+    "collections": [
+      {
+        "id": "us-uscis-genealogy-default",
+        "name": "Travel, Court 1893–1957",
+        "url": "https://www.uscis.gov/records/genealogy",
+        "coverage": [
+          {
+            "events": [
+              "travel",
+              "legal"
+            ],
+            "startYear": 1893,
+            "endYear": 1957
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "global-geneanet",
@@ -3204,7 +5407,29 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Strongest free European genealogy site — France-focused, growing across Western Europe",
-    "notes": "Free name search and tree access; some images and DNA features require Premium."
+    "notes": "Free name search and tree access; some images and DNA features require Premium.",
+    "collections": [
+      {
+        "id": "global-geneanet-default",
+        "name": "All records from 1500",
+        "url": "https://en.geneanet.org/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence"
+            ],
+            "startYear": 1500,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "paid-rootsireland",
@@ -3236,7 +5461,27 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Indexed Irish Catholic and Church of Ireland parish baptisms, marriages and burials",
-    "notes": "Pay-per-view. Most comprehensive name-search across pre-civil-registration Irish parish records."
+    "notes": "Pay-per-view. Most comprehensive name-search across pre-civil-registration Irish parish records.",
+    "collections": [
+      {
+        "id": "paid-rootsireland-default",
+        "name": "Births, Baptisms, Marriages 1700–1900",
+        "url": "https://www.rootsireland.ie/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "burial"
+            ],
+            "startYear": 1700,
+            "endYear": 1900
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "global-internet-archive",
@@ -3272,7 +5517,34 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free digitised genealogy books, county histories, city directories",
-    "notes": "Full-text search of millions of public-domain books. Especially useful for 19th-century county histories and city directories."
+    "notes": "Full-text search of millions of public-domain books. Especially useful for 19th-century county histories and city directories.",
+    "collections": [
+      {
+        "id": "global-internet-archive-default",
+        "name": "All records from 1500",
+        "url": "https://archive.org/details/genealogy",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "residence",
+              "military",
+              "legal",
+              "employment",
+              "education",
+              "other"
+            ],
+            "startYear": 1500,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "global-hathitrust",
@@ -3308,7 +5580,34 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Academic library of digitised genealogy and local history books",
-    "notes": "Searchable across 15+ million volumes from research libraries. Public-domain works are fully readable."
+    "notes": "Searchable across 15+ million volumes from research libraries. Public-domain works are fully readable.",
+    "collections": [
+      {
+        "id": "global-hathitrust-default",
+        "name": "All records from 1500",
+        "url": "https://www.hathitrust.org/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "residence",
+              "military",
+              "legal",
+              "employment",
+              "education",
+              "other"
+            ],
+            "startYear": 1500,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-aiatsis",
@@ -3339,7 +5638,27 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Aboriginal and Torres Strait Islander family history records",
-    "notes": "Specialised support for Indigenous Australian family research, including Stolen Generations records."
+    "notes": "Specialised support for Indigenous Australian family research, including Stolen Generations records.",
+    "collections": [
+      {
+        "id": "au-aiatsis-default",
+        "name": "Births, Marriages, Deaths from 1788",
+        "url": "https://aiatsis.gov.au/family-history",
+        "coverage": [
+          {
+            "events": [
+              "other",
+              "birth",
+              "marriage",
+              "death"
+            ],
+            "startYear": 1788,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "paid-newspapers-com",
@@ -3376,7 +5695,30 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Searchable images of 25,000+ newspapers, mainly US and Canadian",
-    "notes": "Owned by Ancestry. Powerful for obituaries, marriage announcements and small-town family news."
+    "notes": "Owned by Ancestry. Powerful for obituaries, marriage announcements and small-town family news.",
+    "collections": [
+      {
+        "id": "paid-newspapers-com-default",
+        "name": "All records from 1700",
+        "url": "https://www.newspapers.com/search/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "employment",
+              "military",
+              "legal",
+              "other"
+            ],
+            "startYear": 1700,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "paid-genealogybank",
@@ -3410,7 +5752,30 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "US historical newspapers including African-American papers and Social Security Death Index",
-    "notes": "Particularly strong for early American newspapers (pre-1830) and minority-press papers."
+    "notes": "Particularly strong for early American newspapers (pre-1830) and minority-press papers.",
+    "collections": [
+      {
+        "id": "paid-genealogybank-default",
+        "name": "All records from 1690",
+        "url": "https://www.genealogybank.com/search/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "employment",
+              "military",
+              "legal",
+              "other"
+            ],
+            "startYear": 1690,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-nara",
@@ -3443,7 +5808,29 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "US federal records — military service, immigration, naturalization, land, federal census",
-    "notes": "NARA holds the original federal census schedules, military service files, and ship passenger lists. Many digitised collections are indexed via Ancestry/FamilySearch but NARA itself is the authoritative free source."
+    "notes": "NARA holds the original federal census schedules, military service files, and ship passenger lists. Many digitised collections are indexed via Ancestry/FamilySearch but NARA itself is the authoritative free source.",
+    "collections": [
+      {
+        "id": "us-nara-default",
+        "name": "Military, Travel, Court from 1775",
+        "url": "https://www.archives.gov/research/genealogy",
+        "coverage": [
+          {
+            "events": [
+              "military",
+              "travel",
+              "legal",
+              "residence",
+              "employment",
+              "other"
+            ],
+            "startYear": 1775,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-chronicling-america",
@@ -3477,7 +5864,30 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free full-text search of historic US newspapers",
-    "notes": "Library of Congress project. 22+ million pages from all 50 states, free to search and view."
+    "notes": "Library of Congress project. 22+ million pages from all 50 states, free to search and view.",
+    "collections": [
+      {
+        "id": "us-chronicling-america-default",
+        "name": "All records 1690–1963",
+        "url": "https://www.loc.gov/collections/chronicling-america/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "employment",
+              "military",
+              "legal",
+              "other"
+            ],
+            "startYear": 1690,
+            "endYear": 1963
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-dar",
@@ -3508,7 +5918,27 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Index of American Revolutionary War patriots and their descendants",
-    "notes": "Free to search the Genealogical Research System — Ancestor Database, Member List, Bible Records, Genealogical Records Committee Reports."
+    "notes": "Free to search the Genealogical Research System — Ancestor Database, Member List, Bible Records, Genealogical Records Committee Reports.",
+    "collections": [
+      {
+        "id": "us-dar-default",
+        "name": "Military, Births, Marriages 1700–1830",
+        "url": "https://services.dar.org/Public/DAR_Research/search_adb/",
+        "coverage": [
+          {
+            "events": [
+              "military",
+              "birth",
+              "marriage",
+              "death"
+            ],
+            "startYear": 1700,
+            "endYear": 1830
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-castle-garden",
@@ -3536,7 +5966,24 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free index of 11 million immigrants who entered the US through Castle Garden (the pre-Ellis Island port of entry in NYC)",
-    "notes": "Covers the period before Ellis Island opened in 1892. For Ellis-era arrivals (1892-1957) use FamilySearch or Ancestry."
+    "notes": "Covers the period before Ellis Island opened in 1892. For Ellis-era arrivals (1892-1957) use FamilySearch or Ancestry.",
+    "collections": [
+      {
+        "id": "us-castle-garden-default",
+        "name": "Travel 1820–1892",
+        "url": "https://www.castlegarden.org/searcher.php",
+        "coverage": [
+          {
+            "events": [
+              "travel"
+            ],
+            "startYear": 1820,
+            "endYear": 1892
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-civil-war-soldiers",
@@ -3565,7 +6012,25 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free index of 6.3 million US Civil War soldiers and sailors (Union and Confederate)",
-    "notes": "National Park Service project. Includes regimental histories, prisoner records, Medal of Honor recipients, and cemetery information."
+    "notes": "National Park Service project. Includes regimental histories, prisoner records, Medal of Honor recipients, and cemetery information.",
+    "collections": [
+      {
+        "id": "us-civil-war-soldiers-default",
+        "name": "Military, Deaths 1861–1865",
+        "url": "https://www.nps.gov/civilwar/soldiers-and-sailors-database.htm",
+        "coverage": [
+          {
+            "events": [
+              "military",
+              "death"
+            ],
+            "startYear": 1861,
+            "endYear": 1865
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-stevemorse",
@@ -3599,7 +6064,30 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Smarter search front-ends for Ellis Island, Castle Garden, US census, NYC vital records and many other sites",
-    "notes": "Not a record set — wraps clunky search forms with better UX. Especially useful for soundex-driven Ellis Island searches and NYC vital record indexes."
+    "notes": "Not a record set — wraps clunky search forms with better UX. Especially useful for soundex-driven Ellis Island searches and NYC vital record indexes.",
+    "collections": [
+      {
+        "id": "us-stevemorse-default",
+        "name": "All records from 1700",
+        "url": "https://www.stevemorse.org/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "travel",
+              "residence",
+              "military",
+              "other"
+            ],
+            "startYear": 1700,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-afrigeneas",
@@ -3631,7 +6119,28 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "African American family research — slave records, Freedmen records, surnames, beginner help",
-    "notes": "Volunteer community site. Hosts surname databases, marriage and death indexes, and active research forums."
+    "notes": "Volunteer community site. Hosts surname databases, marriage and death indexes, and active research forums.",
+    "collections": [
+      {
+        "id": "us-afrigeneas-default",
+        "name": "Births, Marriages, Deaths from 1700",
+        "url": "http://www.afrigeneas.com/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "burial",
+              "other"
+            ],
+            "startYear": 1700,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-ny-archives",
@@ -3671,7 +6180,32 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "New York State records — court, military, land, education, civil service",
-    "notes": "NY did not centralise vital registration until 1880; for earlier vitals see town clerks and FamilySearch."
+    "notes": "NY did not centralise vital registration until 1880; for earlier vitals see town clerks and FamilySearch.",
+    "collections": [
+      {
+        "id": "us-ny-archives-default",
+        "name": "All records from 1664",
+        "url": "http://www.archives.nysed.gov/",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "military",
+              "travel",
+              "employment",
+              "education",
+              "birth",
+              "marriage",
+              "death",
+              "other"
+            ],
+            "startYear": 1664,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-ca-archives",
@@ -3708,7 +6242,29 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "California state records — court, military, prison, land, government employment",
-    "notes": "Held by the Secretary of State. The CA Death Index 1905-1939 is freely searchable on FamilySearch."
+    "notes": "Held by the Secretary of State. The CA Death Index 1905-1939 is freely searchable on FamilySearch.",
+    "collections": [
+      {
+        "id": "us-ca-archives-default",
+        "name": "Court, Military, Travel from 1850",
+        "url": "https://www.sos.ca.gov/archives/",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "military",
+              "travel",
+              "employment",
+              "education",
+              "other"
+            ],
+            "startYear": 1850,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-ma-archives",
@@ -3747,7 +6303,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Massachusetts state records — early colonial records, vital records, military, court",
-    "notes": "MA has continuous vital registration from 1841. Pre-1841 town vitals are covered by AmericanAncestors (NEHGS)."
+    "notes": "MA has continuous vital registration from 1841. Pre-1841 town vitals are covered by AmericanAncestors (NEHGS).",
+    "collections": [
+      {
+        "id": "us-ma-archives-default",
+        "name": "All records from 1620",
+        "url": "https://www.sec.state.ma.us/divisions/archives/research/genealogy.htm",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "military",
+              "travel",
+              "employment",
+              "birth",
+              "marriage",
+              "death",
+              "other"
+            ],
+            "startYear": 1620,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-pa-archives",
@@ -3786,7 +6366,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Pennsylvania state records — military, naturalisation, land, vital records",
-    "notes": "PA Death Certificates 1906-1969 and Birth Certificates 1906-1909 are freely searchable on Ancestry via Pennsylvania State Archives."
+    "notes": "PA Death Certificates 1906-1969 and Birth Certificates 1906-1909 are freely searchable on Ancestry via Pennsylvania State Archives.",
+    "collections": [
+      {
+        "id": "us-pa-archives-default",
+        "name": "All records from 1682",
+        "url": "https://www.pa.gov/agencies/phmc",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "military",
+              "travel",
+              "employment",
+              "birth",
+              "marriage",
+              "death",
+              "other"
+            ],
+            "startYear": 1682,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-tx-archives",
@@ -3825,7 +6429,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Texas state records — Republic-era documents, Confederate pensions, prison, vital records",
-    "notes": "Civil registration is 1903 onward but county clerks held earlier marriage records. Confederate Pension Applications are indexed online."
+    "notes": "Civil registration is 1903 onward but county clerks held earlier marriage records. Confederate Pension Applications are indexed online.",
+    "collections": [
+      {
+        "id": "us-tx-archives-default",
+        "name": "All records from 1836",
+        "url": "https://www.tsl.texas.gov/arc/genealogy.html",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "military",
+              "travel",
+              "employment",
+              "birth",
+              "marriage",
+              "death",
+              "other"
+            ],
+            "startYear": 1836,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "us-va-library",
@@ -3864,7 +6492,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Virginia state records — colonial and early American court, land, military",
-    "notes": "Holds extensive colonial records. Many county order books and chancery causes are digitised and freely searchable."
+    "notes": "Holds extensive colonial records. Many county order books and chancery causes are digitised and freely searchable.",
+    "collections": [
+      {
+        "id": "us-va-library-default",
+        "name": "All records from 1607",
+        "url": "https://www.lva.virginia.gov/",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "military",
+              "travel",
+              "employment",
+              "birth",
+              "marriage",
+              "death",
+              "other"
+            ],
+            "startYear": 1607,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ca-canadian-headstones",
@@ -3893,7 +6545,25 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free Canadian cemetery and headstone index with photographs",
-    "notes": "Volunteer-driven; coverage varies by province. Complement to Find a Grave for Canadian burials."
+    "notes": "Volunteer-driven; coverage varies by province. Complement to Find a Grave for Canadian burials.",
+    "collections": [
+      {
+        "id": "ca-canadian-headstones-default",
+        "name": "Deaths, Burials from 1700",
+        "url": "https://canadianheadstones.ca/",
+        "coverage": [
+          {
+            "events": [
+              "death",
+              "burial"
+            ],
+            "startYear": 1700,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ca-automated-genealogy",
@@ -3921,7 +6591,24 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free name-indexed transcriptions of the Canadian census 1851-1911",
-    "notes": "Volunteer transcriptions of LAC images. Often easier to search than the official LAC interface."
+    "notes": "Volunteer transcriptions of LAC images. Often easier to search than the official LAC interface.",
+    "collections": [
+      {
+        "id": "ca-automated-genealogy-default",
+        "name": "Residence 1851–1911",
+        "url": "http://automatedgenealogy.com/",
+        "coverage": [
+          {
+            "events": [
+              "residence"
+            ],
+            "startYear": 1851,
+            "endYear": 1911
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ca-cvwm",
@@ -3951,7 +6638,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free index of Canadians who died in military service from the Boer War onward",
-    "notes": "Veterans Affairs Canada project. Includes service records, photos and burial information for over 118,000 Canadian war dead."
+    "notes": "Veterans Affairs Canada project. Includes service records, photos and burial information for over 118,000 Canadian war dead.",
+    "collections": [
+      {
+        "id": "ca-cvwm-default",
+        "name": "Military, Deaths, Burials from 1899",
+        "url": "https://www.veterans.gc.ca/eng/remembrance/memorials/canadian-virtual-war-memorial",
+        "coverage": [
+          {
+            "events": [
+              "military",
+              "death",
+              "burial"
+            ],
+            "startYear": 1899,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ca-ontario-archives",
@@ -3991,7 +6697,32 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Ontario provincial records — vital statistics, land, court, education",
-    "notes": "Ontario civil registration: births 1869+, marriages 1801+ (county-held pre-1869), deaths 1869+. Many indexes free via FamilySearch."
+    "notes": "Ontario civil registration: births 1869+, marriages 1801+ (county-held pre-1869), deaths 1869+. Many indexes free via FamilySearch.",
+    "collections": [
+      {
+        "id": "ca-ontario-archives-default",
+        "name": "All records from 1791",
+        "url": "https://www.archives.gov.on.ca/en/family_history/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "legal",
+              "travel",
+              "military",
+              "employment",
+              "education",
+              "other"
+            ],
+            "startYear": 1791,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ca-banq",
@@ -4031,7 +6762,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Quebec genealogy — Catholic parish registers, notarial records, civil status",
-    "notes": "BAnQ holds the most comprehensive Quebec records. Many Catholic parish registers and notarial collections digitised and free online."
+    "notes": "BAnQ holds the most comprehensive Quebec records. Many Catholic parish registers and notarial collections digitised and free online.",
+    "collections": [
+      {
+        "id": "ca-banq-default",
+        "name": "All records from 1621",
+        "url": "https://www.banq.qc.ca/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "legal",
+              "travel",
+              "other"
+            ],
+            "startYear": 1621,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ca-ns-archives",
@@ -4071,7 +6826,32 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Nova Scotia provincial records — births, marriages, deaths, ship passenger lists",
-    "notes": "Excellent free online indexes — births 1864-1924, marriages 1763-1949, deaths 1864-1974 are all searchable with images."
+    "notes": "Excellent free online indexes — births 1864-1924, marriages 1763-1949, deaths 1864-1974 are all searchable with images.",
+    "collections": [
+      {
+        "id": "ca-ns-archives-default",
+        "name": "All records 1763–1949",
+        "url": "https://archives.novascotia.ca/genealogy/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "legal",
+              "travel",
+              "military",
+              "other"
+            ],
+            "startYear": 1763,
+            "endYear": 1949
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ca-bc-archives",
@@ -4110,7 +6890,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "British Columbia provincial records — vital statistics, court, land, photographs",
-    "notes": "BC Vital Statistics Agency indexes births, marriages and deaths separately at https://www.vs.gov.bc.ca/. Free with images for older events."
+    "notes": "BC Vital Statistics Agency indexes births, marriages and deaths separately at https://www.vs.gov.bc.ca/. Free with images for older events.",
+    "collections": [
+      {
+        "id": "ca-bc-archives-default",
+        "name": "All records from 1858",
+        "url": "https://search-bcarchives.royalbcmuseum.bc.ca/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "legal",
+              "travel",
+              "military",
+              "employment",
+              "other"
+            ],
+            "startYear": 1858,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ca-mb-archives",
@@ -4149,7 +6953,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Manitoba provincial records — Hudson's Bay Company, Métis scrip, civil registration",
-    "notes": "Holds the unique Hudson's Bay Company Archives, important for fur trade and Métis ancestry."
+    "notes": "Holds the unique Hudson's Bay Company Archives, important for fur trade and Métis ancestry.",
+    "collections": [
+      {
+        "id": "ca-mb-archives-default",
+        "name": "All records from 1820",
+        "url": "https://www.gov.mb.ca/chc/archives/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "legal",
+              "travel",
+              "military",
+              "employment",
+              "other"
+            ],
+            "startYear": 1820,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ca-sk-archives",
@@ -4187,7 +7015,30 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Saskatchewan provincial records — homestead files, school, vital statistics",
-    "notes": "Homestead Files (1872-1930) are particularly useful for tracing land grants to settlers."
+    "notes": "Homestead Files (1872-1930) are particularly useful for tracing land grants to settlers.",
+    "collections": [
+      {
+        "id": "ca-sk-archives-default",
+        "name": "All records from 1878",
+        "url": "https://www.saskarchives.com/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "legal",
+              "travel",
+              "employment",
+              "other"
+            ],
+            "startYear": 1878,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ca-ab-archives",
@@ -4226,7 +7077,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Alberta provincial records — homestead, school, court, vital statistics",
-    "notes": "Free online catalogue. Vital records (1898-1970s) are managed separately by Alberta Vital Statistics."
+    "notes": "Free online catalogue. Vital records (1898-1970s) are managed separately by Alberta Vital Statistics.",
+    "collections": [
+      {
+        "id": "ca-ab-archives-default",
+        "name": "All records from 1870",
+        "url": "https://provincialarchives.alberta.ca/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "legal",
+              "travel",
+              "employment",
+              "education",
+              "other"
+            ],
+            "startYear": 1870,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ca-nb-archives",
@@ -4266,7 +7141,32 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "New Brunswick provincial records — Loyalist arrivals, Acadian records, vital statistics",
-    "notes": "Excellent free online indexes including vital statistics (1888-1965), late registrations and county marriage registers."
+    "notes": "Excellent free online indexes including vital statistics (1888-1965), late registrations and county marriage registers.",
+    "collections": [
+      {
+        "id": "ca-nb-archives-default",
+        "name": "All records from 1784",
+        "url": "https://archives.gnb.ca/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "marriage",
+              "death",
+              "baptism",
+              "burial",
+              "legal",
+              "travel",
+              "military",
+              "other"
+            ],
+            "startYear": 1784,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "paid-prdh-igd",
@@ -4303,7 +7203,28 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Reconstructed family files for every Quebec Catholic to 1865",
-    "notes": "Université de Montréal project. The most comprehensive linked dataset for Quebec Catholic ancestry — pay-per-request or subscription."
+    "notes": "Université de Montréal project. The most comprehensive linked dataset for Quebec Catholic ancestry — pay-per-request or subscription.",
+    "collections": [
+      {
+        "id": "paid-prdh-igd-default",
+        "name": "Births, Baptisms, Marriages 1621–1865",
+        "url": "https://www.prdh-igd.com/en/Home",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial"
+            ],
+            "startYear": 1621,
+            "endYear": 1865
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-convict-records",
@@ -4336,7 +7257,25 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free aggregated index of British and Irish convicts transported to Australia",
-    "notes": "Volunteer-driven; pulls together transportation records, ship arrival lists and conduct registers across all penal colonies (NSW, VDL, WA)."
+    "notes": "Volunteer-driven; pulls together transportation records, ship arrival lists and conduct registers across all penal colonies (NSW, VDL, WA).",
+    "collections": [
+      {
+        "id": "au-convict-records-default",
+        "name": "Court, Travel 1788–1868",
+        "url": "https://convictrecords.com.au/",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "travel"
+            ],
+            "startYear": 1788,
+            "endYear": 1868
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-founders-survivors",
@@ -4373,7 +7312,29 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Academic project linking Tasmanian convicts to their descendants",
-    "notes": "University of Tasmania research project. Connects convict records, vital events, and family-history submissions; particularly powerful for tracing descendants of Van Diemen's Land convicts."
+    "notes": "University of Tasmania research project. Connects convict records, vital events, and family-history submissions; particularly powerful for tracing descendants of Van Diemen's Land convicts.",
+    "collections": [
+      {
+        "id": "au-founders-survivors-default",
+        "name": "Court, Travel, Births 1803–1920",
+        "url": "https://www.foundersandsurvivors.org/",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "travel",
+              "birth",
+              "marriage",
+              "death",
+              "other"
+            ],
+            "startYear": 1803,
+            "endYear": 1920
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-passengers-history",
@@ -4405,7 +7366,24 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free name-search index of South Australian passenger arrivals",
-    "notes": "Hosted by the South Australian Maritime Museum. Combines assisted and unassisted arrivals and links to original ship and voyage details."
+    "notes": "Hosted by the South Australian Maritime Museum. Combines assisted and unassisted arrivals and links to original ship and voyage details.",
+    "collections": [
+      {
+        "id": "au-passengers-history-default",
+        "name": "Travel 1836–1900",
+        "url": "https://passengersinhistory.sa.gov.au/",
+        "coverage": [
+          {
+            "events": [
+              "travel"
+            ],
+            "startYear": 1836,
+            "endYear": 1900
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "au-mariners-ships",
@@ -4438,7 +7416,25 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free index of seamen and ships visiting NSW ports",
-    "notes": "Originally hosted by NSW State Records, now under MHNSW. Useful for ancestors who served on or arrived via shipping into Sydney and other NSW ports."
+    "notes": "Originally hosted by NSW State Records, now under MHNSW. Useful for ancestors who served on or arrived via shipping into Sydney and other NSW ports.",
+    "collections": [
+      {
+        "id": "au-mariners-ships-default",
+        "name": "Travel, Employment 1788–1900",
+        "url": "https://mariners.records.nsw.gov.au/",
+        "coverage": [
+          {
+            "events": [
+              "travel",
+              "employment"
+            ],
+            "startYear": 1788,
+            "endYear": 1900
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "global-slave-voyages",
@@ -4476,7 +7472,25 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free comprehensive index of trans-Atlantic and intra-American slave voyages",
-    "notes": "Hosts records for ~36,000 voyages, naming captains and ports of departure/arrival; the African Origins and Intra-American databases name 100,000+ enslaved individuals."
+    "notes": "Hosts records for ~36,000 voyages, naming captains and ports of departure/arrival; the African Origins and Intra-American databases name 100,000+ enslaved individuals.",
+    "collections": [
+      {
+        "id": "global-slave-voyages-default",
+        "name": "Travel 1500–1875",
+        "url": "https://www.slavevoyages.org/voyage/database",
+        "coverage": [
+          {
+            "events": [
+              "travel",
+              "other"
+            ],
+            "startYear": 1500,
+            "endYear": 1875
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "caribbean-jamaican-fs",
@@ -4510,7 +7524,30 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free Jamaican parish registers, BMD indexes, wills and surname lists",
-    "notes": "Long-running volunteer site with the largest free Jamaica-specific genealogy collection online. Includes coverage of the planter/slave-owning class as well as later civil records."
+    "notes": "Long-running volunteer site with the largest free Jamaica-specific genealogy collection online. Includes coverage of the planter/slave-owning class as well as later civil records.",
+    "collections": [
+      {
+        "id": "caribbean-jamaican-fs-default",
+        "name": "All records 1655–1962",
+        "url": "https://www.jamaicanfamilysearch.com/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "other"
+            ],
+            "startYear": 1655,
+            "endYear": 1962
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "asia-fibis",
@@ -4550,7 +7587,33 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free indexes for British and Anglo-Indian families during the Raj",
-    "notes": "FIBIwiki + FIBIS Database. Strong on Indian Army, East India Company, civil service, ecclesiastical records and cemetery transcriptions."
+    "notes": "FIBIwiki + FIBIS Database. Strong on Indian Army, East India Company, civil service, ecclesiastical records and cemetery transcriptions.",
+    "collections": [
+      {
+        "id": "asia-fibis-default",
+        "name": "All records 1600–1947",
+        "url": "https://search.fibis.org/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "military",
+              "employment",
+              "travel",
+              "residence",
+              "other"
+            ],
+            "startYear": 1600,
+            "endYear": 1947
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "africa-eggsa",
@@ -4588,7 +7651,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free Southern African genealogy — gravestone photos, NGK church records, BMDs, family pedigrees",
-    "notes": "The largest free SA-region database. Holds the eGGSA Branch image library, Source Cards, gravestone photos and the GISA collection."
+    "notes": "The largest free SA-region database. Holds the eGGSA Branch image library, Source Cards, gravestone photos and the GISA collection.",
+    "collections": [
+      {
+        "id": "africa-eggsa-default",
+        "name": "All records 1652–1990",
+        "url": "https://www.eggsa.org/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "legal",
+              "other"
+            ],
+            "startYear": 1652,
+            "endYear": 1990
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "asia-philippine-archives",
@@ -4621,7 +7708,29 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Spanish colonial documents, civil registration and notarial records",
-    "notes": "Holds the Philippine Revolutionary Records, Spanish-era parish documents and civil registers. Many records require an in-person visit to Manila but the catalogue is online."
+    "notes": "Holds the Philippine Revolutionary Records, Spanish-era parish documents and civil registers. Many records require an in-person visit to Manila but the catalogue is online.",
+    "collections": [
+      {
+        "id": "asia-philippine-archives-default",
+        "name": "Court, Residence, Births from 1565",
+        "url": "http://nationalarchives.gov.ph/",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "residence",
+              "birth",
+              "marriage",
+              "death",
+              "other"
+            ],
+            "startYear": 1565,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "la-mexico-agn",
@@ -4654,7 +7763,29 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Mexican federal records — colonial, Inquisition, land grants, civil and military",
-    "notes": "AGN holds the colonial-era Ramo de la Inquisición, Mercedes (land grants), and civil registration backups. Some collections digitised; many require a visit."
+    "notes": "AGN holds the colonial-era Ramo de la Inquisición, Mercedes (land grants), and civil registration backups. Some collections digitised; many require a visit.",
+    "collections": [
+      {
+        "id": "la-mexico-agn-default",
+        "name": "Court, Travel, Employment from 1521",
+        "url": "https://www.gob.mx/agn",
+        "coverage": [
+          {
+            "events": [
+              "legal",
+              "travel",
+              "employment",
+              "military",
+              "residence",
+              "other"
+            ],
+            "startYear": 1521,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-it-antenati",
@@ -4688,7 +7819,30 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Italian state archives — civil registration, parish duplicates, conscription rolls",
-    "notes": "Free, no registration. Hosted by the Ministry of Culture. Coverage varies by province; Napoleonic-era civil records (1809-1815) and post-unification civil records (1866+) are extensive."
+    "notes": "Free, no registration. Hosted by the Ministry of Culture. Coverage varies by province; Napoleonic-era civil records (1809-1815) and post-unification civil records (1866+) are extensive.",
+    "collections": [
+      {
+        "id": "eu-it-antenati-default",
+        "name": "All records 1500–1940",
+        "url": "https://antenati.cultura.gov.it/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "legal"
+            ],
+            "startYear": 1500,
+            "endYear": 1940
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-nl-wiewaswie",
@@ -4721,7 +7875,29 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Aggregated index of Dutch civil registration and church records from regional archives",
-    "notes": "Free with a login. Combines records from CBG, Nationaal Archief and provincial archives."
+    "notes": "Free with a login. Combines records from CBG, Nationaal Archief and provincial archives.",
+    "collections": [
+      {
+        "id": "eu-nl-wiewaswie-default",
+        "name": "All records 1500–1960",
+        "url": "https://www.wiewaswie.nl/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence"
+            ],
+            "startYear": 1500,
+            "endYear": 1960
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-no-digitalarkivet",
@@ -4759,7 +7935,34 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Norway parish registers, censuses, emigration lists, court records — fully free",
-    "notes": "One of the most generous national archive portals anywhere. English interface available; censuses 1801-1910 fully indexed; parish registers digitised back to the 1600s."
+    "notes": "One of the most generous national archive portals anywhere. English interface available; censuses 1801-1910 fully indexed; parish registers digitised back to the 1600s.",
+    "collections": [
+      {
+        "id": "eu-no-digitalarkivet-default",
+        "name": "All records 1500–1960",
+        "url": "https://www.digitalarkivet.no/en/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "travel",
+              "military",
+              "legal",
+              "employment",
+              "education"
+            ],
+            "startYear": 1500,
+            "endYear": 1960
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-se-riksarkivet",
@@ -4794,7 +7997,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Swedish state archives — Husförhörslängder (household examination), parish registers, military, court",
-    "notes": "Index search free. Many digital images free; some collections via SVAR require credits or a subscription via ArkivDigital."
+    "notes": "Index search free. Many digital images free; some collections via SVAR require credits or a subscription via ArkivDigital.",
+    "collections": [
+      {
+        "id": "eu-se-riksarkivet-default",
+        "name": "All records 1500–1960",
+        "url": "https://sok.riksarkivet.se/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "military",
+              "legal"
+            ],
+            "startYear": 1500,
+            "endYear": 1960
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-dk-arkivalieronline",
@@ -4831,7 +8058,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Danish parish registers, censuses 1787-1940, probate, military levying rolls",
-    "notes": "Free, fully digitised images (transcription via volunteer projects). Includes Greenland and Iceland records up to their independence."
+    "notes": "Free, fully digitised images (transcription via volunteer projects). Includes Greenland and Iceland records up to their independence.",
+    "collections": [
+      {
+        "id": "eu-dk-arkivalieronline-default",
+        "name": "All records 1645–1960",
+        "url": "https://www.sa.dk/ao-soegesider/da/billedviser",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "military",
+              "legal"
+            ],
+            "startYear": 1645,
+            "endYear": 1960
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-fi-kansallisarkisto",
@@ -4866,7 +8117,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Finnish church records (Lutheran and Orthodox), military, court, civil registration",
-    "notes": "Astia is the public catalogue. Most Lutheran parish books are digitised free; Karelian (lost-territory) records also covered."
+    "notes": "Astia is the public catalogue. Most Lutheran parish books are digitised free; Karelian (lost-territory) records also covered.",
+    "collections": [
+      {
+        "id": "eu-fi-kansallisarkisto-default",
+        "name": "All records 1600–1960",
+        "url": "https://astia.narc.fi/uusiastia/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "military",
+              "legal"
+            ],
+            "startYear": 1600,
+            "endYear": 1960
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-be-state-archives",
@@ -4901,7 +8176,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Belgian parish and civil registers — Flanders, Wallonia and Brussels",
-    "notes": "Free with login. Digitised images for parish records and civil registers up to the 100-year/120-year privacy cutoff."
+    "notes": "Free with login. Digitised images for parish records and civil registers up to the 100-year/120-year privacy cutoff.",
+    "collections": [
+      {
+        "id": "eu-be-state-archives-default",
+        "name": "All records 1500–1920",
+        "url": "https://search.arch.be/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "military",
+              "legal"
+            ],
+            "startYear": 1500,
+            "endYear": 1920
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-pl-szukaj",
@@ -4936,7 +8235,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Polish state archives — Catholic, Lutheran, Orthodox and Jewish parish records",
-    "notes": "Free, no registration. Covers former Polish-Lithuanian Commonwealth territories (now spanning Poland, Belarus, Lithuania, Ukraine). Strong for Galician and Russian-partition records."
+    "notes": "Free, no registration. Covers former Polish-Lithuanian Commonwealth territories (now spanning Poland, Belarus, Lithuania, Ukraine). Strong for Galician and Russian-partition records.",
+    "collections": [
+      {
+        "id": "eu-pl-szukaj-default",
+        "name": "All records 1500–1950",
+        "url": "https://www.szukajwarchiwach.gov.pl/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "military",
+              "legal"
+            ],
+            "startYear": 1500,
+            "endYear": 1950
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-es-pares",
@@ -4972,7 +8295,32 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Spanish state archives — Inquisition, military, ship lists to the Americas, colonial records",
-    "notes": "Free, no registration. Particularly strong for the Archivo General de Indias (AGI) for Spanish colonial families."
+    "notes": "Free, no registration. Particularly strong for the Archivo General de Indias (AGI) for Spanish colonial families.",
+    "collections": [
+      {
+        "id": "eu-es-pares-default",
+        "name": "All records 1500–1900",
+        "url": "https://pares.cultura.gob.es/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "travel",
+              "military",
+              "legal"
+            ],
+            "startYear": 1500,
+            "endYear": 1900
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-pt-digitarq",
@@ -5009,7 +8357,32 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Portuguese state archives — Torre do Tombo, Inquisition, parish, notarial, colonial Brazil",
-    "notes": "Free. Includes Tombo Antigo (medieval) records and the early colonial Brazil inquisition files."
+    "notes": "Free. Includes Tombo Antigo (medieval) records and the early colonial Brazil inquisition files.",
+    "collections": [
+      {
+        "id": "eu-pt-digitarq-default",
+        "name": "All records 1500–1920",
+        "url": "https://digitarq.arquivos.pt/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "travel",
+              "military",
+              "legal"
+            ],
+            "startYear": 1500,
+            "endYear": 1920
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-hu-hungaricana",
@@ -5048,7 +8421,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Hungarian Kingdom-era civil and church records (covers modern Hungary, Slovakia, Transylvania and parts of the former Yugoslavia)",
-    "notes": "Free. The collection spans the historic Kingdom of Hungary, so it is essential for ancestry research across the post-1920 successor states."
+    "notes": "Free. The collection spans the historic Kingdom of Hungary, so it is essential for ancestry research across the post-1920 successor states.",
+    "collections": [
+      {
+        "id": "eu-hu-hungaricana-default",
+        "name": "All records 1500–1900",
+        "url": "https://archives.hungaricana.hu/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "military",
+              "legal"
+            ],
+            "startYear": 1500,
+            "endYear": 1900
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-cz-portafontium",
@@ -5079,7 +8476,26 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free digitised Catholic parish registers from western Bohemia and adjacent Bavarian dioceses",
-    "notes": "Cross-border project of the State Regional Archive in Plzeň and the Bavarian State Archives. Excellent for Sudeten-German ancestry."
+    "notes": "Cross-border project of the State Regional Archive in Plzeň and the Bavarian State Archives. Excellent for Sudeten-German ancestry.",
+    "collections": [
+      {
+        "id": "eu-cz-portafontium-default",
+        "name": "Baptisms, Marriages, Burials 1500–1900",
+        "url": "https://www.portafontium.eu/",
+        "coverage": [
+          {
+            "events": [
+              "baptism",
+              "marriage",
+              "burial"
+            ],
+            "startYear": 1500,
+            "endYear": 1900
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-ee-saaga",
@@ -5114,7 +8530,31 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Estonian church records — Lutheran, Orthodox, Catholic — plus revision lists and civil registration",
-    "notes": "Free with registration. The \"Pärsised\" (revision lists / soul revisions) are a key resource for tax-paying populations under Russian rule."
+    "notes": "Free with registration. The \"Pärsised\" (revision lists / soul revisions) are a key resource for tax-paying populations under Russian rule.",
+    "collections": [
+      {
+        "id": "eu-ee-saaga-default",
+        "name": "All records 1500–1940",
+        "url": "https://www.ra.ee/en/",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "military",
+              "legal"
+            ],
+            "startYear": 1500,
+            "endYear": 1940
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-lv-raduraksti",
@@ -5148,7 +8588,30 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Latvian church records (Lutheran, Catholic, Orthodox), revision lists, vital records",
-    "notes": "Free with registration. English interface available. Covers Courland, Vidzeme and Latgale records under Russian and German Baltic governance."
+    "notes": "Free with registration. English interface available. Covers Courland, Vidzeme and Latgale records under Russian and German Baltic governance.",
+    "collections": [
+      {
+        "id": "eu-lv-raduraksti-default",
+        "name": "All records 1600–1940",
+        "url": "https://www.lvva-raduraksti.lv/en.html",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "legal"
+            ],
+            "startYear": 1600,
+            "endYear": 1940
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "eu-lt-epaveldas",
@@ -5182,7 +8645,30 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Lithuanian church metric books — Catholic, Lutheran, Orthodox, Jewish",
-    "notes": "Free. Includes records for territories that are now in Poland, Belarus and Russia (the historic Grand Duchy and inter-war Lithuania)."
+    "notes": "Free. Includes records for territories that are now in Poland, Belarus and Russia (the historic Grand Duchy and inter-war Lithuania).",
+    "collections": [
+      {
+        "id": "eu-lt-epaveldas-default",
+        "name": "All records 1600–1940",
+        "url": "https://www.epaveldas.lt/en/home",
+        "coverage": [
+          {
+            "events": [
+              "birth",
+              "baptism",
+              "marriage",
+              "death",
+              "burial",
+              "residence",
+              "legal"
+            ],
+            "startYear": 1600,
+            "endYear": 1940
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   },
   {
     "id": "ancestors-at-rest",
@@ -5213,6 +8699,23 @@ window.GENEALOGY_RESOURCES = [
       }
     ],
     "bestFor": "Free death record databases.",
-    "notes": "These searchable indexes to Coffin Plates, Funeral Cards, Cemetery Records, Cenotaph Records, German Death Cards, Wills, Church Records, Family Bibles, Vital Statistics and more"
+    "notes": "These searchable indexes to Coffin Plates, Funeral Cards, Cemetery Records, Cenotaph Records, German Death Cards, Wills, Church Records, Family Bibles, Vital Statistics and more",
+    "collections": [
+      {
+        "id": "ancestors-at-rest-default",
+        "name": "Deaths",
+        "url": "https://www.ancestorsatrest.com/",
+        "coverage": [
+          {
+            "events": [
+              "death"
+            ],
+            "startYear": null,
+            "endYear": null
+          }
+        ],
+        "notes": "Catch-all collection covering this repository’s main holdings. Refine the title with the specific dataset when you cite a record."
+      }
+    ]
   }
 ];
