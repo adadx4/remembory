@@ -10774,19 +10774,24 @@ function handleEdit(m) {
       for (const famRef of rec.children.filter(n=>n.tag==="FAMS")) {
         const fam = famMap[famRef.value];
         if (!fam) continue;
+        // Resolve spouse name first — needed both by the marriage event and
+        // by other family-level events (census, residence, etc.). Previously
+        // this was nested inside the `if (marrNode)` block, so any family
+        // event without a marriage record threw a ReferenceError when the
+        // FAM-level event loop below referenced spouseName. Hoisting it
+        // makes buildMemories safe for everyone in the tree.
+        const spouseTag = child(rec,"SEX")==="F" ? "HUSB" : "WIFE";
+        const spouseRef = child(fam, spouseTag);
+        const spouseRec = spouseRef ? indiMap[spouseRef] : null;
+        let spouseName = null;
+        if (spouseRec) {
+          const sn = spouseRec.children.find(n=>n.tag==="NAME");
+          if (sn) spouseName = fullText(sn).replace(/\//g,"").replace(/\s+/g," ").trim();
+        }
         const marrNode = fam.children.find(n=>n.tag==="MARR");
         if (marrNode) {
           const dateObj = parseDate(child(marrNode,"DATE"));
           const place   = child(marrNode,"PLAC");
-          // Get spouse name
-          const spouseTag = child(rec,"SEX")==="F" ? "HUSB" : "WIFE";
-          const spouseRef = child(fam, spouseTag);
-          const spouseRec = spouseRef ? indiMap[spouseRef] : null;
-          let spouseName = null;
-          if (spouseRec) {
-            const sn = spouseRec.children.find(n=>n.tag==="NAME");
-            if (sn) spouseName = fullText(sn).replace(/\//g,"").replace(/\s+/g," ").trim();
-          }
           const evTitle = spouseName ? `Married ${spouseName}` : "Married";
           const note = child(marrNode,"NOTE")||"";
           addMem(evTitle, dateObj, place, note, spouseName ? [spouseName] : []);
