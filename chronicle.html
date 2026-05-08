@@ -7054,6 +7054,19 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
   const [personDetail, setPersonDetail] = React.useState(null); // tpId for detail panel
   const [editingId, setEditingId] = React.useState(null);
   const [editDraft, setEditDraft] = React.useState({});
+  // Add-relation state. addingKind ∈ "spouse"|"parent"|"sibling"|"child"|"first";
+  // anchorId is the existing person whose relation we're adding (null for "first").
+  const [addingKind, setAddingKind] = React.useState(null);
+  const [addingAnchor, setAddingAnchor] = React.useState(null);
+  const [newDraft, setNewDraft] = React.useState({});
+
+  function blankDraft() { return {name:"",sex:"",dob:"",dod:"",birthPlace:"",deathPlace:"",notes:""}; }
+  function startAddRelation(kind, anchorId) {
+    setAddingKind(kind);
+    setAddingAnchor(anchorId);
+    setNewDraft(blankDraft());
+  }
+  function cancelAddRelation() { setAddingKind(null); setAddingAnchor(null); setNewDraft({}); }
 
   // Keep focalId in sync when gedFocalPersonId changes (e.g. after fresh import)
   React.useEffect(()=>{ if(gedFocalPersonId) setFocalId(gedFocalPersonId); },[gedFocalPersonId]);
@@ -7115,6 +7128,129 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
         s.id === treeHost?.id ? {...s, treePersons: updated} : s
       );
       persistTop({subjects: newSubjects});
+    }
+
+    // ── Manual relation builder ────────────────────────────────
+    // Helpers that produce {persons, families} updates without persisting,
+    // so saveAddRelation can batch into a single persistTop call.
+    function newPersonRecord(draft) {
+      const id = "tp_manual_"+Date.now()+Math.random().toString(36).slice(2,5);
+      return {
+        id,
+        gedId: "@" + id.toUpperCase() + "@",
+        name: (draft.name||"").trim(),
+        sex: (draft.sex||"").trim(),
+        dob: (draft.dob||"").trim(),
+        dod: (draft.dod||"").trim(),
+        birthPlace: (draft.birthPlace||"").trim(),
+        deathPlace: (draft.deathPlace||"").trim(),
+        notes: (draft.notes||"").trim(),
+        subjectId: null,
+      };
+    }
+    function newFamilyRecord() {
+      const id = "tf_manual_"+Date.now()+Math.random().toString(36).slice(2,5);
+      return {
+        id, gedId: "@" + id.toUpperCase() + "@",
+        husbandId: null, wifeId: null, childIds: [],
+        marriageYear: null, marriagePlace: "",
+      };
+    }
+    // Each relation helper returns either {addFamily} (a new family object to
+    // append) or {updateFamily} (an existing family object to replace by id).
+    // Caller layers these on top of the new person itself.
+    function relationOpsSpouse(anchorId, person) {
+      const anchor = tpById[anchorId];
+      // Slot the new spouse into an existing one-sided family if possible.
+      const fam = (treeFamilies||[]).find(f =>
+        (f.husbandId === anchorId && !f.wifeId) ||
+        (f.wifeId === anchorId && !f.husbandId)
+      );
+      if (fam) {
+        const upd = {...fam};
+        if (fam.husbandId === anchorId) upd.wifeId = person.id;
+        else upd.husbandId = person.id;
+        return { updateFamily: upd };
+      }
+      const f = newFamilyRecord();
+      if (anchor?.sex === "F") { f.wifeId = anchorId; f.husbandId = person.id; }
+      else if (anchor?.sex === "M") { f.husbandId = anchorId; f.wifeId = person.id; }
+      else if (person.sex === "F") { f.wifeId = person.id; f.husbandId = anchorId; }
+      else { f.husbandId = anchorId; f.wifeId = person.id; }
+      return { addFamily: f };
+    }
+    function relationOpsParent(anchorId, person) {
+      let fam = (treeFamilies||[]).find(f => (f.childIds||[]).includes(anchorId));
+      const isFemale = person.sex === "F";
+      if (!fam) {
+        const f = newFamilyRecord();
+        f.childIds = [anchorId];
+        if (isFemale) f.wifeId = person.id; else f.husbandId = person.id;
+        return { addFamily: f };
+      }
+      const upd = {...fam};
+      if (isFemale && !fam.wifeId) upd.wifeId = person.id;
+      else if (!isFemale && !fam.husbandId) upd.husbandId = person.id;
+      else if (!fam.wifeId) upd.wifeId = person.id;
+      else if (!fam.husbandId) upd.husbandId = person.id;
+      // Both slots already filled → spawn a new family with this child + new parent.
+      else {
+        const f = newFamilyRecord();
+        f.childIds = [anchorId];
+        if (isFemale) f.wifeId = person.id; else f.husbandId = person.id;
+        return { addFamily: f };
+      }
+      return { updateFamily: upd };
+    }
+    function relationOpsSibling(anchorId, person) {
+      let fam = (treeFamilies||[]).find(f => (f.childIds||[]).includes(anchorId));
+      if (!fam) {
+        const f = newFamilyRecord();
+        f.childIds = [anchorId, person.id];
+        return { addFamily: f };
+      }
+      return { updateFamily: {...fam, childIds: [...fam.childIds, person.id]} };
+    }
+    function relationOpsChild(anchorId, person) {
+      const anchor = tpById[anchorId];
+      const fam = (treeFamilies||[]).find(f => f.husbandId === anchorId || f.wifeId === anchorId);
+      if (!fam) {
+        const f = newFamilyRecord();
+        if (anchor?.sex === "F") f.wifeId = anchorId; else f.husbandId = anchorId;
+        f.childIds = [person.id];
+        return { addFamily: f };
+      }
+      return { updateFamily: {...fam, childIds: [...(fam.childIds||[]), person.id]} };
+    }
+
+    function applyRelationChange(addPerson, ops) {
+      const updPersons = [...treePersons, addPerson];
+      let updFamilies = [...(treeFamilies||[])];
+      if (ops?.addFamily) updFamilies = [...updFamilies, ops.addFamily];
+      if (ops?.updateFamily) updFamilies = updFamilies.map(f => f.id === ops.updateFamily.id ? ops.updateFamily : f);
+      const treeHost = subjects.find(s => (s.treePersons||[]).length > 0);
+      const targetId = treeHost?.id || activeSubjectId;
+      const newSubjects = subjects.map(s =>
+        s.id === targetId ? {...s, treePersons: updPersons, treeFamilies: updFamilies} : s
+      );
+      persistTop({subjects: newSubjects});
+    }
+
+    function saveAddRelation() {
+      if (!(newDraft.name||"").trim()) return;
+      const person = newPersonRecord(newDraft);
+      let ops = null;
+      if (addingKind === "spouse")  ops = relationOpsSpouse(addingAnchor, person);
+      else if (addingKind === "parent")  ops = relationOpsParent(addingAnchor, person);
+      else if (addingKind === "sibling") ops = relationOpsSibling(addingAnchor, person);
+      else if (addingKind === "child")   ops = relationOpsChild(addingAnchor, person);
+      // "first" → just add the person; no family operations needed.
+      applyRelationChange(person, ops);
+      // Focus the new person so the user lands on their record.
+      setFocalId(person.id);
+      setPersonDetail(null);
+      setAddingKind(null); setAddingAnchor(null); setNewDraft({});
+      if (persistSubject) persistSubject({gedFocalPersonId: person.id});
     }
 
     function promoteToSubject(tp) {
@@ -7225,6 +7361,53 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       ? treePersons.filter(p=>p.name.toLowerCase().includes(tpSearch.toLowerCase())).slice(0, 50)
       : null;
 
+    // Reusable name/sex/dates/places/notes form, shared by edit + add-relation.
+    function renderPersonForm(draft, setDraft) {
+      const fld = (k, label, isSelect, isTextarea) => React.createElement("div",{style: k==="name"||k==="notes" ? {gridColumn:"1 / -1"} : {}},
+        React.createElement("label",{style:{fontSize:"0.76rem",color:"#8a7460",display:"block",marginBottom:"2px"}}, label),
+        isSelect
+          ? React.createElement("select",{value:draft[k]||"",onChange:e=>setDraft(d=>({...d,[k]:e.target.value})),style:{...S.input,fontSize:"0.92rem",padding:"6px 10px"}},
+              React.createElement("option",{value:""},"\u2014"),
+              React.createElement("option",{value:"F"},"Female"),
+              React.createElement("option",{value:"M"},"Male"),
+              React.createElement("option",{value:"X"},"Other / unknown")
+            )
+          : isTextarea
+            ? React.createElement("textarea",{value:draft[k]||"",onChange:e=>setDraft(d=>({...d,[k]:e.target.value})),rows:3,style:{...S.input,fontSize:"0.92rem",padding:"6px 10px",resize:"vertical"}})
+            : React.createElement("input",{value:draft[k]||"",onChange:e=>setDraft(d=>({...d,[k]:e.target.value})),style:{...S.input,fontSize:"0.92rem",padding:"6px 10px"}})
+      );
+      return React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}},
+        fld("name","Name", false, false),
+        fld("sex","Sex", true, false),
+        fld("dob","Year of birth", false, false),
+        fld("dod","Year of death", false, false),
+        fld("birthPlace","Birth place", false, false),
+        fld("deathPlace","Death place", false, false),
+        fld("notes","Notes", false, true)
+      );
+    }
+
+    // Inline "+ add relation" form, computed once per render.
+    const addRelationForm = (() => {
+      if (!addingKind) return null;
+      const anchor = addingAnchor ? tpById[addingAnchor] : null;
+      const titles = {
+        spouse: "Add a spouse" + (anchor ? " of " + anchor.name : ""),
+        parent: "Add a parent" + (anchor ? " of " + anchor.name : ""),
+        sibling: "Add a sibling" + (anchor ? " of " + anchor.name : ""),
+        child: "Add a child" + (anchor ? " of " + anchor.name : ""),
+        first: "Add the first person to your tree",
+      };
+      return React.createElement("div",{style:{background:"rgba(196,169,98,0.07)",border:"1px solid rgba(196,169,98,0.4)",borderRadius:"4px",padding:"14px 16px",marginBottom:"20px"}},
+        React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",margin:"0 0 10px",color:"#1a1208"}}, titles[addingKind] || "Add a person"),
+        renderPersonForm(newDraft, setNewDraft),
+        React.createElement("div",{style:{display:"flex",gap:"6px",marginTop:"12px"}},
+          React.createElement("button",{onClick:saveAddRelation,disabled:!(newDraft.name||"").trim(),style:{...S.btn,padding:"6px 14px",fontSize:"0.86rem",opacity:(newDraft.name||"").trim()?1:0.5}},"Save"),
+          React.createElement("button",{onClick:cancelAddRelation,style:{...S.btnOutline,padding:"6px 12px",fontSize:"0.86rem"}},"Cancel")
+        )
+      );
+    })();
+
     return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
       React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"16px",flexWrap:"wrap"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:0,color:"#1a1208"}},"Family Tree"),
@@ -7248,8 +7431,10 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
             ))
       ),
 
+      addRelationForm,
+
       // Detail panel — appears under the search box, above the rows
-      detailPerson && React.createElement("div",{style:{background:"rgba(255,252,245,0.97)",border:"1px solid #a8885a",borderRadius:"4px",padding:"14px 16px",marginBottom:"20px"}},
+      detailPerson && !addingKind && React.createElement("div",{style:{background:"rgba(255,252,245,0.97)",border:"1px solid #a8885a",borderRadius:"4px",padding:"14px 16px",marginBottom:"20px"}},
         editingId === detailPerson.id
         ? React.createElement("div",null,
             React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",margin:"0 0 10px",color:"#1a1208"}}, "Edit "+(detailPerson.name||"person")),
@@ -7312,6 +7497,15 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
                 ? React.createElement("button",{onClick:()=>{onSwitch(linkedSubject.id);setView("life");},style:{...S.btn,padding:"6px 12px",fontSize:"0.84rem"}},"Open Chronicle \u2192")
                 : React.createElement("button",{onClick:()=>promoteToSubject(detailPerson),style:{...S.btn,padding:"6px 12px",fontSize:"0.84rem"}},"\ud83d\udcd6 Start Chronicle"),
               React.createElement("button",{onClick:()=>startEdit(detailPerson),style:{...S.btnOutline,padding:"6px 12px",fontSize:"0.84rem"}},"\u270e Edit details")
+            ),
+            // Add-relation buttons — let the user grow the tree without
+            // touching a GEDCOM file.
+            React.createElement("div",{style:{display:"flex",gap:"6px",marginTop:"10px",flexWrap:"wrap",borderTop:"1px dashed rgba(168,136,90,0.25)",paddingTop:"10px"}},
+              React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",marginRight:"4px",alignSelf:"center"}},"Add a relation:"),
+              React.createElement("button",{onClick:()=>startAddRelation("spouse",detailPerson.id),style:{...S.btnOutline,padding:"4px 11px",fontSize:"0.82rem"}}, "+ Spouse"),
+              React.createElement("button",{onClick:()=>startAddRelation("parent",detailPerson.id),style:{...S.btnOutline,padding:"4px 11px",fontSize:"0.82rem"}}, "+ Parent"),
+              React.createElement("button",{onClick:()=>startAddRelation("sibling",detailPerson.id),style:{...S.btnOutline,padding:"4px 11px",fontSize:"0.82rem"}}, "+ Sibling"),
+              React.createElement("button",{onClick:()=>startAddRelation("child",detailPerson.id),style:{...S.btnOutline,padding:"4px 11px",fontSize:"0.82rem"}}, "+ Child")
             )
           )
       ),
@@ -7342,15 +7536,83 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
     );
   }
 
-  // ── NO TREE DATA — prompt import ─────────────────────────────
+  // ── NO TREE DATA — prompt import OR start manually ─────────────
+  // While addingKind === "first" we render the inline person form here so
+  // the user can build a tree from scratch. Save creates a single tp_*
+  // record on the active subject; from there the in-tree "+ Spouse / +
+  // Parent / + Sibling / + Child" buttons let them grow it organically.
+  function startFirstPerson() { setAddingKind("first"); setNewDraft({name:"",sex:"",dob:"",dod:"",birthPlace:"",deathPlace:"",notes:""}); }
+  function cancelFirstPerson() { setAddingKind(null); setNewDraft({}); }
+  function saveFirstPerson() {
+    if (!(newDraft.name||"").trim()) return;
+    const id = "tp_manual_"+Date.now()+Math.random().toString(36).slice(2,5);
+    const person = {
+      id, gedId: "@" + id.toUpperCase() + "@",
+      name: (newDraft.name||"").trim(),
+      sex: (newDraft.sex||"").trim(),
+      dob: (newDraft.dob||"").trim(), dod: (newDraft.dod||"").trim(),
+      birthPlace: (newDraft.birthPlace||"").trim(), deathPlace: (newDraft.deathPlace||"").trim(),
+      notes: (newDraft.notes||"").trim(),
+      subjectId: null,
+    };
+    const targetId = activeSubjectId;
+    const newSubjects = subjects.map(s =>
+      s.id === targetId ? {...s, treePersons: [person], treeFamilies: [], gedFocalPersonId: person.id} : s
+    );
+    persistTop({subjects: newSubjects});
+    setFocalId(person.id);
+    setAddingKind(null); setNewDraft({});
+  }
+  // Inline first-person form, mirrors the structure used inside the tree.
+  function renderFirstField(k, label, isSelect, isTextarea) {
+    return React.createElement("div",{style:k==="name"||k==="notes"?{gridColumn:"1 / -1"}:{}},
+      React.createElement("label",{style:{fontSize:"0.76rem",color:"#8a7460",display:"block",marginBottom:"2px",textAlign:"left"}}, label),
+      isSelect
+        ? React.createElement("select",{value:newDraft[k]||"",onChange:e=>setNewDraft(d=>({...d,[k]:e.target.value})),style:{...S.input,fontSize:"0.92rem",padding:"6px 10px"}},
+            React.createElement("option",{value:""},"\u2014"),
+            React.createElement("option",{value:"F"},"Female"),
+            React.createElement("option",{value:"M"},"Male"),
+            React.createElement("option",{value:"X"},"Other / unknown")
+          )
+        : isTextarea
+          ? React.createElement("textarea",{value:newDraft[k]||"",onChange:e=>setNewDraft(d=>({...d,[k]:e.target.value})),rows:3,style:{...S.input,fontSize:"0.92rem",padding:"6px 10px",resize:"vertical"}})
+          : React.createElement("input",{value:newDraft[k]||"",onChange:e=>setNewDraft(d=>({...d,[k]:e.target.value})),style:{...S.input,fontSize:"0.92rem",padding:"6px 10px"}})
+    );
+  }
+  if (addingKind === "first") {
+    return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"560px",margin:"40px auto",padding:"0 20px"}},
+      React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.4rem",fontStyle:"italic",margin:"0 0 10px",color:"#1a1208",textAlign:"center"}}, "Add the first person to your tree"),
+      React.createElement("p",{style:{fontSize:"0.86rem",color:"#8a7460",textAlign:"center",marginBottom:"20px",lineHeight:1.5}}, "Once they\u2019re in, click \u201c+ Spouse / Parent / Sibling / Child\u201d on their detail card to grow the tree from them."),
+      React.createElement("div",{style:{background:"rgba(196,169,98,0.07)",border:"1px solid rgba(196,169,98,0.4)",borderRadius:"4px",padding:"16px 18px"}},
+        React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}},
+          renderFirstField("name","Name", false, false),
+          renderFirstField("sex","Sex", true, false),
+          renderFirstField("dob","Year of birth", false, false),
+          renderFirstField("dod","Year of death", false, false),
+          renderFirstField("birthPlace","Birth place", false, false),
+          renderFirstField("deathPlace","Death place", false, false),
+          renderFirstField("notes","Notes", false, true)
+        ),
+        React.createElement("div",{style:{display:"flex",gap:"6px",marginTop:"14px"}},
+          React.createElement("button",{onClick:saveFirstPerson,disabled:!(newDraft.name||"").trim(),style:{...S.btn,padding:"7px 16px",fontSize:"0.9rem",opacity:(newDraft.name||"").trim()?1:0.5}},"Save & start tree"),
+          React.createElement("button",{onClick:cancelFirstPerson,style:{...S.btnOutline,padding:"7px 14px",fontSize:"0.9rem"}},"Cancel")
+        )
+      )
+    );
+  }
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",textAlign:"center",padding:"60px 20px",color:"#8a7460"}},
     React.createElement("p",{style:{fontSize:"2.5rem",margin:"0 0 16px"}},"🌳"),
     React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.4rem",fontStyle:"italic",margin:"0 0 10px",color:"#1a1208"}},"No family tree yet"),
     React.createElement("p",{style:{fontSize:"0.9rem",maxWidth:"360px",margin:"0 auto 20px",lineHeight:1.6}},
-      "Import a GEDCOM file to see the full tree — with relationships, birth years, and places — and start chronicles for individual ancestors."
+      "Import a GEDCOM file to bring in an existing tree, or build one from scratch by adding people one at a time."
     ),
-    React.createElement("button",{onClick:()=>setView("import"),style:{...S.btn,padding:"9px 22px",fontSize:"0.95rem"}},
-      "Import Family Tree →"
+    React.createElement("div",{style:{display:"flex",gap:"10px",justifyContent:"center",flexWrap:"wrap"}},
+      React.createElement("button",{onClick:()=>setView("import"),style:{...S.btn,padding:"9px 22px",fontSize:"0.95rem"}},
+        "Import GEDCOM \u2192"
+      ),
+      React.createElement("button",{onClick:startFirstPerson,style:{...S.btnOutline,padding:"9px 22px",fontSize:"0.95rem"}},
+        "+ Build manually"
+      )
     )
   );
 }
