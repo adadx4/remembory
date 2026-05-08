@@ -6960,23 +6960,47 @@ function buildMemsFromTree(tp, tpById, treeF) {
     if(h&&w){(spousesOf[h]=spousesOf[h]||[]).push(w);(spousesOf[w]=spousesOf[w]||[]).push(h);}
   });
 
-  // Personal events
-  const personalMems = [];
-  personalMems.push(mkMem("Born", subBirth, tp.birthPlace, []));
-  personalMems.push(mkMem("Died", subDeath, tp.deathPlace, []));
-  (treeF||[]).forEach(fam=>{
-    if(fam.husbandId!==tp.id && fam.wifeId!==tp.id) return;
-    const spouseId = fam.husbandId===tp.id ? fam.wifeId : fam.husbandId;
-    const spouse = spouseId ? tpById[spouseId] : null;
-    const spouseName = spouse?.name||null;
-    if(fam.marriageYear)
-      personalMems.push(mkMem(spouseName?"Married "+spouseName:"Married", fam.marriageYear, fam.marriagePlace||"", spouseName?[spouseName]:[]));
-    (fam.childIds||[]).forEach(cid=>{
-      const ch=tpById[cid]; if(!ch) return;
-      personalMems.push(mkMem("Birth of "+ch.name, parseInt(ch.dob)||null, ch.birthPlace||"", [ch.name]));
-      if(ch.dod) personalMems.push(mkMem("Death of "+ch.name, parseInt(ch.dod)||null, ch.deathPlace||"", [ch.name]));
+  // Personal events. Prefer the rich GEDCOM event list captured at
+  // import time (births, baptisms, residences, military, occupations,
+  // immigration, etc., with full day/month dates) over deriving a
+  // year-only stub from the family structure. Fall back to the family-
+  // derivation when tp has no stored events (older imports, manually-
+  // built trees).
+  let personalMems = [];
+  if (Array.isArray(tp.events) && tp.events.length > 0) {
+    personalMems = tp.events.filter(m => m && m.year && inLifetime(m.year));
+    // Add child birth/death markers from the family structure too — these
+    // sit on the parent's record (not the child's) and stay useful even
+    // when tp.events already has rich data for the focal person.
+    (treeF||[]).forEach(fam=>{
+      if(fam.husbandId!==tp.id && fam.wifeId!==tp.id) return;
+      (fam.childIds||[]).forEach(cid=>{
+        const ch=tpById[cid]; if(!ch) return;
+        const m1 = mkMem("Birth of "+ch.name, parseInt(ch.dob)||null, ch.birthPlace||"", [ch.name]);
+        if (m1) personalMems.push(m1);
+        if (ch.dod) {
+          const m2 = mkMem("Death of "+ch.name, parseInt(ch.dod)||null, ch.deathPlace||"", [ch.name]);
+          if (m2) personalMems.push(m2);
+        }
+      });
     });
-  });
+  } else {
+    personalMems.push(mkMem("Born", subBirth, tp.birthPlace, []));
+    personalMems.push(mkMem("Died", subDeath, tp.deathPlace, []));
+    (treeF||[]).forEach(fam=>{
+      if(fam.husbandId!==tp.id && fam.wifeId!==tp.id) return;
+      const spouseId = fam.husbandId===tp.id ? fam.wifeId : fam.husbandId;
+      const spouse = spouseId ? tpById[spouseId] : null;
+      const spouseName = spouse?.name||null;
+      if(fam.marriageYear)
+        personalMems.push(mkMem(spouseName?"Married "+spouseName:"Married", fam.marriageYear, fam.marriagePlace||"", spouseName?[spouseName]:[]));
+      (fam.childIds||[]).forEach(cid=>{
+        const ch=tpById[cid]; if(!ch) return;
+        personalMems.push(mkMem("Birth of "+ch.name, parseInt(ch.dob)||null, ch.birthPlace||"", [ch.name]));
+        if(ch.dod) personalMems.push(mkMem("Death of "+ch.name, parseInt(ch.dod)||null, ch.deathPlace||"", [ch.name]));
+      });
+    });
+  }
 
   // Relatives
   const subParents       = parentsOf[tp.id]||[];
@@ -7494,7 +7518,29 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
                 ),
                 detailPerson.birthPlace && React.createElement("p",{style:{margin:"0 0 4px",fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic"}},"\ud83d\udccd Born: "+detailPerson.birthPlace),
                 detailPerson.deathPlace && React.createElement("p",{style:{margin:"0 0 4px",fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic"}},"\ud83d\udccd Died: "+detailPerson.deathPlace),
-                detailPerson.notes && React.createElement("p",{style:{margin:"6px 0 0",fontSize:"0.82rem",color:"#6a5840",lineHeight:1.5,whiteSpace:"pre-wrap"}},detailPerson.notes)
+                detailPerson.notes && React.createElement("p",{style:{margin:"6px 0 0",fontSize:"0.82rem",color:"#6a5840",lineHeight:1.5,whiteSpace:"pre-wrap"}},detailPerson.notes),
+                // Events captured from the GEDCOM (or added manually after).
+                // Sorted chronologically; placed inside <details> when there
+                // are more than three so the panel stays compact.
+                Array.isArray(detailPerson.events) && detailPerson.events.length > 0 && (() => {
+                  const sorted = detailPerson.events.slice().sort((a,b)=>(a.year||0)-(b.year||0));
+                  const renderEvent = (m, i) => React.createElement("div",{key: m.id || i,
+                    style:{display:"flex",alignItems:"baseline",gap:"8px",padding:"3px 0",fontSize:"0.82rem",color:"#3a3028"}},
+                    React.createElement("span",{style:{minWidth:"42px",fontFamily:"'Playfair Display',serif",fontWeight:600,color:"#5a4a38"}}, m.year ? String(m.year) : "?"),
+                    React.createElement("span",{style:{flex:1}}, m.title),
+                    m.location && React.createElement("span",{style:{fontSize:"0.74rem",color:"#8a7460",fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"45%"}}, "\ud83d\udccd " + m.location.split(",")[0])
+                  );
+                  if (sorted.length <= 3) {
+                    return React.createElement("div",{style:{marginTop:"10px",borderTop:"1px dashed rgba(168,136,90,0.25)",paddingTop:"8px"}},
+                      React.createElement("p",{style:{margin:"0 0 4px",fontSize:"0.74rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#8a7460",fontWeight:700}}, sorted.length + " event"+(sorted.length===1?"":"s")),
+                      sorted.map(renderEvent)
+                    );
+                  }
+                  return React.createElement("details",{style:{marginTop:"10px",borderTop:"1px dashed rgba(168,136,90,0.25)",paddingTop:"8px"}},
+                    React.createElement("summary",{style:{cursor:"pointer",fontSize:"0.74rem",letterSpacing:"0.08em",textTransform:"uppercase",color:"#8a7460",fontWeight:700,marginBottom:"4px"}}, sorted.length + " events"),
+                    React.createElement("div",{style:{marginTop:"6px"}}, sorted.map(renderEvent))
+                  );
+                })()
               ),
               React.createElement("button",{onClick:()=>setPersonDetail(null),"aria-label":"Close",style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1.3rem",padding:"6px 10px",lineHeight:1,minWidth:"36px",minHeight:"36px",display:"flex",alignItems:"center",justifyContent:"center"}},"\u00d7")
             ),
@@ -10675,6 +10721,10 @@ function handleEdit(m) {
       const mems = [];
       let idx = 0;
 
+      // ID base derived from the person's GEDCOM id, so events on every
+      // tree person stay collision-free even when buildMemories is called
+      // for everyone in buildTreeData below.
+      const idBase = "ged_" + (person.id||"").replace(/@/g, "") + "_";
       function addMem(title, dateObj, place, note, extraPeople) {
         // Skip events with no date
         if (!dateObj) return;
@@ -10686,7 +10736,7 @@ function handleEdit(m) {
         const loc   = place || "";
         const content = [note, place ? "Place: "+place : ""].filter(Boolean).join("\n\n").trim();
         mems.push({
-          id: "ged_" + Date.now() + "_" + (idx++),
+          id: idBase + (idx++),
           title,
           content,
           year, month, day, fuzzy,
@@ -11034,6 +11084,13 @@ function handleEdit(m) {
     }
 
     function buildTreeData() {
+      // Index the rich `persons` list (built earlier in this closure) by
+      // GEDCOM id so we can hand each one to buildMemories without
+      // re-walking the record. Each tree person carries its full event
+      // list, so promoting any one to a Chronicle later picks up
+      // everything the GEDCOM said about them — not just family-derived
+      // events like births and deaths.
+      const personByGedId = Object.fromEntries(persons.map(p => [p.id, p]));
       const treePersons = Object.entries(indiMap).map(([gedId, rec]) => {
         const nameNode = rec.children.find(n=>n.tag==="NAME");
         let name = nameNode ? fullText(nameNode) : "Unknown";
@@ -11044,6 +11101,10 @@ function handleEdit(m) {
         const deatDate = deat ? parseDate(child(deat,"DATE")) : null;
         const sex = child(rec,"SEX") || "";
         const topNotes = rec.children.filter(n=>n.tag==="NOTE").map(n=>fullText(n)).filter(Boolean).join("\n\n");
+        // Pull the full event list for this person (births, baptisms,
+        // marriages, residences, military service, deaths, burials, etc.).
+        const p = personByGedId[gedId];
+        const events = p ? (buildMemories(p).mems || []) : [];
         return {
           id: "tp_"+gedId.replace(/@/g,""),
           gedId, name, sex,
@@ -11052,6 +11113,7 @@ function handleEdit(m) {
           birthPlace: birt ? (child(birt,"PLAC")||"") : "",
           deathPlace: deat ? (child(deat,"PLAC")||"") : "",
           notes: topNotes,
+          events,
           subjectId: null,
         };
       });
