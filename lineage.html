@@ -5845,10 +5845,12 @@ function SettingsView({
                 ),
                 React.createElement("div",{style:{display:"flex",gap:"8px"}},
                   React.createElement("button",{onClick:()=>doSync(),disabled:syncStatus==="syncing",style:{...S.btn,flex:1,fontSize:"0.84rem",opacity:syncStatus==="syncing"?0.6:1}},
-                    syncStatus==="syncing"?"Syncing\u2026":syncStatus==="done"?"Synced":syncStatus.startsWith("error")?"Retry":"Sync now"),
-                  React.createElement("button",{onClick:clearSyncFile,style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.82rem"}},"Disconnect")
+                    syncStatus==="syncing"?"Syncing\u2026":syncStatus.startsWith("synced")?"Sync now":syncStatus.startsWith("error")?"Retry":"Sync now"),
+                  React.createElement("button",{onClick:clearSyncFile,title:"Stop syncing to this file. The file itself isn\u2019t deleted; you can reconnect later.",style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.82rem"}},"Disconnect")
                 ),
-                syncStatus.startsWith("error")&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#c4858a",marginTop:"4px",wordBreak:"break-all"}},syncStatus)
+                // Show the most recent status — green for a successful sync (with summary), red for errors.
+                syncStatus.startsWith("error")&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#c4858a",marginTop:"4px",wordBreak:"break-all"}},syncStatus),
+                syncStatus.startsWith("synced")&&React.createElement("p",{style:{fontSize:"0.78rem",color:"#3a6b4a",marginTop:"4px"}},"\u2713 "+syncStatus)
               )
             : React.createElement("div",{style:{display:"flex",gap:"8px"}},
                 React.createElement("button",{onClick:createSyncFile,style:{...S.btn,flex:1,fontSize:"0.84rem"}},"Create sync file"),
@@ -10143,6 +10145,12 @@ function handleEdit(m) {
   }
 
   // ── Cloud sync functions ─────────────────────────────────────────────────
+  // In-flight guard. Two parallel doSync calls (e.g., user double-clicks
+  // "Sync now" or two side-effects fire it) used to read+merge+write
+  // independently, so the slower writer would silently overwrite the
+  // faster one. The ref-based guard lets a second call return immediately
+  // without blocking the first.
+  const syncInFlightRef = React.useRef(false);
 
   async function chooseSyncFile() {
     if (!window.showOpenFilePicker) {
@@ -10199,58 +10207,67 @@ function handleEdit(m) {
   async function doSync(handle) {
     let h = handle || syncFileHandle;
     if (!h) {
-      // Handle lost after page reload — re-prompt then sync
       await chooseSyncFile();
       return;
     }
+    if (syncInFlightRef.current) {
+      // Another sync is mid-flight; ignore this call to avoid trampling its write.
+      return;
+    }
+    syncInFlightRef.current = true;
     setSyncStatus("syncing");
     try {
-      // Ensure readwrite permission (may be needed after page reload or with virtual drives)
       const perm = await h.queryPermission({mode:"readwrite"});
       if (perm !== "granted") {
         const req = await h.requestPermission({mode:"readwrite"});
         if (req !== "granted") { setSyncStatus("error: permission denied — please re-open the sync file"); setTimeout(()=>setSyncStatus(""),8000); return; }
       }
-      // 1. Read the sync file
+      // 1. Read the sync file. The `exported` timestamp is the baseline we
+      //    use later to detect concurrent writes from a second device.
       const file = await h.getFile();
       const text = await file.text();
       let remote;
       try { remote = JSON.parse(text); } catch(e) { remote = null; }
+      const baselineExported = remote?.exported || null;
 
       // 2. Build a local v3 snapshot we can compare and write
       const localJson = await buildBackupJson();
       const local = JSON.parse(localJson);
 
-      // 3. Per-subject merge with the remote, normalising v1/v2 (single-subject)
-      //    files via readBackupSubjects. Embedded media in remote subjects gets
-      //    restored back into IDB so the merged subject's mediaUrls are valid.
+      // 3. Per-subject merge with the remote
       let mergedSubjects = local.subjects || [];
       let mergedTopLevel = {};
+      let mergedActiveId = local.activeSubjectId || null;
+      // Counts for the post-sync summary toast.
+      let subjectsAdded = 0, subjectsMerged = 0, memoriesBefore = 0, memoriesAfter = 0;
       if (remote) {
         const remoteSubjects = readBackupSubjects(remote);
         const restoredRemotes = [];
         for (const r of remoteSubjects) {
-          // Skip the active subject in-place restore: the local copy already has those
-          // memories with proper IDB references. Restoring would just duplicate ids.
-          // For all other subjects (or when local doesn't have them), restore media.
           restoredRemotes.push(await restoreSubjectMedia(r));
         }
+        memoriesBefore = (local.subjects||[]).reduce((s,sub)=>s+(sub.memories||[]).length, 0);
         const usedRemoteIds = new Set();
         mergedSubjects = (local.subjects || []).map(localS => {
           let rem = restoredRemotes.find(r => r.id === localS.id);
           if (!rem) {
-            // Legacy v1/v2 imports won't share ids — fall back to name match
             const ln = (localS.name||"").trim().toLowerCase();
             if (ln) rem = restoredRemotes.find(r => (r.name||"").trim().toLowerCase() === ln && !usedRemoteIds.has(r.id));
           }
-          if (rem) usedRemoteIds.add(rem.id);
+          if (rem) { usedRemoteIds.add(rem.id); subjectsMerged++; }
           return rem ? mergeSubjects(localS, rem) : localS;
         });
-        // Subjects that exist only in remote — accept them as new local subjects
         const newRemotes = restoredRemotes.filter(r => !usedRemoteIds.has(r.id));
+        subjectsAdded = newRemotes.length;
         mergedSubjects = [...mergedSubjects, ...newRemotes];
-        // Cross-subject top-level fields: local wins on conflict (this device is what
-        // the user is editing), but accept remote-only values.
+        memoriesAfter = mergedSubjects.reduce((s,sub)=>s+(sub.memories||[]).length, 0);
+        // If the user has no active subject locally (e.g. fresh install) or the
+        // active one was removed elsewhere, take the remote's. Otherwise keep
+        // the local active subject — that's what the user is working on now.
+        const localActiveStillThere = mergedSubjects.some(s => s.id === mergedActiveId);
+        if (!mergedActiveId || !localActiveStillThere) {
+          mergedActiveId = remote.activeSubjectId || mergedSubjects[0]?.id || null;
+        }
         mergedTopLevel = {
           wantPublicProfile: (typeof remote.wantPublicProfile === "boolean") ? remote.wantPublicProfile : (local.wantPublicProfile || false),
           profileAbout:      remote.profileAbout      || local.profileAbout      || "",
@@ -10266,6 +10283,7 @@ function handleEdit(m) {
         const newData = {
           ...prev,
           subjects: mergedSubjects,
+          activeSubjectId: mergedActiveId,
           ...mergedTopLevel,
         };
         if (activePassword) saveEncrypted(activePassword, newData);
@@ -10304,10 +10322,11 @@ function handleEdit(m) {
         candidates:  await embedMemsFile(s.candidates || []),
         entityPhotos: await embedEntityPhotosFile(s.entityPhotos || {}),
       })));
+      const newExported = new Date().toISOString();
       const mergedJson = JSON.stringify({
         version: 3,
-        exported: new Date().toISOString(),
-        activeSubjectId: local.activeSubjectId || null,
+        exported: newExported,
+        activeSubjectId: mergedActiveId,
         subjects: subjectsForFile,
         wantPublicProfile: mergedTopLevel.wantPublicProfile ?? local.wantPublicProfile,
         profileAbout:      mergedTopLevel.profileAbout      || local.profileAbout      || "",
@@ -10324,25 +10343,48 @@ function handleEdit(m) {
       if ((await h.queryPermission({mode:"readwrite"})) !== "granted") {
         await h.requestPermission({mode:"readwrite"});
       }
+
+      // Concurrent-write guard. Re-read the file just before writing — if its
+      // exported timestamp doesn't match what we read at step 1, another
+      // device synced in between and our merge is stale. Aborting here means
+      // the user just hits Sync again to pick up their changes.
+      const fileNow = await h.getFile();
+      const textNow = await fileNow.text();
+      let remoteNow = null;
+      try { remoteNow = JSON.parse(textNow); } catch(e) { remoteNow = null; }
+      const currentExported = remoteNow?.exported || null;
+      if (baselineExported && currentExported && currentExported !== baselineExported) {
+        setSyncStatus("error: file changed on another device — press Sync again to merge their changes");
+        setTimeout(() => setSyncStatus(""), 9000);
+        return;
+      }
+
       const writable = await h.createWritable();
       await writable.write(mergedJson);
       await writable.close();
 
       const now = new Date().toISOString();
-      const updated = { name: h.name, lastSync: now };
+      const updated = { name: h.name, lastSync: now, lastExported: newExported };
       setSyncInfo(updated);
       localStorage.setItem("chronicle-sync-info", JSON.stringify(updated));
-      setSyncStatus("done");
-      setTimeout(() => setSyncStatus(""), 3000);
+
+      // Build a human-readable summary. Memories delta is across all subjects.
+      const memDelta = memoriesAfter - memoriesBefore;
+      const parts = [];
+      if (subjectsAdded > 0) parts.push("added " + subjectsAdded + " subject" + (subjectsAdded===1?"":"s"));
+      if (subjectsMerged > 0) parts.push("merged " + subjectsMerged + " subject" + (subjectsMerged===1?"":"s"));
+      if (memDelta > 0) parts.push("+" + memDelta + " memor" + (memDelta===1?"y":"ies"));
+      const summary = parts.length === 0 ? "synced \u2014 nothing changed" : "synced \u2014 " + parts.join(", ");
+      setSyncStatus(summary);
+      setTimeout(() => setSyncStatus(""), 6000);
     } catch(e) {
       console.error("doSync:", e);
-      // Classify common failures so the message gives the user something to do.
       let msg;
       const m = (e && e.message) ? e.message : "";
       if (e && (e.name === "NotAllowedError" || /permission/i.test(m))) {
         msg = "error: Sync file permission denied — choose the file again under Settings > Backup.";
       } else if (e && e.name === "NotFoundError") {
-        msg = "error: Sync file not found. Clear and reselect it under Settings > Backup.";
+        msg = "error: Sync file not found. Disconnect and reselect it under Settings > Backup.";
       } else if (e && (e.name === "QuotaExceededError" || /quota/i.test(m))) {
         msg = "error: Out of disk space.";
       } else if (/network|fetch|failed to fetch|networkerror/i.test(m)) {
@@ -10352,6 +10394,8 @@ function handleEdit(m) {
       }
       setSyncStatus(msg);
       setTimeout(() => setSyncStatus(""), 8000);
+    } finally {
+      syncInFlightRef.current = false;
     }
   }
 
