@@ -528,21 +528,75 @@ function genealogyResearchUrl(m, knownLocations) {
 // knownLocations is now an array of objects: { label, street, town, state, country }
 // m.location and m.locations remain plain label strings
 
+// Embedded ISO-3166 country list + common aliases. Used to disambiguate
+// 2-part labels ("Melbourne, Victoria" vs "Hanoi, Vietnam") and to detect
+// single-word country names like "Vietnam". Kept inline so parsing is
+// fully offline — no Nominatim call required just to classify a string.
+const COUNTRY_LIST = [
+  "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda","Argentina","Armenia",
+  "Australia","Austria","Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium",
+  "Belize","Benin","Bhutan","Bolivia","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria",
+  "Burkina Faso","Burundi","Cabo Verde","Cambodia","Cameroon","Canada","Central African Republic","Chad",
+  "Chile","China","Colombia","Comoros","Congo","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic",
+  "Czechia","Denmark","Djibouti","Dominica","Dominican Republic","DR Congo","East Timor","Ecuador",
+  "Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Eswatini","Ethiopia","Fiji","Finland",
+  "France","Gabon","Gambia","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea",
+  "Guinea-Bissau","Guyana","Haiti","Honduras","Hungary","Iceland","India","Indonesia","Iran","Iraq",
+  "Ireland","Israel","Italy","Ivory Coast","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati",
+  "Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein",
+  "Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands",
+  "Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Morocco",
+  "Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Zealand","Nicaragua","Niger",
+  "Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestine","Panama",
+  "Papua New Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia",
+  "Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa","San Marino",
+  "Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore",
+  "Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain",
+  "Sri Lanka","Sudan","Suriname","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania",
+  "Thailand","Togo","Tonga","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda",
+  "Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Vanuatu",
+  "Vatican City","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe",
+  // Common aliases / sub-nations frequently used as a country in casual writing
+  "UK","USA","U.S.","U.S.A.","America","Britain","Great Britain","England","Scotland","Wales",
+  "Northern Ireland","UAE","Holland","Burma","Myanmar (Burma)","Vatican","Russia (Russian Federation)"
+];
+const COUNTRY_LOWER = new Map(COUNTRY_LIST.map(c => [c.toLowerCase(), c]));
+function normaliseCountry(s) {
+  if (!s) return null;
+  const k = String(s).trim().toLowerCase().replace(/\.$/,"").replace(/^the\s+/,"");
+  return COUNTRY_LOWER.get(k) || null;
+}
+
+// Parse a comma-separated location label into structured fields. Conservative:
+// only commits to a layout when it can disambiguate. 2-part labels stay
+// ambiguous unless the second part matches a known country.
+function parseLabelToFields(label) {
+  if (!label || typeof label !== 'string') return null;
+  const s = label.trim();
+  if (!s) return null;
+  const parts = s.split(",").map(p => p.trim()).filter(Boolean);
+  if (parts.length >= 4) return { street: parts[0], town: parts[1], state: parts[2], country: normaliseCountry(parts[parts.length-1]) || parts[parts.length-1] };
+  if (parts.length === 3) return { street: "", town: parts[0], state: parts[1], country: normaliseCountry(parts[2]) || parts[2] };
+  if (parts.length === 2) {
+    const c = normaliseCountry(parts[1]);
+    return c
+      ? { street: "", town: parts[0], state: "", country: c }
+      : { street: "", town: parts[0], state: "", country: "" };
+  }
+  if (parts.length === 1) {
+    const c = normaliseCountry(parts[0]);
+    return c ? { street: "", town: "", state: "", country: c } : null;
+  }
+  return null;
+}
+
 function migrateKnownLocation(loc) {
   // Already an object with label? Return as-is
   if (loc && typeof loc === 'object' && loc.label) return loc;
-  // String → parse into object. Be conservative: 2-part labels like
-  // "Melbourne, Victoria" are ambiguous (city/state vs city/country) so we
-  // only fill in the leading town and leave the rest blank rather than
-  // guess country=Victoria. The user can fix structured fields via the
-  // Locations tree or the Map-view editor.
   if (typeof loc !== 'string' || !loc.trim()) return null;
   const s = loc.trim();
-  const parts = s.split(",").map(p => p.trim());
-  if (parts.length >= 4) return { label: s, street: parts[0], town: parts[1], state: parts[2], country: parts[parts.length-1] };
-  if (parts.length === 3) return { label: s, town: parts[0], state: parts[1], country: parts[2] };
-  if (parts.length === 2) return { label: s, town: parts[0], state: "", country: "", street: "" };
-  return { label: s, street: "", town: "", state: "", country: "" };
+  const parsed = parseLabelToFields(s) || {};
+  return { label: s, street: parsed.street||"", town: parsed.town||"", state: parsed.state||"", country: parsed.country||"" };
 }
 
 function migrateKnownLocations(arr) {
@@ -2715,10 +2769,39 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
     setNewLoc("");
     setAddingLoc(false);
   }
+  // Count entries whose label could be parsed but whose structured fields
+  // are empty — typically locations the user typed via the custom-name path
+  // that never got geocoded. Offer a one-click tidy.
+  const classifiable = (knownLocations||[]).filter(l => {
+    if (typeof l !== 'object') return false;
+    const hasFields = !!(l.country || l.state || l.town || l.street);
+    if (hasFields) return false;
+    const p = parseLabelToFields(l.label);
+    if (!p) return false;
+    return !!(p.country || p.state || p.town || p.street);
+  });
+  function autoClassifyFromLabels() {
+    const updated = knownLocations.map(l => {
+      if (typeof l !== 'object') return l;
+      const hasFields = !!(l.country || l.state || l.town || l.street);
+      if (hasFields) return l;
+      const p = parseLabelToFields(l.label);
+      if (!p) return l;
+      return {...l, street:l.street||p.street||"", town:l.town||p.town||"", state:l.state||p.state||"", country:l.country||p.country||""};
+    });
+    persistSubject({knownLocations: updated});
+  }
   return React.createElement("div",null,
-    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px"}},
+    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px",gap:"8px",flexWrap:"wrap"}},
       React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},knownLocations.length+" location"+(knownLocations.length===1?"":"s")+" · click a name to see its memories"),
-      !addingLoc&&React.createElement("button",{onClick:()=>{setNewLoc("");setAddingLoc(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add location")
+      React.createElement("div",{style:{display:"flex",gap:"10px",alignItems:"baseline",flexWrap:"wrap"}},
+        classifiable.length>0&&React.createElement("button",{
+          onClick: autoClassifyFromLabels,
+          title: "Parse comma-separated labels into Country / State / Town fields where they're missing",
+          style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"3px",padding:"3px 10px",cursor:"pointer",color:"#5a4820",fontFamily:"'Crimson Text',serif",fontSize:"0.82rem"}
+        }, "Auto-classify "+classifiable.length+" from labels"),
+        !addingLoc&&React.createElement("button",{onClick:()=>{setNewLoc("");setAddingLoc(true);},style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.82rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline"}},"+ add location")
+      )
     ),
     addingLoc&&React.createElement("div",{style:{display:"flex",gap:"6px",marginBottom:"12px"}},
       React.createElement("input",{autoFocus:true,value:newLoc,onChange:e=>setNewLoc(e.target.value),
@@ -3428,12 +3511,17 @@ function MapView({ memories, onSelectLocation, onEditLocation, onSelectMemory, l
 
   function openFieldsEditor(label) {
     const kl = knownLocMap[label] || {};
+    // If no structured fields are stored yet, propose a parse of the label so
+    // the user sees a head-start ("Alice Springs, Northern Territory, Australia"
+    // pre-fills town/state/country) rather than four blank inputs.
+    const hasFields = !!(kl.country || kl.state || kl.town || kl.street);
+    const parsed = !hasFields ? (parseLabelToFields(label) || {}) : {};
     setEditFields({
       label,
-      country: kl.country || "",
-      state: kl.state || "",
-      town: kl.town || "",
-      street: kl.street || "",
+      country: kl.country || parsed.country || "",
+      state: kl.state || parsed.state || "",
+      town: kl.town || parsed.town || "",
+      street: kl.street || parsed.street || "",
     });
     setEditingFieldsLabel(label);
     setFixingLabel(null);
@@ -7541,12 +7629,18 @@ function AddEditForm({
               locationCountry: place.country||"",
               _locationData: { coords: place.coords, placeId: place.placeId, osmId: place.osmId, osmType: place.osmType, formalAddress: place.formalAddress },
             }),
-            onPickCustom: name => updateForm({
-              location: name,
-              locationLabel: "",
-              locationStreet:"", locationTown:"", locationState:"", locationCountry:"",
-              _locationData: null,
-            }),
+            onPickCustom: name => {
+              const parsed = parseLabelToFields(name) || {};
+              updateForm({
+                location: name,
+                locationLabel: "",
+                locationStreet: parsed.street || "",
+                locationTown: parsed.town || "",
+                locationState: parsed.state || "",
+                locationCountry: parsed.country || "",
+                _locationData: null,
+              });
+            },
           }),
           showAddrLine && React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",fontStyle:"italic",margin:"4px 0 0"}}, showAddrLine)
         ),
