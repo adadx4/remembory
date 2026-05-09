@@ -7142,27 +7142,68 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
   // Keep focalId in sync when gedFocalPersonId changes (e.g. after fresh import)
   React.useEffect(()=>{ if(gedFocalPersonId) setFocalId(gedFocalPersonId); },[gedFocalPersonId]);
 
+  // Memoised relationship indices — these only change when the tree
+  // topology changes, so don't rebuild them on every focal click /
+  // detail-panel toggle / window resize.
+  const tpById = React.useMemo(
+    () => Object.fromEntries((treePersons||[]).map(p=>[p.id,p])),
+    [treePersons]
+  );
+  const familyMaps = React.useMemo(() => {
+    const parentsOf = {}, childrenOf = {}, spousesOf = {};
+    (treeFamilies||[]).forEach(fam => {
+      const {husbandId:h, wifeId:w, childIds:cs=[]} = fam;
+      cs.forEach(cid => {
+        parentsOf[cid] = parentsOf[cid] || [];
+        if (h && !parentsOf[cid].includes(h)) parentsOf[cid].push(h);
+        if (w && !parentsOf[cid].includes(w)) parentsOf[cid].push(w);
+        if (h) { childrenOf[h] = childrenOf[h] || []; if (!childrenOf[h].includes(cid)) childrenOf[h].push(cid); }
+        if (w) { childrenOf[w] = childrenOf[w] || []; if (!childrenOf[w].includes(cid)) childrenOf[w].push(cid); }
+      });
+      if (h && w) {
+        spousesOf[h] = spousesOf[h] || []; if (!spousesOf[h].includes(w)) spousesOf[h].push(w);
+        spousesOf[w] = spousesOf[w] || []; if (!spousesOf[w].includes(h)) spousesOf[w].push(h);
+      }
+    });
+    return {parentsOf, childrenOf, spousesOf};
+  }, [treeFamilies]);
+  // tp.id -> subject map. Three priority signals: tp.subjectId,
+  // subject.gedFocalPersonId, name match. Memoised since subjects rarely
+  // change in this view.
+  const tpToSubject = React.useMemo(() => {
+    const map = {};
+    const subjectByName = new Map();
+    (subjects||[]).forEach(s => {
+      const nm = (s.name||"").trim().toLowerCase();
+      if (nm && !subjectByName.has(nm)) subjectByName.set(nm, s);
+    });
+    (treePersons||[]).forEach(p => {
+      if (p.subjectId) {
+        const s = (subjects||[]).find(s2 => s2.id === p.subjectId);
+        if (s) map[p.id] = s;
+      }
+    });
+    (subjects||[]).forEach(s => {
+      if (s.gedFocalPersonId && !map[s.gedFocalPersonId]) map[s.gedFocalPersonId] = s;
+    });
+    (treePersons||[]).forEach(p => {
+      if (map[p.id]) return;
+      const nm = (p.name||"").trim().toLowerCase();
+      const s = nm ? subjectByName.get(nm) : null;
+      if (s) map[p.id] = s;
+    });
+    return map;
+  }, [subjects, treePersons]);
+  const chronicleTpIds = React.useMemo(
+    () => new Set(Object.keys(tpToSubject)),
+    [tpToSubject]
+  );
+
   // ── FULL TREE MODE (treePersons populated) ──────────────────────────────
   const hasTree = treePersons && treePersons.length > 0;
 
   if (hasTree) {
-    const tpById = Object.fromEntries(treePersons.map(p=>[p.id,p]));
-    // Build parent / child / spouse maps from treeFamilies
-    const parentsOf = {}, childrenOf = {}, spousesOf = {};
-    (treeFamilies||[]).forEach(fam=>{
-      const {husbandId:h, wifeId:w, childIds:cs=[]} = fam;
-      cs.forEach(cid=>{
-        parentsOf[cid] = parentsOf[cid] || [];
-        if(h && !parentsOf[cid].includes(h)) parentsOf[cid].push(h);
-        if(w && !parentsOf[cid].includes(w)) parentsOf[cid].push(w);
-        if(h){ childrenOf[h] = childrenOf[h] || []; if(!childrenOf[h].includes(cid)) childrenOf[h].push(cid); }
-        if(w){ childrenOf[w] = childrenOf[w] || []; if(!childrenOf[w].includes(cid)) childrenOf[w].push(cid); }
-      });
-      if(h&&w){
-        spousesOf[h] = spousesOf[h] || []; if(!spousesOf[h].includes(w)) spousesOf[h].push(w);
-        spousesOf[w] = spousesOf[w] || []; if(!spousesOf[w].includes(h)) spousesOf[w].push(h);
-      }
-    });
+    const {parentsOf, childrenOf, spousesOf} = familyMaps;
 
     const focal = focalId && tpById[focalId] ? focalId : treePersons[0]?.id;
     const focalP = tpById[focal];
@@ -7376,35 +7417,6 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       updateTreePerson(editingId, patch);
       setEditingId(null);
     }
-
-    // Map of tp.id -> subject (when that tp has a Chronicle). Three signals
-    // are checked, in priority order: tp.subjectId (promoteToSubject sets
-    // this), subject.gedFocalPersonId (covers the tree-host's own self,
-    // which has no tp.subjectId), and finally a case-insensitive name
-    // match (covers subjects whose Chronicle was created independently of
-    // this tree — the import doesn't auto-link them).
-    const tpToSubject = {};
-    const subjectByName = new Map();
-    (subjects||[]).forEach(s => {
-      const nm = (s.name||"").trim().toLowerCase();
-      if (nm && !subjectByName.has(nm)) subjectByName.set(nm, s);
-    });
-    treePersons.forEach(p => {
-      if (p.subjectId) {
-        const s = (subjects||[]).find(s2 => s2.id === p.subjectId);
-        if (s) tpToSubject[p.id] = s;
-      }
-    });
-    (subjects||[]).forEach(s => {
-      if (s.gedFocalPersonId && !tpToSubject[s.gedFocalPersonId]) tpToSubject[s.gedFocalPersonId] = s;
-    });
-    treePersons.forEach(p => {
-      if (tpToSubject[p.id]) return;
-      const nm = (p.name||"").trim().toLowerCase();
-      const s = nm ? subjectByName.get(nm) : null;
-      if (s) tpToSubject[p.id] = s;
-    });
-    const chronicleTpIds = new Set(Object.keys(tpToSubject));
 
     // Card. Chronicle subjects use a sage-green palette so they're visually
     // distinct; the focal card adds a ring/glow on top of whatever palette
@@ -9734,6 +9746,46 @@ function App() {
   const emlImportRef = useRef();
 
   // ── Persist ──────────────────────────────────────────────────
+  // Serialised save queue. Without this, two persist* calls firing in the
+  // same tick would write to localStorage / IDB concurrently and the
+  // later writer (with potentially older data) could overwrite the
+  // earlier one. Chaining through saveQueueRef makes every save wait
+  // for its predecessor; pendingSavesRef lets the beforeunload guard
+  // warn the user if work is still in flight at unload time.
+  const saveQueueRef = React.useRef(Promise.resolve());
+  const pendingSavesRef = React.useRef(0);
+  function flushSave(password, newData) {
+    pendingSavesRef.current++;
+    const next = saveQueueRef.current
+      .catch(()=>{})
+      .then(async () => {
+        try {
+          const ok = password
+            ? await saveEncrypted(password, newData)
+            : saveData(newData);
+          setSaveStatus(ok?"saved":"error"); setTimeout(()=>setSaveStatus(""),2000);
+          return ok;
+        } finally {
+          pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1);
+        }
+      });
+    saveQueueRef.current = next;
+    return next;
+  }
+  // Warn the user if they try to close the tab while a save is still
+  // queued — the modern browser will only show a generic prompt, but
+  // that's enough to give the queue a chance to flush.
+  React.useEffect(() => {
+    function onBeforeUnload(e) {
+      if (pendingSavesRef.current > 0) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
+
   // persistSubject: update the active subject's fields, then save
   function persistSubject(subjectPatch) {
     setData(prev => {
@@ -9741,11 +9793,7 @@ function App() {
       const seeded = seedSubject({...currentSubject, ...subjectPatch});
       const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
       const newData = {...prev, subjects: newSubjects};
-      if (activePassword) {
-        saveEncrypted(activePassword, newData).then(ok => { setSaveStatus(ok?"saved":"error"); setTimeout(()=>setSaveStatus(""),2000); });
-      } else {
-        const ok = saveData(newData); setSaveStatus(ok?"saved":"error"); setTimeout(()=>setSaveStatus(""),2000);
-      }
+      flushSave(activePassword, newData);
       return newData;
     });
   }
@@ -9759,24 +9807,19 @@ function App() {
       const {ownerName:_on, ownerEmail:_oe, ...rest} = patch;
       persistSubject(rest);
     } else {
-      const newData = {...data, ...patch};
-      setData(newData);
-      if (activePassword) {
-        saveEncrypted(activePassword, newData).then(ok => { setSaveStatus(ok?"saved":"error"); setTimeout(()=>setSaveStatus(""),2000); });
-      } else {
-        const ok = saveData(newData);
-        setSaveStatus(ok?"saved":"error"); setTimeout(()=>setSaveStatus(""),2000);
-      }
+      setData(prev => {
+        const newData = {...prev, ...patch};
+        flushSave(activePassword, newData);
+        return newData;
+      });
     }
   }
   function persistTop(patch) {
-    const newData = {...data, ...patch};
-    setData(newData);
-    if (activePassword) {
-      saveEncrypted(activePassword, newData).then(ok => { setSaveStatus(ok?"saved":"error"); setTimeout(()=>setSaveStatus(""),2000); });
-    } else {
-      const ok = saveData(newData); setSaveStatus(ok?"saved":"error"); setTimeout(()=>setSaveStatus(""),2000);
-    }
+    setData(prev => {
+      const newData = {...prev, ...patch};
+      flushSave(activePassword, newData);
+      return newData;
+    });
   }
   function switchSubject(id) {
     persistTop({activeSubjectId: id});
@@ -10263,9 +10306,15 @@ function handleEdit(m) {
 
   function handleDelete(id) {
     if (!confirm("Delete this memory?")) return;
-    // Clean up IDB blobs for this memory
+    // Clean up IDB blobs — both the memory's own media AND any per-citation
+    // record images attached to source citations.
     const mem = memories.find(m=>m.id===id);
-    if (mem) (mem.mediaUrls||[]).forEach(med=>{ if(med.mediaId) idbDelete(med.mediaId); });
+    if (mem) {
+      (mem.mediaUrls||[]).forEach(med=>{ if(med && med.mediaId) idbDelete(med.mediaId); });
+      (mem.sources||[]).forEach(src=>{
+        (src.mediaUrls||[]).forEach(med=>{ if(med && med.mediaId) idbDelete(med.mediaId); });
+      });
+    }
     setMemories(memories.filter(m=>m.id!==id)); setView("life"); setSelected(null);
   }
 
@@ -10479,8 +10528,9 @@ function handleEdit(m) {
       await chooseSyncFile();
       return;
     }
-    if (syncInFlightRef.current) {
-      // Another sync is mid-flight; ignore this call to avoid trampling its write.
+    if (syncInFlightRef.current || importInFlightRef.current) {
+      // Another sync or backup-import is mid-flight; ignore this call to
+      // avoid trampling its write.
       return;
     }
     syncInFlightRef.current = true;
@@ -11592,8 +11642,17 @@ function handleEdit(m) {
     setView("tree");
   }
 
+  const importInFlightRef = React.useRef(false);
   function importBackup(e) {
     const file=e.target.files[0]; if(!file) return;
+    // Prevent overlapping imports — and overlapping with a sync — from
+    // interleaving merges. Cheap guard, similar to syncInFlightRef.
+    if (importInFlightRef.current || syncInFlightRef.current) {
+      alert("Another import or sync is in progress. Wait a moment and try again.");
+      e.target.value = "";
+      return;
+    }
+    importInFlightRef.current = true;
     const r=new FileReader(); r.onload=async ev=>{ try {
       let raw=JSON.parse(ev.target.result);
       // Handle encrypted backups
@@ -11836,10 +11895,13 @@ function handleEdit(m) {
         msg += m || "An unexpected error occurred while reading the backup.";
       }
       alert(msg);
+    } finally {
+      importInFlightRef.current = false;
     } };
     r.onerror = () => {
       console.error("[importBackup] FileReader error:", r.error);
       alert("Couldn't read the backup file. It may be too large or in use by another app. Try copying it somewhere local and re-selecting.");
+      importInFlightRef.current = false;
     };
     r.readAsText(file);
   }
@@ -12271,6 +12333,20 @@ function handleEdit(m) {
       },
       onDelete: id => {
         if (subjects.length<=1) return; // don't let user delete their last visible subject in this product
+        // Reclaim IDB blobs (photos) referenced by the doomed subject's
+        // memories and entity-photo records so they don't pile up forever.
+        const doomed = allSubjects.find(s=>s.id===id);
+        if (doomed) {
+          (doomed.memories||[]).forEach(mem=>{
+            (mem.mediaUrls||[]).forEach(med=>{ if (med && med.mediaId) idbDelete(med.mediaId); });
+            (mem.sources||[]).forEach(src=>{
+              (src.mediaUrls||[]).forEach(med=>{ if (med && med.mediaId) idbDelete(med.mediaId); });
+            });
+          });
+          Object.values(doomed.entityPhotos||{}).forEach(photo=>{
+            if (photo && photo.mediaId) idbDelete(photo.mediaId);
+          });
+        }
         const newSubjects = allSubjects.filter(s=>s.id!==id);
         const newActiveId = id===activeSubjectId
           ? (subjects.find(s=>s.id!==id)?.id || newSubjects.find(subjectInProduct)?.id)
@@ -14005,7 +14081,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(
       if (event.data && event.data.type === "UPDATE_AVAILABLE") {
         const banner = document.createElement("div");
         banner.style.cssText = "position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2c2416;color:#f5f0e8;padding:10px 20px;border-radius:4px;font-family:'Crimson Text',serif;font-size:0.92rem;z-index:1000;box-shadow:0 4px 16px rgba(0,0,0,0.3);display:flex;align-items:center;gap:12px;";
-        banner.innerHTML = 'Chronicle has been updated <button onclick="location.reload()" style="background:#4a7a5a;color:#fff;border:none;padding:5px 14px;border-radius:2px;cursor:pointer;font-family:inherit;font-size:0.88rem">Reload</button>';
+        banner.appendChild(document.createTextNode("Chronicle has been updated "));
+        const reloadBtn = document.createElement("button");
+        reloadBtn.textContent = "Reload";
+        reloadBtn.style.cssText = "background:#4a7a5a;color:#fff;border:none;padding:5px 14px;border-radius:2px;cursor:pointer;font-family:inherit;font-size:0.88rem";
+        reloadBtn.addEventListener("click", () => location.reload());
+        banner.appendChild(reloadBtn);
         document.body.appendChild(banner);
       }
     });
