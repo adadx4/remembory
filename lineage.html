@@ -8540,27 +8540,44 @@ function AddEditForm({
   isCarerMode, ownerName, carerName, subject,
   isHistoryMode, editingCandidateId, handleSaveCandidateSubmit, handleAcceptFromForm,
 }) {
-  // Auto-expand first populated section (accordion: only one open at a time)
-  const [expanded, setExpanded] = React.useState(() => {
-    if (form._expandEndDate) return new Set(["enddate"]);
-    const peopleNames = (form.people||[]).filter(n => !(petNames && petNames.has(n)));
-    const petsOnMem   = (form.people||[]).filter(n => petNames && petNames.has(n));
-    const checks = [
-      ["enddate",    form.endFuzzy || form.endOngoing],
-      ["location",   (form.locationLabel||"").trim() || (form.locations||[]).length],
-      ["tags",       (form.tags||[]).length],
-      ["people",     peopleNames.length],
-      ["pets",       petsOnMem.length],
-      ["orgs",       (form.orgs||[]).length],
-      ["photos",     (form.mediaUrls||[]).length],
-      ["sources",    (form.sources||[]).length || (form.sourceIds||[]).length],
-      ["researchnote", form.researchNote || form.candidateConfidence],
-      ["candidateperson", form.candidatePersonId],
-    ];
-    const first = checks.find(([,v])=>v);
-    return first ? new Set([first[0]]) : new Set();
+  // Sections with content — drives the dot indicator on each tab.
+  const peopleNamesForCount = (form.people||[]).filter(n => !(petNames && petNames.has(n)));
+  const petsOnMemForCount   = (form.people||[]).filter(n => petNames && petNames.has(n));
+  const secHasContent = {
+    location: (form.locationLabel||"").trim()||(form.locations||[]).length, tags: (form.tags||[]).length,
+    people: peopleNamesForCount.length, pets: petsOnMemForCount.length,
+    orgs: (form.orgs||[]).length, photos: (form.mediaUrls||[]).length,
+    sources: (form.sources||[]).length || (form.sourceIds||[]).length,
+    researchnote: form.researchNote||form.candidateConfidence,
+    candidateperson: !!form.candidatePersonId,
+  };
+
+  // Tabs in mode-specific order
+  const tabsForMode = isHistoryMode
+    ? [["location","Location","\ud83d\udccd"],
+       ["people","People","\ud83d\udc64"],
+       ["orgs","Organisation","\ud83c\udfdb"],
+       ["tags","Tags","\ud83c\udff7"],
+       ["photos","Photos","\ud83d\uddbc"],
+       ["sources","Sources","\ud83d\udcda"],
+       ["researchnote","Research Note","\ud83d\udcdd"],
+       ["candidateperson","Candidate","\ud83d\udd0d"]]
+    : [["location","Location","\ud83d\udccd"],
+       ["people","People","\ud83d\udc64"],
+       ["orgs","Organisation","\ud83c\udfdb"],
+       ["pets","Pets","\ud83d\udc3e"],
+       ["tags","Tags","\ud83c\udff7"],
+       ["photos","Photos","\ud83d\uddbc"]];
+
+  // Active tab — defaults to first tab with content, else first tab.
+  const [activeTab, setActiveTab] = React.useState(() => {
+    const found = tabsForMode.find(([k]) => secHasContent[k]);
+    return (found && found[0]) || tabsForMode[0][0];
   });
-  const toggle = k => setExpanded(s => { if (s.has(k)) return new Set(); return new Set([k]); });
+  // End-date panel — independent of tabs, toggled by its own button + ×.
+  const [enddateOpen, setEnddateOpen] = React.useState(() =>
+    !!(form._expandEndDate || form.endFuzzy || form.endOngoing));
+
   // In Lineage mode, eventType must be picked (even if just "Other").
   const canSave = !!(form.title?.trim() && form.year && (!isHistoryMode || form.eventType));
   const sm = modeFor(subject);
@@ -8569,24 +8586,20 @@ function AddEditForm({
   const [newCpName, setNewCpName] = React.useState("");
   const [newCpError, setNewCpError] = React.useState("");
 
-  // Pill button for optional sections
-  const secHasContent = {
-    location: (form.locationLabel||"").trim()||(form.locations||[]).length, tags: (form.tags||[]).length,
-    people: (form.people||[]).length, orgs: (form.orgs||[]).length, photos: (form.mediaUrls||[]).length,
-    sources: (form.sources||[]).length || (form.sourceIds||[]).length,
-    researchnote: form.researchNote||form.candidateConfidence, enddate: form.endFuzzy||form.endOngoing,
-    candidateperson: !!form.candidatePersonId,
-  };
-  function secToggle(k, label, icon) {
-    const on = expanded.has(k);
-    const filled = !on && !!secHasContent[k];
-    return React.createElement("button",{key:k,onClick:()=>toggle(k),style:{
-      padding:"5px 13px",borderRadius:"20px",border:"1px solid",cursor:"pointer",
-      fontSize:"0.8rem",fontFamily:"'Crimson Text',serif",transition:"all 0.15s",
-      background:on?"rgba(44,36,22,0.09)":filled?"rgba(74,122,90,0.08)":"transparent",
-      color:on?"#2c2416":filled?"#4a7a5a":"#6a5840",
-      borderColor:on?"#c8b89a":filled?"rgba(74,122,90,0.35)":"#d4c8b4"
-    }}, on ? ("\u00d7 "+label) : (icon+" "+label), filled&&React.createElement("span",{style:{display:"inline-block",width:"5px",height:"5px",borderRadius:"50%",background:"#4a7a5a",marginLeft:"4px",verticalAlign:"middle"}}));
+  // Tab button — underline style, single active at a time.
+  function secTab(k, label, icon) {
+    const active = activeTab === k;
+    const filled = !active && !!secHasContent[k];
+    return React.createElement("button",{key:k,onClick:()=>setActiveTab(k),style:{
+      padding:"8px 14px",border:"none",
+      borderBottom: active ? "2px solid #2c2416" : "2px solid transparent",
+      marginBottom:"-1px",background:"transparent",cursor:"pointer",
+      fontFamily:"'Crimson Text',serif",fontSize:"0.86rem",
+      color: active ? "#2c2416" : "#8a7460",
+      fontWeight: active ? 600 : 400,
+      transition:"color 0.15s, border-color 0.15s",whiteSpace:"nowrap"
+    }}, icon+" "+label,
+      filled&&React.createElement("span",{style:{display:"inline-block",width:"5px",height:"5px",borderRadius:"50%",background:"#4a7a5a",marginLeft:"6px",verticalAlign:"middle"}}));
   }
 
   // Section wrapper with consistent top margin
@@ -8642,7 +8655,7 @@ function AddEditForm({
       ),
       React.createElement(DateFields,{form,setForm:updateForm}),
       // End date — visible button
-      !expanded.has("enddate")&&React.createElement("button",{onClick:()=>toggle("enddate"),style:{
+      !enddateOpen&&React.createElement("button",{onClick:()=>setEnddateOpen(true),style:{
         display:"flex",alignItems:"center",gap:"7px",width:"100%",
         background:"rgba(200,184,154,0.1)",border:"1px dashed #c8b89a",borderRadius:"4px",
         padding:"9px 14px",cursor:"pointer",textAlign:"left",
@@ -8657,10 +8670,10 @@ function AddEditForm({
           React.createElement("span",{style:{color:"#8a7460",marginLeft:"6px",fontSize:"0.82rem",fontStyle:"italic"}},"\u2014 for jobs, addresses, relationships, journeys\u2026")
         )
       ),
-      expanded.has("enddate")&&React.createElement("div",{style:{background:"rgba(200,184,154,0.1)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px"}},
+      enddateOpen&&React.createElement("div",{style:{background:"rgba(200,184,154,0.1)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px"}},
         React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:form.endFuzzy||form.endOngoing?"12px":0}},
           React.createElement("span",{style:{...S.label,margin:0}},"End date"),
-          React.createElement("button",{onClick:()=>{toggle("enddate");updateForm({endFuzzy:null,endOngoing:false});},style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.9rem",padding:0}},"\u00d7")
+          React.createElement("button",{onClick:()=>{setEnddateOpen(false);updateForm({endFuzzy:null,endOngoing:false});},style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.9rem",padding:0}},"\u00d7")
         ),
         React.createElement("label",{style:{...S.label,cursor:"pointer",display:"flex",alignItems:"center",gap:"8px",marginBottom:form.endOngoing?0:"10px",userSelect:"none"}},
           React.createElement("input",{type:"checkbox",checked:!!form.endOngoing,onChange:e=>updateForm({endOngoing:e.target.checked,endFuzzy:e.target.checked?null:(form.endFuzzy||form.fuzzy)}),style:{accentColor:"#2c2416",cursor:"pointer"}}),
@@ -8686,21 +8699,13 @@ function AddEditForm({
       )
     ),
 
-    // ── Optional section toggle pills ──
-    React.createElement("div",{style:{display:"flex",gap:"7px",flexWrap:"wrap",marginTop:"16px"}},
-      secToggle("location",  "Location",     "\ud83d\udccd"),
-      secToggle("tags",      "Tags",          "\ud83c\udff7"),
-      secToggle("people",    "People",        "\ud83d\udc64"),
-      secToggle("pets",      "Pets",          "\ud83d\udc3e"),
-      secToggle("orgs",      "Organisation",  "\ud83c\udfdb"),
-      secToggle("photos",    "Photos",        "\ud83d\uddbc"),
-      isHistoryMode&&secToggle("sources", "Sources", "\ud83d\udcda"),
-      isHistoryMode&&secToggle("researchnote","Research Note","\ud83d\udcdd"),
-      isHistoryMode&&secToggle("candidateperson","Candidate Person","\ud83d\udd0d")
+    // ── Optional section tabs ──
+    React.createElement("div",{style:{display:"flex",gap:"2px",flexWrap:"wrap",marginTop:"20px",borderBottom:"1px solid #d4c8b4"}},
+      ...tabsForMode.map(([k,label,icon])=>secTab(k,label,icon))
     ),
 
     // ── Location ──
-    expanded.has("location")&&sec((()=>{
+    activeTab==="location"&&sec((()=>{
       // The picked place is whatever the user has chosen — either a saved place
       // (label only) or a Nominatim result (carrying coords + structured fields).
       // form.location holds the canonical place name; form.locationLabel is the
@@ -8782,7 +8787,7 @@ function AddEditForm({
     })()),
 
     // ── Tags ──
-    expanded.has("tags")&&sec(React.createElement("div",null,
+    activeTab==="tags"&&sec(React.createElement("div",null,
       React.createElement("label",{style:S.label},"Tags"),
       React.createElement(TagPicker,{tags:form.tags,onToggle:tag=>updateForm({tags:form.tags.includes(tag)?form.tags.filter(t=>t!==tag):[...form.tags,tag]}),customTags,onAddCustom:addCustomTag,onRemoveCustom:removeCustomTag}),
       (form.tags.includes("education")||form.tags.includes("work"))&&(()=>{
@@ -8795,7 +8800,7 @@ function AddEditForm({
     )),
 
     // ── People ──
-    expanded.has("people")&&sec((()=>{
+    activeTab==="people"&&sec((()=>{
       // Names already tagged as pets shouldn't appear in the people field —
       // both as suggestions and as currently-selected values. Keep the field's
       // value list filtered so a memory doesn't show the same name in both
@@ -8812,7 +8817,7 @@ function AddEditForm({
     })()),
 
     // ── Pets ──
-    expanded.has("pets")&&sec((()=>{
+    activeTab==="pets"&&sec((()=>{
       const knownPetNames = (pets||[]).map(p => p.name);
       const petValues = (form.people||[]).filter(n => petNames && petNames.has(n));
       return React.createElement("div",null,
@@ -8841,13 +8846,13 @@ function AddEditForm({
     })()),
 
     // ── Organisations ──
-    expanded.has("orgs")&&sec(React.createElement("div",null,
+    activeTab==="orgs"&&sec(React.createElement("div",null,
       React.createElement("label",{style:S.label},"Organisations"),
       React.createElement(PeopleOrgField,{icon:"\ud83c\udfdb",values:form.orgs||[],allValues:knownOrgs,onChange:v=>updateForm({orgs:v}),placeholder:"Add an organisation\u2026"})
     )),
 
     // ── Photos ──
-    expanded.has("photos")&&sec(React.createElement("div",null,
+    activeTab==="photos"&&sec(React.createElement("div",null,
       React.createElement("label",{style:S.label},"Photos & Media"),
       React.createElement("div",{style:{display:"flex",gap:"9px",flexWrap:"wrap",marginBottom:"7px"}},
         form.mediaUrls.map((med,i)=>React.createElement("div",{key:i,style:{position:"relative"}},
@@ -8860,7 +8865,7 @@ function AddEditForm({
     )),
 
     // ── Source Citations ──
-    expanded.has("sources")&&sec((()=>{
+    activeTab==="sources"&&sec((()=>{
       // Lazy-migrate from sourceIds[] to sources[]; setSources always writes new shape and drops the old field.
       const sources = Array.isArray(form.sources)
         ? form.sources
@@ -9108,7 +9113,7 @@ function AddEditForm({
     })()),
 
     // ── Research note (History mode, collapsible) ──
-    isHistoryMode&&expanded.has("researchnote")&&sec(React.createElement("div",null,
+    isHistoryMode&&activeTab==="researchnote"&&sec(React.createElement("div",null,
       React.createElement("label",{style:S.label},"Research Note"),
       React.createElement("textarea",{value:form.researchNote||"",onChange:e=>updateForm({researchNote:e.target.value}),placeholder:"Repository, reference number, why this is uncertain, what still needs verification\u2026",rows:2,style:{...S.input,resize:"vertical"}}),
       React.createElement("div",{style:{display:"flex",gap:"6px",marginTop:"8px",alignItems:"center"}},
@@ -9118,7 +9123,7 @@ function AddEditForm({
     )),
 
     // ── Candidate person tag (Genealogy mode, collapsible) ──
-    isHistoryMode&&expanded.has("candidateperson")&&sec((()=>{
+    isHistoryMode&&activeTab==="candidateperson"&&sec((()=>{
       const current = (candidatePersons||[]).find(c=>c.id===form.candidatePersonId);
       const handleAdd = () => {
         const result = addCandidatePerson ? addCandidatePerson(newCpName, "") : {error:"Unable to add."};
