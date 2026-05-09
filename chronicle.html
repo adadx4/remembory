@@ -7102,6 +7102,35 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
   const [addingAnchor, setAddingAnchor] = React.useState(null);
   const [newDraft, setNewDraft] = React.useState({});
 
+  // Layout refs/state for the SVG connector overlay. Cards register their
+  // DOM nodes via cardRefs; useLayoutEffect measures positions after each
+  // render so the SVG paths land on the right pixels.
+  const containerRef = React.useRef(null);
+  const cardRefs = React.useRef({});
+  const [layout, setLayout] = React.useState(null);
+  React.useLayoutEffect(() => {
+    function measure() {
+      const c = containerRef.current;
+      if (!c) return;
+      const cBox = c.getBoundingClientRect();
+      const positions = {};
+      Object.keys(cardRefs.current).forEach(id => {
+        const el = cardRefs.current[id];
+        if (!el || !el.isConnected) return;
+        const r = el.getBoundingClientRect();
+        positions[id] = {
+          cx: r.left + r.width/2 - cBox.left,
+          top: r.top - cBox.top,
+          bottom: r.bottom - cBox.top,
+        };
+      });
+      setLayout({width: cBox.width, height: cBox.height, positions});
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [focalId, treePersons, treeFamilies, personDetail, editingId, addingKind]);
+
   function blankDraft() { return {name:"",sex:"",dob:"",dod:"",birthPlace:"",deathPlace:"",notes:""}; }
   function startAddRelation(kind, anchorId) {
     setAddingKind(kind);
@@ -7357,6 +7386,7 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       const sexAccent = tp.sex === "F" ? "#c4858a" : tp.sex === "M" ? "#8b9dc3" : "#a89a7a";
       return React.createElement("div",{
         key: id,
+        ref: el => { if (el) cardRefs.current[id] = el; },
         onClick: () => setPersonDetail(id),
         style: {
           background: isFocal ? "#2c2416" : hasSubject ? "rgba(196,169,98,0.18)" : "rgba(255,252,245,0.97)",
@@ -7365,8 +7395,7 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
           borderLeft: "4px solid " + (isFocal ? "#8a7040" : hasSubject ? "#c8a84a" : sexAccent),
           borderRadius: "4px",
           padding: "8px 12px",
-          minWidth: "150px",
-          maxWidth: "210px",
+          width: "190px",
           flex: "0 0 auto",
           cursor: "pointer",
           textAlign: "left",
@@ -7388,16 +7417,6 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
         React.createElement("span",{style:{flex:"1 1 0",maxWidth:"180px",height:"1px",background:"linear-gradient(to right, transparent, #c8b89a)"}}),
         React.createElement("h3",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.78rem",letterSpacing:"0.12em",textTransform:"uppercase",color:"#8a7460",fontWeight:700,margin:0,whiteSpace:"nowrap"}},label),
         React.createElement("span",{style:{flex:"1 1 0",maxWidth:"180px",height:"1px",background:"linear-gradient(to left, transparent, #c8b89a)"}})
-      );
-    }
-    function renderRow(label, ids, opts={}) {
-      return React.createElement("div",{style:{marginBottom:"36px"}},
-        rowHeader(label),
-        ids.length === 0
-          ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#a89a7a",fontStyle:"italic",margin:0,textAlign:"center"}}, opts.empty || "\u2014")
-          : React.createElement("div",{style:{display:"flex",gap:"18px",flexWrap:"wrap",alignItems:"flex-start",justifyContent:"center"}},
-              ids.map(id => renderCard(id))
-            )
       );
     }
 
@@ -7578,42 +7597,115 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
           )
       ),
 
-      // Three-row 3-generation layout — each row centred, spouses spliced
-      // next to focal, siblings + focal in birth order.
-      renderRow("Parents", parentIds, {empty:"No parents recorded"}),
-
-      // Subject row: parents' children in birth order, focal's spouse(s)
-      // immediately after focal.
+      // Traditional tree layout: three rows (parents / focal generation /
+      // children) with SVG connector lines drawn behind the cards. The
+      // outer wrapper allows horizontal scroll for very wide trees; the
+      // inner ref'd container sizes to content so SVG paths line up.
       (() => {
         const generation = sortByDob([focal, ...siblingIds]);
         const fIdx = generation.indexOf(focal);
-        const composed = [
-          ...generation.slice(0, fIdx + 1),
-          ...spouseIds.map(id => ({_kind:"spouse", id})),
-          ...generation.slice(fIdx + 1),
-        ];
+        const beforeFocal = generation.slice(0, fIdx);
+        const afterFocal  = generation.slice(fIdx + 1);
         const headerLabel = siblingIds.length > 0
           ? (spouseIds.length > 0 ? "Subject \u00b7 spouse \u00b7 siblings" : "Subject \u00b7 siblings")
           : (spouseIds.length > 0 ? "Subject \u00b7 spouse" : "Subject");
-        return React.createElement("div",{style:{marginBottom:"36px"}},
-          rowHeader(headerLabel),
-          React.createElement("div",{style:{display:"flex",gap:"14px",flexWrap:"wrap",alignItems:"flex-start",justifyContent:"center"}},
-            composed.map((entry, i) => {
-              if (entry && entry._kind === "spouse") {
-                const prev = composed[i-1];
-                const showHeart = prev === focal || (prev && prev._kind === "spouse");
-                return React.createElement(React.Fragment, {key: "sp-"+entry.id},
-                  showHeart && React.createElement("span",{style:{alignSelf:"center",color:"#c4858a",fontSize:"1rem",letterSpacing:"0.05em"}}, "\u2764"),
-                  renderCard(entry.id)
-                );
-              }
-              return renderCard(entry);
-            })
+        const TREE_LINE = "#b89868";
+
+        // SVG connector paths
+        const renderConnectors = () => {
+          if (!layout) return null;
+          const paths = [];
+          // Parents → focal generation (siblings + focal)
+          if (parentIds.length > 0) {
+            const ps = parentIds.map(id => layout.positions[id]).filter(Boolean);
+            const genIds = sortByDob([focal, ...siblingIds]);
+            const gs = genIds.map(id => layout.positions[id]).filter(Boolean);
+            if (ps.length > 0 && gs.length > 0) {
+              const parentMidX = ps.reduce((s,p)=>s+p.cx,0) / ps.length;
+              const parentBottom = Math.max(...ps.map(p=>p.bottom));
+              const genTop = Math.min(...gs.map(g=>g.top));
+              const barY = parentBottom + (genTop - parentBottom) * 0.55;
+              const leftCx = Math.min(...gs.map(g=>g.cx));
+              const rightCx = Math.max(...gs.map(g=>g.cx));
+              const d = [
+                "M "+parentMidX+" "+parentBottom+" L "+parentMidX+" "+barY,
+                "M "+leftCx+" "+barY+" L "+rightCx+" "+barY,
+                ...gs.map(g => "M "+g.cx+" "+barY+" L "+g.cx+" "+g.top),
+              ].join(" ");
+              paths.push(React.createElement("path",{key:"p2g", d, fill:"none", stroke:TREE_LINE, strokeWidth:1.5, strokeLinecap:"round"}));
+            }
+          }
+          // Focal (+ first spouse) → children
+          if (childIds.length > 0) {
+            const fp = layout.positions[focal];
+            const cs = childIds.map(id => layout.positions[id]).filter(Boolean);
+            if (fp && cs.length > 0) {
+              const sp = spouseIds.length > 0 ? layout.positions[spouseIds[0]] : null;
+              const dropX = sp ? (fp.cx + sp.cx) / 2 : fp.cx;
+              const fbBottom = sp ? Math.max(fp.bottom, sp.bottom) : fp.bottom;
+              const childTop = Math.min(...cs.map(c=>c.top));
+              const barY = fbBottom + (childTop - fbBottom) * 0.55;
+              const leftCx = Math.min(...cs.map(c=>c.cx));
+              const rightCx = Math.max(...cs.map(c=>c.cx));
+              const d = [
+                "M "+dropX+" "+fbBottom+" L "+dropX+" "+barY,
+                "M "+leftCx+" "+barY+" L "+rightCx+" "+barY,
+                ...cs.map(c => "M "+c.cx+" "+barY+" L "+c.cx+" "+c.top),
+              ].join(" ");
+              paths.push(React.createElement("path",{key:"f2c", d, fill:"none", stroke:TREE_LINE, strokeWidth:1.5, strokeLinecap:"round"}));
+            }
+          }
+          return React.createElement("svg",{
+            style:{position:"absolute",top:0,left:0,pointerEvents:"none",zIndex:0},
+            width: layout.width, height: layout.height,
+            "aria-hidden": true,
+          }, ...paths);
+        };
+
+        const cardWithKey = id => React.createElement("div",{key:"k-"+id,style:{flex:"0 0 auto"}}, renderCard(id));
+
+        return React.createElement("div",{style:{overflowX:"auto",overflowY:"hidden",textAlign:"center"}},
+          React.createElement("div",{
+            ref: containerRef,
+            style:{position:"relative",display:"inline-block",textAlign:"left",padding:"4px 12px 12px",minWidth:"100%"}
+          },
+            renderConnectors(),
+            React.createElement("div",{style:{position:"relative",zIndex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:"56px"}},
+              // Parents row
+              React.createElement("div",null,
+                rowHeader("Parents"),
+                parentIds.length === 0
+                  ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#a89a7a",fontStyle:"italic",margin:0,textAlign:"center"}},"No parents recorded")
+                  : React.createElement("div",{style:{display:"flex",gap:"40px",flexWrap:"nowrap",alignItems:"flex-start",justifyContent:"center"}},
+                      parentIds.map(cardWithKey)
+                    )
+              ),
+              // Focal generation row — siblings + focal + spouse(s) in birth order, no wrap
+              React.createElement("div",null,
+                rowHeader(headerLabel),
+                React.createElement("div",{style:{display:"flex",gap:"18px",flexWrap:"nowrap",alignItems:"flex-start",justifyContent:"center"}},
+                  ...beforeFocal.map(cardWithKey),
+                  cardWithKey(focal),
+                  ...spouseIds.flatMap(id => [
+                    React.createElement("span",{key:"heart-"+id,style:{alignSelf:"center",color:"#c4858a",fontSize:"1.05rem",padding:"0 2px",flex:"0 0 auto"}},"\u2764"),
+                    cardWithKey(id)
+                  ]),
+                  ...afterFocal.map(cardWithKey)
+                )
+              ),
+              // Children row
+              React.createElement("div",null,
+                rowHeader("Children"),
+                childIds.length === 0
+                  ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#a89a7a",fontStyle:"italic",margin:0,textAlign:"center"}},"No children recorded")
+                  : React.createElement("div",{style:{display:"flex",gap:"18px",flexWrap:"nowrap",alignItems:"flex-start",justifyContent:"center"}},
+                      childIds.map(cardWithKey)
+                    )
+              )
+            )
           )
         );
       })(),
-
-      renderRow("Children", childIds, {empty:"No children recorded"}),
 
       React.createElement("p",{style:{fontSize:"0.78rem",color:"#a89a7a",fontStyle:"italic",marginTop:"24px",textAlign:"center"}},
         "Click any card to switch focus, edit details, or start a Chronicle for that person."
