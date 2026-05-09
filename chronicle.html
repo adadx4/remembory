@@ -7377,22 +7377,28 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       setEditingId(null);
     }
 
-    // Card. Acts as a button when not focal, plain block when focal.
+    // Card. Chronicle subjects use a sage-green palette so they're visually
+    // distinct; the focal card adds a ring/glow on top of whatever palette
+    // is in play, so a Chronicle focal still reads as Chronicle.
     function renderCard(id, opts={}) {
       const tp = tpById[id];
       if (!tp) return null;
       const isFocal = id === focal;
       const hasSubject = !!tp.subjectId;
       const sexAccent = tp.sex === "F" ? "#c4858a" : tp.sex === "M" ? "#8b9dc3" : "#a89a7a";
+      const bg         = hasSubject ? "rgba(74,122,90,0.13)" : "rgba(255,252,245,0.97)";
+      const borderCol  = hasSubject ? "#5a8a6a" : "#d4c4a8";
+      const leftBar    = hasSubject ? "#4a7a5a" : sexAccent;
+      const baseShadow = hasSubject ? "0 2px 8px rgba(74,122,90,0.18)" : "none";
+      const focalRing  = "0 0 0 3px rgba(196,169,98,0.65), 0 4px 14px rgba(0,0,0,0.18)";
       return React.createElement("div",{
         key: id,
         ref: el => { if (el) cardRefs.current[id] = el; },
         onClick: () => setPersonDetail(id),
         style: {
-          background: isFocal ? "#2c2416" : hasSubject ? "rgba(196,169,98,0.18)" : "rgba(255,252,245,0.97)",
-          border: "1px solid",
-          borderColor: isFocal ? "#2c2416" : hasSubject ? "#a8882a" : "#d4c4a8",
-          borderLeft: "4px solid " + (isFocal ? "#8a7040" : hasSubject ? "#c8a84a" : sexAccent),
+          background: bg,
+          border: "1px solid " + borderCol,
+          borderLeft: "4px solid " + leftBar,
           borderRadius: "4px",
           padding: "7px 10px",
           width: "150px",
@@ -7400,25 +7406,17 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
           cursor: "pointer",
           textAlign: "left",
           position: "relative",
-          boxShadow: isFocal ? "0 3px 12px rgba(0,0,0,0.18)" : hasSubject ? "0 2px 8px rgba(168,136,42,0.22)" : "none",
+          boxShadow: isFocal ? focalRing : baseShadow,
           ...(opts.style||{})
         }
       },
-        hasSubject && !isFocal && React.createElement("span",{style:{position:"absolute",top:"-7px",right:"-6px",background:"#4a7a5a",color:"#fff",fontSize:"0.62rem",fontWeight:700,letterSpacing:"0.06em",padding:"2px 7px",borderRadius:"10px",fontFamily:"Arial,sans-serif",pointerEvents:"none"}}, "\u2713 Chronicle"),
-        React.createElement("div",{style:{fontFamily:"'Crimson Text',serif",fontSize:isFocal?"1rem":"0.92rem",color:isFocal?"#f5f0e8":"#1a1208",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",lineHeight:1.2}}, tp.name),
-        React.createElement("div",{style:{fontSize:"0.76rem",color:isFocal?"rgba(245,240,232,0.65)":"#8a7460",marginTop:"2px"}},
+        React.createElement("div",{style:{fontFamily:"'Crimson Text',serif",fontSize:isFocal?"0.95rem":"0.9rem",color:"#1a1208",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",lineHeight:1.2}}, tp.name),
+        React.createElement("div",{style:{fontSize:"0.74rem",color: hasSubject?"#3a6b4a":"#8a7460",marginTop:"2px"}},
           [tp.dob && "b. "+tp.dob, tp.dod && "d. "+tp.dod].filter(Boolean).join(" \u00b7 ") || "\u00a0"
         )
       );
     }
 
-    function rowHeader(label) {
-      return React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"center",gap:"14px",marginBottom:"14px"}},
-        React.createElement("span",{style:{flex:"1 1 0",maxWidth:"180px",height:"1px",background:"linear-gradient(to right, transparent, #c8b89a)"}}),
-        React.createElement("h3",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.78rem",letterSpacing:"0.12em",textTransform:"uppercase",color:"#8a7460",fontWeight:700,margin:0,whiteSpace:"nowrap"}},label),
-        React.createElement("span",{style:{flex:"1 1 0",maxWidth:"180px",height:"1px",background:"linear-gradient(to left, transparent, #c8b89a)"}})
-      );
-    }
 
     const detailPerson = personDetail && tpById[personDetail];
     const linkedSubject = detailPerson?.subjectId ? subjects.find(s=>s.id===detailPerson.subjectId) : null;
@@ -7599,23 +7597,28 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
 
       // Traditional tree layout: three rows (parents / focal generation /
       // children) with SVG connector lines drawn behind the cards. The
-      // outer wrapper allows horizontal scroll for very wide trees; the
-      // inner ref'd container sizes to content so SVG paths line up.
+      // focal+spouse couple is centred in the focal-generation row by
+      // padding the lighter sibling side with invisible card-shaped
+      // slots, so the children row centred below the row sits directly
+      // under the couple.
       (() => {
         const generation = sortByDob([focal, ...siblingIds]);
         const fIdx = generation.indexOf(focal);
         const beforeFocal = generation.slice(0, fIdx);
         const afterFocal  = generation.slice(fIdx + 1);
-        const headerLabel = siblingIds.length > 0
-          ? (spouseIds.length > 0 ? "Subject \u00b7 spouse \u00b7 siblings" : "Subject \u00b7 siblings")
-          : (spouseIds.length > 0 ? "Subject \u00b7 spouse" : "Subject");
+        const balance = beforeFocal.length - afterFocal.length;
+        const leftPad  = balance < 0 ? Math.abs(balance) : 0;
+        const rightPad = balance > 0 ? balance : 0;
         const TREE_LINE = "#b89868";
+        const blankSlot = key => React.createElement("div",{key,style:{width:"150px",flex:"0 0 auto",visibility:"hidden"}});
 
         // SVG connector paths
         const renderConnectors = () => {
           if (!layout) return null;
           const paths = [];
-          // Parents → focal generation (siblings + focal)
+          // Parents → focal generation (siblings + focal). Bar is extended to
+          // cover the parent-midpoint when the focal-gen row is asymmetric so
+          // the drop always lands on the bar.
           if (parentIds.length > 0) {
             const ps = parentIds.map(id => layout.positions[id]).filter(Boolean);
             const genIds = sortByDob([focal, ...siblingIds]);
@@ -7625,11 +7628,12 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
               const parentBottom = Math.max(...ps.map(p=>p.bottom));
               const genTop = Math.min(...gs.map(g=>g.top));
               const barY = parentBottom + (genTop - parentBottom) * 0.55;
-              const leftCx = Math.min(...gs.map(g=>g.cx));
-              const rightCx = Math.max(...gs.map(g=>g.cx));
+              const legXs = gs.map(g=>g.cx);
+              const barLeft  = Math.min(parentMidX, ...legXs);
+              const barRight = Math.max(parentMidX, ...legXs);
               const d = [
                 "M "+parentMidX+" "+parentBottom+" L "+parentMidX+" "+barY,
-                "M "+leftCx+" "+barY+" L "+rightCx+" "+barY,
+                "M "+barLeft+" "+barY+" L "+barRight+" "+barY,
                 ...gs.map(g => "M "+g.cx+" "+barY+" L "+g.cx+" "+g.top),
               ].join(" ");
               paths.push(React.createElement("path",{key:"p2g", d, fill:"none", stroke:TREE_LINE, strokeWidth:1.5, strokeLinecap:"round"}));
@@ -7645,11 +7649,12 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
               const fbBottom = sp ? Math.max(fp.bottom, sp.bottom) : fp.bottom;
               const childTop = Math.min(...cs.map(c=>c.top));
               const barY = fbBottom + (childTop - fbBottom) * 0.55;
-              const leftCx = Math.min(...cs.map(c=>c.cx));
-              const rightCx = Math.max(...cs.map(c=>c.cx));
+              const childXs = cs.map(c=>c.cx);
+              const barLeft  = Math.min(dropX, ...childXs);
+              const barRight = Math.max(dropX, ...childXs);
               const d = [
                 "M "+dropX+" "+fbBottom+" L "+dropX+" "+barY,
-                "M "+leftCx+" "+barY+" L "+rightCx+" "+barY,
+                "M "+barLeft+" "+barY+" L "+barRight+" "+barY,
                 ...cs.map(c => "M "+c.cx+" "+barY+" L "+c.cx+" "+c.top),
               ].join(" ");
               paths.push(React.createElement("path",{key:"f2c", d, fill:"none", stroke:TREE_LINE, strokeWidth:1.5, strokeLinecap:"round"}));
@@ -7679,36 +7684,32 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
             renderConnectors(),
             React.createElement("div",{style:{position:"relative",zIndex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:"56px"}},
               // Parents row
-              React.createElement("div",null,
-                rowHeader("Parents"),
-                parentIds.length === 0
-                  ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#a89a7a",fontStyle:"italic",margin:0,textAlign:"center"}},"No parents recorded")
-                  : React.createElement("div",{style:{display:"flex",gap:"40px",flexWrap:"nowrap",alignItems:"flex-start",justifyContent:"center"}},
-                      parentIds.map(cardWithKey)
-                    )
+              parentIds.length === 0
+                ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#a89a7a",fontStyle:"italic",margin:0,textAlign:"center"}},"No parents recorded")
+                : React.createElement("div",{style:{display:"flex",gap:"40px",flexWrap:"nowrap",alignItems:"flex-start",justifyContent:"center"}},
+                    parentIds.map(cardWithKey)
+                  ),
+              // Focal generation row — siblings + focal + spouse(s) in birth
+              // order, padded so the focal+spouse couple sits at the row's
+              // geometric centre.
+              React.createElement("div",{style:{display:"flex",gap:"18px",flexWrap:"nowrap",alignItems:"flex-start",justifyContent:"center"}},
+                ...Array(leftPad).fill(0).map((_,i)=>blankSlot("lp-"+i)),
+                ...beforeFocal.map(cardWithKey),
+                cardWithKey(focal),
+                ...spouseIds.flatMap(id => [
+                  React.createElement("span",{key:"eq-"+id,style:{alignSelf:"center",color:"#8a7460",fontSize:"1.15rem",fontWeight:600,padding:"0 2px",flex:"0 0 auto",fontFamily:"'Playfair Display',serif"}},"="),
+                  cardWithKey(id)
+                ]),
+                ...afterFocal.map(cardWithKey),
+                ...Array(rightPad).fill(0).map((_,i)=>blankSlot("rp-"+i))
               ),
-              // Focal generation row — siblings + focal + spouse(s) in birth order, no wrap
-              React.createElement("div",null,
-                rowHeader(headerLabel),
-                React.createElement("div",{style:{display:"flex",gap:"18px",flexWrap:"nowrap",alignItems:"flex-start",justifyContent:"center"}},
-                  ...beforeFocal.map(cardWithKey),
-                  cardWithKey(focal),
-                  ...spouseIds.flatMap(id => [
-                    React.createElement("span",{key:"heart-"+id,style:{alignSelf:"center",color:"#c4858a",fontSize:"1.05rem",padding:"0 2px",flex:"0 0 auto"}},"\u2764"),
-                    cardWithKey(id)
-                  ]),
-                  ...afterFocal.map(cardWithKey)
-                )
-              ),
-              // Children row
-              React.createElement("div",null,
-                rowHeader("Children"),
-                childIds.length === 0
-                  ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#a89a7a",fontStyle:"italic",margin:0,textAlign:"center"}},"No children recorded")
-                  : React.createElement("div",{style:{display:"flex",gap:"18px",flexWrap:"nowrap",alignItems:"flex-start",justifyContent:"center"}},
-                      childIds.map(cardWithKey)
-                    )
-              )
+              // Children row — centred (which lands directly under the
+              // focal+spouse couple thanks to the padding above).
+              childIds.length === 0
+                ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#a89a7a",fontStyle:"italic",margin:0,textAlign:"center"}},"No children recorded")
+                : React.createElement("div",{style:{display:"flex",gap:"18px",flexWrap:"nowrap",alignItems:"flex-start",justifyContent:"center"}},
+                    childIds.map(cardWithKey)
+                  )
             )
           )
         );
