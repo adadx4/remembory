@@ -7377,6 +7377,15 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       setEditingId(null);
     }
 
+    // Set of tp ids that correspond to a Chronicle. A tp has a Chronicle
+    // if any subject's gedFocalPersonId points at it (the tree-host case)
+    // OR if it has been promoted via promoteToSubject (which sets
+    // tp.subjectId). The host-subject case wasn't covered by tp.subjectId
+    // alone, so the active subject's own tp wasn't getting the green tint.
+    const chronicleTpIds = new Set();
+    (subjects||[]).forEach(s => { if (s.gedFocalPersonId) chronicleTpIds.add(s.gedFocalPersonId); });
+    treePersons.forEach(p => { if (p.subjectId) chronicleTpIds.add(p.id); });
+
     // Card. Chronicle subjects use a sage-green palette so they're visually
     // distinct; the focal card adds a ring/glow on top of whatever palette
     // is in play, so a Chronicle focal still reads as Chronicle.
@@ -7384,7 +7393,7 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       const tp = tpById[id];
       if (!tp) return null;
       const isFocal = id === focal;
-      const hasSubject = !!tp.subjectId;
+      const hasSubject = chronicleTpIds.has(id);
       const sexAccent = tp.sex === "F" ? "#c4858a" : tp.sex === "M" ? "#8b9dc3" : "#a89a7a";
       const bg         = hasSubject ? "rgba(74,122,90,0.13)" : "rgba(255,252,245,0.97)";
       const borderCol  = hasSubject ? "#5a8a6a" : "#d4c4a8";
