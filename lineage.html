@@ -8979,52 +8979,100 @@ function AddEditForm({
                     React.createElement("button",{onClick:()=>removeCitation(idx),title:"Remove citation",style:{background:"none",border:"none",cursor:"pointer",color:"#c4858a",fontSize:"1.1rem",padding:"2px 6px",lineHeight:1}},"\u00d7")
                   ),
 
-                  // Step 1 — Repository
+                  // Step 1 — Repository (free-text + autocomplete suggestions).
+                  // Typing a name not in the catalogue is fine — when the user
+                  // commits a Collection below, a new knownSource is created
+                  // with this repository name, so the inline Repository entry
+                  // doesn't need a separate save action.
                   React.createElement("div",{style:{marginBottom:"8px"}},
                     React.createElement("label",{style:{...S.label,fontSize:"0.76rem",letterSpacing:"0.08em",textTransform:"uppercase"}}, "1 \u00b7 Repository"),
-                    React.createElement("select",{
+                    React.createElement("input",{
+                      list: "repo-suggest-"+idx,
                       value: repoPicked,
                       onChange: e => updateCitation(idx, {_repoFilter: e.target.value, sourceId: ""}),
-                      style: S.select
-                    },
-                      React.createElement("option",{value:""}, "\u2014 pick repository \u2014"),
-                      knownRepos.map(r => React.createElement("option",{key:r,value:r}, r))
+                      placeholder: "Type or pick \u2014 e.g. Ancestry, FreeBMD, Trove\u2026",
+                      style: S.input,
+                      autoComplete: "off"
+                    }),
+                    React.createElement("datalist",{id:"repo-suggest-"+idx},
+                      knownRepos.map(r => React.createElement("option",{key:r,value:r}))
                     )
                   ),
 
                   // Step 2 — Collection (only after a repository is picked).
-                  // Two optgroups: user-saved collections in this repo, and
-                  // catalogue collections (which lazy-create knownSources on pick).
-                  repoPicked && React.createElement("div",{style:{marginBottom:"10px"}},
-                    React.createElement("label",{style:{...S.label,fontSize:"0.76rem",letterSpacing:"0.08em",textTransform:"uppercase"}}, "2 \u00b7 Collection"),
-                    React.createElement("select",{
-                      value: cit.sourceId || "",
-                      onChange: e => {
-                        const v = e.target.value;
-                        if (v.startsWith("cat:") && catalogueRepoEntry) {
-                          const collId = v.slice(4);
-                          const coll = (catalogueRepoEntry.collections||[]).find(c => c.id === collId);
-                          if (coll) pickCatalogueCollection(idx, catalogueRepoEntry, coll);
-                        } else {
-                          updateCitation(idx, {sourceId: v, _repoFilter: undefined});
-                        }
-                      },
-                      style: S.select
-                    },
-                      React.createElement("option",{value:""}, "\u2014 pick collection \u2014"),
-                      userCollectionsInRepo.length > 0 && React.createElement("optgroup",{label:"Your collections"},
-                        userCollectionsInRepo.map(s => React.createElement("option",{key:s.id,value:s.id}, s.title + (s.year ? " ("+s.year+")" : "")))
+                  // Autocomplete with all user collections in the repo + every
+                  // catalogue collection in this repository's catalogue entry.
+                  // Picking a user collection commits its sourceId. Picking a
+                  // catalogue collection lazy-creates a knownSource. Typing a
+                  // brand new name and clicking "+ Create" makes a new
+                  // knownSource in the current repository on the spot.
+                  repoPicked && (() => {
+                    const collInput = (cit._collText !== undefined && cit._collText !== null) ? cit._collText : (src ? src.title : "");
+                    // Try to commit on exact match against a suggestion
+                    function tryCommitTyped(v) {
+                      const userMatch = userCollectionsInRepo.find(s => (s.title||"") === v);
+                      if (userMatch) {
+                        updateCitation(idx, {sourceId: userMatch.id, _repoFilter: undefined, _collText: undefined});
+                        return true;
+                      }
+                      const catMatch = cataloguedColls.find(c => (c.name||"") === v);
+                      if (catMatch && catalogueRepoEntry) {
+                        pickCatalogueCollection(idx, catalogueRepoEntry, catMatch);
+                        updateCitation(idx, {_collText: undefined});
+                        return true;
+                      }
+                      return false;
+                    }
+                    function createNew() {
+                      const title = (collInput||"").trim();
+                      if (!title || !repoPicked) return;
+                      const newId = "src_"+Date.now()+Math.random().toString(36).slice(2,5);
+                      const newSrc = { id:newId, title, type:"other", repository:repoPicked, year:null, url:"", notes:"" };
+                      persistSubject({knownSources: [...(knownSources||[]), newSrc].sort((a,b)=>(a.title||"").localeCompare(b.title||""))});
+                      updateCitation(idx, {sourceId: newId, _repoFilter: undefined, _collText: undefined});
+                    }
+                    const trimmed = (collInput||"").trim();
+                    const exactMatch = trimmed && (
+                      userCollectionsInRepo.some(s => (s.title||"") === trimmed) ||
+                      cataloguedColls.some(c => (c.name||"") === trimmed)
+                    );
+                    return React.createElement("div",{style:{marginBottom:"10px"}},
+                      React.createElement("label",{style:{...S.label,fontSize:"0.76rem",letterSpacing:"0.08em",textTransform:"uppercase"}}, "2 \u00b7 Collection"),
+                      React.createElement("input",{
+                        list: "coll-suggest-"+idx,
+                        value: collInput,
+                        onChange: e => {
+                          const v = e.target.value;
+                          updateCitation(idx, {_collText: v});
+                          // datalist picks fire onChange with the exact label;
+                          // catch that and commit the right citation.
+                          tryCommitTyped(v);
+                        },
+                        onKeyDown: e => { if (e.key === "Enter") { e.preventDefault(); if (!tryCommitTyped(collInput)) createNew(); } },
+                        placeholder: "Type or pick \u2014 e.g. England & Wales BMD, Deaths 1916\u20132007",
+                        style: S.input,
+                        autoComplete: "off"
+                      }),
+                      React.createElement("datalist",{id:"coll-suggest-"+idx},
+                        userCollectionsInRepo.map(s => React.createElement("option",{key:s.id,value:s.title})),
+                        cataloguedColls.map(c => React.createElement("option",{key:"cat:"+c.id,value:c.name}))
                       ),
-                      cataloguedColls.length > 0 && React.createElement("optgroup",{label:"From the Research catalogue"},
-                        cataloguedColls.map(c => React.createElement("option",{key:"cat:"+c.id,value:"cat:"+c.id},
-                          c.name + (fmtSpan(c) ? " \u00b7 "+fmtSpan(c) : "")
-                        ))
+                      // "+ Create new" button: appears when the user has typed
+                      // a name that doesn't match any suggestion. Saves a new
+                      // knownSource immediately so it's available for this
+                      // citation and any future ones.
+                      trimmed && !exactMatch && React.createElement("div",{style:{display:"flex",gap:"6px",alignItems:"center",marginTop:"6px"}},
+                        React.createElement("button",{
+                          onClick: createNew,
+                          style:{...S.btnOutline,padding:"4px 12px",fontSize:"0.82rem"}
+                        }, "+ Create \u201c"+trimmed+"\u201d in "+repoPicked),
+                        React.createElement("span",{style:{fontSize:"0.74rem",color:"#8a7460",fontStyle:"italic"}},"or pick a suggestion above")
+                      ),
+                      userCollectionsInRepo.length === 0 && cataloguedColls.length === 0 && !trimmed && React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",margin:"4px 0 0"}},
+                        "No saved collections yet \u2014 type a name and click \u201c+ Create\u201d to make one."
                       )
-                    ),
-                    userCollectionsInRepo.length === 0 && cataloguedColls.length === 0 && React.createElement("p",{style:{fontSize:"0.76rem",color:"#8a7460",fontStyle:"italic",margin:"4px 0 0"}},
-                      "No collections yet inside this repository. Add one in Index \u2192 Sources."
-                    )
-                  ),
+                    );
+                  })(),
 
                   // Step 3 — Record details (only after a collection is picked)
                   src && React.createElement("div",{style:{display:"grid",gap:"8px",borderTop:"1px dashed rgba(168,136,90,0.25)",paddingTop:"10px"}},
