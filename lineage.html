@@ -7377,14 +7377,34 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       setEditingId(null);
     }
 
-    // Set of tp ids that correspond to a Chronicle. A tp has a Chronicle
-    // if any subject's gedFocalPersonId points at it (the tree-host case)
-    // OR if it has been promoted via promoteToSubject (which sets
-    // tp.subjectId). The host-subject case wasn't covered by tp.subjectId
-    // alone, so the active subject's own tp wasn't getting the green tint.
-    const chronicleTpIds = new Set();
-    (subjects||[]).forEach(s => { if (s.gedFocalPersonId) chronicleTpIds.add(s.gedFocalPersonId); });
-    treePersons.forEach(p => { if (p.subjectId) chronicleTpIds.add(p.id); });
+    // Map of tp.id -> subject (when that tp has a Chronicle). Three signals
+    // are checked, in priority order: tp.subjectId (promoteToSubject sets
+    // this), subject.gedFocalPersonId (covers the tree-host's own self,
+    // which has no tp.subjectId), and finally a case-insensitive name
+    // match (covers subjects whose Chronicle was created independently of
+    // this tree — the import doesn't auto-link them).
+    const tpToSubject = {};
+    const subjectByName = new Map();
+    (subjects||[]).forEach(s => {
+      const nm = (s.name||"").trim().toLowerCase();
+      if (nm && !subjectByName.has(nm)) subjectByName.set(nm, s);
+    });
+    treePersons.forEach(p => {
+      if (p.subjectId) {
+        const s = (subjects||[]).find(s2 => s2.id === p.subjectId);
+        if (s) tpToSubject[p.id] = s;
+      }
+    });
+    (subjects||[]).forEach(s => {
+      if (s.gedFocalPersonId && !tpToSubject[s.gedFocalPersonId]) tpToSubject[s.gedFocalPersonId] = s;
+    });
+    treePersons.forEach(p => {
+      if (tpToSubject[p.id]) return;
+      const nm = (p.name||"").trim().toLowerCase();
+      const s = nm ? subjectByName.get(nm) : null;
+      if (s) tpToSubject[p.id] = s;
+    });
+    const chronicleTpIds = new Set(Object.keys(tpToSubject));
 
     // Card. Chronicle subjects use a sage-green palette so they're visually
     // distinct; the focal card adds a ring/glow on top of whatever palette
@@ -7428,7 +7448,7 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
 
 
     const detailPerson = personDetail && tpById[personDetail];
-    const linkedSubject = detailPerson?.subjectId ? subjects.find(s=>s.id===detailPerson.subjectId) : null;
+    const linkedSubject = detailPerson ? (tpToSubject[detailPerson.id] || null) : null;
     const filtered = tpSearch.trim()
       ? treePersons.filter(p=>p.name.toLowerCase().includes(tpSearch.toLowerCase())).slice(0, 50)
       : null;
