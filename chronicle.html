@@ -7394,8 +7394,8 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
           borderColor: isFocal ? "#2c2416" : hasSubject ? "#a8882a" : "#d4c4a8",
           borderLeft: "4px solid " + (isFocal ? "#8a7040" : hasSubject ? "#c8a84a" : sexAccent),
           borderRadius: "4px",
-          padding: "8px 12px",
-          width: "190px",
+          padding: "7px 10px",
+          width: "150px",
           flex: "0 0 auto",
           cursor: "pointer",
           textAlign: "left",
@@ -7664,7 +7664,14 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
 
         const cardWithKey = id => React.createElement("div",{key:"k-"+id,style:{flex:"0 0 auto"}}, renderCard(id));
 
-        return React.createElement("div",{style:{overflowX:"auto",overflowY:"hidden",textAlign:"center"}},
+        return React.createElement("div",{style:{
+          overflowX:"auto",overflowY:"hidden",textAlign:"center",
+          // Break out of the 900px main column so the tree can use the
+          // full viewport width on wider screens.
+          marginLeft:"calc(50% - 50vw + 12px)",
+          marginRight:"calc(50% - 50vw + 12px)",
+          width:"calc(100vw - 24px)",
+        }},
           React.createElement("div",{
             ref: containerRef,
             style:{position:"relative",display:"inline-block",textAlign:"left",padding:"4px 12px 12px",minWidth:"100%"}
