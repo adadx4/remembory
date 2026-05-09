@@ -6873,12 +6873,23 @@ function SharedTimelineView({ memories, subjectName, dobYear, setSelected, setVi
       },"Show all")
     ),
 
+    // Decade jump-links
+    allEvents.length>0 && Object.keys(byDec).length>1 && React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"18px",paddingBottom:"12px",borderBottom:"1px solid #ede4d4",alignItems:"center"}},
+      React.createElement("span",{style:{fontSize:"0.74rem",color:"#8a7460",fontStyle:"italic",letterSpacing:"0.04em",marginRight:"2px"}},"Jump to:"),
+      Object.keys(byDec).sort((a,b)=>+a-+b).map(dec=>React.createElement("a",{
+        key:"sjump-"+dec,
+        href:"#sdec-"+dec,
+        onClick:e=>{e.preventDefault();document.getElementById("sdec-"+dec)?.scrollIntoView({behavior:"smooth",block:"start"});},
+        style:{fontSize:"0.82rem",color:"#5a4a38",textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px",fontFamily:"'Playfair Display',serif",fontWeight:700,letterSpacing:"0.04em",padding:"2px 4px"}
+      }, dec+"s"))
+    ),
+
     // Timeline
     allEvents.length===0
       ? React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",textAlign:"center",padding:"40px 0"}},"No events to display. Select people above.")
       : Object.keys(byDec).sort((a,b)=>+a-+b).map(dec=>{
           const events = byDec[dec];
-          return React.createElement("div",{key:dec,style:{marginBottom:"24px"}},
+          return React.createElement("div",{key:dec,id:"sdec-"+dec,style:{marginBottom:"24px"}},
             React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"12px",marginBottom:"8px"}},
               React.createElement("h3",{style:{margin:0,fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#8a7460",fontWeight:700,letterSpacing:"0.1em"}},
                 dec,React.createElement("span",{style:{fontSize:"0.55em",letterSpacing:0,verticalAlign:"baseline"}},"s")
@@ -7372,15 +7383,19 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       );
     }
 
+    function rowHeader(label) {
+      return React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"center",gap:"14px",marginBottom:"14px"}},
+        React.createElement("span",{style:{flex:"1 1 0",maxWidth:"180px",height:"1px",background:"linear-gradient(to right, transparent, #c8b89a)"}}),
+        React.createElement("h3",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.78rem",letterSpacing:"0.12em",textTransform:"uppercase",color:"#8a7460",fontWeight:700,margin:0,whiteSpace:"nowrap"}},label),
+        React.createElement("span",{style:{flex:"1 1 0",maxWidth:"180px",height:"1px",background:"linear-gradient(to left, transparent, #c8b89a)"}})
+      );
+    }
     function renderRow(label, ids, opts={}) {
-      return React.createElement("div",{style:{marginBottom:"22px"}},
-        React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"8px"}},
-          React.createElement("h3",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.78rem",letterSpacing:"0.12em",textTransform:"uppercase",color:"#8a7460",fontWeight:700,margin:0}},label),
-          React.createElement("span",{style:{flex:1,height:"1px",background:"linear-gradient(to right, #c8b89a, transparent)"}})
-        ),
+      return React.createElement("div",{style:{marginBottom:"36px"}},
+        rowHeader(label),
         ids.length === 0
-          ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#a89a7a",fontStyle:"italic",margin:"0 0 0 4px"}}, opts.empty || "\u2014")
-          : React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"flex-start"}},
+          ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#a89a7a",fontStyle:"italic",margin:0,textAlign:"center"}}, opts.empty || "\u2014")
+          : React.createElement("div",{style:{display:"flex",gap:"18px",flexWrap:"wrap",alignItems:"flex-start",justifyContent:"center"}},
               ids.map(id => renderCard(id))
             )
       );
@@ -7563,23 +7578,40 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
           )
       ),
 
-      // Three-row 3-generation layout
+      // Three-row 3-generation layout — each row centred, spouses spliced
+      // next to focal, siblings + focal in birth order.
       renderRow("Parents", parentIds, {empty:"No parents recorded"}),
 
-      // Subject row: focal in centre, spouses immediately to its right, siblings on either side.
-      React.createElement("div",{style:{marginBottom:"22px"}},
-        React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"8px"}},
-          React.createElement("h3",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.78rem",letterSpacing:"0.12em",textTransform:"uppercase",color:"#8a7460",fontWeight:700,margin:0}},"Subject \u00b7 spouses \u00b7 siblings"),
-          React.createElement("span",{style:{flex:1,height:"1px",background:"linear-gradient(to right, #c8b89a, transparent)"}})
-        ),
-        React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"flex-start"}},
-          focalP && renderCard(focal),
-          spouseIds.map(id => renderCard(id)),
-          siblingIds.length > 0 && React.createElement("div",{style:{display:"flex",gap:"10px",flexWrap:"wrap",borderLeft:"1px dashed #c8b89a",paddingLeft:"10px",marginLeft:"6px"}},
-            siblingIds.map(id => renderCard(id))
+      // Subject row: parents' children in birth order, focal's spouse(s)
+      // immediately after focal.
+      (() => {
+        const generation = sortByDob([focal, ...siblingIds]);
+        const fIdx = generation.indexOf(focal);
+        const composed = [
+          ...generation.slice(0, fIdx + 1),
+          ...spouseIds.map(id => ({_kind:"spouse", id})),
+          ...generation.slice(fIdx + 1),
+        ];
+        const headerLabel = siblingIds.length > 0
+          ? (spouseIds.length > 0 ? "Subject \u00b7 spouse \u00b7 siblings" : "Subject \u00b7 siblings")
+          : (spouseIds.length > 0 ? "Subject \u00b7 spouse" : "Subject");
+        return React.createElement("div",{style:{marginBottom:"36px"}},
+          rowHeader(headerLabel),
+          React.createElement("div",{style:{display:"flex",gap:"14px",flexWrap:"wrap",alignItems:"flex-start",justifyContent:"center"}},
+            composed.map((entry, i) => {
+              if (entry && entry._kind === "spouse") {
+                const prev = composed[i-1];
+                const showHeart = prev === focal || (prev && prev._kind === "spouse");
+                return React.createElement(React.Fragment, {key: "sp-"+entry.id},
+                  showHeart && React.createElement("span",{style:{alignSelf:"center",color:"#c4858a",fontSize:"1rem",letterSpacing:"0.05em"}}, "\u2764"),
+                  renderCard(entry.id)
+                );
+              }
+              return renderCard(entry);
+            })
           )
-        )
-      ),
+        );
+      })(),
 
       renderRow("Children", childIds, {empty:"No children recorded"}),
 
@@ -13714,6 +13746,16 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
           filter.sharing&&React.createElement("button",{onClick:()=>setFilter(f=>({...f,sharing:null})),
             style:{background:"transparent",border:"none",color:"#c4858a",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"0 4px"}},
             "clear")
+        ),
+        // Decade jump-links
+        Object.keys(filtByDec).length>1&&React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"18px",paddingBottom:"12px",borderBottom:"1px solid #ede4d4",alignItems:"center"}},
+          React.createElement("span",{style:{fontSize:"0.74rem",color:"#8a7460",fontStyle:"italic",letterSpacing:"0.04em",marginRight:"2px"}},"Jump to:"),
+          Object.keys(filtByDec).sort().map(dec=>React.createElement("a",{
+            key:"jump-"+dec,
+            href:"#dec-"+dec,
+            onClick:e=>{e.preventDefault();document.getElementById("dec-"+dec)?.scrollIntoView({behavior:"smooth",block:"start"});},
+            style:{fontSize:"0.82rem",color:"#5a4a38",textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px",fontFamily:"'Playfair Display',serif",fontWeight:700,letterSpacing:"0.04em",padding:"2px 4px"}
+          }, dec+"s"))
         ),
         Object.keys(filtByDec).sort().map(dec=>{
           const byYear={};
