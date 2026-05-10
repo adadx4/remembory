@@ -2471,17 +2471,21 @@ function LockScreen({onUnlock}) {
 }
 
 // ── MediaImg — resolves mediaId to object URL ──────────────────
-function MediaImg({med, style, alt=""}) {
+function MediaImg({med, style, alt}) {
   const [src, setSrc] = React.useState(med.url && med.url.startsWith("data:") ? med.url : null);
   React.useEffect(() => {
     let cancelled = false;
     resolveMediaUrl(med).then(url => { if (!cancelled && url) setSrc(url); }).catch(()=>{});
     return () => { cancelled = true; };
   }, [med.mediaId, med.url]);
-  if (!src) return React.createElement("div", {style:{...style, background:"#e8dfd0", display:"flex", alignItems:"center", justifyContent:"center"}},
-    React.createElement("span", {style:{fontSize:"1.2rem", opacity:0.4}}, "🖼")
+  // If the caller passes an explicit alt (including ""), respect it —
+  // "" marks the image as decorative for screen readers. Otherwise fall
+  // back to the file name so the image isn't completely opaque.
+  const resolvedAlt = (alt !== undefined) ? alt : (med && med.name ? med.name : "");
+  if (!src) return React.createElement("div", {style:{...style, background:"#e8dfd0", display:"flex", alignItems:"center", justifyContent:"center"}, role: resolvedAlt ? "img" : undefined, "aria-label": resolvedAlt || undefined},
+    React.createElement("span", {style:{fontSize:"1.2rem", opacity:0.4}, "aria-hidden": true}, "🖼")
   );
-  return React.createElement("img", {src, alt, style});
+  return React.createElement("img", {src, alt: resolvedAlt, style});
 }
 
 function EntityPhotoUpload({photo, onSet, onClear, size=56}) {
@@ -2540,7 +2544,7 @@ const MemoryCard = React.memo(function MemoryCard({m, onClick}) {
 
 // ── Main App ───────────────────────────────────────────────────
 
-function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, knownLocations, photo, onRename, onDelete, onSetRelationship, onSetNotes, onSetOrgs, onSetLocs, onSetPhoto, onViewMemories, allRelationships=[], connectionEntry, onSetConnection, email="", onSetEmail}) {
+const PersonRow = React.memo(function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, knownLocations, photo, onRename, onDelete, onSetRelationship, onSetNotes, onSetOrgs, onSetLocs, onSetPhoto, onViewMemories, allRelationships=[], connectionEntry, onSetConnection, email="", onSetEmail}) {
   const [renaming, setRenaming] = React.useState(false);
   const [draft, setDraft] = React.useState(name);
   const [editingRel, setEditingRel] = React.useState(false);
@@ -2721,7 +2725,31 @@ function PersonRow({name, count, relationship, notes, orgs, knownOrgs, locs, kno
     )
     ) // close inner content div
   );
-}
+}, function arePropsEqualForPersonRow(prev, next) {
+  // Custom comparator: re-render only when the row's data changes.
+  // Callbacks (onRename, onSetPhoto, etc.) are dispatchers that close
+  // over the parent's setters — those setters are stable enough that
+  // ignoring callback identity is safe here. Without this, the parent
+  // recreates every callback on each render and React.memo never fires.
+  if (prev.name !== next.name || prev.count !== next.count) return false;
+  if (prev.relationship !== next.relationship) return false;
+  if (prev.notes !== next.notes) return false;
+  if (prev.email !== next.email) return false;
+  if (prev.photo !== next.photo) return false;
+  if (prev.connectionEntry !== next.connectionEntry) return false;
+  const arrEq = (a, b) => {
+    a = a || []; b = b || [];
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  };
+  if (!arrEq(prev.orgs, next.orgs)) return false;
+  if (!arrEq(prev.locs, next.locs)) return false;
+  if (!arrEq(prev.knownOrgs, next.knownOrgs)) return false;
+  if (!arrEq(prev.knownLocations, next.knownLocations)) return false;
+  if (!arrEq(prev.allRelationships, next.allRelationships)) return false;
+  return true;
+});
 
 function RelationshipRow({rel, people, memCount, onView, onRename}) {
   const [editing, setEditing] = React.useState(false);
@@ -7736,13 +7764,21 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
         const cardWithKey = id => React.createElement("div",{key:"k-"+id,style:{flex:"0 0 auto"}}, renderCard(id));
 
         return React.createElement("div",{style:{
-          overflowX:"auto",overflowY:"hidden",textAlign:"center",
+          position:"relative",
           // Break out of the 900px main column so the tree can use the
           // full viewport width on wider screens.
           marginLeft:"calc(50% - 50vw + 12px)",
           marginRight:"calc(50% - 50vw + 12px)",
           width:"calc(100vw - 24px)",
         }},
+          // Right-edge fade hints there's more to scroll horizontally.
+          // Pure decoration; pointer-events:none lets clicks pass through.
+          React.createElement("div",{"aria-hidden":true,style:{
+            position:"absolute",right:0,top:0,bottom:0,width:"24px",
+            background:"linear-gradient(to right, transparent, rgba(245,240,232,0.95))",
+            pointerEvents:"none",zIndex:2
+          }}),
+          React.createElement("div",{style:{overflowX:"auto",overflowY:"hidden",textAlign:"center"}},
           React.createElement("div",{
             ref: containerRef,
             style:{position:"relative",display:"inline-block",textAlign:"left",padding:"4px 12px 12px",minWidth:"100%"}
@@ -7777,6 +7813,7 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
                     childIds.map(cardWithKey)
                   )
             )
+          )
           )
         );
       })(),
@@ -13308,13 +13345,22 @@ function handleEdit(m) {
         const tabLabels={people:"People",pets:"Pets",orgs:"Organisations",locations:"Places",relationships:"Relationships",groups:"Groups",tags:"Tags",sources:"Sources",candidatePersons:"Candidates"};
         return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
           React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 20px",color:"#1a1208"}},tabLabels[indexTab]||"Index"),
-          // Tabs
-          React.createElement("div",{style:{display:"flex",gap:"0",borderBottom:"1px solid #c8b89a",marginBottom:"22px",overflowX:"auto",WebkitOverflowScrolling:"touch"}},
-            tabs.map(t=>React.createElement("button",{key:t.id,onClick:()=>setIndexTab(t.id),style:{
-              padding:"9px 16px",border:"none",borderBottom:indexTab===t.id?"2px solid #2c2416":"2px solid transparent",
-              background:"transparent",color:indexTab===t.id?"#1a1208":"#8a7460",cursor:"pointer",
-              fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",marginBottom:"-1px"
-            }},t.label))
+          // Tabs — wrapped in a relative container with a right-edge fade
+          // so users on narrow viewports get a hint that more tabs exist
+          // off-screen.
+          React.createElement("div",{style:{position:"relative",marginBottom:"22px"}},
+            React.createElement("div",{style:{display:"flex",gap:"0",borderBottom:"1px solid #c8b89a",overflowX:"auto",WebkitOverflowScrolling:"touch"}},
+              tabs.map(t=>React.createElement("button",{key:t.id,onClick:()=>setIndexTab(t.id),style:{
+                padding:"9px 16px",border:"none",borderBottom:indexTab===t.id?"2px solid #2c2416":"2px solid transparent",
+                background:"transparent",color:indexTab===t.id?"#1a1208":"#8a7460",cursor:"pointer",
+                fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",marginBottom:"-1px",whiteSpace:"nowrap"
+              }},t.label))
+            ),
+            React.createElement("div",{"aria-hidden":true,style:{
+              position:"absolute",right:0,top:0,bottom:0,width:"24px",
+              background:"linear-gradient(to right, transparent, rgba(245,240,232,0.95))",
+              pointerEvents:"none"
+            }})
           ),
           // People tab renders the full manager inline
           indexTab==="people"
@@ -14174,6 +14220,17 @@ ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("/sw.js").then(reg => {
         console.log("[Chronicle] Service worker registered:", reg.scope);
+        // Long-running tabs (the typical Chronicle session) won't trigger
+        // a navigation that re-fetches sw.js. Re-check on visibility-
+        // change so users who leave the tab open and come back still
+        // pick up new versions, and once an hour as a backstop.
+        function checkForUpdate() {
+          try { reg.update(); } catch (e) {}
+        }
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") checkForUpdate();
+        });
+        setInterval(checkForUpdate, 60 * 60 * 1000);
       }).catch(err => {
         console.warn("[Chronicle] Service worker registration failed:", err);
       });
