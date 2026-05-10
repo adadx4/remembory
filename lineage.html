@@ -1457,7 +1457,10 @@ function PlacePicker({value, displayValue, onClear, onPickKnown, onPickRemote, o
         React.createElement("div",null, "📍 " + l.label),
         (l.street||l.town||l.country) && React.createElement("div",{style:{fontSize:"0.78rem",color:"#8a7460",marginTop:"1px"}}, [l.street,l.town,l.state,l.country].filter(Boolean).join(", "))
       )),
-      query.trim().length >= 3 && React.createElement("div",{style:{padding:"5px 12px",fontSize:"0.72rem",color:"#8a7460",letterSpacing:"0.05em",textTransform:"uppercase",background:"#f5ede0",borderBottom:"1px solid #ede5d4"}}, "Map suggestions"),
+      query.trim().length >= 3 && React.createElement("div",{style:{padding:"5px 12px",fontSize:"0.72rem",color:"#8a7460",background:"#f5ede0",borderBottom:"1px solid #ede5d4"}},
+        React.createElement("div",{style:{letterSpacing:"0.05em",textTransform:"uppercase"}}, "Map suggestions"),
+        React.createElement("div",{style:{fontSize:"0.66rem",color:"#a89868",fontStyle:"italic",textTransform:"none",letterSpacing:0,marginTop:"1px"}}, "Searched on OpenStreetMap — your query leaves this device.")
+      ),
       query.trim().length >= 3 && searching && React.createElement("div",{style:{padding:"8px 12px",fontSize:"0.86rem",color:"#8a7460",fontStyle:"italic"}}, "🌍 Searching…"),
       query.trim().length >= 3 && !searching && remoteSugs.length === 0 && React.createElement("div",{style:{padding:"8px 12px",fontSize:"0.86rem",color:"#8a7460",fontStyle:"italic"}}, "No map matches"),
       remoteSugs.map(r => React.createElement("div",{
@@ -2507,7 +2510,7 @@ function EntityPhotoUpload({photo, onSet, onClear, size=56}) {
   );
 }
 
-function MemoryCard({m, onClick}) {
+const MemoryCard = React.memo(function MemoryCard({m, onClick}) {
   const [hov, setHov] = useState(false);
   return React.createElement("div",{
     onClick:()=>onClick(m.id),
@@ -2533,7 +2536,7 @@ function MemoryCard({m, onClick}) {
       m.tags.map(tag=>React.createElement("span",{key:tag,style:{padding:"2px 7px",borderRadius:"20px",fontSize:"0.78rem",background:TAG_COLORS[tag]+"33",color:TAG_COLORS[tag],border:`1px solid ${TAG_COLORS[tag]}44`}},tag))
     )
   );
-}
+});
 
 // ── Main App ───────────────────────────────────────────────────
 
@@ -6896,7 +6899,7 @@ function SharedTimelineView({ memories, subjectName, dobYear, setSelected, setVi
       ? React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",textAlign:"center",padding:"40px 0"}},"No events to display. Select people above.")
       : Object.keys(byDec).sort((a,b)=>+a-+b).map(dec=>{
           const events = byDec[dec];
-          return React.createElement("div",{key:dec,id:"sdec-"+dec,style:{marginBottom:"24px"}},
+          return React.createElement("div",{key:dec,id:"sdec-"+dec,style:{marginBottom:"24px",contentVisibility:"auto",containIntrinsicSize:"auto 500px"}},
             React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"12px",marginBottom:"8px"}},
               React.createElement("h3",{style:{margin:0,fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#8a7460",fontWeight:700,letterSpacing:"0.1em"}},
                 dec,React.createElement("span",{style:{fontSize:"0.55em",letterSpacing:0,verticalAlign:"baseline"}},"s")
@@ -10368,6 +10371,15 @@ function handleEdit(m) {
     setForm(editForm); setEditingId(m.id); setView("edit");
   }
 
+  // Stable callback for MemoryCard's onClick. Without this, every render
+  // of the timeline produces a new arrow function and React.memo on
+  // MemoryCard can't shortcut the re-render. setState refs are stable,
+  // so empty deps are fine.
+  const openMemoryDetail = React.useCallback(id => {
+    setSelected(id);
+    setView("detail");
+  }, []);
+
   function handleDelete(id) {
     if (!confirm("Delete this memory?")) return;
     // Clean up IDB blobs — both the memory's own media AND any per-citation
@@ -12254,7 +12266,7 @@ function handleEdit(m) {
   function TimelineList({mems, onClickMem}) {
     return React.createElement("div",{style:{position:"relative",paddingLeft:"22px"}},
       React.createElement("div",{style:{position:"absolute",left:"7px",top:0,bottom:0,width:"1px",background:"linear-gradient(to bottom, #c8b89a, transparent)"}}),
-      mems.map(m=>React.createElement(MemoryCard,{key:m.id,m,onClick:id=>{ setSelected(id); setView("detail"); }}))
+      mems.map(m=>React.createElement(MemoryCard,{key:m.id,m,onClick:openMemoryDetail}))
     );
   }
 
@@ -13287,7 +13299,7 @@ function handleEdit(m) {
             React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"22px",fontSize:"0.92rem"}},`${filtered.length} ${isHistoryMode?(filtered.length===1?"event":"events"):(filtered.length===1?"memory":"memories")}`),
             React.createElement("div",{style:{position:"relative",paddingLeft:"22px"}},
               React.createElement("div",{style:{position:"absolute",left:"7px",top:0,bottom:0,width:"1px",background:"linear-gradient(to bottom, #c8b89a, transparent)"}}),
-              filtered.map(m=>React.createElement(MemoryCard,{key:m.id,m,onClick:id=>{setSelected(id);setView("detail");}}))
+              filtered.map(m=>React.createElement(MemoryCard,{key:m.id,m,onClick:openMemoryDetail}))
             )
           );
         }
@@ -13884,12 +13896,17 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         );})(),
         React.createElement("div",{style:{display:"grid",gridTemplateColumns:isMobile?"repeat(auto-fill, minmax(140px, 1fr))":"repeat(auto-fill, minmax(190px, 1fr))",gap:isMobile?"10px":"14px"}},
           (()=>{
-            const globalMax=Math.max(1,...allDecades.flatMap(dec=>Array.from({length:10},(_,i)=>ownMems.filter(m=>m.year===dec+i).length)));
+            // Bucket memories by year once instead of filtering ownMems
+            // for every (decade × year) cell — that was O(decades × 10 ×
+            // memories) on every render, a stutter source for big timelines.
+            const yearCounts = {};
+            ownMems.forEach(m => { if (m.year) yearCounts[m.year] = (yearCounts[m.year]||0) + 1; });
+            const globalMax = Math.max(1, ...Object.values(yearCounts));
             return allDecades.map(dec=>{
             const mems=memsForDec(dec);
             const tagCounts={}; mems.forEach(m=>m.tags.forEach(t=>{tagCounts[t]=(tagCounts[t]||0)+1;}));
             const topTags=Object.entries(tagCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
-            const perYear=Array.from({length:10},(_,i)=>ownMems.filter(m=>m.year===dec+i).length);
+            const perYear=Array.from({length:10},(_,i)=>yearCounts[dec+i]||0);
             return React.createElement("div",{key:dec,onClick:()=>{setScrollToDecade(dec);setView("timeline");},style:{cursor:"pointer",background:"rgba(255,252,245,0.85)",border:"1px solid #e0d4be",borderRadius:"4px",padding:"16px 14px",transition:"all 0.2s"},
               onMouseEnter:e=>{e.currentTarget.style.borderColor="#c8b89a";e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.07)";},
               onMouseLeave:e=>{e.currentTarget.style.borderColor="#e0d4be";e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="none";}},
@@ -13991,7 +14008,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
                 ),
                 React.createElement("div",{style:{flex:1,height:"1px",background:"#e0d4be"}})
               ),
-              byMonth[mk].map(m=>React.createElement(MemoryCard,{key:m.id,m,onClick:id=>{setSelected(id);setView("detail");}}))
+              byMonth[mk].map(m=>React.createElement(MemoryCard,{key:m.id,m,onClick:openMemoryDetail}))
             ))
           );
         })()
@@ -14033,7 +14050,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         Object.keys(filtByDec).sort().map(dec=>{
           const byYear={};
           filtByDec[dec].forEach(m=>{const yr=m.year||0;if(!byYear[yr])byYear[yr]=[];byYear[yr].push(m);});
-          return React.createElement("div",{key:dec,id:"dec-"+dec,style:{marginBottom:"28px"}},
+          return React.createElement("div",{key:dec,id:"dec-"+dec,style:{marginBottom:"28px",contentVisibility:"auto",containIntrinsicSize:"auto 600px"}},
             React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"12px",marginBottom:"10px"}},
               React.createElement("h3",{onClick:()=>{setZoomDecade(+dec);setZoomYear(null);setView("decade");},style:{margin:0,fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#8a7460",fontWeight:700,letterSpacing:"0.1em",cursor:"pointer"},onMouseEnter:e=>e.currentTarget.style.color="#1a1208",onMouseLeave:e=>e.currentTarget.style.color="#8a7460"},
                 dec,React.createElement("span",{style:{fontSize:"0.55em",letterSpacing:0,verticalAlign:"baseline"}},"s")," ↗"),
