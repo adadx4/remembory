@@ -8035,7 +8035,29 @@ function SourcesPanel({knownSources, memories, persistSubject, setIndexFilter}) 
 
   function deleteSource(id) {
     if (!window.confirm("Remove this source collection? Citations on individual events will keep their text but lose the link to the collection.")) return;
-    persistSubject({knownSources: knownSources.filter(s=>s.id!==id)});
+    // Match the confirm copy: walk every memory, null the sourceId on
+    // any citation pointing at the deleted collection (so citation text
+    // and confidence survive) and drop the id from any legacy
+    // sourceIds[] array. Without this, dangling references to the
+    // deleted source persist on every event that cited it.
+    const updatedMems = memories.map(m => {
+      let changed = false;
+      let sources = m.sources;
+      if (Array.isArray(sources)) {
+        const next = sources.map(s => s.sourceId === id ? {...s, sourceId: ""} : s);
+        if (next.some((s, i) => s !== sources[i])) { sources = next; changed = true; }
+      }
+      let sourceIds = m.sourceIds;
+      if (Array.isArray(sourceIds) && sourceIds.includes(id)) {
+        sourceIds = sourceIds.filter(sid => sid !== id);
+        changed = true;
+      }
+      return changed ? {...m, sources, sourceIds} : m;
+    });
+    persistSubject({
+      knownSources: knownSources.filter(s=>s.id!==id),
+      memories: updatedMems,
+    });
   }
 
   const typeInfo = t => SOURCE_TYPES.find(x=>x.id===t) || SOURCE_TYPES[SOURCE_TYPES.length-1];
@@ -9838,12 +9860,43 @@ function App() {
     saveQueueRef.current = next;
     return next;
   }
+  // Debounced wrapper. Typing in a form previously fired one save per
+  // keystroke; collapse rapid updates into one trailing save so we
+  // hammer the disk less. Latest data wins because pendingDataRef is
+  // overwritten on each call. React state still updates immediately —
+  // only the disk write is deferred.
+  const pendingDataRef = React.useRef(null);
+  const debounceTimerRef = React.useRef(null);
+  const pendingScheduleRef = React.useRef(0);
+  function scheduleSave(password, newData) {
+    pendingDataRef.current = {password, newData};
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    pendingScheduleRef.current = 1;
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      pendingScheduleRef.current = 0;
+      const latest = pendingDataRef.current;
+      pendingDataRef.current = null;
+      if (latest) flushSave(latest.password, latest.newData);
+    }, 250);
+  }
   // Warn the user if they try to close the tab while a save is still
-  // queued — the modern browser will only show a generic prompt, but
-  // that's enough to give the queue a chance to flush.
+  // queued or pending in the debounce window. We also try a best-effort
+  // synchronous flush of the debounced save so localStorage backed
+  // writes can still land before unload.
   React.useEffect(() => {
     function onBeforeUnload(e) {
-      if (pendingSavesRef.current > 0) {
+      const pendingScheduled = pendingScheduleRef.current > 0;
+      if (pendingScheduled && pendingDataRef.current) {
+        const latest = pendingDataRef.current;
+        pendingDataRef.current = null;
+        pendingScheduleRef.current = 0;
+        if (debounceTimerRef.current) { clearTimeout(debounceTimerRef.current); debounceTimerRef.current = null; }
+        // Best-effort: localStorage saves are sync and will land;
+        // encrypted (IDB) saves are async and may not.
+        flushSave(latest.password, latest.newData);
+      }
+      if (pendingSavesRef.current > 0 || pendingScheduled) {
         e.preventDefault();
         e.returnValue = "";
       }
@@ -9897,7 +9950,7 @@ function App() {
       const seeded = seedSubject({...currentSubject, ...subjectPatch});
       const newSubjects = prev.subjects.map(s => s.id===activeSubjectId ? seeded : s);
       const newData = {...prev, subjects: newSubjects};
-      flushSave(activePassword, newData);
+      scheduleSave(activePassword, newData);
       return newData;
     });
   }
@@ -9913,7 +9966,7 @@ function App() {
     } else {
       setData(prev => {
         const newData = {...prev, ...patch};
-        flushSave(activePassword, newData);
+        scheduleSave(activePassword, newData);
         return newData;
       });
     }
@@ -9921,7 +9974,7 @@ function App() {
   function persistTop(patch) {
     setData(prev => {
       const newData = {...prev, ...patch};
-      flushSave(activePassword, newData);
+      scheduleSave(activePassword, newData);
       return newData;
     });
   }
