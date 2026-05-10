@@ -725,19 +725,16 @@ async function storeMedia(dataUrl, name) {
 
 // Resize a blob image to max dimension, return data URL
 async function resizeImageBlob(blob, maxDim) {
+  // Always re-encode through a canvas — even when no resize is needed —
+  // so EXIF metadata (camera, GPS, timestamp) is stripped before the
+  // image leaves the device via share / sync. Returning the original
+  // blob via FileReader would preserve EXIF and quietly leak GPS.
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
     const img = new Image();
     img.onload = () => {
       const w = img.width, h = img.height;
-      if (w <= maxDim && h <= maxDim) {
-        const reader = new FileReader();
-        reader.onload = () => { URL.revokeObjectURL(url); resolve(reader.result); };
-        reader.onerror = () => { URL.revokeObjectURL(url); reject(new Error("read failed")); };
-        reader.readAsDataURL(blob);
-        return;
-      }
-      const scale = maxDim / Math.max(w, h);
+      const scale = (w <= maxDim && h <= maxDim) ? 1 : maxDim / Math.max(w, h);
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(w * scale);
       canvas.height = Math.round(h * scale);
@@ -917,11 +914,21 @@ function seedSubject(s) {
   const dedupedLocs = allLocs.filter(l => { if (seen.has(l.label)) return false; seen.add(l.label); return true; });
   dedupedLocs.sort((a, b) => a.label.localeCompare(b.label));
 
+  // Normalise email casing on every save so two share entries for
+  // "user@x.com" and "User@X.com" can't accumulate as duplicates. The
+  // sync Worker already lowercases on its side; this matches it locally.
+  const normEmails = {};
+  Object.entries(s.peopleEmails || {}).forEach(([name, email]) => {
+    if (typeof email === "string") normEmails[name] = email.trim().toLowerCase();
+    else if (email != null) normEmails[name] = email;
+  });
+
   return {
     ...s,
     knownPeople:    [...new Set([...(s.knownPeople||[]),    ...mems.flatMap(m=>m.people||[])])].sort(),
     knownOrgs:      [...new Set([...(s.knownOrgs||[]),      ...mems.flatMap(m=>m.orgs||[])])].sort(),
     knownLocations: dedupedLocs,
+    peopleEmails:   normEmails,
   };
 }
 
@@ -7439,7 +7446,18 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       return React.createElement("div",{
         key: id,
         ref: el => { if (el) cardRefs.current[id] = el; },
+        role: "button",
+        tabIndex: 0,
+        "aria-label": tp.name + (tp.dob ? ", born " + tp.dob : "") + (isFocal ? ", focused" : ""),
         onClick: () => setPersonDetail(id),
+        onKeyDown: e => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setPersonDetail(id);
+          }
+        },
+        onFocus: e => { e.currentTarget.style.outline = "2px solid #4a7a5a"; e.currentTarget.style.outlineOffset = "2px"; },
+        onBlur:  e => { e.currentTarget.style.outline = "none"; },
         style: {
           background: bg,
           border: "1px solid " + borderCol,
@@ -8756,7 +8774,15 @@ function AddEditForm({
     !!(form._expandEndDate || form.endFuzzy || form.endOngoing));
 
   // In Lineage mode, eventType must be picked (even if just "Other").
-  const canSave = !!(form.title?.trim() && form.year && (!isHistoryMode || form.eventType));
+  // Collect every missing required field at once so the footer can list
+  // them all together and each input can flag itself inline, instead of
+  // surfacing one violation at a time.
+  const missingFields = [];
+  if (!form.title?.trim()) missingFields.push("title");
+  if (!form.year) missingFields.push("date");
+  if (isHistoryMode && !form.eventType) missingFields.push("event type");
+  const canSave = missingFields.length === 0;
+  const isMissing = key => missingFields.includes(key);
   const sm = modeFor(subject);
   const addTitle = typeof sm.addMemory==="function" ? sm.addMemory(ownerName||subject?.name) : (sm.addMemory||"Record a Memory");
   // Inline new-candidate-person creation from the form
@@ -8828,7 +8854,7 @@ function AddEditForm({
       ),
       React.createElement("div",null,
         React.createElement("label",{style:S.label},"Title *"),
-        React.createElement("input",{value:form.title,onChange:e=>updateForm({title:e.target.value}),placeholder:isHistoryMode?"e.g. Birth of John Smith":"What do you want to call this memory?",style:S.input,autoFocus:view==="add"&&!isHistoryMode})
+        React.createElement("input",{value:form.title,onChange:e=>updateForm({title:e.target.value}),placeholder:isHistoryMode?"e.g. Birth of John Smith":"What do you want to call this memory?",style:{...S.input,borderColor:isMissing("title")?"#c4858a":S.input.borderColor},autoFocus:view==="add"&&!isHistoryMode})
       ),
       React.createElement(DateFields,{form,setForm:updateForm}),
       // End date — visible button
@@ -9342,8 +9368,8 @@ function AddEditForm({
               view==="edit"?"Save Changes":isCarerMode&&ownerName?`Save to ${ownerName}'s Chronicle`:"Save to Chronicle"),
         isHistoryMode&&!editingCandidateId&&view==="add"&&React.createElement("button",{onClick:canSave?handleSaveCandidateSubmit:undefined,disabled:!canSave,style:{...S.btnOutline,borderColor:"rgba(196,169,98,0.6)",color:"#7a5a20",opacity:canSave?1:0.45,cursor:canSave?"pointer":"not-allowed"}},"📥 Save as Candidate"),
         React.createElement("button",{onClick:onCancel,style:S.btnOutline},"Cancel"),
-        !canSave&&React.createElement("span",{style:{fontSize:"0.8rem",color:"#8a7460",fontStyle:"italic"}},
-          !form.title?.trim()?"Add a title to save":!form.year?"Add a date to save":(isHistoryMode&&!form.eventType)?"Pick an event type to save":"")
+        !canSave&&React.createElement("span",{style:{fontSize:"0.8rem",color:"#c4858a",fontStyle:"italic"}},
+          "Missing: " + missingFields.join(", "))
       )
     )
   );
@@ -9784,6 +9810,44 @@ function App() {
     }
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
+
+  // One-shot cleanup of stale references on mount: if data.activeSubjectId
+  // points at a subject that no longer exists (e.g. another tab deleted
+  // it, or a backup restore wiped it), or if any subject's
+  // gedFocalPersonId points at a tree person that's no longer in any
+  // tree, write back the corrected values so the bad ids can't keep
+  // misleading downstream lookups.
+  const stalePassRef = React.useRef(false);
+  React.useEffect(() => {
+    if (stalePassRef.current) return;
+    const allSubs = data.subjects || [];
+    if (allSubs.length === 0) return;
+    stalePassRef.current = true;
+    let dirty = false;
+    let next = data;
+    if (data.activeSubjectId && !allSubs.some(s => s.id === data.activeSubjectId)) {
+      const fallback = allSubs.find(subjectInProduct)?.id || allSubs[0].id;
+      next = {...next, activeSubjectId: fallback};
+      dirty = true;
+    }
+    const allTpIds = new Set(allSubs.flatMap(s => (s.treePersons||[]).map(p => p.id)));
+    if (allTpIds.size > 0) {
+      const cleanedSubs = allSubs.map(s => {
+        if (s.gedFocalPersonId && !allTpIds.has(s.gedFocalPersonId)) {
+          return {...s, gedFocalPersonId: null};
+        }
+        return s;
+      });
+      if (cleanedSubs.some((s, i) => s !== allSubs[i])) {
+        next = {...next, subjects: cleanedSubs};
+        dirty = true;
+      }
+    }
+    if (dirty) {
+      setData(next);
+      flushSave(activePassword, next);
+    }
   }, []);
 
   // persistSubject: update the active subject's fields, then save
