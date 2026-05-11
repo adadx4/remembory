@@ -12229,13 +12229,33 @@ function handleEdit(m) {
   const filtByDec={};
   filtered.forEach(m=>{ const d=Math.floor(m.year/10)*10; if(!filtByDec[d]) filtByDec[d]=[]; filtByDec[d].push(m); });
 
-  // Scroll to a decade section in the list view after navigation from Life view
+  // Scroll to a decade section in the list view after navigation from Life view.
+  // content-visibility:auto on the decade blocks uses an estimated height for
+  // off-screen sections, so the first scrollIntoView lands on an estimate
+  // that shifts once the real layout resolves. Re-run across a few frames
+  // until the target's top stabilises.
   React.useEffect(() => {
-    if (view === "timeline" && scrollToDecade !== null) {
-      const el = document.getElementById("dec-" + scrollToDecade);
-      if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); }
-      setScrollToDecade(null);
+    if (view !== "timeline" || scrollToDecade === null) return;
+    const el = document.getElementById("dec-" + scrollToDecade);
+    if (!el) { setScrollToDecade(null); return; }
+    let attempts = 0;
+    let lastTop = NaN;
+    let raf = 0;
+    function settle() {
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      if (top === lastTop || attempts > 8) {
+        // Final pass in smooth mode now that the position is correct
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      lastTop = top;
+      window.scrollTo({ top, behavior: "auto" });
+      attempts++;
+      raf = requestAnimationFrame(settle);
     }
+    raf = requestAnimationFrame(settle);
+    setScrollToDecade(null);
+    return () => { if (raf) cancelAnimationFrame(raf); };
   }, [view, scrollToDecade]);
 
   // ── Delivery polling ─────────────────────────────────────────
