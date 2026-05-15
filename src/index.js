@@ -2136,6 +2136,24 @@ export default {
       return json({ ok: true, deleted: listed.objects.length });
     }
 
+    // DELETE /sync/:keyHash — wipe the entire sync slot (metadata + photos).
+    // Lets a user recover when the cloud passphrase is lost: they can't pull
+    // because decryption fails, and they can't push because the server holds
+    // newer data. Requires the licence key matching the keyHash.
+    if (request.method === "DELETE" && /^\/sync\/[0-9a-f]{64}$/.test(path)) {
+      const keyHash = path.slice("/sync/".length);
+      const callerKey = getViewerKey(request, url);
+      if (!callerKey) return json({ error: "Forbidden" }, 403);
+      const callerHash = await sha256hex(callerKey.trim().toUpperCase());
+      if (callerHash !== keyHash) return json({ error: "Forbidden" }, 403);
+      const listed = await env.MEDIA.list({ prefix: `sync/${keyHash}/` });
+      await Promise.all([
+        env.SHARES.delete("sync:" + keyHash),
+        ...listed.objects.map(o => env.MEDIA.delete(o.key)),
+      ]);
+      return json({ ok: true, mediaDeleted: listed.objects.length });
+    }
+
     // ── Mailing list ──────────────────────────────────────────────────────────
 
     // POST /mailing/subscribe

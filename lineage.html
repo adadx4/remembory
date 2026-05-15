@@ -1860,7 +1860,7 @@ function buildPrompt(memories, knownPeople, knownOrgs, knownLocations, seen=new 
 }
 
 // ── LifeTimeline ─────────────────────────────────────────────
-function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, onAddTagged, onEditTagged, isMobile}) {
+function LifeTimeline({memories, setView, setSelected, setIndexFilter, onMissingEnd, onAddTagged, onEditTagged, isMobile}) {
   const now = new Date();
   const currentFrac = now.getFullYear() + now.getMonth()/12 + now.getDate()/365;
 
@@ -1916,15 +1916,30 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, onAddTag
     return m.endYear;
   }
   function buildPeriods(tag) {
+    // Memories with an org or location group together under that label.
+    // Memories with neither (e.g. a "Job" saved with just a title) fall back
+    // to using the memory's title — that way they still appear on the chart
+    // instead of being silently filtered out.
     const tagged = memories
-      .filter(m=>m.year&&(m.tags||[]).includes(tag)&&((m.orgs||[])[0]||m.location))
-      .map(m=>{const org=(m.orgs||[])[0];const hasMo=!!m.month&&m.month>0;const hasEndMo=!!m.endMonth&&m.endMonth>0;return{frac:memFrac(m),eFrac:memEndFrac(m),ongoing:!!m.endOngoing,hasMo,hasEndMo,startMonth:m.month||0,startYear:m.year,endMonth:m.endMonth||0,endYear:m.endYear||0,label:org||m.location,fType:org?"orgs":"locations"};})
+      .filter(m=>m.year&&(m.tags||[]).includes(tag))
+      .map(m=>{
+        const org=(m.orgs||[])[0];
+        const hasMo=!!m.month&&m.month>0;
+        const hasEndMo=!!m.endMonth&&m.endMonth>0;
+        const label = org || m.location || m.title || "(untitled)";
+        const fType = org ? "orgs" : (m.location ? "locations" : "memory");
+        return{frac:memFrac(m),eFrac:memEndFrac(m),ongoing:!!m.endOngoing,hasMo,hasEndMo,startMonth:m.month||0,startYear:m.year,endMonth:m.endMonth||0,endYear:m.endYear||0,label,fType,memId:m.id};
+      })
       .sort((a,b)=>a.frac-b.frac);
     const out=[];
     let i=0;
     while(i<tagged.length){
       const{label,fType}=tagged[i]; let j=i;
-      while(j+1<tagged.length&&tagged[j+1].label===label) j++;
+      // Title-labelled rows never group: each Job memory without org/location
+      // is its own row so the click target stays unambiguous.
+      if (fType !== "memory") {
+        while(j+1<tagged.length&&tagged[j+1].label===label&&tagged[j+1].fType!=="memory") j++;
+      }
       let groupEnd=tagged[j].frac, groupOngoing=false, endHasMo=tagged[j].hasMo, endMonth=tagged[j].startMonth, endYear=tagged[j].startYear;
       for(let k=i;k<=j;k++){
         if(tagged[k].ongoing) groupOngoing=true;
@@ -1933,7 +1948,7 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, onAddTag
       }
       if(groupOngoing) groupEnd=currentFrac;
       const hasEnd = i!==j || tagged[i].eFrac>0 || tagged[i].ongoing;
-      out.push({label,startFrac:tagged[i].frac,endFrac:groupEnd,isCurrent:groupOngoing,fType,noEnd:!hasEnd,startHasMo:tagged[i].hasMo,endHasMo:groupOngoing||endHasMo,startMonth:tagged[i].startMonth,startYear:tagged[i].startYear,endMonth,endYear});
+      out.push({label,startFrac:tagged[i].frac,endFrac:groupEnd,isCurrent:groupOngoing,fType,memId:i===j?tagged[i].memId:null,noEnd:!hasEnd,startHasMo:tagged[i].hasMo,endHasMo:groupOngoing||endHasMo,startMonth:tagged[i].startMonth,startYear:tagged[i].startYear,endMonth,endYear});
       i=j+1;
     }
     return out;
@@ -2062,7 +2077,10 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, onAddTag
           ),
           React.createElement("div",{style:{paddingBottom:isLast?"4px":"16px",flex:1,minWidth:0}},
             React.createElement("div",{
-              onClick:function(){setIndexFilter({type:r.fType,value:r.label});setView("index");},
+              onClick:function(){
+                if(r.fType==="memory"&&r.memId&&setSelected){ setSelected(r.memId); setView("detail"); }
+                else { setIndexFilter({type:r.fType,value:r.label}); setView("index"); }
+              },
               style:{fontFamily:"'Crimson Text',Georgia,serif",fontSize:"1rem",color:"#1a1208",cursor:"pointer",
                 textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px",
                 overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}
@@ -2071,14 +2089,14 @@ function LifeTimeline({memories, setView, setIndexFilter, onMissingEnd, onAddTag
               startLbl+(r.startFrac===r.endFrac&&!r.isCurrent?"":" \u2013 "+endLbl)+(dy>0.05?" \u00b7 "+durLabel(dy):"")
             ),
             showPrompt&&React.createElement("button",{
-              onClick:function(){onMissingEnd&&onMissingEnd(r.label, active.tag);},
+              onClick:function(){onMissingEnd&&onMissingEnd(r.label, active.tag, r.memId);},
               style:{background:"none",border:"none",padding:"0",marginTop:"4px",fontSize:"0.78rem",color:"#a8885a",
                 cursor:"pointer",fontFamily:"'Crimson Text',serif",fontStyle:"italic",textDecoration:"underline",
                 textDecorationColor:"rgba(168,136,90,0.4)",textUnderlineOffset:"2px"}
             },"When did this end? \u2192"),
             r.isCurrent&&React.createElement("span",{style:{display:"inline-block",fontSize:"0.78rem",background:"rgba(74,122,90,0.12)",color:"#3a6b4a",border:"1px solid rgba(74,122,90,0.3)",borderRadius:"20px",padding:"0 7px",marginTop:"3px",marginRight:"8px"}},"current"),
             onEditTagged&&React.createElement("button",{
-              onClick:function(){onEditTagged(r.label, active.tag);},
+              onClick:function(){onEditTagged(r.label, active.tag, r.memId);},
               style:{background:"none",border:"none",padding:"0",marginTop:"4px",fontSize:"0.78rem",color:"#8a7460",
                 cursor:"pointer",fontFamily:"'Crimson Text',serif",textDecoration:"underline",
                 textDecorationColor:"rgba(138,116,96,0.4)",textUnderlineOffset:"2px"}
@@ -5878,6 +5896,30 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey, onSyncComple
     } catch(e) { setStatus("error:"+e.message); }
   }
 
+  async function clearCloud() {
+    if (!licenceKey) { setStatus("error:A licence key is required for cloud sync."); return; }
+    const ok = window.confirm(
+      "Wipe all cloud sync data for this licence key?\n\n" +
+      "This permanently deletes the encrypted blob and photos stored in the cloud. " +
+      "Your local memories on this device are NOT affected.\n\n" +
+      "Use this when you've lost your sync passphrase and need to start fresh. " +
+      "After clearing, set a new passphrase and push from the device that has the data you want to keep."
+    );
+    if (!ok) return;
+    setStatus("clearing");
+    try {
+      const hash = await keyHash(licenceKey);
+      const res = await fetch(WORKER_URL + "/sync/" + hash, {
+        method: "DELETE",
+        headers: {"X-Chronicle-Client":"1","X-LS-Key":licenceKey},
+      });
+      if (!res.ok) { const e=await res.json().catch(()=>({})); setStatus("error:"+(e.error||res.status)); return; }
+      savePushedAt("");
+      setStatus("cleared");
+      setTimeout(()=>setStatus(""),3000);
+    } catch(e) { setStatus("error:"+e.message); }
+  }
+
   async function pull() {
     if (!passphrase.trim()) { setStatus("error:Enter your sync passphrase first."); return; }
     if (!licenceKey) { setStatus("error:A licence key is required for cloud sync."); return; }
@@ -5952,14 +5994,21 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey, onSyncComple
     React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"8px"}},
       React.createElement("button",{
         onClick:push,
-        disabled:status==="pushing"||status==="pulling",
-        style:{...S.btn,flex:1,opacity:(status==="pushing"||status==="pulling")?0.6:1}
+        disabled:status==="pushing"||status==="pulling"||status==="clearing",
+        style:{...S.btn,flex:1,opacity:(status==="pushing"||status==="pulling"||status==="clearing")?0.6:1}
       },status==="pushing"?"Pushing\u2026":"Push to cloud"),
       React.createElement("button",{
         onClick:pull,
-        disabled:status==="pushing"||status==="pulling",
-        style:{...S.btnOutline,flex:1,opacity:(status==="pushing"||status==="pulling")?0.6:1}
+        disabled:status==="pushing"||status==="pulling"||status==="clearing",
+        style:{...S.btnOutline,flex:1,opacity:(status==="pushing"||status==="pulling"||status==="clearing")?0.6:1}
       },status==="pulling"?"Pulling\u2026":"Pull from cloud")
+    ),
+    React.createElement("div",{style:{marginBottom:"8px"}},
+      React.createElement("button",{
+        onClick:clearCloud,
+        disabled:status==="pushing"||status==="pulling"||status==="clearing",
+        style:{background:"none",border:"none",color:"#a8885a",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",textDecoration:"underline",padding:0,opacity:(status==="pushing"||status==="pulling"||status==="clearing")?0.6:1}
+      },status==="clearing"?"Clearing\u2026":"Lost passphrase? Clear cloud data and start fresh")
     ),
     // Progress indicator
     (status.startsWith("pushing")||status.startsWith("pulling"))&&(()=>{
@@ -5977,6 +6026,7 @@ function CloudSyncPanel({buildBackupJson, importBackup, licenceKey, onSyncComple
       return React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic"}},label+"\u2026");
     })(),
     status==="done"&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontStyle:"italic"}},"\u2713 Done"),
+    status==="cleared"&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",fontStyle:"italic"}},"\u2713 Cloud cleared. Set a passphrase above and push from the device with the data you want to keep."),
     isErr&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#c4858a",marginTop:"4px"}},errMsg)
   );
 }
@@ -13520,16 +13570,19 @@ function handleEdit(m) {
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Life Timeline"),
         React.createElement("p",{style:{color:"#8a7460",fontStyle:"italic",marginBottom:"18px",fontSize:"0.92rem"}},
           "A visual overview of where you lived, studied, and worked. Tag memories with home, education, or work and add an organisation or location."),
-        React.createElement(LifeTimeline,{memories, setView, setIndexFilter, isMobile,
-          onMissingEnd:(label, tag)=>{
-            const m = memories.find(mem=>mem.year&&(mem.tags||[]).includes(tag)&&(((mem.orgs||[])[0]||mem.location)===label));
+        React.createElement(LifeTimeline,{memories, setView, setSelected, setIndexFilter, isMobile,
+          onMissingEnd:(label, tag, memId)=>{
+            const m = memId
+              ? memories.find(mem=>mem.id===memId)
+              : memories.find(mem=>mem.year&&(mem.tags||[]).includes(tag)&&(((mem.orgs||[])[0]||mem.location)===label));
             if(m){ handleEdit(m); setForm(f=>({...f, _expandEndDate:true})); }
           },
           onAddTagged:(tag)=>{
             setForm({...newForm(), tags:[tag]});
             setEditingId(null); setEditingCandidateId(null); setView("add");
           },
-          onEditTagged:(label, tag)=>{
+          onEditTagged:(label, tag, memId)=>{
+            if(memId){ const m=memories.find(mem=>mem.id===memId); if(m){ handleEdit(m); } return; }
             const matches = memories.filter(mem=>mem.year&&(mem.tags||[]).includes(tag)&&(((mem.orgs||[])[0]||mem.location)===label));
             if(matches.length===1){ handleEdit(matches[0]); }
             else if(matches.length>1){
