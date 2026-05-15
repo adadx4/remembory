@@ -294,6 +294,30 @@ const S = {
 };
 
 // ── Helpers ────────────────────────────────────────────────────
+// Scroll a DOM anchor into view, settling against content-visibility:auto.
+// Each off-screen block uses an estimated height, so the first scroll
+// targets a position that shifts as real layouts resolve. Re-aim across
+// a few frames until the target's top stabilises, then finish with a
+// short smooth scroll.
+function scrollAnchorIntoView(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  let attempts = 0;
+  let lastTop = NaN;
+  function settle() {
+    const top = el.getBoundingClientRect().top + window.scrollY;
+    if (top === lastTop || attempts > 8) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    lastTop = top;
+    window.scrollTo({ top, behavior: "auto" });
+    attempts++;
+    requestAnimationFrame(settle);
+  }
+  requestAnimationFrame(settle);
+}
+
 function fuzzyDateLabel(m) {
   const { year, month, day, fuzzy, season } = m;
   function startLabel() {
@@ -6917,7 +6941,7 @@ function SharedTimelineView({ memories, subjectName, dobYear, setSelected, setVi
       Object.keys(byDec).sort((a,b)=>+a-+b).map(dec=>React.createElement("a",{
         key:"sjump-"+dec,
         href:"#sdec-"+dec,
-        onClick:e=>{e.preventDefault();document.getElementById("sdec-"+dec)?.scrollIntoView({behavior:"smooth",block:"start"});},
+        onClick:e=>{e.preventDefault();scrollAnchorIntoView("sdec-"+dec);},
         style:{fontSize:"0.82rem",color:"#5a4a38",textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px",fontFamily:"'Playfair Display',serif",fontWeight:700,letterSpacing:"0.04em",padding:"2px 4px"}
       }, dec+"s"))
     ),
@@ -9584,12 +9608,16 @@ function App() {
 
   const [view, _setView] = useState("life");
   const viewHistoryRef = React.useRef([]);
+  // Views that shouldn't be remembered as a "place to go back to": the
+  // add/edit forms (Back skips past the form chain) and the sharing
+  // workflow (Back from a memory after sharing should land on the
+  // memory's life view, not on the sharing page).
+  const TRANSIENT_VIEWS = new Set(["add", "edit", "sharing"]);
   function setView(v) {
-    const EDIT_VIEWS = ["add", "edit"];
-    if (EDIT_VIEWS.includes(view)) {
-      // Leaving an edit/add screen: don't record it in back-history.
+    if (TRANSIENT_VIEWS.has(view)) {
+      // Leaving a transient screen: don't record it in back-history.
       // If we're returning to the exact view we came from, also pop that entry
-      // so Back skips past it to the view before the edit chain started.
+      // so Back skips past it to the view before the transient chain started.
       const hist = viewHistoryRef.current;
       if (hist.length > 0 && hist[hist.length - 1] === v) {
         viewHistoryRef.current = hist.slice(0, -1);
@@ -12230,32 +12258,10 @@ function handleEdit(m) {
   filtered.forEach(m=>{ const d=Math.floor(m.year/10)*10; if(!filtByDec[d]) filtByDec[d]=[]; filtByDec[d].push(m); });
 
   // Scroll to a decade section in the list view after navigation from Life view.
-  // content-visibility:auto on the decade blocks uses an estimated height for
-  // off-screen sections, so the first scrollIntoView lands on an estimate
-  // that shifts once the real layout resolves. Re-run across a few frames
-  // until the target's top stabilises.
   React.useEffect(() => {
     if (view !== "timeline" || scrollToDecade === null) return;
-    const el = document.getElementById("dec-" + scrollToDecade);
-    if (!el) { setScrollToDecade(null); return; }
-    let attempts = 0;
-    let lastTop = NaN;
-    let raf = 0;
-    function settle() {
-      const top = el.getBoundingClientRect().top + window.scrollY;
-      if (top === lastTop || attempts > 8) {
-        // Final pass in smooth mode now that the position is correct
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-        return;
-      }
-      lastTop = top;
-      window.scrollTo({ top, behavior: "auto" });
-      attempts++;
-      raf = requestAnimationFrame(settle);
-    }
-    raf = requestAnimationFrame(settle);
+    scrollAnchorIntoView("dec-" + scrollToDecade);
     setScrollToDecade(null);
-    return () => { if (raf) cancelAnimationFrame(raf); };
   }, [view, scrollToDecade]);
 
   // ── Delivery polling ─────────────────────────────────────────
@@ -14162,21 +14168,31 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
           Object.keys(filtByDec).sort().map(dec=>React.createElement("a",{
             key:"jump-"+dec,
             href:"#dec-"+dec,
-            onClick:e=>{e.preventDefault();document.getElementById("dec-"+dec)?.scrollIntoView({behavior:"smooth",block:"start"});},
+            onClick:e=>{e.preventDefault();scrollAnchorIntoView("dec-"+dec);},
             style:{fontSize:"0.82rem",color:"#5a4a38",textDecoration:"underline",textDecorationColor:"#c8b89a",textUnderlineOffset:"2px",fontFamily:"'Playfair Display',serif",fontWeight:700,letterSpacing:"0.04em",padding:"2px 4px"}
           }, dec+"s"))
         ),
         Object.keys(filtByDec).sort().map(dec=>{
           const byYear={};
           filtByDec[dec].forEach(m=>{const yr=m.year||0;if(!byYear[yr])byYear[yr]=[];byYear[yr].push(m);});
+          const sortedYears=Object.keys(byYear).sort((a,b)=>+a-+b).filter(yr=>+yr>0);
           return React.createElement("div",{key:dec,id:"dec-"+dec,style:{marginBottom:"28px",contentVisibility:"auto",containIntrinsicSize:"auto 600px"}},
             React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"12px",marginBottom:"10px"}},
               React.createElement("h3",{onClick:()=>{setZoomDecade(+dec);setZoomYear(null);setView("decade");},style:{margin:0,fontFamily:"'Playfair Display',serif",fontSize:"1rem",color:"#8a7460",fontWeight:700,letterSpacing:"0.1em",cursor:"pointer"},onMouseEnter:e=>e.currentTarget.style.color="#1a1208",onMouseLeave:e=>e.currentTarget.style.color="#8a7460"},
                 dec,React.createElement("span",{style:{fontSize:"0.55em",letterSpacing:0,verticalAlign:"baseline"}},"s")," ↗"),
               React.createElement("div",{style:{flex:1,height:"1px",background:"linear-gradient(to right, #c8b89a, transparent)"}})
             ),
+            // Year jump-links for this decade
+            sortedYears.length>1&&React.createElement("div",{style:{display:"flex",gap:"4px",flexWrap:"wrap",marginBottom:"10px",paddingLeft:"14px"}},
+              sortedYears.map(yr=>React.createElement("a",{
+                key:"yrjump-"+dec+"-"+yr,
+                href:"#yr-"+yr,
+                onClick:e=>{e.preventDefault();scrollAnchorIntoView("yr-"+yr);},
+                style:{fontSize:"0.78rem",color:"#7a6a58",textDecoration:"underline",textDecorationColor:"#d4c4a8",textUnderlineOffset:"2px",fontFamily:"'Playfair Display',serif",fontWeight:600,padding:"1px 4px"}
+              }, yr))
+            ),
             React.createElement("div",{style:{paddingLeft:"14px",borderLeft:"3px solid #c8a87a"}},
-              Object.keys(byYear).sort((a,b)=>+a-+b).map(yr=>React.createElement("div",{key:yr,style:{marginBottom:"10px"}},
+              Object.keys(byYear).sort((a,b)=>+a-+b).map(yr=>React.createElement("div",{key:yr,id:+yr>0?("yr-"+yr):undefined,style:{marginBottom:"10px",scrollMarginTop:"12px"}},
                 +yr>0&&React.createElement("div",{onClick:()=>{setZoomDecade(+dec);setZoomYear(+yr);setView("year");},style:{display:"inline-flex",alignItems:"baseline",gap:"5px",marginBottom:"4px",cursor:"pointer"},onMouseEnter:e=>e.currentTarget.style.opacity="0.6",onMouseLeave:e=>e.currentTarget.style.opacity="1"},
                   React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.82rem",fontWeight:700,color:"#5a4a38",letterSpacing:"0.04em"}},yr),
                   (() => { const age = ageAtYear(+yr); return age != null && age >= 0 ? React.createElement("span",{style:{fontSize:"0.74rem",color:"#a8885a",fontStyle:"italic"}},"· age "+age) : null; })(),
