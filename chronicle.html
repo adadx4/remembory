@@ -9155,8 +9155,10 @@ function AddEditForm({
        ["tags","Tags","\ud83c\udff7"],
        ["photos","Photos","\ud83d\uddbc"]];
 
-  // Active tab — defaults to first tab with content, else first tab.
+  // Active tab — caller-requested (e.g. "💼 Job" pre-opens Organisation),
+  // else the first tab with content, else the first tab.
   const [activeTab, setActiveTab] = React.useState(() => {
+    if (form._initialTab && tabsForMode.some(([k]) => k === form._initialTab)) return form._initialTab;
     const found = tabsForMode.find(([k]) => secHasContent[k]);
     return (found && found[0]) || tabsForMode[0][0];
   });
@@ -10512,10 +10514,11 @@ function App() {
         updatedKnownLocs = [...knownLocations, locObj].sort((a,b) => (typeof a==='string'?a:a.label).localeCompare(typeof b==='string'?b:b.label));
       }
     }
-    // Strip transient picker payloads from the saved memory: the location
-    // picker's _locationData, and each source citation's _repoFilter (used
-    // only by the in-form Repository → Collection cascade).
-    const {_locationData, ...fClean} = f;
+    // Strip transient picker / form-UI payloads from the saved memory:
+    // the location picker's _locationData, the Add-menu preset hints
+    // (_expandEndDate, _initialTab, _promptHint), and each source citation's
+    // _repoFilter (used only by the in-form Repository → Collection cascade).
+    const {_locationData, _expandEndDate, _initialTab, _promptHint, ...fClean} = f;
     if (Array.isArray(fClean.sources)) {
       fClean.sources = fClean.sources.map(s => { const {_repoFilter, ...rest} = s; return rest; });
     }
@@ -13437,9 +13440,9 @@ function handleEdit(m) {
               {label:"🔎 Research",action:()=>window.open(genealogyResearchUrl(null, knownLocations),"_blank","noopener")},
             ]:[
               {label:"+ Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
-              {label:"💼 Job",action:()=>{setForm({...newForm(),tags:["work"],_expandEndDate:true});setEditingId(null);setView("add");}},
-              {label:"🎓 Study",action:()=>{setForm({...newForm(),tags:["education"],_expandEndDate:true});setEditingId(null);setView("add");}},
-              {label:"✈ Travel",action:()=>{setForm({...newForm(),tags:["travel"],_expandEndDate:true});setEditingId(null);setView("add");}},
+              {label:"💼 Job",action:()=>{setForm({...newForm(),tags:["work"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setView("add");}},
+              {label:"🎓 Study",action:()=>{setForm({...newForm(),tags:["education"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setView("add");}},
+              {label:"✈ Travel",action:()=>{setForm({...newForm(),tags:["travel"],_expandEndDate:true,_initialTab:"location"});setEditingId(null);setView("add");}},
               {divider:true},
               {label:"👤 Person",action:()=>{setIndexFilter(null);setIndexTab("people");setPendingPanelAdd("person");setView("index");}},
               {label:"🐾 Pet",action:()=>{setIndexFilter(null);setIndexTab("pets");setPendingPanelAdd("pet");setView("index");}},
@@ -13526,8 +13529,8 @@ function handleEdit(m) {
           {label:"🔎 Research",action:()=>window.open(genealogyResearchUrl(null, knownLocations),"_blank","noopener")},
         ]:[
           {label:"+ Memory",action:()=>{setForm(newForm());setEditingId(null);setView("add");}},
-          {label:"💼 Job",action:()=>{setForm({...newForm(),tags:["work"]});setEditingId(null);setView("add");}},
-          {label:"🎓 Study",action:()=>{setForm({...newForm(),tags:["education"]});setEditingId(null);setView("add");}},
+          {label:"💼 Job",action:()=>{setForm({...newForm(),tags:["work"],_initialTab:"orgs"});setEditingId(null);setView("add");}},
+          {label:"🎓 Study",action:()=>{setForm({...newForm(),tags:["education"],_initialTab:"orgs"});setEditingId(null);setView("add");}},
           {divider:true},
           {label:"👤 Person",action:()=>{setIndexFilter(null);setIndexTab("people");setView("index");}},
           {label:"🐾 Pet",action:()=>{setIndexFilter(null);setIndexTab("pets");setView("index");}},
