@@ -3158,6 +3158,27 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
     setNewLoc("");
     setAddingLoc(false);
   }
+  // Build (country -> set of state names known in OTHER entries) so we
+  // can spot a state value sitting in the Town slot. If the user has
+  // recorded "Australia / Victoria / Melbourne" elsewhere, a stray
+  // "Australia / -- / Victoria" entry can be recognised as a state
+  // mis-slotted as a town. Same idea for town-in-street.
+  const statesByCountry = {};
+  const townsByCountryState = {};
+  (knownLocations||[]).forEach(l => {
+    if (typeof l !== 'object') return;
+    const ctry = (l.country||"").trim();
+    const stt  = (l.state||"").trim();
+    const twn  = (l.town||"").trim();
+    if (ctry && stt) {
+      (statesByCountry[ctry] = statesByCountry[ctry] || new Set()).add(stt);
+    }
+    if (ctry && stt && twn) {
+      const k = ctry+"||"+stt;
+      (townsByCountryState[k] = townsByCountryState[k] || new Set()).add(twn);
+    }
+  });
+
   // Walk every known location and propose tidier values:
   //   1. Country-shaped values found in the street/town/state slot move
   //      down into Country (if Country is empty).
@@ -3202,6 +3223,28 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
       // State duplicated into Town (e.g. State=Victoria and Town=Victoria).
       if (f.state && f.town && f.state === f.town) {
         f.town = ""; changed = true;
+      }
+      // State sitting in the Town slot — promote it. Evidence: the
+      // value appears as a known state under the same country in some
+      // other entry. Only fires when the State slot is currently empty.
+      if (!f.state && f.town && f.country) {
+        const known = statesByCountry[f.country];
+        if (known && known.has(f.town)) {
+          f.state = f.town;
+          f.town = "";
+          changed = true;
+        }
+      }
+      // Town sitting in the Street slot — promote it. Evidence: the
+      // value appears as a known town under the same (country, state) in
+      // some other entry. Only fires when the Town slot is empty.
+      if (!f.town && f.street && f.country && f.state) {
+        const known = townsByCountryState[f.country+"||"+f.state];
+        if (known && known.has(f.street)) {
+          f.town = f.street;
+          f.street = "";
+          changed = true;
+        }
       }
       // Fall back to label parsing when nothing was structured at all.
       if (!f.country && !f.state && !f.town && !f.street) {
