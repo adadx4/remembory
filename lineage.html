@@ -3186,6 +3186,23 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
         const c = normaliseCountry(f.country);
         if (c && c !== f.country) { f.country = c; changed = true; }
       }
+      // Country duplicated into another slot — e.g. Country=Australia and
+      // State=Australia, which puts an "Australia" branch nested under the
+      // country in the tree view. Clear the duplicate. Compares both the
+      // raw and normalised forms so aliases catch too.
+      if (f.country) {
+        const canon = normaliseCountry(f.country) || f.country;
+        for (const k of ["state","town","street"]) {
+          if (!f[k]) continue;
+          const same = f[k] === f.country;
+          const sameNorm = (normaliseCountry(f[k]) || f[k]) === canon;
+          if (same || sameNorm) { f[k] = ""; changed = true; }
+        }
+      }
+      // State duplicated into Town (e.g. State=Victoria and Town=Victoria).
+      if (f.state && f.town && f.state === f.town) {
+        f.town = ""; changed = true;
+      }
       // Fall back to label parsing when nothing was structured at all.
       if (!f.country && !f.state && !f.town && !f.street) {
         const p = parseLabelToFields(l.label);
