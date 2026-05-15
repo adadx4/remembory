@@ -3261,34 +3261,71 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
     });
     return {next, changedCount};
   }
-  const cleanupPlan = planLocationCleanup();
-  function autoClassifyFromLabels() {
-    const {next, changedCount} = planLocationCleanup();
-    if (changedCount === 0) return;
-    // Cascade the cleaned address fields into memories so the form view of
-    // each memory stays in sync with its knownLocation entry.
-    const byLabel = {};
-    next.forEach(l => { if (typeof l === 'object' && l.label) byLabel[l.label] = l; });
+  // Build a per-item diff for the review panel. Each entry carries the
+  // label, the original snapshot, and the proposed snapshot so the user
+  // can eyeball before/after.
+  function planLocationDiffs() {
+    const diffs = [];
+    const {next} = planLocationCleanup();
+    next.forEach((after, idx) => {
+      const before = (knownLocations||[])[idx];
+      if (!before || typeof before !== 'object' || typeof after !== 'object') return;
+      const keys = ["street","town","state","country"];
+      const same = keys.every(k => (before[k]||"") === (after[k]||""));
+      if (same) return;
+      diffs.push({label: before.label, before, after});
+    });
+    return diffs;
+  }
+  const [reviewOpen, setReviewOpen] = React.useState(false);
+  const [reviewDiffs, setReviewDiffs] = React.useState([]);
+  const [ignoredLabels, setIgnoredLabels] = React.useState(new Set());
+  function openCleanupReview() {
+    const diffs = planLocationDiffs();
+    if (!diffs.length) return;
+    setReviewDiffs(diffs);
+    setIgnoredLabels(new Set());
+    setReviewOpen(true);
+  }
+  function closeCleanupReview() {
+    setReviewOpen(false);
+    setReviewDiffs([]);
+    setIgnoredLabels(new Set());
+  }
+  function toggleIgnoreLabel(label) {
+    setIgnoredLabels(prev => {
+      const n = new Set(prev);
+      if (n.has(label)) n.delete(label); else n.add(label);
+      return n;
+    });
+  }
+  function applyCleanupReview() {
+    const accept = new Map();
+    reviewDiffs.forEach(d => { if (!ignoredLabels.has(d.label)) accept.set(d.label, d.after); });
+    if (accept.size === 0) { closeCleanupReview(); return; }
+    const next = (knownLocations||[]).map(l => {
+      if (typeof l !== 'object') return l;
+      return accept.has(l.label) ? accept.get(l.label) : l;
+    });
+    // Cascade only into memories whose label is among the accepted diffs.
     const updMems = memories.map(m => {
-      if (!m.location) return m;
-      const kl = byLabel[m.location];
-      if (!kl) return m;
-      const before = [m.locationStreet||"", m.locationTown||"", m.locationState||"", m.locationCountry||""].join("|");
-      const after  = [kl.street||"", kl.town||"", kl.state||"", kl.country||""].join("|");
-      if (before === after) return m;
+      if (!m.location || !accept.has(m.location)) return m;
+      const kl = accept.get(m.location);
       return {...m, locationStreet:kl.street||"", locationTown:kl.town||"", locationState:kl.state||"", locationCountry:kl.country||""};
     });
     persistSubject({knownLocations: next, memories: updMems});
+    closeCleanupReview();
   }
+  const cleanupPlan = planLocationCleanup();
   return React.createElement("div",null,
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px",gap:"8px",flexWrap:"wrap"}},
       React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},knownLocations.length+" location"+(knownLocations.length===1?"":"s")+" · click a name to see its memories"),
       React.createElement("div",{style:{display:"flex",gap:"10px",alignItems:"baseline",flexWrap:"wrap"}},
         cleanupPlan.changedCount>0&&React.createElement("button",{
-          onClick: autoClassifyFromLabels,
-          title: "Fix locations where structured fields are missing or a country is sitting in the State/Town/Street slot. Country aliases (USA, UK, Holland...) are normalised. Changes cascade into memories.",
+          onClick: openCleanupReview,
+          title: "Review proposed fixes for locations where fields are missing, mis-slotted, or duplicated. You decide which to apply.",
           style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"3px",padding:"3px 10px",cursor:"pointer",color:"#5a4820",fontFamily:"'Crimson Text',serif",fontSize:"0.82rem"}
-        }, "Clean up "+cleanupPlan.changedCount+" location"+(cleanupPlan.changedCount===1?"":"s")),
+        }, "Clean up "+cleanupPlan.changedCount+" location"+(cleanupPlan.changedCount===1?"":"s")+"..."),
         !addingLoc&&React.createElement("button",{onClick:()=>{setNewLoc("");setAddingLoc(true);},style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.84rem"}},"+ Add location")
       )
     ),
@@ -3299,6 +3336,46 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
       React.createElement("button",{onClick:commitAdd,style:{...S.btn,padding:"5px 12px",fontSize:"0.86rem"}},"Add"),
       React.createElement("button",{onClick:()=>{setAddingLoc(false);setNewLoc("");},style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.86rem"}},"Cancel")
     ),
+    // ── Cleanup review panel ──
+    reviewOpen && (() => {
+      const fmt = obj => [obj.street, obj.town, obj.state, obj.country].map(v => v || "—").join("  /  ");
+      const acceptCount = reviewDiffs.filter(d => !ignoredLabels.has(d.label)).length;
+      return React.createElement("div",{style:{background:"rgba(255,252,245,0.97)",border:"1px solid #b89868",borderRadius:"4px",padding:"14px 16px",marginBottom:"14px"}},
+        React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"10px",marginBottom:"8px",flexWrap:"wrap"}},
+          React.createElement("div",null,
+            React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",margin:"0 0 2px",color:"#1a1208"}},"Review location fixes"),
+            React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",margin:0,fontStyle:"italic"}},reviewDiffs.length+" proposed change"+(reviewDiffs.length===1?"":"s")+" · fields shown as Street / Town / State / Country")
+          ),
+          React.createElement("div",{style:{display:"flex",gap:"6px",alignItems:"center"}},
+            ignoredLabels.size > 0 && React.createElement("button",{onClick:()=>setIgnoredLabels(new Set()),style:{...S.btnOutline,padding:"4px 10px",fontSize:"0.8rem"}}, "Re-include all"),
+            ignoredLabels.size < reviewDiffs.length && React.createElement("button",{onClick:()=>setIgnoredLabels(new Set(reviewDiffs.map(d=>d.label))),style:{...S.btnOutline,padding:"4px 10px",fontSize:"0.8rem"}}, "Ignore all")
+          )
+        ),
+        React.createElement("div",{style:{maxHeight:"380px",overflowY:"auto",border:"1px solid #ede4d4",borderRadius:"3px",background:"rgba(255,252,245,0.6)"}},
+          reviewDiffs.map((d, i) => {
+            const ignored = ignoredLabels.has(d.label);
+            return React.createElement("label",{key:d.label+"_"+i,style:{display:"flex",alignItems:"flex-start",gap:"10px",padding:"9px 12px",borderBottom:i<reviewDiffs.length-1?"1px solid #ede4d4":"none",cursor:"pointer",opacity:ignored?0.55:1}},
+              React.createElement("input",{type:"checkbox",checked:!ignored,onChange:()=>toggleIgnoreLabel(d.label),style:{marginTop:"3px",accentColor:"#4a7a5a",cursor:"pointer"}}),
+              React.createElement("div",{style:{flex:1,minWidth:0}},
+                React.createElement("div",{style:{fontFamily:"'Crimson Text',serif",fontSize:"0.92rem",color:"#1a1208",fontWeight:600,marginBottom:"3px"}}, d.label),
+                React.createElement("div",{style:{fontSize:"0.78rem",color:"#8a3030",fontFamily:"'Crimson Text',serif"}},
+                  React.createElement("span",{style:{display:"inline-block",minWidth:"42px",color:"#8a7460"}},"before"),
+                  React.createElement("span",{style:{textDecoration:ignored?"none":"line-through"}}, fmt(d.before))
+                ),
+                React.createElement("div",{style:{fontSize:"0.78rem",color:"#3a6b3a",fontFamily:"'Crimson Text',serif"}},
+                  React.createElement("span",{style:{display:"inline-block",minWidth:"42px",color:"#8a7460"}},"after"),
+                  React.createElement("span",{style:{fontWeight:600}}, fmt(d.after))
+                )
+              )
+            );
+          })
+        ),
+        React.createElement("div",{style:{display:"flex",gap:"8px",marginTop:"12px",alignItems:"center"}},
+          React.createElement("button",{onClick:applyCleanupReview,disabled:acceptCount===0,style:{...S.btn,padding:"7px 14px",fontSize:"0.88rem",opacity:acceptCount===0?0.5:1,cursor:acceptCount===0?"not-allowed":"pointer"}}, "Apply "+acceptCount+" change"+(acceptCount===1?"":"s")),
+          React.createElement("button",{onClick:closeCleanupReview,style:{...S.btnOutline,padding:"7px 12px",fontSize:"0.88rem"}}, "Cancel")
+        )
+      );
+    })(),
     knownLocations.length===0&&!addingLoc&&React.createElement("p",{style:{color:"#7a6a58",fontStyle:"italic"}},"No locations recorded yet."),
     knownLocations.length>0&&React.createElement("input",{value:search,onChange:e=>setSearch(e.target.value),placeholder:"Search locations…",style:{...S.input,marginBottom:"10px",padding:"7px 11px",fontSize:"0.88rem"}}),
     (()=>{
