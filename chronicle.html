@@ -6518,7 +6518,7 @@ function ImportView({
   importTab, setImportTab, importSaved,
   // Photo state & handlers
   photoQueue, photoDragOver, setPhotoDragOver, photoImportRef,
-  processPhotos, updatePhoto, savePhotos,
+  processPhotos, updatePhoto, savePhotos, editPhotoFully,
   // Email state & handlers
   emailForm, setEmailForm, emailDragOver, setEmailDragOver, emlImportRef,
   handleEmailText, saveEmail,
@@ -6575,8 +6575,15 @@ function ImportView({
               React.createElement("label",{style:S.label},"Organisations"),
               React.createElement(PeopleOrgField,{icon:"\ud83c\udfdb",values:item.orgs||[],allValues:knownOrgs,onChange:v=>updatePhoto(item.id,{orgs:v}),placeholder:"Add an organisation\u2026"})
             ),
-            React.createElement("p",{style:{margin:0,fontSize:"0.8rem",color:item.exifDate?"#89b08a":"#c4858a",fontStyle:"italic"}},
-              (item.exifDate?"\u2713 Date from EXIF":"\u26a0 No EXIF date")+(item.exifGps?" \u00b7 \u2713 GPS location":""))
+            React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"10px",flexWrap:"wrap",marginTop:"2px"}},
+              React.createElement("p",{style:{margin:0,fontSize:"0.8rem",color:item.exifDate?"#89b08a":"#c4858a",fontStyle:"italic"}},
+                (item.exifDate?"\u2713 Date from EXIF":"\u26a0 No EXIF date")+(item.exifGps?" \u00b7 \u2713 GPS location":"")),
+              editPhotoFully && React.createElement("button",{
+                onClick:()=>editPhotoFully(item),
+                title:"Open this photo in the full memory form for Pets, End date, Sources, Citations, Event Type, Research Note and more",
+                style:{...S.btnOutline,padding:"4px 10px",fontSize:"0.8rem",whiteSpace:"nowrap"}
+              }, "\u270e Edit with full options \u2192")
+            )
           )
         ))
       )
@@ -12145,6 +12152,31 @@ function handleEdit(m) {
 
   function updatePhoto(id,u) { setPhotoQueue(q=>q.map(p=>p.id===id?{...p,...u}:p)); }
 
+  // Route a single photo into the full Add form so the user can use
+  // every option (Pets, End date, Sources, Event Type, Display name,
+  // Additional locations, Research Note, Candidate, etc.) rather than
+  // the trimmed quick-import grid.
+  function editPhotoFully(photo) {
+    setForm({
+      ...newForm(),
+      title: photo.title || "",
+      content: photo.content || "",
+      year: photo.year || 0, month: photo.month || 1, day: photo.day || 0,
+      fuzzy: photo.fuzzy || "day", season: photo.season || "Early",
+      location: photo.location || "",
+      locations: photo.location ? [photo.location] : [],
+      tags: photo.tags || [],
+      people: photo.people || [],
+      orgs: photo.orgs || [],
+      mediaUrls: photo.med ? [photo.med] : [],
+    });
+    // Drop it from the queue — the form is now the source of truth for
+    // this photo. If the user cancels, they can re-drag the image.
+    setPhotoQueue(q => q.filter(p => p.id !== photo.id));
+    setEditingId(null);
+    setView("add");
+  }
+
   function savePhotos() {
     let toSave = photoQueue.filter(p=>p.keep&&p.title.trim());
     // Free tier: limit to 3 photo imports per day
@@ -14000,7 +14032,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
       view==="import"&&React.createElement(ImportView,{
         importTab, setImportTab, importSaved,
         photoQueue, photoDragOver, setPhotoDragOver, photoImportRef,
-        processPhotos, updatePhoto, savePhotos,
+        processPhotos, updatePhoto, savePhotos, editPhotoFully,
         emailForm, setEmailForm, emailDragOver, setEmailDragOver, emlImportRef,
         handleEmailText, saveEmail,
         isSubscriber, gedPersons, gedPicked, gedPreview, gedBusy,
