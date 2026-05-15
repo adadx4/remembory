@@ -3158,37 +3158,77 @@ function LocationsPanel({knownLocations,memories,locationNotes,renameLocation,de
     setNewLoc("");
     setAddingLoc(false);
   }
-  // Count entries whose label could be parsed but whose structured fields
-  // are empty — typically locations the user typed via the custom-name path
-  // that never got geocoded. Offer a one-click tidy.
-  const classifiable = (knownLocations||[]).filter(l => {
-    if (typeof l !== 'object') return false;
-    const hasFields = !!(l.country || l.state || l.town || l.street);
-    if (hasFields) return false;
-    const p = parseLabelToFields(l.label);
-    if (!p) return false;
-    return !!(p.country || p.state || p.town || p.street);
-  });
-  function autoClassifyFromLabels() {
-    const updated = knownLocations.map(l => {
+  // Walk every known location and propose tidier values:
+  //   1. Country-shaped values found in the street/town/state slot move
+  //      down into Country (if Country is empty).
+  //   2. Country aliases (USA, UK, Holland...) are normalised to their
+  //      canonical form (United States, United Kingdom, Netherlands...).
+  //   3. If every structured field is blank, parse the label and use that.
+  // Returns {next, changedCount} without mutating anything, so the same
+  // logic powers the count badge on the button AND the apply step.
+  function planLocationCleanup() {
+    let changedCount = 0;
+    const next = (knownLocations||[]).map(l => {
       if (typeof l !== 'object') return l;
-      const hasFields = !!(l.country || l.state || l.town || l.street);
-      if (hasFields) return l;
-      const p = parseLabelToFields(l.label);
-      if (!p) return l;
-      return {...l, street:l.street||p.street||"", town:l.town||p.town||"", state:l.state||p.state||"", country:l.country||p.country||""};
+      const f = {street:l.street||"", town:l.town||"", state:l.state||"", country:l.country||""};
+      let changed = false;
+      // Pull a country sitting in the wrong slot down to Country.
+      if (!f.country) {
+        for (const k of ["state","town","street"]) {
+          if (f[k]) {
+            const c = normaliseCountry(f[k]);
+            if (c) { f.country = c; f[k] = ""; changed = true; break; }
+          }
+        }
+      }
+      // Normalise country aliases (USA -> United States, etc.).
+      if (f.country) {
+        const c = normaliseCountry(f.country);
+        if (c && c !== f.country) { f.country = c; changed = true; }
+      }
+      // Fall back to label parsing when nothing was structured at all.
+      if (!f.country && !f.state && !f.town && !f.street) {
+        const p = parseLabelToFields(l.label);
+        if (p && (p.country || p.state || p.town || p.street)) {
+          f.street = p.street || ""; f.town = p.town || "";
+          f.state  = p.state  || ""; f.country = p.country || "";
+          changed = true;
+        }
+      }
+      if (!changed) return l;
+      changedCount++;
+      return {...l, ...f};
     });
-    persistSubject({knownLocations: updated});
+    return {next, changedCount};
+  }
+  const cleanupPlan = planLocationCleanup();
+  function autoClassifyFromLabels() {
+    const {next, changedCount} = planLocationCleanup();
+    if (changedCount === 0) return;
+    // Cascade the cleaned address fields into memories so the form view of
+    // each memory stays in sync with its knownLocation entry.
+    const byLabel = {};
+    next.forEach(l => { if (typeof l === 'object' && l.label) byLabel[l.label] = l; });
+    const updMems = memories.map(m => {
+      if (!m.location) return m;
+      const kl = byLabel[m.location];
+      if (!kl) return m;
+      const before = [m.locationStreet||"", m.locationTown||"", m.locationState||"", m.locationCountry||""].join("|");
+      const after  = [kl.street||"", kl.town||"", kl.state||"", kl.country||""].join("|");
+      if (before === after) return m;
+      return {...m, locationStreet:kl.street||"", locationTown:kl.town||"", locationState:kl.state||"", locationCountry:kl.country||""};
+    });
+    persistSubject({knownLocations: next, memories: updMems});
   }
   return React.createElement("div",null,
     React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"8px",gap:"8px",flexWrap:"wrap"}},
       React.createElement("p",{style:{fontSize:"0.8rem",color:"#7a6a58",fontStyle:"italic",margin:0}},knownLocations.length+" location"+(knownLocations.length===1?"":"s")+" · click a name to see its memories"),
       React.createElement("div",{style:{display:"flex",gap:"10px",alignItems:"baseline",flexWrap:"wrap"}},
-        classifiable.length>0&&React.createElement("button",{
+        cleanupPlan.changedCount>0&&React.createElement("button",{
           onClick: autoClassifyFromLabels,
-          title: "Parse comma-separated labels into Country / State / Town fields where they're missing",
+          title: "Fix locations where structured fields are missing or a country is sitting in the State/Town/Street slot. Country aliases (USA, UK, Holland...) are normalised. Changes cascade into memories.",
           style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"3px",padding:"3px 10px",cursor:"pointer",color:"#5a4820",fontFamily:"'Crimson Text',serif",fontSize:"0.82rem"}
-        }, "Auto-classify "+classifiable.length+" from labels"),
+        }, "Clean up "+cleanupPlan.changedCount+" location"+(cleanupPlan.changedCount===1?"":"s")),
         !addingLoc&&React.createElement("button",{onClick:()=>{setNewLoc("");setAddingLoc(true);},style:{...S.btnOutline,padding:"5px 12px",fontSize:"0.84rem"}},"+ Add location")
       )
     ),
