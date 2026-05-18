@@ -8308,6 +8308,9 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       const p = {
         ...newPersonRecord({name, sex: sex || matched?.sex || ""}),
         dob: matched?.dob || "",
+        dod: matched?.dod || "",
+        birthPlace: matched ? placeFromEvent(matched.memories, "birth") : "",
+        deathPlace: matched ? placeFromEvent(matched.memories, "death") : "",
         subjectId: matched ? matched.id : null,
       };
       persons.push(p);
@@ -8386,12 +8389,23 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
   function activeSubjectForSeed() {
     return (subjects||[]).find(s => s.id === activeSubjectId) || null;
   }
+  // Pull a place string out of a subject's first event of a given type
+  // (birth / death / baptism / burial / …). Prefers the user's display
+  // label, falls back to the canonical place name, blank if neither.
+  function placeFromEvent(memories, eventTypeId) {
+    if (!Array.isArray(memories)) return "";
+    const m = memories.find(x => x && x.eventType === eventTypeId);
+    if (!m) return "";
+    return (m.locationLabel||"").trim() || (m.location||"").trim() || "";
+  }
   function startFirstPerson() {
     const sub = activeSubjectForSeed();
     setAddingKind("first");
     setNewDraft(sub && (sub.name||"").trim()
       ? { name:sub.name||"", sex:sub.sex||"", dob:sub.dob||"", dod:sub.dod||"",
-          birthPlace:"", deathPlace:"", notes:"" }
+          birthPlace: placeFromEvent(sub.memories, "birth"),
+          deathPlace: placeFromEvent(sub.memories, "death"),
+          notes:"" }
       : { name:"", sex:"", dob:"", dod:"", birthPlace:"", deathPlace:"", notes:"" });
   }
   function cancelFirstPerson() { setAddingKind(null); setNewDraft({}); }
