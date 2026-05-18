@@ -7699,31 +7699,8 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
     }
 
     // ── Manual relation builder ────────────────────────────────
-    // Helpers that produce {persons, families} updates without persisting,
-    // so saveAddRelation can batch into a single persistTop call.
-    function newPersonRecord(draft) {
-      const id = "tp_manual_"+Date.now()+Math.random().toString(36).slice(2,5);
-      return {
-        id,
-        gedId: "@" + id.toUpperCase() + "@",
-        name: (draft.name||"").trim(),
-        sex: (draft.sex||"").trim(),
-        dob: (draft.dob||"").trim(),
-        dod: (draft.dod||"").trim(),
-        birthPlace: (draft.birthPlace||"").trim(),
-        deathPlace: (draft.deathPlace||"").trim(),
-        notes: (draft.notes||"").trim(),
-        subjectId: null,
-      };
-    }
-    function newFamilyRecord() {
-      const id = "tf_manual_"+Date.now()+Math.random().toString(36).slice(2,5);
-      return {
-        id, gedId: "@" + id.toUpperCase() + "@",
-        husbandId: null, wifeId: null, childIds: [],
-        marriageYear: null, marriagePlace: "",
-      };
-    }
+    // newPersonRecord / newFamilyRecord live at FamilyTreeView level so the
+    // first-person + seed-from-subject path can share them.
     // Each relation helper returns either {addFamily} (a new family object to
     // append) or {updateFamily} (an existing family object to replace by id).
     // Caller layers these on top of the new person itself.
@@ -7807,6 +7784,11 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
     function saveAddRelation() {
       if (!(newDraft.name||"").trim()) return;
       const person = newPersonRecord(newDraft);
+      // Link to an existing subject if the typed name matches one, so the
+      // new card immediately picks up the Chronicle palette + can be
+      // navigated to without a manual link step.
+      const matchedSub = findSubjectByName(person.name);
+      if (matchedSub) person.subjectId = matchedSub.id;
       let ops = null;
       if (addingKind === "spouse")  ops = relationOpsSpouse(addingAnchor, person);
       else if (addingKind === "parent")  ops = relationOpsParent(addingAnchor, person);
@@ -8242,28 +8224,173 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
     );
   }
 
+  // Tree record constructors — used both for in-tree relation adds
+  // (saveAddRelation) and for the first-person/seed-from-subject path.
+  function newPersonRecord(draft) {
+    const id = "tp_manual_"+Date.now()+Math.random().toString(36).slice(2,7);
+    return {
+      id,
+      gedId: "@" + id.toUpperCase() + "@",
+      name: (draft.name||"").trim(),
+      sex: (draft.sex||"").trim(),
+      dob: (draft.dob||"").trim(),
+      dod: (draft.dod||"").trim(),
+      birthPlace: (draft.birthPlace||"").trim(),
+      deathPlace: (draft.deathPlace||"").trim(),
+      notes: (draft.notes||"").trim(),
+      subjectId: null,
+    };
+  }
+  function newFamilyRecord() {
+    const id = "tf_manual_"+Date.now()+Math.random().toString(36).slice(2,7);
+    return {
+      id, gedId: "@" + id.toUpperCase() + "@",
+      husbandId: null, wifeId: null, childIds: [],
+      marriageYear: null, marriagePlace: "",
+    };
+  }
+
+  // Find a subject whose name matches `name` case-insensitively. Used so a
+  // manually-added tree person can pick up the subjectId of an existing
+  // chronicle without the user having to re-link by hand later.
+  function findSubjectByName(name) {
+    const nm = (name||"").trim().toLowerCase();
+    if (!nm) return null;
+    return (subjects||[]).find(s => (s.name||"").trim().toLowerCase() === nm) || null;
+  }
+
+  // Map a free-text relationship label (as stored in
+  // subject.peopleRelationships, e.g. "father" / "wife" / "daughter") to a
+  // structured family role we can wire into the tree. Returns null for
+  // anything ambiguous (in-laws, grandparents, cousins, uncles/aunts) —
+  // those need multi-hop wiring that's risky to auto-guess, so we leave
+  // them out of the seed and let the user add them manually.
+  function classifyRelType(relText) {
+    const r = (relText||"").toLowerCase().trim();
+    if (!r) return null;
+    if (/in[\s-]?law/.test(r)) return null;
+    if (/\b(grand|great)/.test(r)) return null;
+    if (/\b(uncle|aunt|cousin|nephew|niece|godparent|godfather|godmother)\b/.test(r)) return null;
+    if (/\b(father|stepfather|dad(?:dy)?|papa)\b/.test(r))            return {role:"parent", sex:"M"};
+    if (/\b(mother|stepmother|mum(?:my)?|mom(?:my)?|mama)\b/.test(r)) return {role:"parent", sex:"F"};
+    if (/\b(parent|guardian)\b/.test(r))                              return {role:"parent", sex:""};
+    if (/\b(husband|fianc[eé])\b/.test(r))                            return {role:"spouse", sex:"M"};
+    if (/\b(wife|fianc[eé]e)\b/.test(r))                              return {role:"spouse", sex:"F"};
+    if (/\b(spouse|partner)\b/.test(r))                               return {role:"spouse", sex:""};
+    if (/\b(son|stepson)\b/.test(r))                                  return {role:"child",  sex:"M"};
+    if (/\b(daughter|stepdaughter)\b/.test(r))                        return {role:"child",  sex:"F"};
+    if (/\b(child|kid)\b/.test(r))                                    return {role:"child",  sex:""};
+    if (/\b(brother|stepbrother|half[\s-]?brother)\b/.test(r))        return {role:"sibling",sex:"M"};
+    if (/\b(sister|stepsister|half[\s-]?sister)\b/.test(r))           return {role:"sibling",sex:"F"};
+    if (/\b(sibling|twin)\b/.test(r))                                 return {role:"sibling",sex:""};
+    return null;
+  }
+
+  // Seed an empty tree from a subject's peopleRelationships. The focal
+  // tree person is `focalPerson`; relatives are pulled out of
+  // matchedSubject.peopleRelationships, classified by classifyRelType,
+  // and wired into family groups:
+  //   • one "parents" family — both parents + focal + any siblings;
+  //   • one family per spouse — focal + spouse;
+  //   • children attach to the first spouse's family, or a single-parent
+  //     family if no spouse is known.
+  // If a relative's name also matches another subject, the new tree
+  // person is linked to that subject as well.
+  function seedTreeFromSubject(focalPerson, matchedSubject) {
+    const rels = matchedSubject.peopleRelationships || {};
+    const persons = [focalPerson];
+    const families = [];
+    const personByName = {[focalPerson.name.toLowerCase()]: focalPerson};
+    function ensurePerson(name, sex) {
+      const key = name.toLowerCase();
+      if (personByName[key]) return personByName[key];
+      const matched = findSubjectByName(name);
+      const p = {
+        ...newPersonRecord({name, sex: sex || matched?.sex || ""}),
+        dob: matched?.dob || "",
+        subjectId: matched ? matched.id : null,
+      };
+      persons.push(p);
+      personByName[key] = p;
+      return p;
+    }
+    const classified = [];
+    for (const [name, rel] of Object.entries(rels)) {
+      const c = classifyRelType(rel);
+      if (!c || !(name||"").trim()) continue;
+      classified.push({name: name.trim(), ...c});
+    }
+    const parents  = classified.filter(c => c.role === "parent");
+    const siblings = classified.filter(c => c.role === "sibling");
+    const spouses  = classified.filter(c => c.role === "spouse");
+    const children = classified.filter(c => c.role === "child");
+
+    // Parents family — focal + siblings share it
+    if (parents.length || siblings.length) {
+      const fam = newFamilyRecord();
+      const father = parents.find(p => p.sex === "M") || parents.find(p => !p.sex);
+      const mother = parents.find(p => p.sex === "F" && p !== father)
+                  || parents.find(p => !p.sex && p !== father);
+      if (father) fam.husbandId = ensurePerson(father.name, "M").id;
+      if (mother) fam.wifeId   = ensurePerson(mother.name, "F").id;
+      fam.childIds = [focalPerson.id, ...siblings.map(s => ensurePerson(s.name, s.sex).id)];
+      families.push(fam);
+    }
+
+    // Spouse / child families. Multiple spouses get separate families; all
+    // children attach to the first spouse's family (we have no signal for
+    // which kid belongs to which marriage). With no spouse known, children
+    // join a single-parent family rooted on the focal.
+    function assignSpouseSlots(fam, spouseTpId, spouseSex) {
+      if (focalPerson.sex === "F")            { fam.wifeId = focalPerson.id; fam.husbandId = spouseTpId; }
+      else if (focalPerson.sex === "M")       { fam.husbandId = focalPerson.id; fam.wifeId = spouseTpId; }
+      else if (spouseSex === "F")             { fam.wifeId = spouseTpId; fam.husbandId = focalPerson.id; }
+      else if (spouseSex === "M")             { fam.husbandId = spouseTpId; fam.wifeId = focalPerson.id; }
+      else                                    { fam.husbandId = focalPerson.id; fam.wifeId = spouseTpId; }
+    }
+    if (spouses.length > 0) {
+      spouses.forEach((sp, idx) => {
+        const spouseTp = ensurePerson(sp.name, sp.sex);
+        const fam = newFamilyRecord();
+        assignSpouseSlots(fam, spouseTp.id, sp.sex || spouseTp.sex);
+        if (idx === 0) fam.childIds = children.map(c => ensurePerson(c.name, c.sex).id);
+        families.push(fam);
+      });
+    } else if (children.length > 0) {
+      const fam = newFamilyRecord();
+      if (focalPerson.sex === "F") fam.wifeId = focalPerson.id;
+      else                          fam.husbandId = focalPerson.id;
+      fam.childIds = children.map(c => ensurePerson(c.name, c.sex).id);
+      families.push(fam);
+    }
+
+    return {persons, families};
+  }
+
   // ── NO TREE DATA — prompt import OR start manually ─────────────
   // While addingKind === "first" we render the inline person form here so
   // the user can build a tree from scratch. Save creates a single tp_*
   // record on the active subject; from there the in-tree "+ Spouse / +
   // Parent / + Sibling / + Child" buttons let them grow it organically.
+  // If a subject with the same name already exists, the new tree person
+  // is linked to it AND the subject's peopleRelationships are walked to
+  // pre-populate the initial tree with parents / spouses / siblings /
+  // children — so you don't have to retype people you've already named.
   function startFirstPerson() { setAddingKind("first"); setNewDraft({name:"",sex:"",dob:"",dod:"",birthPlace:"",deathPlace:"",notes:""}); }
   function cancelFirstPerson() { setAddingKind(null); setNewDraft({}); }
   function saveFirstPerson() {
     if (!(newDraft.name||"").trim()) return;
-    const id = "tp_manual_"+Date.now()+Math.random().toString(36).slice(2,5);
-    const person = {
-      id, gedId: "@" + id.toUpperCase() + "@",
-      name: (newDraft.name||"").trim(),
-      sex: (newDraft.sex||"").trim(),
-      dob: (newDraft.dob||"").trim(), dod: (newDraft.dod||"").trim(),
-      birthPlace: (newDraft.birthPlace||"").trim(), deathPlace: (newDraft.deathPlace||"").trim(),
-      notes: (newDraft.notes||"").trim(),
-      subjectId: null,
-    };
+    const person = newPersonRecord(newDraft);
+    const matched = findSubjectByName(person.name);
+    if (matched) person.subjectId = matched.id;
+    const seed = matched
+      ? seedTreeFromSubject(person, matched)
+      : {persons:[person], families:[]};
     const targetId = activeSubjectId;
     const newSubjects = subjects.map(s =>
-      s.id === targetId ? {...s, treePersons: [person], treeFamilies: [], gedFocalPersonId: person.id} : s
+      s.id === targetId
+        ? {...s, treePersons: seed.persons, treeFamilies: seed.families, gedFocalPersonId: person.id}
+        : s
     );
     persistTop({subjects: newSubjects});
     setFocalId(person.id);
@@ -9645,18 +9772,32 @@ function AddEditForm({
         if (endYear) return "to "+endYear;
         return "";
       }
-      // Tally sources already cited on this subject's other events — used
-      // to surface a "quick-pick" chip row above each empty citation so a
-      // recurring source (e.g. a census collection cited on dozens of
-      // events) is reused with one click instead of walking Repository →
-      // Collection every time. Excludes the event currently being edited;
-      // its in-progress state lives in `form.sources` and is handled per
-      // citation below.
-      const usedHereCounts = new Map();
+      // Catalogue records already cited on this subject's other events —
+      // surfaced above each empty citation so a single record (one URL /
+      // page reference) that's evidence for multiple events (birth,
+      // marriage, death, residence…) can be re-used with one click.
+      // Keyed on sourceId + citation text so each distinct record gets
+      // its own row, not just each collection. Click on a row copies
+      // every field forward (citation text, notes, confidence, media)
+      // so it's a true "use this record again" action, not just "use
+      // this collection".
+      const usedRecordsMap = new Map();
       for (const ev of (subject?.memories || [])) {
         if (ev.id === editingId) continue;
         for (const s of eventSources(ev)) {
-          if (s.sourceId) usedHereCounts.set(s.sourceId, (usedHereCounts.get(s.sourceId)||0) + 1);
+          if (!s.sourceId) continue;
+          const citTxt = (s.citation || "").trim();
+          const key = s.sourceId + "␟" + citTxt; // ␟ = unit separator
+          const existing = usedRecordsMap.get(key);
+          if (existing) { existing.count++; continue; }
+          usedRecordsMap.set(key, {
+            sourceId: s.sourceId,
+            citation: s.citation || "",
+            recordNotes: s.recordNotes || "",
+            confidence: s.confidence || "unknown",
+            mediaUrls: s.mediaUrls || [],
+            count: 1,
+          });
         }
       }
       return React.createElement("div",null,
@@ -9689,36 +9830,72 @@ function AddEditForm({
                 // has already linked (so the dropdown doesn't show duplicates).
                 const linkedCollIds = new Set(userCollectionsInRepo.map(s => s.researchCollectionId).filter(Boolean));
                 const cataloguedColls = (catalogueRepoEntry?.collections||[]).filter(c => c.id && !linkedCollIds.has(c.id));
-                // Quick-pick chips: sources already used on this subject's
-                // other events, ranked by frequency. Hidden once a repository
-                // is picked or a source committed (no point suggesting then).
-                // Anything already cited on a sibling citation in the same
-                // event is filtered out so the user doesn't double-cite.
-                const otherCitedHere = new Set(sources.filter((_,j) => j !== idx).map(s => s.sourceId).filter(Boolean));
-                const quickPicks = [...usedHereCounts.entries()]
-                  .filter(([sid]) => !otherCitedHere.has(sid))
-                  .map(([sid, count]) => ({src: (knownSources||[]).find(s => s.id === sid), count}))
-                  .filter(x => x.src)
-                  .sort((a, b) => b.count - a.count || (a.src.title||"").localeCompare(b.src.title||""));
-                const showQuickPicks = !cit.sourceId && !repoPicked && quickPicks.length > 0;
+                // Records (sourceId + specific citation text) used on this
+                // subject's other events. Excludes anything already cited
+                // on a sibling citation in the same in-progress event so
+                // we don't suggest a duplicate. Hidden once this citation
+                // has a repo or source picked \u2014 the user is past the
+                // "reuse" decision and on to entering record details.
+                const alreadyInFormKeys = new Set(
+                  sources.filter((_,j) => j !== idx)
+                    .filter(s => s.sourceId)
+                    .map(s => s.sourceId + "\u241f" + (s.citation||"").trim())
+                );
+                const usedRecords = [...usedRecordsMap.values()]
+                  .filter(rec => !alreadyInFormKeys.has(rec.sourceId + "\u241f" + (rec.citation||"").trim()))
+                  .sort((a, b) => b.count - a.count);
+                const showUsedRecords = !cit.sourceId && !repoPicked && usedRecords.length > 0;
                 return React.createElement("div",{key:idx,style:{background:"rgba(255,252,245,0.65)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px",marginBottom:"10px"}},
                   React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px",marginBottom:"10px"}},
                     React.createElement("strong",{style:{fontSize:"0.82rem",letterSpacing:"0.06em",textTransform:"uppercase",color:"#8a7460"}}, "Citation " + (idx+1)),
                     React.createElement("button",{onClick:()=>removeCitation(idx),title:"Remove citation",style:{background:"none",border:"none",cursor:"pointer",color:"#c4858a",fontSize:"1.1rem",padding:"2px 6px",lineHeight:1}},"\u00d7")
                   ),
 
-                  showQuickPicks && React.createElement("div",{style:{marginBottom:"10px",padding:"8px 10px",background:"rgba(196,169,98,0.08)",border:"1px solid rgba(196,169,98,0.3)",borderRadius:"3px"}},
-                    React.createElement("div",{style:{fontSize:"0.72rem",color:"#7a6a58",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:"5px"}}, "Sources used on this person"),
-                    React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"5px"}},
-                      quickPicks.slice(0,12).map(q =>
-                        React.createElement("button",{
-                          key:q.src.id,
-                          onClick:()=>updateCitation(idx,{sourceId:q.src.id,_repoFilter:undefined,_collText:undefined}),
-                          title:(q.src.repository?q.src.repository+" \u2014 ":"")+"used "+q.count+" time"+(q.count===1?"":"s")+" elsewhere on this person",
-                          style:{padding:"3px 9px",borderRadius:"20px",border:"1px solid #c8b89a",background:"rgba(255,252,245,0.9)",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.8rem",color:"#2c2416",display:"inline-flex",alignItems:"center",gap:"5px"}
-                        }, q.src.title || "(untitled)",
-                          React.createElement("span",{style:{color:"#8a7460",fontSize:"0.72rem"}}, "\u00d7"+q.count))
-                      )
+                  showUsedRecords && React.createElement("div",{style:{marginBottom:"10px",padding:"8px 10px",background:"rgba(196,169,98,0.08)",border:"1px solid rgba(196,169,98,0.3)",borderRadius:"3px"}},
+                    React.createElement("div",{style:{fontSize:"0.72rem",color:"#7a6a58",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:"6px"}}, "Records used on this person \u2014 click to reuse"),
+                    React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"4px"}},
+                      usedRecords.slice(0,10).map((rec, ri) => {
+                        const recSrc = (knownSources||[]).find(s => s.id === rec.sourceId);
+                        const title = recSrc?.title || "(untitled source)";
+                        const repo = recSrc?.repository || "";
+                        const citTxt = (rec.citation||"").trim();
+                        const citShort = citTxt.length > 90 ? citTxt.slice(0,87)+"\u2026" : citTxt;
+                        const mediaCount = (rec.mediaUrls||[]).length;
+                        const summary = [
+                          "used " + rec.count + " time" + (rec.count===1?"":"s") + " elsewhere on this person",
+                          repo ? "in " + repo : "",
+                          mediaCount ? mediaCount + " media attachment" + (mediaCount===1?"":"s") : "",
+                          "click to copy this record into this citation"
+                        ].filter(Boolean).join(" \u00b7 ");
+                        return React.createElement("button",{
+                          key:ri,
+                          onClick:()=>updateCitation(idx,{
+                            sourceId: rec.sourceId,
+                            citation: rec.citation,
+                            recordNotes: rec.recordNotes,
+                            confidence: rec.confidence,
+                            mediaUrls: rec.mediaUrls,
+                            _repoFilter: undefined,
+                            _collText: undefined,
+                          }),
+                          title: summary,
+                          style:{textAlign:"left",padding:"6px 9px",borderRadius:"3px",border:"1px solid #d4c4a8",background:"rgba(255,252,245,0.9)",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",color:"#2c2416"}
+                        },
+                          React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:"8px"}},
+                            React.createElement("span",{style:{flex:"1 1 auto",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},
+                              React.createElement("strong",{style:{fontWeight:600}}, title),
+                              repo ? React.createElement("span",{style:{color:"#8a7460",fontWeight:400,fontSize:"0.78rem",marginLeft:"6px"}}, "\u2014 " + repo) : null
+                            ),
+                            React.createElement("span",{style:{color:"#8a7460",fontSize:"0.74rem",flexShrink:0}},
+                              mediaCount ? "\ud83d\udcce " + mediaCount + " \u00b7 " : "",
+                              "\u00d7" + rec.count
+                            )
+                          ),
+                          citShort
+                            ? React.createElement("div",{style:{fontSize:"0.76rem",color:"#7a6a58",fontStyle:"italic",marginTop:"2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, citShort)
+                            : React.createElement("div",{style:{fontSize:"0.74rem",color:"#9a8a78",fontStyle:"italic",marginTop:"2px"}}, "(no specific record reference)")
+                        );
+                      })
                     )
                   ),
 
