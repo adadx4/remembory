@@ -9975,19 +9975,32 @@ function AddEditForm({
                 // has already linked (so the dropdown doesn't show duplicates).
                 const linkedCollIds = new Set(userCollectionsInRepo.map(s => s.researchCollectionId).filter(Boolean));
                 const cataloguedColls = (catalogueRepoEntry?.collections||[]).filter(c => c.id && !linkedCollIds.has(c.id));
-                // Records (sourceId + specific citation text) used on this
-                // subject's other events. Excludes anything already cited
-                // on a sibling citation in the same in-progress event so
-                // we don't suggest a duplicate. Hidden once this citation
-                // has a repo or source picked \u2014 the user is past the
-                // "reuse" decision and on to entering record details.
-                const alreadyInFormKeys = new Set(
-                  sources.filter((_,j) => j !== idx)
-                    .filter(s => s.sourceId)
-                    .map(s => s.sourceId + "\u241f" + (s.citation||"").trim())
-                );
-                const usedRecords = [...usedRecordsMap.values()]
-                  .filter(rec => !alreadyInFormKeys.has(rec.sourceId + "\u241f" + (rec.citation||"").trim()))
+                // Per-citation record list. Starts from the subject-wide
+                // map (records on saved events) and merges in the in-
+                // progress sibling citations from this same form so a
+                // record the user just picked on citation 1 immediately
+                // becomes available to pick on citation 2 (the common
+                // "one record, evidence for two events" workflow on a
+                // single new entry). Nothing is filtered out \u2014 letting
+                // the user re-pick the same record on two slots is
+                // harmless and dropping it can leave the list empty.
+                const localMap = new Map(usedRecordsMap);
+                sources.forEach((s, j) => {
+                  if (j === idx || !s.sourceId) return;
+                  const citTxt = (s.citation||"").trim();
+                  const key = s.sourceId + "\u241f" + citTxt;
+                  const existing = localMap.get(key);
+                  if (existing) { existing.count++; return; }
+                  localMap.set(key, {
+                    sourceId: s.sourceId,
+                    citation: s.citation || "",
+                    recordNotes: s.recordNotes || "",
+                    confidence: s.confidence || "unknown",
+                    mediaUrls: s.mediaUrls || [],
+                    count: 1,
+                  });
+                });
+                const usedRecords = [...localMap.values()]
                   .sort((a, b) => b.count - a.count);
                 const showUsedRecords = !cit.sourceId && !repoPicked && usedRecords.length > 0;
                 return React.createElement("div",{key:idx,style:{background:"rgba(255,252,245,0.65)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px",marginBottom:"10px"}},
