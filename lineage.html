@@ -7803,18 +7803,112 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       if (persistSubject) persistSubject({gedFocalPersonId: person.id});
     }
 
+    // Walk every other tree member's chronicle (matched via tp.subjectId or
+    // gedFocalPersonId) and pull events that tag `tp` by name. These are
+    // shared events (a marriage tagged on the spouse's chronicle, a child's
+    // birth tagged on the parent's, etc.) — the same event-record gets
+    // re-cast from this person's perspective, so the new chronicle starts
+    // populated with everything the user has already entered elsewhere
+    // about them.
+    function eventsFromOtherTreeSubjects(tp) {
+      const tpNameLow = (tp.name||"").trim().toLowerCase();
+      if (!tpNameLow) return [];
+      const otherSubjectIds = new Set();
+      (treePersons||[]).forEach(p => {
+        if (p.id === tp.id) return;
+        if (p.subjectId) otherSubjectIds.add(p.subjectId);
+      });
+      (subjects||[]).forEach(s => {
+        if (s.gedFocalPersonId && s.gedFocalPersonId !== tp.id) otherSubjectIds.add(s.id);
+      });
+      const found = [];
+      (subjects||[]).forEach(s => {
+        if (!otherSubjectIds.has(s.id)) return;
+        (s.memories||[]).forEach(m => {
+          const tags = Array.isArray(m.people) ? m.people : [];
+          if (tags.some(p => (p||"").trim().toLowerCase() === tpNameLow)) {
+            found.push({source: s, mem: m});
+          }
+        });
+      });
+      return found;
+    }
+    // Re-cast a tagged event as a memory belonging to `tp`: drop `tp` from
+    // the people list (they're now the implicit subject of the event), add
+    // the source subject's name in (so we keep the connection visible),
+    // give it a fresh id, and clear perspectives so they don't bleed
+    // across chronicles.
+    function memFromTaggedEvent(srcSubject, m, tp) {
+      const tpNameLow = (tp.name||"").trim().toLowerCase();
+      const people = (m.people||[]).filter(p => (p||"").trim().toLowerCase() !== tpNameLow);
+      if (srcSubject?.name &&
+          !people.some(p => (p||"").trim().toLowerCase() === srcSubject.name.toLowerCase())) {
+        people.push(srcSubject.name);
+      }
+      return {
+        ...m,
+        id: "mem_seed_"+Date.now()+Math.random().toString(36).slice(2,7),
+        people,
+        perspectives: [],
+        _seededFromSubjectId: srcSubject.id,
+        _seededFromSubjectName: srcSubject.name,
+      };
+    }
+    // Dedupe key for the tree-stub vs tagged-event merge. Tree stubs don't
+    // carry eventType, so we infer it from the title (Born → birth, Died
+    // → death, Married → marriage). Null = not eligible for dedupe — keep
+    // both entries side by side.
+    function inferTreeEventType(title) {
+      const t = (title||"").toLowerCase().trim();
+      if (/^born\b|^birth\b/.test(t))            return "birth";
+      if (/^died\b/.test(t))                     return "death";
+      if (/^married\b|^marriage\b/.test(t))      return "marriage";
+      return null;
+    }
+    function memDedupeKey(m) {
+      if (!m || !m.year) return null;
+      const et = m.eventType || inferTreeEventType(m.title);
+      return et ? et + "@" + m.year : null;
+    }
+
     function promoteToSubject(tp) {
       const newId = "subj_tp_"+Date.now();
       const tpById2 = Object.fromEntries(treePersons.map(p=>[p.id,p]));
       const { allMems, rels } = buildMemsFromTree(tp, tpById2, treeFamilies);
-      const allKnownPeople = [...new Set(allMems.flatMap(m=>m.people||[]))].sort();
-      const allKnownLocs   = [...new Set(allMems.map(m=>m.location).filter(Boolean))].sort();
+      // Bring in events from other tree members' chronicles that tag this
+      // person. Tree-stub events get dropped when a richer tagged event
+      // exists for the same (eventType, year) — so a Marriage entered by
+      // hand on the spouse's chronicle replaces the bare "Married X" stub.
+      const taggedMems = eventsFromOtherTreeSubjects(tp)
+        .map(({source, mem}) => memFromTaggedEvent(source, mem, tp));
+      const taggedKeys = new Set(taggedMems.map(memDedupeKey).filter(Boolean));
+      const treeKept = allMems.filter(m => {
+        const k = memDedupeKey(m);
+        return !(k && taggedKeys.has(k));
+      });
+      const mergedMems = [...treeKept, ...taggedMems];
+      const allKnownPeople = [...new Set(mergedMems.flatMap(m=>m.people||[]))].sort();
+      const allKnownLocs   = [...new Set(mergedMems.map(m=>m.location).filter(Boolean))].sort();
+      // Pull in source records cited on any of the merged events so the new
+      // chronicle's Sources index isn't empty when those events arrive
+      // pre-cited. Look up each referenced sourceId in the source chronicle's
+      // knownSources and copy the entry over.
+      const sourceIdsNeeded = new Set();
+      mergedMems.forEach(m => eventSources(m).forEach(s => { if (s.sourceId) sourceIdsNeeded.add(s.sourceId); }));
+      const seedKnownSources = [];
+      const seenSrcIds = new Set();
+      (subjects||[]).forEach(s => (s.knownSources||[]).forEach(src => {
+        if (sourceIdsNeeded.has(src.id) && !seenSrcIds.has(src.id)) {
+          seedKnownSources.push(src);
+          seenSrcIds.add(src.id);
+        }
+      }));
       const newSubj = {
         id:newId, name:tp.name, isSelf:false, mode:"history",
         dob:tp.dob||"", notes:tp.notes||"",
-        memories:allMems, candidates:[], candidatePersons:[],
+        memories:mergedMems, candidates:[], candidatePersons:[],
         knownPeople:allKnownPeople, knownOrgs:[], knownLocations:allKnownLocs,
-        knownSources:[], peopleEmails:{}, peopleRelationships:rels,
+        knownSources:seedKnownSources, peopleEmails:{}, peopleRelationships:rels,
         peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{},
         locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{},
         personGroups:{}, customTags:[], shareHistory:[], lastBackup:null, lastImport:null,
