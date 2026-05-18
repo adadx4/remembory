@@ -8376,7 +8376,24 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
   // is linked to it AND the subject's peopleRelationships are walked to
   // pre-populate the initial tree with parents / spouses / siblings /
   // children — so you don't have to retype people you've already named.
-  function startFirstPerson() { setAddingKind("first"); setNewDraft({name:"",sex:"",dob:"",dod:"",birthPlace:"",deathPlace:"",notes:""}); }
+  // Suggest the active subject as the first tree person — most of the time
+  // you're building a tree centred on yourself or the person you're
+  // chronicling, so prefilling their name / sex / dates saves a step and
+  // also primes the subject-match logic in saveFirstPerson (which links
+  // the tp to the subject and seeds the tree from peopleRelationships).
+  // If there's no active subject (or it has no name), fall back to a
+  // blank draft.
+  function activeSubjectForSeed() {
+    return (subjects||[]).find(s => s.id === activeSubjectId) || null;
+  }
+  function startFirstPerson() {
+    const sub = activeSubjectForSeed();
+    setAddingKind("first");
+    setNewDraft(sub && (sub.name||"").trim()
+      ? { name:sub.name||"", sex:sub.sex||"", dob:sub.dob||"", dod:sub.dod||"",
+          birthPlace:"", deathPlace:"", notes:"" }
+      : { name:"", sex:"", dob:"", dod:"", birthPlace:"", deathPlace:"", notes:"" });
+  }
   function cancelFirstPerson() { setAddingKind(null); setNewDraft({}); }
   function saveFirstPerson() {
     if (!(newDraft.name||"").trim()) return;
@@ -8413,9 +8430,26 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
     );
   }
   if (addingKind === "first") {
+    // Heading + helper text shift when the typed name still matches an
+    // existing subject, to surface the auto-link / auto-seed that will
+    // happen on save. The user can edit the prefilled name and the
+    // banner updates live.
+    const draftName = (newDraft.name||"").trim();
+    const matchedFirstSub = draftName ? findSubjectByName(draftName) : null;
+    const relCount = matchedFirstSub
+      ? Object.values(matchedFirstSub.peopleRelationships||{}).filter(r=>classifyRelType(r)).length
+      : 0;
     return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"560px",margin:"40px auto",padding:"0 20px"}},
-      React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.4rem",fontStyle:"italic",margin:"0 0 10px",color:"#1a1208",textAlign:"center"}}, "Add the first person to your tree"),
-      React.createElement("p",{style:{fontSize:"0.86rem",color:"#8a7460",textAlign:"center",marginBottom:"20px",lineHeight:1.5}}, "Once they\u2019re in, click \u201c+ Spouse / Parent / Sibling / Child\u201d on their detail card to grow the tree from them."),
+      React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.4rem",fontStyle:"italic",margin:"0 0 10px",color:"#1a1208",textAlign:"center"}},
+        matchedFirstSub ? "Start your tree with " + matchedFirstSub.name : "Add the first person to your tree"
+      ),
+      React.createElement("p",{style:{fontSize:"0.86rem",color:"#8a7460",textAlign:"center",marginBottom:"20px",lineHeight:1.5}},
+        matchedFirstSub
+          ? (relCount > 0
+              ? `Linked to your existing chronicle. We\u2019ll add ${relCount} relative${relCount===1?"":"s"} from their known relationships to seed the tree.`
+              : "Linked to your existing chronicle. Once they\u2019re in, use \u201c+ Spouse / Parent / Sibling / Child\u201d to grow the tree.")
+          : "Once they\u2019re in, click \u201c+ Spouse / Parent / Sibling / Child\u201d on their detail card to grow the tree from them."
+      ),
       React.createElement("div",{style:{background:"rgba(196,169,98,0.07)",border:"1px solid rgba(196,169,98,0.4)",borderRadius:"4px",padding:"16px 18px"}},
         React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}},
           renderFirstField("name","Name", false, false),
@@ -8444,7 +8478,10 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
         "Import GEDCOM \u2192"
       ),
       React.createElement("button",{onClick:startFirstPerson,style:{...S.btnOutline,padding:"9px 22px",fontSize:"0.95rem"}},
-        "+ Build manually"
+        (() => {
+          const sub = activeSubjectForSeed();
+          return sub && (sub.name||"").trim() ? "Start with " + sub.name : "+ Build manually";
+        })()
       )
     )
   );
