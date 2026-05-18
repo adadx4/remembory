@@ -1701,15 +1701,27 @@ const RELATIONSHIP_SUGGESTIONS = [
 function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPerson, onNewPersonRelationship, allRelationships=[], groups={}}) {
   const [input, setInput] = React.useState("");
   const [showSugs, setShowSugs] = React.useState(false);
-  const [step, setStep] = React.useState(null); // null | "email" | "relationship"
+  const [step, setStep] = React.useState(null); // null | "email" | "relationship" | "qualifier"
   const [pendingName, setPendingName] = React.useState(null);
   const [relInput, setRelInput] = React.useState("");
   const [showRelSugs, setShowRelSugs] = React.useState(false);
+  // Qualifier step: when two people share a name we ask the user for a
+  // free-text discriminator (Sr/Jr/III, "b. 1920", "Mary's brother", …)
+  // that gets appended in parentheses so the full string becomes the
+  // unique identifier ("John Smith (Sr)").
+  const [qualifierInput, setQualifierInput] = React.useState("");
   const groupNames = Object.keys(groups);
   const peopleSugs = allValues.filter(v=>v.toLowerCase().includes(input.toLowerCase())&&!values.includes(v)&&input.length>0);
   const groupSugs = input.length>0 ? groupNames.filter(g=>g.toLowerCase().includes(input.toLowerCase())) : [];
   const suggestions = [...peopleSugs, ...groupSugs.filter(g=>!peopleSugs.includes(g))];
   const allRelSugs=[...new Set([...RELATIONSHIP_SUGGESTIONS,...allRelationships])]; const relSugs=allRelSugs.filter(r=>r.toLowerCase().includes(relInput.toLowerCase())&&relInput.length>0);
+  // Detect an exact (case-insensitive) match against an existing person —
+  // drives the "+ Add as different person" affordance in the dropdown.
+  const trimInput = input.trim();
+  const exactMatchName = trimInput
+    ? allValues.find(v => v.toLowerCase() === trimInput.toLowerCase())
+    : null;
+  const canDisambiguate = exactMatchName && !!onNewPerson;
 
   function commit(name, email, rel) {
     const v = name.trim();
@@ -1717,7 +1729,7 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
     if (onNewPerson) onNewPerson(v, "");
     if (onNewPersonRelationship && rel.trim()) onNewPersonRelationship(v, rel.trim());
     setInput(""); setShowSugs(false); setPendingName(null);
-    setRelInput(""); setStep(null);
+    setRelInput(""); setQualifierInput(""); setStep(null);
   }
 
   function add(val) {
@@ -1733,6 +1745,37 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
       setPendingName(v); setInput(""); setShowSugs(false); setStep("relationship");
     } else {
       commit(v, "", "");
+    }
+  }
+
+  // Start the disambiguation flow for an existing name. Captures the base
+  // name, blanks the qualifier input, and routes into the qualifier step.
+  function startDisambiguate(baseName) {
+    setPendingName(baseName);
+    setQualifierInput("");
+    setInput("");
+    setShowSugs(false);
+    setStep("qualifier");
+  }
+
+  // Apply the qualifier and decide what comes next. Empty qualifier
+  // collapses back to the bare existing name (effectively cancel); a
+  // qualifier we've already seen short-circuits to a plain commit; a
+  // new qualified name flows into the relationship step the same way
+  // any other new person does, so the user only ever sees the extra
+  // qualifier prompt when they actually need it.
+  function commitWithQualifier(qualifier) {
+    const q = (qualifier||"").trim();
+    if (!q) { setStep(null); setPendingName(null); setQualifierInput(""); return; }
+    const fullName = pendingName + " (" + q + ")";
+    if (values.includes(fullName)) {
+      setStep(null); setPendingName(null); setQualifierInput("");
+      return;
+    }
+    if (onNewPerson && !allValues.includes(fullName)) {
+      setPendingName(fullName); setQualifierInput(""); setStep("relationship");
+    } else {
+      commit(fullName, "", "");
     }
   }
 
@@ -1767,11 +1810,33 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
               onMouseLeave:e=>e.currentTarget.style.background="transparent"},r))
           )
         )
-      : React.createElement("div",{style:{display:"flex",gap:"6px"}},
-          React.createElement("input",{value:input,onChange:e=>{setInput(e.target.value);setShowSugs(true);},onKeyDown:e=>{if(e.key==="Enter"){e.preventDefault();add(input);}if(e.key==="Escape")setShowSugs(false);},onBlur:()=>setTimeout(()=>setShowSugs(false),150),onFocus:()=>input&&setShowSugs(true),placeholder,style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",flex:1}}),
-          React.createElement("button",{onClick:()=>add(input),style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"6px 11px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.85rem",color:"#8a7460"}},"+ Add")
-        ),
-    showSugs&&suggestions.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,right:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",maxHeight:"160px",overflowY:"auto"}},
+      : step==="qualifier"
+        ? React.createElement("div",{style:{background:"rgba(240,235,224,0.8)",border:"1px solid #c8b89a",borderRadius:"3px",padding:"10px 12px",marginBottom:"4px"}},
+            React.createElement("p",{style:{margin:"0 0 7px",fontSize:"0.84rem",color:"#2c2416"}},
+              "Another ",React.createElement("strong",null,pendingName),". ",
+              React.createElement("span",{style:{color:"#7a6a58",fontStyle:"italic"}},"What sets them apart?")
+            ),
+            React.createElement("div",{style:{display:"flex",gap:"6px"}},
+              React.createElement("input",{autoFocus:true,value:qualifierInput,
+                onChange:e=>setQualifierInput(e.target.value),
+                onKeyDown:e=>{
+                  if(e.key==="Enter"){e.preventDefault();commitWithQualifier(qualifierInput);}
+                  if(e.key==="Escape"){setStep(null);setPendingName(null);setQualifierInput("");}
+                },
+                placeholder:"e.g. Sr, b. 1920, Mary's brother…",
+                style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",flex:1}}),
+              React.createElement("button",{onClick:()=>commitWithQualifier(qualifierInput),disabled:!qualifierInput.trim(),style:{...S.btn,padding:"6px 13px",fontSize:"0.84rem",opacity:qualifierInput.trim()?1:0.5}},"Save"),
+              React.createElement("button",{onClick:()=>{setStep(null);setPendingName(null);setQualifierInput("");},style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"6px 11px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",color:"#8a7460"}},"Cancel")
+            ),
+            React.createElement("p",{style:{margin:"6px 0 0",fontSize:"0.74rem",color:"#7a6a58",fontStyle:"italic"}},
+              "Saves as “",pendingName,(qualifierInput.trim()?" (" + qualifierInput.trim() + ")":""), "” — a separate person from the existing ",pendingName,"."
+            )
+          )
+        : React.createElement("div",{style:{display:"flex",gap:"6px"}},
+            React.createElement("input",{value:input,onChange:e=>{setInput(e.target.value);setShowSugs(true);},onKeyDown:e=>{if(e.key==="Enter"){e.preventDefault();add(input);}if(e.key==="Escape")setShowSugs(false);},onBlur:()=>setTimeout(()=>setShowSugs(false),150),onFocus:()=>input&&setShowSugs(true),placeholder,style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",flex:1}}),
+            React.createElement("button",{onClick:()=>add(input),style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"6px 11px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.85rem",color:"#8a7460"}},"+ Add")
+          ),
+    showSugs&&(suggestions.length>0||canDisambiguate)&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,right:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",maxHeight:"200px",overflowY:"auto"}},
       suggestions.map(s=>{
         const isGroup = !!groups[s];
         const memberCount = isGroup ? (groups[s].members||[]).length : 0;
@@ -1786,7 +1851,18 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
               )
             : React.createElement("span",null,icon," ",s)
         );
-      })
+      }),
+      // "+ Add as a different person" footer — only when input exactly
+      // matches an existing name. The default Enter / click still picks
+      // the existing person (no extra clicks for the common case); this
+      // footer is the escape hatch when the user means a different person
+      // who happens to share the name (Sr/Jr, distant cousin, etc.).
+      canDisambiguate && React.createElement("div",{
+        onMouseDown:()=>startDisambiguate(exactMatchName),
+        style:{padding:"8px 12px",cursor:"pointer",fontSize:"0.85rem",color:"#5a4820",borderTop:"1px dashed #d4c4a8",background:"rgba(196,169,98,0.06)",fontStyle:"italic"},
+        onMouseEnter:e=>e.currentTarget.style.background="rgba(196,169,98,0.16)",
+        onMouseLeave:e=>e.currentTarget.style.background="rgba(196,169,98,0.06)"
+      }, "+ Different ", exactMatchName, " — add as a new person")
     )
   );
 }
