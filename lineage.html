@@ -8326,6 +8326,7 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
 const CANDIDATE_CONFIDENCE = [
   {id:"possible",  label:"Possible",  color:"#8a7460"},
   {id:"probable",  label:"Probable",  color:"#5a7a6a"},
+  {id:"certain",   label:"Certain",   color:"#3a6a4a"},
 ];
 
 function CandidatesPanel({candidates, memories, knownSources, isMobile, onEdit, onAccept, onReject, onAddNew}) {
@@ -9644,6 +9645,20 @@ function AddEditForm({
         if (endYear) return "to "+endYear;
         return "";
       }
+      // Tally sources already cited on this subject's other events — used
+      // to surface a "quick-pick" chip row above each empty citation so a
+      // recurring source (e.g. a census collection cited on dozens of
+      // events) is reused with one click instead of walking Repository →
+      // Collection every time. Excludes the event currently being edited;
+      // its in-progress state lives in `form.sources` and is handled per
+      // citation below.
+      const usedHereCounts = new Map();
+      for (const ev of (subject?.memories || [])) {
+        if (ev.id === editingId) continue;
+        for (const s of eventSources(ev)) {
+          if (s.sourceId) usedHereCounts.set(s.sourceId, (usedHereCounts.get(s.sourceId)||0) + 1);
+        }
+      }
       return React.createElement("div",null,
         React.createElement("label",{style:S.label},"Source Citations"),
         React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 10px",lineHeight:1.5}},
@@ -9674,10 +9689,37 @@ function AddEditForm({
                 // has already linked (so the dropdown doesn't show duplicates).
                 const linkedCollIds = new Set(userCollectionsInRepo.map(s => s.researchCollectionId).filter(Boolean));
                 const cataloguedColls = (catalogueRepoEntry?.collections||[]).filter(c => c.id && !linkedCollIds.has(c.id));
+                // Quick-pick chips: sources already used on this subject's
+                // other events, ranked by frequency. Hidden once a repository
+                // is picked or a source committed (no point suggesting then).
+                // Anything already cited on a sibling citation in the same
+                // event is filtered out so the user doesn't double-cite.
+                const otherCitedHere = new Set(sources.filter((_,j) => j !== idx).map(s => s.sourceId).filter(Boolean));
+                const quickPicks = [...usedHereCounts.entries()]
+                  .filter(([sid]) => !otherCitedHere.has(sid))
+                  .map(([sid, count]) => ({src: (knownSources||[]).find(s => s.id === sid), count}))
+                  .filter(x => x.src)
+                  .sort((a, b) => b.count - a.count || (a.src.title||"").localeCompare(b.src.title||""));
+                const showQuickPicks = !cit.sourceId && !repoPicked && quickPicks.length > 0;
                 return React.createElement("div",{key:idx,style:{background:"rgba(255,252,245,0.65)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px",marginBottom:"10px"}},
                   React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px",marginBottom:"10px"}},
                     React.createElement("strong",{style:{fontSize:"0.82rem",letterSpacing:"0.06em",textTransform:"uppercase",color:"#8a7460"}}, "Citation " + (idx+1)),
                     React.createElement("button",{onClick:()=>removeCitation(idx),title:"Remove citation",style:{background:"none",border:"none",cursor:"pointer",color:"#c4858a",fontSize:"1.1rem",padding:"2px 6px",lineHeight:1}},"\u00d7")
+                  ),
+
+                  showQuickPicks && React.createElement("div",{style:{marginBottom:"10px",padding:"8px 10px",background:"rgba(196,169,98,0.08)",border:"1px solid rgba(196,169,98,0.3)",borderRadius:"3px"}},
+                    React.createElement("div",{style:{fontSize:"0.72rem",color:"#7a6a58",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:"5px"}}, "Sources used on this person"),
+                    React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"5px"}},
+                      quickPicks.slice(0,12).map(q =>
+                        React.createElement("button",{
+                          key:q.src.id,
+                          onClick:()=>updateCitation(idx,{sourceId:q.src.id,_repoFilter:undefined,_collText:undefined}),
+                          title:(q.src.repository?q.src.repository+" \u2014 ":"")+"used "+q.count+" time"+(q.count===1?"":"s")+" elsewhere on this person",
+                          style:{padding:"3px 9px",borderRadius:"20px",border:"1px solid #c8b89a",background:"rgba(255,252,245,0.9)",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.8rem",color:"#2c2416",display:"inline-flex",alignItems:"center",gap:"5px"}
+                        }, q.src.title || "(untitled)",
+                          React.createElement("span",{style:{color:"#8a7460",fontSize:"0.72rem"}}, "\u00d7"+q.count))
+                      )
+                    )
                   ),
 
                   // Step 1 — Repository (free-text + autocomplete suggestions).
