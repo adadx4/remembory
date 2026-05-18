@@ -49,7 +49,7 @@ function useWindowSize() {
 
 // ── Constants ──────────────────────────────────────────────────
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const TAGS = ["childhood","family","travel","education","work","love","health","milestone","home","friendship","adventure","loss"];
+const TAGS = ["childhood","family","travel","education","work","love","health","milestone","home","friendship","adventure","loss","community"];
 const WORKER_URL = "https://social.remembory.net";
 const IS_STAGING = WORKER_URL.includes('staging');
 
@@ -276,6 +276,7 @@ const EVENT_TYPES = [
   {id:"residence",  label:"Residence (census, directories, electoral rolls)", short:"Residence"},
   {id:"employment", label:"Employment / occupational",                        short:"Employment"},
   {id:"education",  label:"Education / schools",                              short:"Education"},
+  {id:"community",  label:"Community (church, club, society, membership)",    short:"Community"},
   {id:"travel",     label:"Travel / immigration / emigration",                short:"Travel"},
   {id:"military",   label:"Military",                                         short:"Military"},
   {id:"legal",      label:"Legal (wills, probate, court, land)",              short:"Legal"},
@@ -2259,23 +2260,33 @@ function LifeTimeline({memories, setView, setSelected, setIndexFilter, onMissing
   }
   const eduPeriods  = buildPeriods("education");
   const workPeriods = buildPeriods("work");
+  const commPeriods = buildPeriods("community");
 
-  if (!residences.length&&!eduPeriods.length&&!workPeriods.length) return null;
+  if (!residences.length&&!eduPeriods.length&&!workPeriods.length&&!commPeriods.length) return null;
 
   // Colour palettes
   const RES_PAL  = ["#a87e6b","#c4a962","#c4858a","#b5936b","#d4986b"];
   const EDU_PAL  = ["#8b9dc3","#7a8ec0","#9b8ea8","#6d80b0","#a090c0"];
   const WORK_PAL = ["#7a9e9f","#89b08a","#5a8e8e","#6a9e7a","#7a8e6a"];
+  // Community palette — burgundy / wine / muted rose, chosen to read as
+  // social/affiliation distinct from the brown-residence, blue-education
+  // and green-work lanes. Subjects often belong to several communities at
+  // once, so this lane can get visually crowded; the existing per-period
+  // absolute positioning still works but you'll see overlaps inside the
+  // lane when memberships run concurrently.
+  const COMM_PAL = ["#a8746a","#946a6a","#b88a7a","#8a5a5a","#a4707a"];
   function makeColFn(pal){const c={};return l=>{if(!c[l])c[l]=pal[Object.keys(c).length%pal.length];return c[l];};}
-  const resCol=makeColFn(RES_PAL),eduCol=makeColFn(EDU_PAL),workCol=makeColFn(WORK_PAL);
+  const resCol=makeColFn(RES_PAL),eduCol=makeColFn(EDU_PAL),workCol=makeColFn(WORK_PAL),commCol=makeColFn(COMM_PAL);
   residences.forEach(r=>resCol(r.label));
   eduPeriods.forEach(r=>eduCol(r.label));
   workPeriods.forEach(r=>workCol(r.label));
+  commPeriods.forEach(r=>commCol(r.label));
 
   const tabs = [
     residences.length>0  && {id:"residence", label:"Residence", periods:residences,  colFn:resCol,  tag:"home"},
     eduPeriods.length>0  && {id:"education", label:"Education", periods:eduPeriods,  colFn:eduCol,  tag:"education"},
     workPeriods.length>0 && {id:"work",      label:"Employment",periods:workPeriods, colFn:workCol, tag:"work"},
+    commPeriods.length>0 && {id:"community", label:"Community", periods:commPeriods, colFn:commCol, tag:"community"},
   ].filter(Boolean);
 
   const [activeTab, setActiveTab] = React.useState(null);
@@ -2289,7 +2300,7 @@ function LifeTimeline({memories, setView, setSelected, setIndexFilter, onMissing
   function periodLabel(year, month, hasMo) { return hasMo && month > 0 ? MONTHS[month-1]+" "+year : String(year); }
 
   // Graphical multi-lane timeline
-  const allPeriods = [...residences,...eduPeriods,...workPeriods];
+  const allPeriods = [...residences,...eduPeriods,...workPeriods,...commPeriods];
   const minFrac = Math.min(...allPeriods.map(p=>p.startFrac));
   const maxFrac = Math.max(...allPeriods.map(p=>p.endFrac));
   const graphStartYear = Math.floor(minFrac);
@@ -2299,7 +2310,8 @@ function LifeTimeline({memories, setView, setSelected, setIndexFilter, onMissing
   const lanes = [
     {id:"residence", label:"Residence", periods:residences, colFn:resCol},
     {id:"education", label:"Education", periods:eduPeriods, colFn:eduCol},
-    {id:"work", label:"Employment", periods:workPeriods, colFn:workCol},
+    {id:"work",      label:"Employment",periods:workPeriods, colFn:workCol},
+    {id:"community", label:"Community", periods:commPeriods, colFn:commCol},
   ].filter(l=>l.periods.length>0);
   const labelW = 40;
   const chartH = span * rowH;
@@ -14210,6 +14222,12 @@ function handleEdit(m) {
             ].filter(Boolean)}),
             React.createElement(NavDropdown,{label:"Add",isActive:addActive,items:(isHistoryMode?[
               {label:"+ Event",action:()=>{setForm(newForm());setEditingId(null);setEditingCandidateId(null);setView("add");}},
+              {divider:true},
+              {label:"🏠 Residence",action:()=>{setForm({...newForm(),eventType:"residence",tags:["home"],_expandEndDate:true,_initialTab:"location"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+              {label:"🎓 Education",action:()=>{setForm({...newForm(),eventType:"education",tags:["education"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+              {label:"💼 Occupation",action:()=>{setForm({...newForm(),eventType:"employment",tags:["work"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+              {label:"🤝 Community",action:()=>{setForm({...newForm(),eventType:"community",tags:["community"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+              {divider:true},
               {label:"📚 Source",action:()=>{setIndexFilter({type:"sources"});setView("index");},active:view==="index"&&indexFilter?.type==="sources"},
               {label:"🔍 Candidate",action:()=>{setIndexFilter({type:"candidatePersons"});setView("index");},active:view==="index"&&indexFilter?.type==="candidatePersons"},
               {label:"👤 Person",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
@@ -14299,6 +14317,12 @@ function handleEdit(m) {
         ].filter(Boolean)}),
         React.createElement(NavDropdown,{label:"Add",icon:"＋",isActive:addActive,variant:"mobile",direction:"up",menuAlign:"center",items:(isHistoryMode?[
           {label:"+ Event",action:()=>{setForm(newForm());setEditingId(null);setEditingCandidateId(null);setView("add");}},
+          {divider:true},
+          {label:"🏠 Residence",action:()=>{setForm({...newForm(),eventType:"residence",tags:["home"],_expandEndDate:true,_initialTab:"location"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+          {label:"🎓 Education",action:()=>{setForm({...newForm(),eventType:"education",tags:["education"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+          {label:"💼 Occupation",action:()=>{setForm({...newForm(),eventType:"employment",tags:["work"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+          {label:"🤝 Community",action:()=>{setForm({...newForm(),eventType:"community",tags:["community"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+          {divider:true},
           {label:"📚 Source",action:()=>{setIndexFilter({type:"sources"});setView("index");},active:view==="index"&&indexFilter?.type==="sources"},
           {label:"🔍 Candidate",action:()=>{setIndexFilter({type:"candidatePersons"});setView("index");},active:view==="index"&&indexFilter?.type==="candidatePersons"},
           {label:"👤 Person",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
