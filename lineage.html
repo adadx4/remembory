@@ -268,19 +268,24 @@ const SOURCE_CONFIDENCE = [
 // Genealogical event types — must match the values accepted by the Genealogy
 // research tool's eventType field at https://adadx4.github.io/genealogy/.
 const EVENT_TYPES = [
-  {id:"birth",      label:"Birth"},
-  {id:"baptism",    label:"Baptism"},
-  {id:"marriage",   label:"Marriage"},
-  {id:"death",      label:"Death"},
-  {id:"burial",     label:"Burial"},
-  {id:"residence",  label:"Residence (census, directories, electoral rolls)"},
-  {id:"employment", label:"Employment / occupational"},
-  {id:"education",  label:"Education / schools"},
-  {id:"travel",     label:"Travel / immigration / emigration"},
-  {id:"military",   label:"Military"},
-  {id:"legal",      label:"Legal (wills, probate, court, land)"},
-  {id:"other",      label:"Other"},
+  {id:"birth",      label:"Birth",                                            short:"Birth"},
+  {id:"baptism",    label:"Baptism",                                          short:"Baptism"},
+  {id:"marriage",   label:"Marriage",                                         short:"Marriage"},
+  {id:"death",      label:"Death",                                            short:"Death"},
+  {id:"burial",     label:"Burial",                                           short:"Burial"},
+  {id:"residence",  label:"Residence (census, directories, electoral rolls)", short:"Residence"},
+  {id:"employment", label:"Employment / occupational",                        short:"Employment"},
+  {id:"education",  label:"Education / schools",                              short:"Education"},
+  {id:"travel",     label:"Travel / immigration / emigration",                short:"Travel"},
+  {id:"military",   label:"Military",                                         short:"Military"},
+  {id:"legal",      label:"Legal (wills, probate, court, land)",              short:"Legal"},
+  {id:"other",      label:"Other",                                            short:""},
 ];
+// Point-in-time events: their end-date UI is hidden when the date is exact
+// (nothing to bracket) and reframed as a "range" when the date is vague
+// (so the user can record "between X and Y" without inventing a fake end).
+const POINT_EVENT_IDS = new Set(["birth","baptism","marriage","death","burial"]);
+const eventTypeShort = (id) => (EVENT_TYPES.find(t => t.id === id) || {}).short || "";
 const GENEALOGY_TOOL_URL = "/research.html";
 
 // ── Styles ─────────────────────────────────────────────────────
@@ -9250,6 +9255,38 @@ function AddEditForm({
   const [enddateOpen, setEnddateOpen] = React.useState(() =>
     !!(form._expandEndDate || form.endFuzzy || form.endOngoing));
 
+  // End-date framing depends on event type + date precision:
+  //   • Point event (birth/baptism/marriage/death/burial) + exact date
+  //       → hide the section entirely (nothing to bracket).
+  //   • Point event + vague/uncertain date
+  //       → keep the section but reframe it as a "range" — the second
+  //         date is the latest possible date, not an end of a period.
+  //   • Any other event type
+  //       → "end date" as before (for jobs, residences, journeys…).
+  const isPointEvent = POINT_EVENT_IDS.has(form.eventType);
+  const isExactDate  = form.fuzzy === "day" && !form.dateUncertain;
+  const showEndDateSection = !(isPointEvent && isExactDate);
+  const endDateMode = isPointEvent ? "range" : "period";
+
+  // Clear stale end-date data when the form transitions into the
+  // "point event + exact date" combination — otherwise a range left over
+  // from a previous edit would silently persist in the saved record while
+  // being invisible in the UI. Also clear `endOngoing` on point events,
+  // where "still ongoing" has no meaning.
+  React.useEffect(() => {
+    if (isPointEvent && isExactDate &&
+        (form.endFuzzy || form.endOngoing || form.endYear)) {
+      updateForm({endFuzzy:null, endOngoing:false, endYear:0,
+                  endMonth:null, endDay:null, endSeason:null});
+      setEnddateOpen(false);
+    } else if (isPointEvent && form.endOngoing) {
+      updateForm({endOngoing:false});
+    }
+  // updateForm is a stable closure from the parent; tracking it would
+  // re-fire the effect on every keystroke.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.eventType, form.fuzzy, form.dateUncertain]);
+
   // In Lineage mode, eventType must be picked (even if just "Other").
   // Collect every missing required field at once so the footer can list
   // them all together and each input can flag itself inline, instead of
@@ -9318,7 +9355,18 @@ function AddEditForm({
         React.createElement("label",{style:{...S.label,marginBottom:"6px"}},"\ud83d\udcdc Event Type *"),
         React.createElement("select",{
           value:form.eventType||"",
-          onChange:e=>updateForm({eventType:e.target.value}),
+          onChange:e=>{
+            const newType = e.target.value;
+            const oldShort = eventTypeShort(form.eventType);
+            const newShort = eventTypeShort(newType);
+            const titleTrim = (form.title || "").trim();
+            // Autofill the title from the picked event type as a starting
+            // point. Only overwrite when the title is empty or still equals
+            // the previously auto-filled value, so a deliberate edit like
+            // "Birth of John Smith" is never clobbered by a type switch.
+            const shouldAutofill = newShort && (!titleTrim || titleTrim === oldShort);
+            updateForm(shouldAutofill ? {eventType:newType, title:newShort} : {eventType:newType});
+          },
           style:{...S.select,width:"100%",borderColor:!form.eventType?"#c4858a":undefined},
           autoFocus:view==="add"
         },
@@ -9334,8 +9382,10 @@ function AddEditForm({
         React.createElement("input",{value:form.title,onChange:e=>updateForm({title:e.target.value}),placeholder:isHistoryMode?"e.g. Birth of John Smith":"What do you want to call this memory?",style:{...S.input,borderColor:isMissing("title")?"#c4858a":S.input.borderColor},autoFocus:view==="add"&&!isHistoryMode})
       ),
       React.createElement(DateFields,{form,setForm:updateForm}),
-      // End date — visible button
-      !enddateOpen&&React.createElement("button",{onClick:()=>setEnddateOpen(true),style:{
+      // End-date / range button — hidden when point-in-time event has an
+      // exact date (nothing to bracket); reframed as a date range when
+      // a point event has a vague or uncertain date.
+      showEndDateSection&&!enddateOpen&&React.createElement("button",{onClick:()=>setEnddateOpen(true),style:{
         display:"flex",alignItems:"center",gap:"7px",width:"100%",
         background:"rgba(200,184,154,0.1)",border:"1px dashed #c8b89a",borderRadius:"4px",
         padding:"9px 14px",cursor:"pointer",textAlign:"left",
@@ -9346,16 +9396,19 @@ function AddEditForm({
       },
         React.createElement("span",{style:{fontSize:"1rem",lineHeight:1,flexShrink:0}},"\u23f8"),
         React.createElement("span",null,
-          React.createElement("span",{style:{fontWeight:600,color:"#4a3820"}},"Add end date"),
-          React.createElement("span",{style:{color:"#8a7460",marginLeft:"6px",fontSize:"0.82rem",fontStyle:"italic"}},"\u2014 for jobs, addresses, relationships, journeys\u2026")
+          React.createElement("span",{style:{fontWeight:600,color:"#4a3820"}},endDateMode==="range"?"Add a date range":"Add end date"),
+          React.createElement("span",{style:{color:"#8a7460",marginLeft:"6px",fontSize:"0.82rem",fontStyle:"italic"}},
+            endDateMode==="range"
+              ? "\u2014 latest possible date, when the date is not certain"
+              : "\u2014 for jobs, addresses, relationships, journeys\u2026")
         )
       ),
-      enddateOpen&&React.createElement("div",{style:{background:"rgba(200,184,154,0.1)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px"}},
+      showEndDateSection&&enddateOpen&&React.createElement("div",{style:{background:"rgba(200,184,154,0.1)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px"}},
         React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:form.endFuzzy||form.endOngoing?"12px":0}},
-          React.createElement("span",{style:{...S.label,margin:0}},"End date"),
+          React.createElement("span",{style:{...S.label,margin:0}},endDateMode==="range"?"Latest possible date":"End date"),
           React.createElement("button",{onClick:()=>{setEnddateOpen(false);updateForm({endFuzzy:null,endOngoing:false});},style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.9rem",padding:0}},"\u00d7")
         ),
-        React.createElement("label",{style:{...S.label,cursor:"pointer",display:"flex",alignItems:"center",gap:"8px",marginBottom:form.endOngoing?0:"10px",userSelect:"none"}},
+        endDateMode!=="range"&&React.createElement("label",{style:{...S.label,cursor:"pointer",display:"flex",alignItems:"center",gap:"8px",marginBottom:form.endOngoing?0:"10px",userSelect:"none"}},
           React.createElement("input",{type:"checkbox",checked:!!form.endOngoing,onChange:e=>updateForm({endOngoing:e.target.checked,endFuzzy:e.target.checked?null:(form.endFuzzy||form.fuzzy)}),style:{accentColor:"#2c2416",cursor:"pointer"}}),
           "Still ongoing (present)"
         ),
@@ -9374,8 +9427,8 @@ function AddEditForm({
         )
       ),
       React.createElement("div",null,
-        React.createElement("label",{style:S.label},"Memory ",React.createElement("span",{style:{fontWeight:"normal",textTransform:"none",fontSize:"0.78rem",color:"#8a7460",letterSpacing:0}},"(optional)")),
-        React.createElement("textarea",{value:form.content,onChange:e=>updateForm({content:e.target.value}),placeholder:"Write as much or as little as you remember\u2026",rows:5,style:{...S.input,resize:"vertical",lineHeight:"1.7"}})
+        React.createElement("label",{style:S.label},isHistoryMode?"Transcript / Notes ":"Memory ",React.createElement("span",{style:{fontWeight:"normal",textTransform:"none",fontSize:"0.78rem",color:"#8a7460",letterSpacing:0}},"(optional)")),
+        React.createElement("textarea",{value:form.content,onChange:e=>updateForm({content:e.target.value}),placeholder:isHistoryMode?"Paste a transcript, or jot down what the record shows\u2026":"Write as much or as little as you remember\u2026",rows:5,style:{...S.input,resize:"vertical",lineHeight:"1.7"}})
       )
     ),
 
