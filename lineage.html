@@ -10007,12 +10007,18 @@ function AddEditForm({
         if (ev.id === editingId) continue;
         for (const s of eventSources(ev)) {
           if (!s.sourceId) continue;
+          const urlTxt = (s.url || "").trim();
           const citTxt = (s.citation || "").trim();
-          const key = s.sourceId + "␟" + citTxt; // ␟ = unit separator
+          // Record identity = sourceId + url + citation. The URL is the
+          // primary record reference (the actual page on Ancestry /
+          // Findmypast / etc.); citation text disambiguates when several
+          // distinct records on the same source share no URL.
+          const key = s.sourceId + "␟" + urlTxt + "␟" + citTxt;
           const existing = usedRecordsMap.get(key);
           if (existing) { existing.count++; continue; }
           usedRecordsMap.set(key, {
             sourceId: s.sourceId,
+            url: s.url || "",
             citation: s.citation || "",
             recordNotes: s.recordNotes || "",
             confidence: s.confidence || "unknown",
@@ -10063,12 +10069,14 @@ function AddEditForm({
                 const localMap = new Map(usedRecordsMap);
                 sources.forEach((s, j) => {
                   if (j === idx || !s.sourceId) return;
+                  const urlTxt = (s.url||"").trim();
                   const citTxt = (s.citation||"").trim();
-                  const key = s.sourceId + "\u241f" + citTxt;
+                  const key = s.sourceId + "\u241f" + urlTxt + "\u241f" + citTxt;
                   const existing = localMap.get(key);
                   if (existing) { existing.count++; return; }
                   localMap.set(key, {
                     sourceId: s.sourceId,
+                    url: s.url || "",
                     citation: s.citation || "",
                     recordNotes: s.recordNotes || "",
                     confidence: s.confidence || "unknown",
@@ -10092,8 +10100,13 @@ function AddEditForm({
                         const recSrc = (knownSources||[]).find(s => s.id === rec.sourceId);
                         const title = recSrc?.title || "(untitled source)";
                         const repo = recSrc?.repository || "";
+                        const urlTxt = (rec.url||"").trim();
                         const citTxt = (rec.citation||"").trim();
-                        const citShort = citTxt.length > 90 ? citTxt.slice(0,87)+"\u2026" : citTxt;
+                        // URL is the primary identifier; fall back to
+                        // citation text; final fallback indicates no
+                        // record-level reference at all.
+                        const detail = urlTxt || citTxt;
+                        const detailShort = detail.length > 90 ? detail.slice(0,87)+"\u2026" : detail;
                         const mediaCount = (rec.mediaUrls||[]).length;
                         const summary = [
                           "used " + rec.count + " time" + (rec.count===1?"":"s") + " elsewhere on this person",
@@ -10105,6 +10118,7 @@ function AddEditForm({
                           key:ri,
                           onClick:()=>updateCitation(idx,{
                             sourceId: rec.sourceId,
+                            url: rec.url,
                             citation: rec.citation,
                             recordNotes: rec.recordNotes,
                             confidence: rec.confidence,
@@ -10125,8 +10139,12 @@ function AddEditForm({
                               "\u00d7" + rec.count
                             )
                           ),
-                          citShort
-                            ? React.createElement("div",{style:{fontSize:"0.76rem",color:"#7a6a58",fontStyle:"italic",marginTop:"2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}, citShort)
+                          detailShort
+                            ? React.createElement("div",{style:{fontSize:"0.76rem",color:urlTxt?"#5a4820":"#7a6a58",fontStyle:urlTxt?"normal":"italic",marginTop:"2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},
+                                urlTxt ? "\ud83d\udd17 " : "",
+                                detailShort,
+                                urlTxt && citTxt ? React.createElement("span",{style:{color:"#8a7460",fontStyle:"italic",marginLeft:"6px"}}, "\u00b7 " + (citTxt.length > 50 ? citTxt.slice(0,47)+"\u2026" : citTxt)) : null
+                              )
                             : React.createElement("div",{style:{fontSize:"0.74rem",color:"#9a8a78",fontStyle:"italic",marginTop:"2px"}}, "(no specific record reference)")
                         );
                       })
