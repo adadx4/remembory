@@ -1523,6 +1523,145 @@ function LocationFieldsBlock({form, updateForm, knownLocations}) {
   );
 }
 
+// AdditionalLocationsField - structured entry for extra places attached
+// to an event (road trips, multi-city visits, etc.). Starts as a single
+// Town field; once the user types anything, the Street / State / Country
+// fields fade in for full address entry, mirroring the primary
+// LocationFieldsBlock UX. Town picks from the user's known towns and
+// auto-fills State / Country from the matching saved place. On save:
+// the structured fields go into the subject's knownLocations index (so
+// the entry is reusable everywhere) and the rebuilt label gets pushed
+// into form.locations.
+function AdditionalLocationsField({form, updateForm, knownLocations, persistSubject}) {
+  const [draft, setDraft] = React.useState({street:"", town:"", state:"", country:""});
+  const labels = form.locations || [];
+  const kl = knownLocations || [];
+  const expanded = !!(draft.town || draft.street || draft.state || draft.country);
+  const uniq = arr => [...new Set(arr.filter(Boolean))].sort();
+  const knownTowns     = uniq(kl.map(l => l && typeof l === 'object' ? l.town    : null));
+  const knownStates    = uniq(kl.map(l => l && typeof l === 'object' ? l.state   : null));
+  const knownCountries = uniq(kl.map(l => l && typeof l === 'object' ? l.country : null));
+
+  function applyPatch(patch) {
+    const next = {...draft, ...patch};
+    // Town change → fill State / Country from a matching saved place
+    // (only fields the user hasn't typed something into themselves).
+    if (patch.town !== undefined && patch.town && patch.town !== draft.town) {
+      const m = kl.find(l => l && typeof l === 'object' && l.town === patch.town);
+      if (m) {
+        if (!next.state   && m.state)   next.state   = m.state;
+        if (!next.country && m.country) next.country = m.country;
+        if (!next.street  && m.street)  next.street  = m.street;
+      }
+    }
+    if (patch.state !== undefined && patch.state && patch.state !== draft.state) {
+      const m = kl.find(l => l && typeof l === 'object' && l.state === patch.state && l.country);
+      if (m && !next.country) next.country = m.country;
+    }
+    setDraft(next);
+  }
+
+  function reset() { setDraft({street:"", town:"", state:"", country:""}); }
+
+  function save() {
+    // Prefer to re-use an existing saved place if all four fields match,
+    // so we don't bloat knownLocations with near-duplicates of the same
+    // place under slightly different labels.
+    const matchExisting = kl.find(l =>
+      l && typeof l === 'object' &&
+      (l.street ||"") === (draft.street ||"") &&
+      (l.town   ||"") === (draft.town   ||"") &&
+      (l.state  ||"") === (draft.state  ||"") &&
+      (l.country||"") === (draft.country||"")
+    );
+    const label = matchExisting
+      ? (matchExisting.label || "")
+      : ([draft.town, draft.state, draft.country].filter(Boolean).join(", ") || draft.street);
+    if (!label) return;
+    if (labels.includes(label)) { reset(); return; }
+    if (!matchExisting && persistSubject) {
+      const newKL = {label, street:draft.street, town:draft.town, state:draft.state, country:draft.country};
+      persistSubject({
+        knownLocations: [...kl, newKL].sort((a,b) =>
+          ((typeof a==='string'?a:a.label)||"").localeCompare((typeof b==='string'?b:b.label)||"")
+        )
+      });
+    }
+    updateForm({locations: [...labels, label]});
+    reset();
+  }
+
+  function remove(label) {
+    updateForm({locations: labels.filter(l => l !== label)});
+  }
+
+  const labelCss = {fontSize:"0.74rem",color:"#8a7460",display:"block",marginBottom:"3px"};
+  const inpCss   = {...S.input,padding:"7px 10px",fontSize:"0.88rem"};
+  const fieldDef = (key, label, listId, listValues, placeholder, fullWidth) =>
+    React.createElement("div",{style:fullWidth?{gridColumn:"1 / -1"}:{}},
+      React.createElement("label",{style:labelCss}, label),
+      React.createElement("input",{
+        list:listId, value:draft[key]||"",
+        onChange:e=>applyPatch({[key]:e.target.value}),
+        onKeyDown:e=>{if(e.key==="Enter"&&(draft.town||draft.street)){e.preventDefault();save();}if(e.key==="Escape")reset();},
+        placeholder, style:inpCss, autoComplete:"off"
+      }),
+      React.createElement("datalist",{id:listId}, listValues.map(v=>React.createElement("option",{key:v,value:v})))
+    );
+
+  return React.createElement("div",null,
+    // Chips for already-attached additional locations
+    labels.length > 0 && React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"5px",marginBottom:"8px"}},
+      labels.map(label =>
+        React.createElement("span",{key:label,style:{display:"inline-flex",alignItems:"center",gap:"4px",padding:"3px 8px",borderRadius:"20px",fontSize:"0.8rem",background:"rgba(100,110,140,0.1)",color:"#4a5470",border:"1px solid rgba(100,110,140,0.25)"}},
+          "📍 ", label,
+          React.createElement("button",{onClick:()=>remove(label),title:"Remove",style:{background:"none",border:"none",cursor:"pointer",color:"#8a8aaa",fontSize:"0.78rem",padding:0,lineHeight:1}},"×")
+        )
+      )
+    ),
+    // Progressive disclosure: a single Town input when collapsed; the
+    // full Street / Town / State / Country grid + Save / Clear once
+    // the user starts typing.
+    React.createElement("div",{style:{
+      background: expanded ? "rgba(240,235,224,0.5)" : "transparent",
+      border: expanded ? "1px solid #d4c4a8" : "1px dashed #c8b89a",
+      borderRadius:"3px",
+      padding: expanded ? "10px 12px" : "0",
+      transition:"background 0.2s,border-color 0.2s,padding 0.2s"
+    }},
+      expanded
+        ? React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}},
+            React.createElement("div",{style:{gridColumn:"1 / -1"}},
+              React.createElement("label",{style:labelCss},"Street ",React.createElement("span",{style:{color:"#9a8a78",fontStyle:"italic"}},"(optional)")),
+              React.createElement("input",{value:draft.street,onChange:e=>applyPatch({street:e.target.value}),onKeyDown:e=>{if(e.key==="Enter"&&(draft.town||draft.street)){e.preventDefault();save();}if(e.key==="Escape")reset();},placeholder:"Number and road",style:inpCss,autoComplete:"off"})
+            ),
+            fieldDef("town",    "Town / Suburb / City", "al-town-sugs",    knownTowns,    "e.g. Brunswick",  false),
+            fieldDef("state",   "State / Region",       "al-state-sugs",   knownStates,   "e.g. Victoria",   false),
+            fieldDef("country", "Country",              "al-country-sugs", knownCountries,"e.g. Australia", true)
+          )
+        : React.createElement("input",{
+            list:"al-town-sugs",
+            autoFocus:false,
+            value:draft.town,
+            onChange:e=>applyPatch({town:e.target.value}),
+            onKeyDown:e=>{if(e.key==="Enter"&&draft.town){e.preventDefault();save();}if(e.key==="Escape")reset();},
+            placeholder:"+ Add another location — town or place",
+            style:{...inpCss,width:"100%"},
+            autoComplete:"off"
+          }),
+      // Datalist always emitted so the collapsed Town input still
+      // autocompletes; the structured branch re-emits its own data-
+      // lists with the same ids, which is fine (last one wins, and
+      // the values are identical).
+      !expanded && React.createElement("datalist",{id:"al-town-sugs"}, knownTowns.map(t=>React.createElement("option",{key:t,value:t}))),
+      expanded && React.createElement("div",{style:{display:"flex",gap:"6px",marginTop:"10px"}},
+        React.createElement("button",{onClick:save,disabled:!(draft.town||draft.street),style:{...S.btn,padding:"6px 14px",fontSize:"0.85rem",opacity:(draft.town||draft.street)?1:0.5}},"+ Add location"),
+        React.createElement("button",{onClick:reset,style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"6px 12px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",color:"#8a7460"}},"Clear")
+      )
+    )
+  );
+}
+
 // PlacePicker - single-field location entry that searches saved places
 // instantly and Nominatim live (debounced). Still used inside the Map
 // view's "fix this place's coordinates" workflow.
@@ -9826,7 +9965,7 @@ function AddEditForm({
         React.createElement("div",null,
           React.createElement("label",{style:{...S.label,fontSize:"0.78rem",color:"#8a7460"}},"Additional locations"),
           React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 5px"}},"Road trips, multi-city visits, or memories spanning several places"),
-          React.createElement(PeopleOrgField,{icon:"\ud83d\udccd",values:form.locations||[],allValues:knownLocationLabels(knownLocations),onChange:v=>updateForm({locations:v}),placeholder:"Add another location\u2026"})
+          React.createElement(AdditionalLocationsField,{form,updateForm,knownLocations,persistSubject})
         )
       );
     })()),
