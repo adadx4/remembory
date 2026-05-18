@@ -479,6 +479,92 @@ function findMatchingLocalSubject(remote, localSubjects) {
 // Merge two subjects' fields. Local wins on dictionary conflicts (so the
 // device the user is editing on takes precedence on key:value entries);
 // arrays are unioned by id where possible, otherwise sorted set-union.
+// ── Sync merge helpers ──────────────────────────────────────────
+// Deep equality for primitives, plain objects, and arrays. Used so the
+// merge can detect identical-but-different-reference values (e.g. two
+// "London" objects produced by separate edits with the same final fields).
+function deepEq(a, b) {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (!deepEq(a[i], b[i])) return false;
+    return true;
+  }
+  const ka = Object.keys(a), kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) if (!deepEq(a[k], b[k])) return false;
+  return true;
+}
+
+function isEmptyVal(v) {
+  if (v == null || v === "") return true;
+  if (Array.isArray(v)) return v.length === 0;
+  if (typeof v === "object") return Object.keys(v).length === 0;
+  return false;
+}
+
+// Merge a single field. Prefers non-empty over empty; on a true value
+// conflict (both non-empty, different), prefers `remote` — because sync
+// pull and file import both express the user's intent to bring incoming
+// data in. Returns { value, conflict }.
+function mergeField(local, remote) {
+  if (deepEq(local, remote)) return { value: local, conflict: false };
+  if (isEmptyVal(local))  return { value: remote, conflict: false };
+  if (isEmptyVal(remote)) return { value: local,  conflict: false };
+  return { value: remote, conflict: true };
+}
+
+// Merge two key/value dictionaries field-by-field.
+function mergeDict(local, remote) {
+  const out = {};
+  let conflicts = 0;
+  const keys = new Set([...Object.keys(local||{}), ...Object.keys(remote||{})]);
+  for (const k of keys) {
+    const lHas = local  && Object.prototype.hasOwnProperty.call(local,  k);
+    const rHas = remote && Object.prototype.hasOwnProperty.call(remote, k);
+    if (!lHas) { out[k] = remote[k]; continue; }
+    if (!rHas) { out[k] = local[k];  continue; }
+    const r = mergeField(local[k], remote[k]);
+    out[k] = r.value;
+    if (r.conflict) conflicts++;
+  }
+  return { result: out, conflicts };
+}
+
+// Merge two knownLocations arrays. Coalesces both string and object form
+// to objects, dedupes by label, and merges the structured fields
+// (street/town/state/country/coords/...) per key via mergeField. Without
+// this, a cloud-side address fix never reaches a device that already had
+// a stale entry with the same label.
+function mergeKnownLocations(local, remote) {
+  const labelOf = l => typeof l === "string" ? l : (l && l.label) || "";
+  const toObj = l => typeof l === "string" ? { label: l } : (l || {});
+  const byLabel = new Map();
+  let conflicts = 0;
+  for (const lo of (local || [])) {
+    const lbl = labelOf(lo);
+    if (!lbl) continue;
+    byLabel.set(lbl, toObj(lo));
+  }
+  for (const ro of (remote || [])) {
+    const lbl = labelOf(ro);
+    if (!lbl) continue;
+    const existing = byLabel.get(lbl);
+    if (!existing) { byLabel.set(lbl, toObj(ro)); continue; }
+    const m = mergeDict(existing, toObj(ro));
+    conflicts += m.conflicts;
+    byLabel.set(lbl, { ...m.result, label: lbl });
+  }
+  return {
+    result: [...byLabel.values()].sort((a, b) => labelOf(a).localeCompare(labelOf(b))),
+    conflicts,
+  };
+}
+
 function mergeSubjects(local, remote) {
   if (!local) return remote;
   if (!remote) return local;
@@ -506,12 +592,10 @@ function mergeSubjects(local, remote) {
   };
   // String set-unions, sorted
   const unionSorted = (a, b) => [...new Set([...(a||[]), ...(b||[])])].sort();
-  // knownLocations: union by label (handle both string and object form)
-  const labelOf = (l) => typeof l === 'string' ? l : (l && l.label) || "";
-  const localLocs = local.knownLocations || [];
-  const localLocLabels = new Set(localLocs.map(labelOf));
-  const newLocs = (remote.knownLocations||[]).filter(l => !localLocLabels.has(labelOf(l)));
-  const knownLocations = [...localLocs, ...newLocs].sort((a,b) => labelOf(a).localeCompare(labelOf(b)));
+  // knownLocations: dedupe by label, merging structured fields per-label so
+  // cloud-side address corrections actually reach a device that already had
+  // a stale entry with the same label.
+  const knownLocations = mergeKnownLocations(local.knownLocations, remote.knownLocations).result;
   // shareHistory: union by (timestamp + memId list) signature
   const shareSig = (h) => (h.timestamp||"") + "|" + (h.memIds||[]).join(",");
   const localShareKeys = new Set((local.shareHistory||[]).map(shareSig));
@@ -529,19 +613,19 @@ function mergeSubjects(local, remote) {
     treePersons:       unionById(local.treePersons, remote.treePersons),
     treeFamilies:      unionById(local.treeFamilies, remote.treeFamilies),
     gedFocalPersonId:  local.gedFocalPersonId || remote.gedFocalPersonId || null,
-    peopleEmails:        { ...(remote.peopleEmails||{}),         ...(local.peopleEmails||{}) },
-    peopleRelationships: { ...(remote.peopleRelationships||{}),  ...(local.peopleRelationships||{}) },
-    peopleNotes:         { ...(remote.peopleNotes||{}),          ...(local.peopleNotes||{}) },
-    orgNotes:            { ...(remote.orgNotes||{}),             ...(local.orgNotes||{}) },
-    orgLocations:        { ...(remote.orgLocations||{}),         ...(local.orgLocations||{}) },
-    orgPeriods:          { ...(remote.orgPeriods||{}),           ...(local.orgPeriods||{}) },
-    entityPhotos:        { ...(remote.entityPhotos||{}),         ...(local.entityPhotos||{}) },
-    locationNotes:       { ...(remote.locationNotes||{}),        ...(local.locationNotes||{}) },
-    locationCoords:      { ...(remote.locationCoords||{}),       ...(local.locationCoords||{}) },
-    personOrgs:          { ...(remote.personOrgs||{}),           ...(local.personOrgs||{}) },
-    personLocations:     { ...(remote.personLocations||{}),      ...(local.personLocations||{}) },
-    personGroups:        { ...(remote.personGroups||{}),         ...(local.personGroups||{}) },
-    senderNameMaps:      { ...(remote.senderNameMaps||{}),       ...(local.senderNameMaps||{}) },
+    peopleEmails:        mergeDict(local.peopleEmails,        remote.peopleEmails).result,
+    peopleRelationships: mergeDict(local.peopleRelationships, remote.peopleRelationships).result,
+    peopleNotes:         mergeDict(local.peopleNotes,         remote.peopleNotes).result,
+    orgNotes:            mergeDict(local.orgNotes,            remote.orgNotes).result,
+    orgLocations:        mergeDict(local.orgLocations,        remote.orgLocations).result,
+    orgPeriods:          mergeDict(local.orgPeriods,          remote.orgPeriods).result,
+    entityPhotos:        mergeDict(local.entityPhotos,        remote.entityPhotos).result,
+    locationNotes:       mergeDict(local.locationNotes,       remote.locationNotes).result,
+    locationCoords:      mergeDict(local.locationCoords,      remote.locationCoords).result,
+    personOrgs:          mergeDict(local.personOrgs,          remote.personOrgs).result,
+    personLocations:     mergeDict(local.personLocations,     remote.personLocations).result,
+    personGroups:        mergeDict(local.personGroups,        remote.personGroups).result,
+    senderNameMaps:      mergeDict(local.senderNameMaps,      remote.senderNameMaps).result,
     shareHistory:      [...(local.shareHistory||[]), ...newShares],
     legacyMessage:     local.legacyMessage || remote.legacyMessage || "",
     contributionLinks: unionById(local.contributionLinks, remote.contributionLinks),
@@ -12265,16 +12349,26 @@ function handleEdit(m) {
       const mergedOrgs=[...new Set([...knownOrgs,...backupOrgs])].sort();
       const mergedTags=[...new Set([...customTags,...(d.customTags||[])])];
       const backupLocs=d.knownLocations||[...new Set(d.memories.flatMap(m=>[m.location,...(m.locations||[])].filter(Boolean)))];
-      const mergedLocs=[...new Set([...knownLocations,...backupLocs])].sort();
+      // knownLocations now objects with structured fields — must dedupe by
+      // label and deep-merge fields, otherwise stale local entries shadow
+      // cloud-side address fixes (Set-of-objects doesn't actually dedupe).
+      const locsMerge = mergeKnownLocations(knownLocations, backupLocs);
+      const mergedLocs = locsMerge.result;
       const backupSources=d.knownSources||[];
       const existingSrcIds=new Set(knownSources.map(s=>s.id));
       const mergedSources=[...knownSources,...backupSources.filter(s=>!existingSrcIds.has(s.id))];
       const backupCandidates=d.candidates||[];
       const existingCandIds=new Set(candidates.map(c=>c.id));
       const mergedCandidates=[...candidates,...backupCandidates.filter(c=>!existingCandIds.has(c.id))];
-      const updatedPeopleEmails = {...(d.peopleEmails||{}), ...(peopleEmails||{})};
+      // Entity dicts: per-key merge that fills empty-from-the-other-side and
+      // prefers incoming on real conflicts — so a cloud-side fix actually
+      // overwrites a stale local value. (Previously `{...remote, ...local}`
+      // made local win for every shared key, silently dropping cloud fixes.)
+      const peopleEmailsMerge = mergeDict(peopleEmails, d.peopleEmails);
+      const updatedPeopleEmails = peopleEmailsMerge.result;
       if (senderName && senderEmail) updatedPeopleEmails[senderName] = senderEmail;
-      const mergedRelationships = {...(d.peopleRelationships||{}), ...(data.peopleRelationships||{})};
+      const relsMerge = mergeDict(data.peopleRelationships, d.peopleRelationships);
+      const mergedRelationships = relsMerge.result;
       // Merge shareHistory (deduplicate by date+memIds)
       const existingShareDates = new Set((shareHistory||[]).map(h=>h.date));
       const mergedShareHistory = [...(shareHistory||[]), ...(d.shareHistory||[]).filter(h=>!existingShareDates.has(h.date))];
@@ -12299,14 +12393,33 @@ function handleEdit(m) {
           }
         } catch(e) {}
       }
-      const mergedPeopleNotes={...(d.peopleNotes||{}),...peopleNotes}; const mergedOrgNotes={...(d.orgNotes||{}),...orgNotes};
-      const mergedOrgLocations={...(d.orgLocations||{}), ...(data.orgLocations||{})};
-      const mergedOrgPeriods={...(d.orgPeriods||{}), ...(data.orgPeriods||{})};
-      const mergedLocationNotes={...(d.locationNotes||{}), ...(data.locationNotes||{})};
-      const mergedLocationCoords={...(d.locationCoords||{}), ...(data.locationCoords||{})};
-      const mergedPersonOrgs={...(d.personOrgs||{}), ...(data.personOrgs||{})};
-      const mergedPersonLocations={...(d.personLocations||{}), ...(data.personLocations||{})};
-      const mergedPersonGroups={...(d.personGroups||{}), ...(data.personGroups||{})};
+      const peopleNotesMerge   = mergeDict(peopleNotes,           d.peopleNotes);
+      const orgNotesMerge      = mergeDict(orgNotes,              d.orgNotes);
+      const orgLocationsMerge  = mergeDict(data.orgLocations,     d.orgLocations);
+      const orgPeriodsMerge    = mergeDict(data.orgPeriods,       d.orgPeriods);
+      const locationNotesMerge = mergeDict(data.locationNotes,    d.locationNotes);
+      const locationCoordsMerge= mergeDict(data.locationCoords,   d.locationCoords);
+      const personOrgsMerge    = mergeDict(data.personOrgs,       d.personOrgs);
+      const personLocationsMerge=mergeDict(data.personLocations,  d.personLocations);
+      const personGroupsMerge  = mergeDict(data.personGroups,     d.personGroups);
+      const mergedPeopleNotes      = peopleNotesMerge.result;
+      const mergedOrgNotes         = orgNotesMerge.result;
+      const mergedOrgLocations     = orgLocationsMerge.result;
+      const mergedOrgPeriods       = orgPeriodsMerge.result;
+      const mergedLocationNotes    = locationNotesMerge.result;
+      const mergedLocationCoords   = locationCoordsMerge.result;
+      const mergedPersonOrgs       = personOrgsMerge.result;
+      const mergedPersonLocations  = personLocationsMerge.result;
+      const mergedPersonGroups     = personGroupsMerge.result;
+      // Tally entity-level reconciliations to surface in the import summary
+      // alongside memory adds/conflicts. "fields updated" = empty-on-one-side
+      // filled in OR a true conflict resolved in favour of incoming.
+      const entityUpdates =
+        locsMerge.conflicts + peopleEmailsMerge.conflicts + relsMerge.conflicts +
+        peopleNotesMerge.conflicts + orgNotesMerge.conflicts +
+        orgLocationsMerge.conflicts + orgPeriodsMerge.conflicts +
+        locationNotesMerge.conflicts + locationCoordsMerge.conflicts +
+        personOrgsMerge.conflicts + personLocationsMerge.conflicts + personGroupsMerge.conflicts;
       // Restore entity photos from backup into IDB
       const mergedEntityPhotos = {...(data.entityPhotos||{})};
       await Promise.all(Object.entries(d.entityPhotos||{}).map(async ([key, med]) => {
@@ -12350,6 +12463,7 @@ function handleEdit(m) {
         if (addedCount > 0) parts.push(`${addedCount} new ${addedCount===1?"memory":"memories"} added`);
         if (mergedPerspectivesCount > 0) parts.push(`${mergedPerspectivesCount} updated with new perspectives`);
         if (skippedCount > 0) parts.push(`${skippedCount} already present`);
+        if (entityUpdates > 0) parts.push(`${entityUpdates} location/people/org field${entityUpdates===1?"":"s"} updated from incoming data`);
         if (conflicts.length > 0) {
           parts.push(`${conflicts.length} ${conflicts.length===1?"memory has":"memories have"} changes to review`);
           setSyncConflicts(conflicts);
