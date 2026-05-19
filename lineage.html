@@ -289,6 +289,172 @@ const POINT_EVENT_IDS = new Set(["birth","baptism","marriage","death","burial"])
 const eventTypeShort = (id) => (EVENT_TYPES.find(t => t.id === id) || {}).short || "";
 const GENEALOGY_TOOL_URL = "/research.html";
 
+// ── Tree helpers (module-level so the relationship-update path in
+//    AddEditForm / ImportView can keep the tree in sync as new relatives
+//    are added to the chronicle, without depending on FamilyTreeView
+//    being mounted) ─────────────────────────────────────────────
+function newPersonRecord(draft) {
+  const id = "tp_manual_"+Date.now()+Math.random().toString(36).slice(2,7);
+  return {
+    id,
+    gedId: "@" + id.toUpperCase() + "@",
+    name: (draft.name||"").trim(),
+    sex: (draft.sex||"").trim(),
+    dob: (draft.dob||"").trim(),
+    dod: (draft.dod||"").trim(),
+    birthPlace: (draft.birthPlace||"").trim(),
+    deathPlace: (draft.deathPlace||"").trim(),
+    notes: (draft.notes||"").trim(),
+    subjectId: null,
+  };
+}
+function newFamilyRecord() {
+  const id = "tf_manual_"+Date.now()+Math.random().toString(36).slice(2,7);
+  return {
+    id, gedId: "@" + id.toUpperCase() + "@",
+    husbandId: null, wifeId: null, childIds: [],
+    marriageYear: null, marriagePlace: "",
+  };
+}
+
+// Map a free-text relationship label to a structured family role we can
+// wire into the tree. Returns null for ambiguous cases (in-laws, grand-
+// anything, uncles/aunts, cousins, godparents) — these need multi-hop
+// wiring that's risky to auto-guess, so they don't get auto-added.
+function classifyRelType(relText) {
+  const r = (relText||"").toLowerCase().trim();
+  if (!r) return null;
+  if (/in[\s-]?law/.test(r)) return null;
+  if (/\b(grand|great)/.test(r)) return null;
+  if (/\b(uncle|aunt|cousin|nephew|niece|godparent|godfather|godmother)\b/.test(r)) return null;
+  if (/\b(father|stepfather|dad(?:dy)?|papa)\b/.test(r))            return {role:"parent", sex:"M"};
+  if (/\b(mother|stepmother|mum(?:my)?|mom(?:my)?|mama)\b/.test(r)) return {role:"parent", sex:"F"};
+  if (/\b(parent|guardian)\b/.test(r))                              return {role:"parent", sex:""};
+  if (/\b(husband|fianc[eé])\b/.test(r))                            return {role:"spouse", sex:"M"};
+  if (/\b(wife|fianc[eé]e)\b/.test(r))                              return {role:"spouse", sex:"F"};
+  if (/\b(spouse|partner)\b/.test(r))                               return {role:"spouse", sex:""};
+  if (/\b(son|stepson)\b/.test(r))                                  return {role:"child",  sex:"M"};
+  if (/\b(daughter|stepdaughter)\b/.test(r))                        return {role:"child",  sex:"F"};
+  if (/\b(child|kid)\b/.test(r))                                    return {role:"child",  sex:""};
+  if (/\b(brother|stepbrother|half[\s-]?brother)\b/.test(r))        return {role:"sibling",sex:"M"};
+  if (/\b(sister|stepsister|half[\s-]?sister)\b/.test(r))           return {role:"sibling",sex:"F"};
+  if (/\b(sibling|twin)\b/.test(r))                                 return {role:"sibling",sex:""};
+  return null;
+}
+
+// Incrementally extend a subject's tree with one new relative. Returns
+// {treePersons, treeFamilies} when the tree was changed, or null when
+// nothing was done (empty/missing tree, no focal, ambiguous relationship,
+// relative already in tree). Pure — caller is responsible for persisting.
+//
+// The new tree person is connected to the focal via the right family
+// slot (parent → parents-of-focal family, spouse → spousal family,
+// child → spousal family children list, sibling → parents family
+// childIds). If the appropriate family doesn't exist yet, a new one is
+// created; if it exists but the relevant slot is filled with someone
+// else, a parallel family is spawned (e.g. a second spouse).
+function addRelativeToTree(subject, name, rel) {
+  if (!subject) return null;
+  const treePersons  = subject.treePersons  || [];
+  const treeFamilies = subject.treeFamilies || [];
+  if (treePersons.length === 0) return null; // nothing to attach to yet
+  const role = classifyRelType(rel);
+  if (!role) return null;
+  const nm = (name||"").trim();
+  if (!nm) return null;
+
+  // Focal: prefer gedFocalPersonId; fall back to the tp whose name
+  // matches the subject's own name (covers manually-built trees where
+  // gedFocalPersonId may not have been set yet).
+  let focal = subject.gedFocalPersonId
+    ? treePersons.find(p => p.id === subject.gedFocalPersonId)
+    : null;
+  if (!focal) {
+    const subjLow = (subject.name||"").trim().toLowerCase();
+    if (subjLow) focal = treePersons.find(p => (p.name||"").trim().toLowerCase() === subjLow);
+  }
+  if (!focal) return null;
+
+  // Already in tree (by case-insensitive name)? Leave alone — we don't
+  // try to reconcile an existing person into a different family slot
+  // automatically, since that's a destructive change the user should
+  // make explicitly via the tree view.
+  const nmLow = nm.toLowerCase();
+  if (treePersons.some(p => (p.name||"").trim().toLowerCase() === nmLow)) return null;
+
+  const np = newPersonRecord({name: nm, sex: role.sex || ""});
+  const persons = [...treePersons, np];
+  let families = [...treeFamilies];
+
+  if (role.role === "parent") {
+    let fam = families.find(f => (f.childIds||[]).includes(focal.id));
+    const isFemale = role.sex === "F";
+    if (!fam) {
+      const nf = newFamilyRecord();
+      nf.childIds = [focal.id];
+      if (isFemale) nf.wifeId = np.id; else nf.husbandId = np.id;
+      families.push(nf);
+    } else if (isFemale && !fam.wifeId) {
+      families = families.map(f => f.id===fam.id ? {...f, wifeId: np.id} : f);
+    } else if (!isFemale && !fam.husbandId) {
+      families = families.map(f => f.id===fam.id ? {...f, husbandId: np.id} : f);
+    } else if (!fam.wifeId) {
+      families = families.map(f => f.id===fam.id ? {...f, wifeId: np.id} : f);
+    } else if (!fam.husbandId) {
+      families = families.map(f => f.id===fam.id ? {...f, husbandId: np.id} : f);
+    } else {
+      // Both parent slots already filled → second parents family for focal.
+      const nf = newFamilyRecord();
+      nf.childIds = [focal.id];
+      if (isFemale) nf.wifeId = np.id; else nf.husbandId = np.id;
+      families.push(nf);
+    }
+  } else if (role.role === "spouse") {
+    // Reuse a one-sided family that already includes the focal, otherwise
+    // create a new spousal family with focal + new person.
+    let fam = families.find(f =>
+      (f.husbandId === focal.id && !f.wifeId) ||
+      (f.wifeId === focal.id && !f.husbandId)
+    );
+    if (fam) {
+      families = families.map(f => {
+        if (f.id !== fam.id) return f;
+        if (f.husbandId === focal.id) return {...f, wifeId: np.id};
+        return {...f, husbandId: np.id};
+      });
+    } else {
+      const nf = newFamilyRecord();
+      if (focal.sex === "F")            { nf.wifeId = focal.id; nf.husbandId = np.id; }
+      else if (focal.sex === "M")       { nf.husbandId = focal.id; nf.wifeId = np.id; }
+      else if (role.sex === "F")        { nf.wifeId = np.id;    nf.husbandId = focal.id; }
+      else if (role.sex === "M")        { nf.husbandId = np.id; nf.wifeId = focal.id; }
+      else                              { nf.husbandId = focal.id; nf.wifeId = np.id; }
+      families.push(nf);
+    }
+  } else if (role.role === "child") {
+    let fam = families.find(f => f.husbandId === focal.id || f.wifeId === focal.id);
+    if (fam) {
+      families = families.map(f => f.id===fam.id ? {...f, childIds:[...(f.childIds||[]), np.id]} : f);
+    } else {
+      const nf = newFamilyRecord();
+      if (focal.sex === "F") nf.wifeId = focal.id; else nf.husbandId = focal.id;
+      nf.childIds = [np.id];
+      families.push(nf);
+    }
+  } else if (role.role === "sibling") {
+    let fam = families.find(f => (f.childIds||[]).includes(focal.id));
+    if (fam) {
+      families = families.map(f => f.id===fam.id ? {...f, childIds:[...(f.childIds||[]), np.id]} : f);
+    } else {
+      const nf = newFamilyRecord();
+      nf.childIds = [focal.id, np.id];
+      families.push(nf);
+    }
+  }
+
+  return {treePersons: persons, treeFamilies: families};
+}
+
 // ── Styles ─────────────────────────────────────────────────────
 const S = {
   input: { width:"100%", padding:"10px 13px", background:"rgba(255,252,245,0.9)", border:"1px solid #c8b89a", borderRadius:"2px", fontFamily:"'Crimson Text', serif", fontSize:"1rem", color:"#2c2416", outline:"none" },
@@ -7143,6 +7309,8 @@ function ImportView({
   isHistoryMode,
   // Shared data
   knownPeople, knownOrgs, knownLocations, peopleEmails, peopleRelationships, persistSubject,
+  // For incremental tree sync on new relationships
+  subject,
 }) {
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
     React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Import"),
@@ -7183,7 +7351,13 @@ function ImportView({
             React.createElement("div",null,React.createElement("label",{style:S.label},"Tags"),React.createElement(TagPicker,{tags:item.tags,onToggle:tag=>updatePhoto(item.id,{tags:item.tags.includes(tag)?item.tags.filter(t=>t!==tag):[...item.tags,tag]})})),
             React.createElement("div",null,
               React.createElement("label",{style:S.label},"People"),
-              React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:item.people||[],allValues:knownPeople,onChange:v=>updatePhoto(item.id,{people:v}),placeholder:"Add a person\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
+              React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:item.people||[],allValues:knownPeople,onChange:v=>updatePhoto(item.id,{people:v}),placeholder:"Add a person\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{
+                if (!rel) return;
+                const treeUpdate = addRelativeToTree(subject, name, rel);
+                const patch = {peopleRelationships:{...peopleRelationships, [name]:rel}};
+                if (treeUpdate) { patch.treePersons = treeUpdate.treePersons; patch.treeFamilies = treeUpdate.treeFamilies; }
+                persistSubject(patch);
+              },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
             ),
             React.createElement("div",null,
               React.createElement("label",{style:S.label},"Organisations"),
@@ -7405,7 +7579,13 @@ function ImportView({
           React.createElement("div",null,
             React.createElement("label",{style:S.label},"People"),
             React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 6px"}},"Sender added automatically. Add anyone else mentioned in the email."),
-            React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:emailForm.people||[],allValues:knownPeople,onChange:v=>setEmailForm(f=>({...f,people:v})),placeholder:"Add a person\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
+            React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:emailForm.people||[],allValues:knownPeople,onChange:v=>setEmailForm(f=>({...f,people:v})),placeholder:"Add a person\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{
+              if (!rel) return;
+              const treeUpdate = addRelativeToTree(subject, name, rel);
+              const patch = {peopleRelationships:{...peopleRelationships, [name]:rel}};
+              if (treeUpdate) { patch.treePersons = treeUpdate.treePersons; patch.treeFamilies = treeUpdate.treeFamilies; }
+              persistSubject(patch);
+            },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
           ),
           React.createElement("button",{onClick:saveEmail,style:{...S.btn,justifySelf:"start"}},"Save to Chronicle")
         )
@@ -8545,31 +8725,9 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
     );
   }
 
-  // Tree record constructors — used both for in-tree relation adds
-  // (saveAddRelation) and for the first-person/seed-from-subject path.
-  function newPersonRecord(draft) {
-    const id = "tp_manual_"+Date.now()+Math.random().toString(36).slice(2,7);
-    return {
-      id,
-      gedId: "@" + id.toUpperCase() + "@",
-      name: (draft.name||"").trim(),
-      sex: (draft.sex||"").trim(),
-      dob: (draft.dob||"").trim(),
-      dod: (draft.dod||"").trim(),
-      birthPlace: (draft.birthPlace||"").trim(),
-      deathPlace: (draft.deathPlace||"").trim(),
-      notes: (draft.notes||"").trim(),
-      subjectId: null,
-    };
-  }
-  function newFamilyRecord() {
-    const id = "tf_manual_"+Date.now()+Math.random().toString(36).slice(2,7);
-    return {
-      id, gedId: "@" + id.toUpperCase() + "@",
-      husbandId: null, wifeId: null, childIds: [],
-      marriageYear: null, marriagePlace: "",
-    };
-  }
+  // newPersonRecord / newFamilyRecord / classifyRelType are defined at
+  // module level so the relationship-update path in AddEditForm can keep
+  // the tree in sync without needing FamilyTreeView to be mounted.
 
   // Find a subject whose name matches `name` case-insensitively. Used so a
   // manually-added tree person can pick up the subjectId of an existing
@@ -8578,33 +8736,6 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
     const nm = (name||"").trim().toLowerCase();
     if (!nm) return null;
     return (subjects||[]).find(s => (s.name||"").trim().toLowerCase() === nm) || null;
-  }
-
-  // Map a free-text relationship label (as stored in
-  // subject.peopleRelationships, e.g. "father" / "wife" / "daughter") to a
-  // structured family role we can wire into the tree. Returns null for
-  // anything ambiguous (in-laws, grandparents, cousins, uncles/aunts) —
-  // those need multi-hop wiring that's risky to auto-guess, so we leave
-  // them out of the seed and let the user add them manually.
-  function classifyRelType(relText) {
-    const r = (relText||"").toLowerCase().trim();
-    if (!r) return null;
-    if (/in[\s-]?law/.test(r)) return null;
-    if (/\b(grand|great)/.test(r)) return null;
-    if (/\b(uncle|aunt|cousin|nephew|niece|godparent|godfather|godmother)\b/.test(r)) return null;
-    if (/\b(father|stepfather|dad(?:dy)?|papa)\b/.test(r))            return {role:"parent", sex:"M"};
-    if (/\b(mother|stepmother|mum(?:my)?|mom(?:my)?|mama)\b/.test(r)) return {role:"parent", sex:"F"};
-    if (/\b(parent|guardian)\b/.test(r))                              return {role:"parent", sex:""};
-    if (/\b(husband|fianc[eé])\b/.test(r))                            return {role:"spouse", sex:"M"};
-    if (/\b(wife|fianc[eé]e)\b/.test(r))                              return {role:"spouse", sex:"F"};
-    if (/\b(spouse|partner)\b/.test(r))                               return {role:"spouse", sex:""};
-    if (/\b(son|stepson)\b/.test(r))                                  return {role:"child",  sex:"M"};
-    if (/\b(daughter|stepdaughter)\b/.test(r))                        return {role:"child",  sex:"F"};
-    if (/\b(child|kid)\b/.test(r))                                    return {role:"child",  sex:""};
-    if (/\b(brother|stepbrother|half[\s-]?brother)\b/.test(r))        return {role:"sibling",sex:"M"};
-    if (/\b(sister|stepsister|half[\s-]?sister)\b/.test(r))           return {role:"sibling",sex:"F"};
-    if (/\b(sibling|twin)\b/.test(r))                                 return {role:"sibling",sex:""};
-    return null;
   }
 
   // Seed an empty tree from a subject's peopleRelationships. The focal
@@ -10008,7 +10139,13 @@ function AddEditForm({
           // Preserve any pet entries already on the memory that we hid above.
           const pets = (form.people||[]).filter(n => petNames && petNames.has(n));
           updateForm({people: [...new Set([...v, ...pets])]});
-        },placeholder:"Add a person or group\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails,[name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships,[name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean),groups:personGroups||{}})
+        },placeholder:"Add a person or group\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails,[name]:email}}); },onNewPersonRelationship:(name,rel)=>{
+          if (!rel) return;
+          const treeUpdate = addRelativeToTree(subject, name, rel);
+          const patch = {peopleRelationships:{...peopleRelationships,[name]:rel}};
+          if (treeUpdate) { patch.treePersons = treeUpdate.treePersons; patch.treeFamilies = treeUpdate.treeFamilies; }
+          persistSubject(patch);
+        },allRelationships:Object.values(peopleRelationships).filter(Boolean),groups:personGroups||{}})
       );
     })()),
 
@@ -11089,7 +11226,12 @@ function App() {
   function setOrgPeriods(orgName, periods) { persistSubject({orgPeriods:{...orgPeriods, [orgName]: periods}}); }
   function registerPeople(names) { const merged=[...new Set([...knownPeople,...names])].sort(); persistSubject({knownPeople:merged}); }
   function setPersonEmail(name, email) { persistSubject({peopleEmails:{...peopleEmails, [name]: email}}); }
-  function setPersonRelationship(name, rel) { persistSubject({peopleRelationships:{...peopleRelationships, [name]: rel}}); }
+  function setPersonRelationship(name, rel) {
+    const patch = {peopleRelationships:{...peopleRelationships, [name]: rel}};
+    const treeUpdate = addRelativeToTree(subject, name, rel);
+    if (treeUpdate) { patch.treePersons = treeUpdate.treePersons; patch.treeFamilies = treeUpdate.treeFamilies; }
+    persistSubject(patch);
+  }
   function setLocationNotes(name, notes) { persistSubject({locationNotes:{...locationNotes, [name]: notes}}); }
   function setLocationCoords(name, coords) {
     const updated = knownLocations.map(l => l.label===name ? {...l, coords: coords||null} : l);
@@ -15119,6 +15261,7 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         handleGedFile, handleGedPick, commitGedImport, commitGedTreeImport,
         isHistoryMode,
         knownPeople, knownOrgs, knownLocations, peopleEmails, peopleRelationships, persistSubject,
+        subject,
       }),
                         
       // ── LIFE VIEW ──
