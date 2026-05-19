@@ -505,6 +505,81 @@ function countMissingRelativesForTree(subject) {
   return n;
 }
 
+// Wire a single birth / baptism / death / burial event into the
+// family tree. The event's "primary person" is the individual the
+// event is about — explicit via event.primaryPerson, or inferred when
+// the event tags exactly one person other than the chronicle owner.
+// When the primary isn't the chronicle owner:
+//   1. Ensure they're in the tree, adding them via addRelativeToTree
+//      using their entry in peopleRelationships (if classifiable).
+//   2. Fill in dob/birthPlace (for birth/baptism) or dod/deathPlace
+//      (for death/burial) on their tree person — only when those
+//      fields are currently empty, so a manual edit in the tree view
+//      is never overwritten by a later event save.
+// Returns {treePersons, treeFamilies} when something changed, null
+// otherwise. Caller persists.
+function applyEventToTree(subject, event) {
+  if (!subject || !event) return null;
+  const et = event.eventType;
+  if (!["birth","baptism","death","burial"].includes(et)) return null;
+
+  const subjLow = (subject.name||"").trim().toLowerCase();
+  // Resolve primary: explicit pick first, then auto-pick when exactly
+  // one tagged person isn't the chronicle owner.
+  let primary = (event.primaryPerson || "").trim();
+  if (!primary) {
+    const others = (event.people||[]).filter(p => {
+      const t = (p||"").trim();
+      return t && t.toLowerCase() !== subjLow;
+    });
+    if (others.length === 1) primary = others[0];
+  }
+  if (!primary || primary.toLowerCase() === subjLow) return null;
+
+  let treePersons = subject.treePersons || [];
+  let treeFamilies = subject.treeFamilies || [];
+  const primaryLow = primary.toLowerCase();
+
+  // Ensure the primary is in the tree. addRelativeToTree handles all
+  // the family-slot wiring; if it returns null (empty tree, missing
+  // focal, unclassifiable rel, etc.) we can't safely auto-add, and the
+  // caller would need a tree present + a relationship before the
+  // dob/dod patch makes sense.
+  let tpNode = treePersons.find(p => (p.name||"").trim().toLowerCase() === primaryLow);
+  if (!tpNode) {
+    const rel = (subject.peopleRelationships || {})[primary] || "";
+    if (!rel) return null;
+    const addUpdate = addRelativeToTree(
+      {...subject, treePersons, treeFamilies}, primary, rel);
+    if (!addUpdate) return null;
+    treePersons = addUpdate.treePersons;
+    treeFamilies = addUpdate.treeFamilies;
+    tpNode = treePersons.find(p => (p.name||"").trim().toLowerCase() === primaryLow);
+    if (!tpNode) return null;
+  }
+
+  // Patch dob / dod / places. Only fill empty fields — a tree edit
+  // that's already specified, say, an exact month is preserved.
+  const year = event.year ? String(event.year) : "";
+  const place = (event.locationLabel || event.location || "").trim();
+  const patch = {};
+  if (et === "birth" || et === "baptism") {
+    if (!tpNode.dob && year) patch.dob = year;
+    if (!tpNode.birthPlace && place) patch.birthPlace = place;
+  } else {
+    if (!tpNode.dod && year) patch.dod = year;
+    if (!tpNode.deathPlace && place) patch.deathPlace = place;
+  }
+
+  const treeMutated = treePersons !== (subject.treePersons || []);
+  const patchHasChanges = Object.keys(patch).length > 0;
+  if (!treeMutated && !patchHasChanges) return null;
+  if (patchHasChanges) {
+    treePersons = treePersons.map(p => p.id === tpNode.id ? {...p, ...patch} : p);
+  }
+  return {treePersons, treeFamilies};
+}
+
 // ── Cross-chronicle event sync ────────────────────────────────
 // When a subject is mentioned by name in events on OTHER subjects'
 // chronicles, those events represent the same real-world moments seen
@@ -1105,7 +1180,7 @@ function knownLocationValues(knownLocations, field) {
 }
 
 function newForm() {
-  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], sources:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town", researchNote:"", candidateConfidence:"possible", candidatePersonId:"", eventType:"", recalledBy:"self" };
+  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], sources:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town", researchNote:"", candidateConfidence:"possible", candidatePersonId:"", eventType:"", primaryPerson:"", recalledBy:"self" };
 }
 
 // ── Storage ────────────────────────────────────────────────────
@@ -10123,6 +10198,25 @@ function AddEditForm({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.eventType, form.fuzzy, form.dateUncertain]);
 
+  // Auto-default primaryPerson for events that target a specific
+  // individual when there's exactly one tagged person (and that person
+  // isn't the chronicle owner). Keeps the common "Birth of John —
+  // tag John — save" flow zero-click on the primary picker. The user
+  // can still override; we only set when primaryPerson is empty, so a
+  // deliberate pick is never clobbered by adding/removing other people.
+  React.useEffect(() => {
+    if (!isHistoryMode) return;
+    if (!["birth","baptism","death","burial"].includes(form.eventType)) return;
+    if (form.primaryPerson) return;
+    const subjLow = (subject?.name||"").trim().toLowerCase();
+    const taggedOthers = (form.people||[]).filter(p => {
+      const t = (p||"").trim();
+      return t && t.toLowerCase() !== subjLow;
+    });
+    if (taggedOthers.length === 1) updateForm({primaryPerson: taggedOthers[0]});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.eventType, form.people]);
+
   // In Lineage mode, eventType must be picked (even if just "Other").
   // Collect every missing required field at once so the footer can list
   // them all together and each input can flag itself inline, instead of
@@ -10211,7 +10305,28 @@ function AddEditForm({
         ),
         React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"6px 0 0",lineHeight:1.4}},
           "Pick the closest match \u2014 use \u201cOther\u201d if none apply."
-        )
+        ),
+        // Primary person picker \u2014 surfaced only for events that target a
+        // specific individual (birth / baptism / death / burial), and only
+        // once there's someone tagged on the event. Used at save time to
+        // wire the event's year + place into the tree person's dob/dod /
+        // birthPlace / deathPlace. Empty value = the chronicle owner is
+        // the implicit primary; otherwise the picked tagged person is.
+        ["birth","baptism","death","burial"].includes(form.eventType) && (form.people||[]).length > 0 &&
+          React.createElement("div",{style:{marginTop:"10px",paddingTop:"10px",borderTop:"1px dashed rgba(196,169,98,0.5)"}},
+            React.createElement("label",{style:{...S.label,marginBottom:"6px"}}, "\ud83d\udc64 Primary person"),
+            React.createElement("select",{
+              value: form.primaryPerson || "",
+              onChange: e => updateForm({primaryPerson: e.target.value}),
+              style: {...S.select, width:"100%"}
+            },
+              React.createElement("option",{value:""}, (subject?.name || "(this chronicle's subject)") + " \u2014 implicit"),
+              (form.people||[]).map(p => React.createElement("option",{key:p, value:p}, p))
+            ),
+            React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"4px 0 0",lineHeight:1.4}},
+              "Who this event is about. Picking a tagged person other than the chronicle owner lets us write their birth / death date and place into the family tree."
+            )
+          )
       ),
       React.createElement("div",null,
         React.createElement("label",{style:S.label},"Title *"),
@@ -11679,6 +11794,23 @@ function App() {
         .map(label => ({label, street:"", town:"", state:"", country:""}))
     ].sort((a,b) => (typeof a==='string'?a:a.label).localeCompare(typeof b==='string'?b:b.label));
 
+    // For birth / baptism / death / burial events that target another
+    // person, wire the event's date and place into the family tree —
+    // adding the primary to the tree if classifiable, otherwise just
+    // filling in dob/dod/birthPlace/deathPlace on the matching node.
+    // Run BEFORE the persistSubject call so the tree update lands in
+    // the same patch and replays correctly on undo.
+    const treeUpdate = isHistoryMode ? applyEventToTree({
+      ...subject,
+      // Use the freshly-built people/locations indexes so a tree-person
+      // that was added as part of THIS save (e.g. the primary newly
+      // tagged inline) can be matched via peopleRelationships.
+      knownPeople: newPeople,
+    }, primary) : null;
+    const treePatch = treeUpdate
+      ? {treePersons: treeUpdate.treePersons, treeFamilies: treeUpdate.treeFamilies}
+      : {};
+
     if (editingId) {
       // Preserve addedBy, allow contributor name correction via edit form
       const {addedByName, ...primaryClean} = primary;
@@ -11687,7 +11819,7 @@ function App() {
         ? {...primaryClean, addedBy:{...orig.addedBy, ...(addedByName!==undefined&&{name:addedByName})}}
         : primaryClean;
       const updated = memories.map(m=>m.id===editingId?editedPrimary:m).sort((a,b)=>sortKey(a)-sortKey(b));
-      persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs});
+      persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs, ...treePatch});
       setEditingId(null); setSelected(editingId); setForm(newForm()); clearDraft(); setView("detail");
     } else {
       // Stamp addedBy / recalledBy on new memories in carer mode
@@ -11702,7 +11834,7 @@ function App() {
       }
       const toAdd = secondary ? [primary, secondary] : [primary];
       const updated = [...memories,...toAdd].sort((a,b)=>sortKey(a)-sortKey(b));
-      persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs});
+      persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs, ...treePatch});
       setForm(newForm()); clearDraft();
       setView("life");
     }
