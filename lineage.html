@@ -505,6 +505,129 @@ function countMissingRelativesForTree(subject) {
   return n;
 }
 
+// ── Cross-chronicle event sync ────────────────────────────────
+// When a subject is mentioned by name in events on OTHER subjects'
+// chronicles, those events represent the same real-world moments seen
+// from a different angle (e.g. a marriage on the spouse's chronicle
+// also belongs to this person). promoteToSubject does this once at
+// chronicle creation; the helpers below keep it current as new events
+// are added to OTHER chronicles after creation.
+
+// Infer eventType from a tree-stub title (Born → birth, Died → death,
+// Married → marriage). Returns null when the title doesn't classify;
+// caller falls back to keeping both entries side-by-side.
+function inferEventTypeFromTitle(title) {
+  const t = (title||"").toLowerCase().trim();
+  if (/^born\b|^birth\b/.test(t))            return "birth";
+  if (/^died\b/.test(t))                     return "death";
+  if (/^married\b|^marriage\b/.test(t))      return "marriage";
+  return null;
+}
+
+// Cross-chronicle dedupe key. Two events from different chronicles for
+// the same (eventType, year) collapse to one — we prefer the richer
+// remote version over a bare tree stub on this subject.
+function crossChronicleMemKey(m) {
+  if (!m || !m.year) return null;
+  const et = m.eventType || inferEventTypeFromTitle(m.title);
+  return et ? et + "@" + m.year : null;
+}
+
+// Recast an event from another chronicle (`srcSubject`'s memory `m`) as
+// a memory belonging to `subj`. The subject's own name is dropped from
+// the people list and the source subject's name is added in its place
+// so the cross-reference stays visible. A fresh id is generated and
+// perspectives are cleared so other chronicles' viewpoints don't bleed
+// in. The provenance is stamped on _seededFromSubjectId so future syncs
+// can dedupe against this entry.
+function recastEventForChronicle(srcSubject, m, subj) {
+  const subjLow = (subj.name||"").trim().toLowerCase();
+  const people = (m.people||[]).filter(p => (p||"").trim().toLowerCase() !== subjLow);
+  if (srcSubject?.name &&
+      !people.some(p => (p||"").trim().toLowerCase() === srcSubject.name.toLowerCase())) {
+    people.push(srcSubject.name);
+  }
+  return {
+    ...m,
+    id: "mem_synced_"+Date.now()+Math.random().toString(36).slice(2,7),
+    people,
+    perspectives: [],
+    _seededFromSubjectId: srcSubject.id,
+    _seededFromSubjectName: srcSubject.name,
+  };
+}
+
+// Walk every OTHER subject's memories for events that tag `subj` by
+// name (case-insensitive) and don't already have a representation on
+// `subj.memories`. Dedupe rules, in order:
+//   1. Already seeded from this exact source for this year+title
+//      (provenance signature — survives across syncs).
+//   2. Same (eventType, year) signature — the existing entry wins (we
+//      assume the user has already edited it; we don't clobber).
+// Returns the raw {source, mem} pairs so the caller can preview before
+// recasting / persisting.
+function missingTaggedEventsForSubject(allSubjects, subj) {
+  if (!subj) return [];
+  const subjLow = (subj.name||"").trim().toLowerCase();
+  if (!subjLow) return [];
+  const existingKeys = new Set((subj.memories||[]).map(crossChronicleMemKey).filter(Boolean));
+  const seededProvSigs = new Set((subj.memories||[])
+    .filter(m => m && m._seededFromSubjectId)
+    .map(m => m._seededFromSubjectId + "|" + (m.year||"") + "|" + (m.title||"")));
+  const out = [];
+  for (const src of (allSubjects||[])) {
+    if (!src || src.id === subj.id) continue;
+    for (const m of (src.memories||[])) {
+      const tags = Array.isArray(m.people) ? m.people : [];
+      if (!tags.some(p => (p||"").trim().toLowerCase() === subjLow)) continue;
+      const k = crossChronicleMemKey(m);
+      if (k && existingKeys.has(k)) continue;
+      const prov = src.id + "|" + (m.year||"") + "|" + (m.title||"");
+      if (seededProvSigs.has(prov)) continue;
+      out.push({source: src, mem: m});
+    }
+  }
+  return out;
+}
+
+function countMissingTaggedEventsForSubject(allSubjects, subj) {
+  return missingTaggedEventsForSubject(allSubjects, subj).length;
+}
+
+// Build a persistTop-shaped patch for `subj`: recast every missing
+// tagged event, plus copy across any knownSources referenced by those
+// events so the new memories' citations resolve in this chronicle. The
+// caller updates the subjects array and persists. Returns null if
+// nothing needed adding.
+function buildMissingTaggedEventsPatch(allSubjects, subj) {
+  const missing = missingTaggedEventsForSubject(allSubjects, subj);
+  if (missing.length === 0) return null;
+  const recast = missing.map(({source, mem}) => recastEventForChronicle(source, mem, subj));
+  // Collect referenced sourceIds, then copy any source records the
+  // current chronicle doesn't already have.
+  const needIds = new Set();
+  recast.forEach(m => {
+    const srcs = Array.isArray(m.sources) ? m.sources :
+      (Array.isArray(m.sourceIds) ? m.sourceIds.map(id => ({sourceId:id})) : []);
+    srcs.forEach(s => { if (s.sourceId) needIds.add(s.sourceId); });
+  });
+  const existingSrcIds = new Set((subj.knownSources||[]).map(s => s.id));
+  const extraSources = [];
+  for (const otherSub of (allSubjects||[])) {
+    for (const src of (otherSub.knownSources||[])) {
+      if (needIds.has(src.id) && !existingSrcIds.has(src.id)) {
+        extraSources.push(src);
+        existingSrcIds.add(src.id);
+      }
+    }
+  }
+  return {
+    memories: [...(subj.memories||[]), ...recast],
+    knownSources: extraSources.length > 0 ? [...(subj.knownSources||[]), ...extraSources] : (subj.knownSources||[]),
+    addedCount: recast.length,
+  };
+}
+
 // ── Styles ─────────────────────────────────────────────────────
 const S = {
   input: { width:"100%", padding:"10px 13px", background:"rgba(255,252,245,0.9)", border:"1px solid #c8b89a", borderRadius:"2px", fontFamily:"'Crimson Text', serif", fontSize:"1rem", color:"#2c2416", outline:"none" },
@@ -15348,6 +15471,33 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
                         
       // ── LIFE VIEW ──
       view==="life"&&React.createElement("div",{style:{animation:"fadeIn 0.35s ease"}},
+        // Cross-chronicle event sync banner: surfaces events from other
+        // subjects' chronicles that tag this person but haven't yet been
+        // re-cast into their own chronicle. Click → recasts all and
+        // also copies across any referenced source records.
+        (()=>{
+          const missingTaggedCount = isHistoryMode ? countMissingTaggedEventsForSubject(subjects, subject) : 0;
+          if (missingTaggedCount === 0) return null;
+          return React.createElement("div",{style:{background:"rgba(74,122,90,0.10)",border:"1px solid rgba(74,122,90,0.4)",borderRadius:"4px",padding:"10px 14px",marginBottom:"16px",display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
+            React.createElement("span",{style:{fontSize:"1rem",flexShrink:0}}, "🔗"),
+            React.createElement("span",{style:{flex:1,fontSize:"0.88rem",color:"#3a5a3a",lineHeight:1.5}},
+              React.createElement("strong",null, missingTaggedCount, " ", missingTaggedCount===1?"event":"events"),
+              " on other chronicles tag ",
+              React.createElement("strong",null, subject.name),
+              " but ", missingTaggedCount===1?"isn't":"aren't",
+              " on this chronicle yet."
+            ),
+            React.createElement("button",{onClick:()=>{
+              const patch = buildMissingTaggedEventsPatch(subjects, subject);
+              if (!patch) return;
+              const newSubjects = subjects.map(s =>
+                s.id === subject.id
+                  ? {...s, memories: patch.memories, knownSources: patch.knownSources}
+                  : s);
+              persistTop({subjects: newSubjects});
+            },style:{...S.btn,padding:"6px 14px",fontSize:"0.86rem",flexShrink:0}}, "Add to chronicle")
+          );
+        })(),
         React.createElement("p",{style:{fontStyle:"italic",color:"#8a7460",marginBottom:"22px",fontSize:"0.95rem"}},modeFor(subject).subtitle(subject.name, ownMems.length, allDecades.length)),
         ownMems.length===0&&(()=>{const sm=modeFor(subject);return React.createElement("div",{style:{textAlign:"center",padding:"60px 20px",color:"#8a7460"}},
           React.createElement("div",{style:{fontSize:"3rem",marginBottom:"12px",opacity:0.4}},sm.icon),
