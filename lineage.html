@@ -455,6 +455,56 @@ function addRelativeToTree(subject, name, rel) {
   return {treePersons: persons, treeFamilies: families};
 }
 
+// Walk every entry in subject.peopleRelationships and add any classifi-
+// able relative that isn't already in the tree. Reuses addRelativeToTree
+// (so the wiring rules are identical to the incremental path). Returns
+// {treePersons, treeFamilies, addedCount, missingNames} where addedCount
+// is the number of relatives newly attached and missingNames lists names
+// that classified but didn't fit (e.g. focal absent). Returns null when
+// nothing changed. Caller persists the result.
+function syncAllRelativesIntoTree(subject) {
+  if (!subject) return null;
+  const rels = subject.peopleRelationships || {};
+  let acc = subject;
+  let count = 0;
+  const added = [];
+  for (const [name, rel] of Object.entries(rels)) {
+    const update = addRelativeToTree(acc, name, rel);
+    if (update) {
+      acc = {...acc, treePersons: update.treePersons, treeFamilies: update.treeFamilies};
+      count++;
+      added.push(name);
+    }
+  }
+  if (count === 0) return null;
+  return {treePersons: acc.treePersons, treeFamilies: acc.treeFamilies, addedCount: count, addedNames: added};
+}
+
+// Count how many of the subject's relationships would be newly added to
+// the tree if we synced now. Cheap (no record allocation), used to drive
+// the "Pull N relatives from the chronicle" banner. Mirrors addRelative-
+// ToTree's skip-conditions so the count is honest.
+function countMissingRelativesForTree(subject) {
+  if (!subject) return 0;
+  const treePersons = subject.treePersons || [];
+  if (treePersons.length === 0) return 0;
+  const treeNames = new Set(treePersons.map(p => (p.name||"").trim().toLowerCase()));
+  // Need a focal — same rule as addRelativeToTree.
+  const subjLow = (subject.name||"").trim().toLowerCase();
+  const hasFocal = (subject.gedFocalPersonId && treePersons.some(p => p.id === subject.gedFocalPersonId))
+    || (subjLow && treePersons.some(p => (p.name||"").trim().toLowerCase() === subjLow));
+  if (!hasFocal) return 0;
+  let n = 0;
+  for (const [name, rel] of Object.entries(subject.peopleRelationships || {})) {
+    const nm = (name||"").trim();
+    if (!nm) continue;
+    if (treeNames.has(nm.toLowerCase())) continue;
+    if (!classifyRelType(rel)) continue;
+    n++;
+  }
+  return n;
+}
+
 // ── Styles ─────────────────────────────────────────────────────
 const S = {
   input: { width:"100%", padding:"10px 13px", background:"rgba(255,252,245,0.9)", border:"1px solid #c8b89a", borderRadius:"2px", fontFamily:"'Crimson Text', serif", fontSize:"1rem", color:"#2c2416", outline:"none" },
@@ -8466,6 +8516,22 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       );
     })();
 
+    // Active subject hosts the tree and the relationships index \u2014 both
+    // are needed for the "pull missing relatives" affordance.
+    const activeSubjectForMissing = (subjects||[]).find(s => s.id === activeSubjectId);
+    const missingRelCount = countMissingRelativesForTree(activeSubjectForMissing);
+
+    function pullMissingRelatives() {
+      const update = syncAllRelativesIntoTree(activeSubjectForMissing);
+      if (!update) return;
+      const newSubjects = subjects.map(s =>
+        s.id === activeSubjectId
+          ? {...s, treePersons: update.treePersons, treeFamilies: update.treeFamilies}
+          : s
+      );
+      persistTop({subjects: newSubjects});
+    }
+
     return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
       React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"16px",flexWrap:"wrap"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:0,color:"#1a1208"}},"Family Tree"),
@@ -8473,6 +8539,22 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
         React.createElement("div",{style:{marginLeft:"auto"}},
           React.createElement("input",{value:tpSearch,onChange:e=>setTpSearch(e.target.value),placeholder:"Find another person\u2026",style:{...S.input,padding:"5px 10px",fontSize:"0.86rem",width:"200px"}})
         )
+      ),
+
+      // Missing-relatives banner: shown when the chronicle's
+      // peopleRelationships index has classifiable entries that aren't
+      // yet represented in the tree. Catches pre-existing relationships
+      // entered before the tree-sync wiring landed, plus the trickle
+      // from any future code path that bypasses the per-callback sync.
+      missingRelCount > 0 && React.createElement("div",{style:{background:"rgba(196,169,98,0.12)",border:"1px solid rgba(196,169,98,0.45)",borderRadius:"4px",padding:"10px 14px",marginBottom:"16px",display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
+        React.createElement("span",{style:{fontSize:"1rem",flexShrink:0}}, "\ud83c\udf3f"),
+        React.createElement("span",{style:{flex:1,fontSize:"0.88rem",color:"#5a4820",lineHeight:1.5}},
+          React.createElement("strong",null, missingRelCount, " ", missingRelCount===1?"relative":"relatives"),
+          " in this chronicle's people index ",
+          missingRelCount===1?"isn't":"aren't",
+          " in the tree yet."
+        ),
+        React.createElement("button",{onClick:pullMissingRelatives,style:{...S.btn,padding:"6px 14px",fontSize:"0.86rem",flexShrink:0}}, "Add to tree")
       ),
 
       filtered && React.createElement("div",{style:{marginBottom:"16px",border:"1px solid #d4c4a8",borderRadius:"4px",maxHeight:"260px",overflowY:"auto",background:"rgba(255,252,245,0.85)"}},
