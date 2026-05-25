@@ -73,73 +73,12 @@ function subjectInProduct(s) {
   if (PRODUCT === "lineage") return s.mode === "history";
   return s.mode !== "history"; // chronicle catches personal, legacy, and unset
 }
-// Legacy single-plan URLs (kept for backwards compat)
-const STRIPE_URL  = "https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02";
-const PAYPAL_URL  = "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-05R23708A75872801NHNR24Q&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net";
-// Tier-specific PayPal subscribe URLs
-const TIER_PAYPAL = {
-  basic_monthly:  "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-8A039115JW5963309NHWDKFY&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
-  basic_annual:   "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-8EM5053771319903FNHWDKRA&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
-  premium_monthly:"https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-5YW95489AS5523114NHWDIYA&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
-  premium_annual: "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-36836414R6412833CNHWDJYY&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
-  social_monthly: "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-5ME91618BL673874NNHWDLJY&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
-  social_annual:  "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-0VE52677U6814661SNHWDLVA&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
-};
-const TIER_STRIPE = {
-  basic_monthly:  "https://buy.stripe.com/8x228q33I9T06z95dr8IU03",
-  basic_annual:   "https://buy.stripe.com/5kQ14m33IaX4g9J21f8IU04",
-  premium_monthly:"https://buy.stripe.com/6oU9AS0VAghoaPpbBP8IU05",
-  premium_annual: "https://buy.stripe.com/4gMbJ06fU8OW4r149n8IU06",
-  social_monthly: "https://buy.stripe.com/9B66oG7jY0iq5v5axL8IU07",
-  social_annual:  "https://buy.stripe.com/28E3cu47M1mu8HhcFT8IU08",
-};
-
-// ── Subscribe buttons helper ────────────────────────────────────
-// Renders Stripe + PayPal options. mode: "buttons"|"links"|"full"
-// Subscriptions temporarily paused
-const SUBS_PAUSED = false;
-
-function SubOptions({mode="buttons"}) {
-  if (SUBS_PAUSED) {
-    const style = mode==="links"
-      ? {color:"#8a7460",fontSize:"inherit",fontStyle:"italic"}
-      : {padding:mode==="full"?"12px":"6px 14px",fontSize:mode==="full"?"0.95rem":"0.84rem",color:"#8a7460",fontStyle:"italic"};
-    return React.createElement("span",{style},"Subscriptions available soon");
-  }
-  const subUrl = "https://remembory.net/#subscribe";
-  // Simple link for "links" and "buttons" modes
-  if (mode==="links") return React.createElement("a",{href:subUrl,target:"_blank",rel:"noopener",
-    style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)",fontSize:"inherit"}},"subscribe from $20/yr");
-  if (mode==="buttons") return React.createElement("a",{href:subUrl,target:"_blank",rel:"noopener",
-    style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem",textDecoration:"none",display:"inline-block"}},"View plans");
-  // Full mode: detailed tier cards with all payment options
-  const tiers = [
-    {id:"basic",label:"Share Basic",price:"$20/yr",monthly:"$5/mo"},
-    {id:"premium",label:"Share Premium",price:"$30/yr",monthly:"$8/mo"},
-  ];
-  return React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"8px",width:"100%"}},
-    tiers.map(t=>React.createElement("div",{key:t.id,style:{border:"1px solid #d4c4a8",borderRadius:"3px",padding:"10px 14px"}},
-      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}},
-        React.createElement("div",null,
-          React.createElement("div",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208"}},t.label),
-          React.createElement("div",{style:{fontSize:"0.78rem",color:"#8a7460"}},t.price+" or "+t.monthly)
-        )
-      ),
-      React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap"}},
-        React.createElement("a",{href:TIER_STRIPE[t.id+"_annual"],target:"_blank",rel:"noopener",style:{...S.btn,padding:"5px 10px",fontSize:"0.82rem",textDecoration:"none"}},"Annual (Card)"),
-        React.createElement("a",{href:TIER_STRIPE[t.id+"_monthly"],target:"_blank",rel:"noopener",style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.82rem",textDecoration:"none"}},"Monthly (Card)"),
-        React.createElement("a",{href:TIER_PAYPAL[t.id+"_annual"],target:"_blank",rel:"noopener",style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.82rem",textDecoration:"none",color:"#003087",borderColor:"#1a9dd9"}},"Annual (PayPal)"),
-        React.createElement("a",{href:TIER_PAYPAL[t.id+"_monthly"],target:"_blank",rel:"noopener",style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.82rem",textDecoration:"none",color:"#003087",borderColor:"#1a9dd9"}},"Monthly (PayPal)")
-      )
-    ))
-  );
-}
-
+// Lineage is free — no Stripe / PayPal / pricing components. SubOptions
+// is a no-op stub so existing call-sites in Settings keep working.
+function SubOptions() { return null; }
 // ── Subscribe pill (header) ───────────────────────────────────
-function SubscribePill() {
-  if (SUBS_PAUSED) return React.createElement("span",{style:{display:"inline-flex",alignItems:"center",padding:"4px 10px",border:"1px solid rgba(138,116,96,0.3)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",color:"#8a7460"}},"Subscriptions coming soon");
-  return React.createElement("a",{href:"https://remembory.net/#subscribe",target:"_blank",rel:"noopener",style:{display:"inline-flex",alignItems:"center",gap:"6px",padding:"4px 10px",border:"1px solid rgba(168,136,90,0.45)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",whiteSpace:"nowrap",flexShrink:0,cursor:"pointer",background:"transparent",color:"#a8885a",textDecoration:"none"}},"\u2728 Subscribe");
-}
+// Lineage is free \u2014 kept as a stub so existing render sites keep working.
+function SubscribePill() { return null; }
 
 // ── Dropdown nav menu ──────────────────────────────────────────
 // variant: "desktop" | "mobile"  direction: "down" | "up"  menuAlign: "left"|"center"|"right"
@@ -1486,7 +1425,7 @@ const MODES = {
   legacy: {
     id:"legacy", label:"Legacy", icon:"◈",
     tagline:"Record for someone else",
-    desc:"Preserve the story of a loved one — a parent, grandparent, or friend. Free for one contributor; subscribe to invite others.",
+    desc:"Preserve the story of a loved one — a parent, grandparent, or friend.",
     isSelf:false,
     color:"#89b08a", bg:"rgba(137,176,138,0.1)", border:"rgba(137,176,138,0.4)",
     addMemory: name => `Record a Memory for ${name||"them"}`,
@@ -6859,45 +6798,6 @@ function SettingsView({
         )
       ),
 
-      // ── Subscription ──
-      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-        React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
-          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},"\u2728 Subscription"),
-          isSubscriber&&React.createElement("span",{style:{fontSize:"0.78rem",background:"#4a7a5a",color:"#fff",padding:"2px 9px",borderRadius:"20px",letterSpacing:"0.04em"}},"ACTIVE")
-        ),
-        isSubscriber
-          ? React.createElement("div",null,
-              React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"6px"}},"\u2713 Subscriber"),
-              React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"Sharing and Lineage Mode are enabled."),
-              !activePassword&&React.createElement("div",{style:{background:"rgba(168,136,90,0.08)",border:"1px solid rgba(168,136,90,0.3)",borderRadius:"3px",padding:"9px 12px",marginBottom:"12px",fontSize:"0.8rem",color:"#5a4020",lineHeight:1.5}},
-                "\uD83D\uDD13 Your licence key is saved in plain text on this device \u2014 anyone who opens Chronicle here could use it. Set a password below to encrypt it along with all your memories."
-              ),
-              React.createElement("button",{onClick:()=>saveLicenceKey(""),style:{...S.btnOutline,fontSize:"0.82rem",padding:"5px 12px",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove key")
-            )
-          : React.createElement("div",null,
-              React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,marginBottom:"12px"}},
-                "A subscription unlocks sharing memories with others, Lineage Mode, and public timelines. The core app is always free \u2014 no account ever required."),
-              licenceStatus&&!licenceStatus.valid&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#c4858a",marginBottom:"8px",fontStyle:"italic"}},
-                licenceStatus.reason==="expired"?"Your licence key has expired \u2014 renew at remembory.net.":
-                licenceStatus.reason==="invalid"?"That key doesn\u2019t look right \u2014 check for typos.":"Couldn\u2019t validate that key."),
-              React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"10px"}},
-                React.createElement("input",{value:licenceKey,
-                  onChange:e=>saveLicenceKey(e.target.value),
-                  onKeyDown:e=>{if(e.key==="Enter")saveLicenceKey(e.target.value);},
-                  id:"licence-key-input",
-                  placeholder:"Paste your licence key (REM-XXXX-…)\u2026",
-                  style:{...S.input,flex:1,fontSize:"0.88rem",fontFamily:"monospace",letterSpacing:"0.05em"}}),
-                React.createElement("button",{
-                  onClick:()=>{ const el=document.getElementById("licence-key-input"); saveLicenceKey(el?el.value:licenceKey); },
-                  style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem"}
-                },"Apply")
-              ),
-              React.createElement("div",{style:{marginTop:"4px"}},React.createElement(SubOptions,{mode:"buttons"})),
-              React.createElement("p",{style:{fontSize:"0.78rem",color:"#a8a090",marginTop:"6px"}},
-                "Lost your key? Contact us at ",React.createElement("a",{href:"mailto:admin@remembory.net",style:{color:"#a8885a"}},"admin@remembory.net"))
-            )
-      ),
-
       // ── Password / lock ──
       React.createElement(PasswordCard,{activePassword,data,setActivePassword,setLocked,setData}),
 
@@ -6911,11 +6811,6 @@ function SettingsView({
         },"\ud83d\uddd1 Clear all memories")
       ),
 
-      !isSubscriber&&React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
-        "Unlock sharing & Lineage mode \u2014 ",
-        React.createElement(SubOptions,{mode:"links"}),
-        "."
-      ),
       React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
         "Chronicle \u2022 build 2026-04-03 UTC"
       )
@@ -11155,10 +11050,14 @@ function App() {
     }catch(e){return "";}
   },[licenceKey]);
   const [licenceStatus, setLicenceStatus] = useState(null);
-  const userTier = licenceStatus?.valid ? (licenceStatus.tier || "premium") : "free";
+  // Lineage is free — every feature is unlocked for every user, so the
+  // legacy tier / subscriber gates always pass. Kept as constants here
+  // so call-sites (`hasTier("premium")`, `if (isSubscriber)`, etc.)
+  // continue to work without churn through the rest of the codebase.
+  const userTier = "premium";
   const TIERS = {free:0, basic:1, premium:2, social:3};
-  const hasTier = (required) => (TIERS[userTier]||0) >= (TIERS[required]||0);
-  const isSubscriber = userTier !== "free";
+  const hasTier = () => true;
+  const isSubscriber = true;
   // Daily usage counters (reset each day)
   function getDailyCount(key) {
     try { const d=JSON.parse(localStorage.getItem("chronicle-daily-"+key)||"{}"); return d.date===new Date().toISOString().slice(0,10)?d.count:0; } catch(e){return 0;}
@@ -14037,17 +13936,6 @@ function handleEdit(m) {
       );
     })()),
 
-    (!isSubscriber&&!subscribeNagDismissed&&!subscribeNagPermanent&&ownerName)&&React.createElement("div",{style:{background:"rgba(168,136,90,0.1)",borderBottom:"1px solid rgba(168,136,90,0.3)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
-      React.createElement("p",{style:{margin:0,fontSize:"0.85rem",color:"#5a4020",lineHeight:1.4}},
-        "\u2728 Enjoying Chronicle? A subscription unlocks sharing, social features, and Lineage mode — and helps keep the project going."
-      ),
-      React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0,alignItems:"center"}},
-        React.createElement(SubOptions,{mode:"buttons"}),
-        React.createElement("button",{onClick:()=>dismissSubscribeNag(false),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.8rem",padding:"4px 8px",fontFamily:"'Crimson Text',serif",whiteSpace:"nowrap"}},"Not now"),
-        React.createElement("button",{onClick:()=>dismissSubscribeNag(true),style:{background:"transparent",border:"none",color:"#b0a080",cursor:"pointer",fontSize:"0.78rem",padding:"4px 6px"}},"Don\u2019t show again")
-      )
-    ),
-
     !onboardingDismissed && !ownerName && React.createElement("div",{style:{background:"rgba(200,168,122,0.12)",borderBottom:"1px solid rgba(200,168,122,0.4)",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
       React.createElement("div",null,
         React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#4a3820",fontWeight:600}},"👋 Welcome to Chronicle"),
@@ -14732,9 +14620,6 @@ function handleEdit(m) {
             iconBtn("🖨","Print & export",view==="print",()=>setView("print")),
             isHistoryMode&&iconBtn("🌳","GEDCOM",view==="gedcom",()=>setView("gedcom")),
             React.createElement(NavDropdown,{label:"Help",isActive:false,items:[
-              {label:"Manual",href:"https://remembory.net/manual.html",external:true},
-              {label:"Tips",href:"https://remembory.net/tips.html",external:true},
-              {divider:true},
               {label:"Contact",action:()=>setView("contact"),active:view==="contact"},
               {divider:true},
               {label:"Terms of Service",href:WORKER_URL+"/terms",external:true},
@@ -14826,9 +14711,6 @@ function handleEdit(m) {
         mobileIconBtn("🖨","Print & export",view==="print",()=>setView("print")),
         isHistoryMode&&mobileIconBtn("🌳","GEDCOM",view==="gedcom",()=>setView("gedcom")),
         React.createElement(NavDropdown,{label:"Help",icon:"?",isActive:false,variant:"mobile",direction:"up",items:[
-          {label:"Manual",href:"https://remembory.net/manual.html",external:true},
-          {label:"Tips",href:"https://remembory.net/tips.html",external:true},
-          {divider:true},
           {label:"Contact",action:()=>setView("contact"),active:view==="contact"},
           {divider:true},
           {label:"Terms of Service",href:WORKER_URL+"/terms",external:true},
@@ -15251,7 +15133,7 @@ function handleEdit(m) {
                 },"Dismiss all")
               ),
               React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",fontStyle:"italic",marginBottom:"10px",lineHeight:1.5}},
-                "These subscribers published memories at the same time and place as you. You may have crossed paths."
+                "These people published memories at the same time and place as you. You may have crossed paths."
               ),
               placeMatchNotifs.map((n,i)=>React.createElement("div",{key:i,
                 style:{padding:"8px 0",borderBottom:i<placeMatchNotifs.length-1?"1px solid rgba(122,158,138,0.15)":"none"}},
@@ -15367,7 +15249,7 @@ function handleEdit(m) {
         // Profile privacy
         React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
           React.createElement("label",{style:{...S.label,display:"block",marginBottom:"8px"}},"Profile visibility"),
-          [["open","Open","Anyone with your profile link can view it"],["subscribers","Subscribers only","Visitors must have a valid Remembory subscription"],["connected","Connected only","Only people linked to your profile"],["disabled","Disabled","Profile is offline — memories stay private"]].map(([val,label,desc])=>
+          [["open","Open","Anyone with your profile link can view it"],["connected","Connected only","Only people linked to your profile"],["disabled","Disabled","Profile is offline — memories stay private"]].map(([val,label,desc])=>
             React.createElement("label",{key:val,style:{display:"flex",alignItems:"flex-start",gap:"10px",marginBottom:"10px",cursor:"pointer"}},
               React.createElement("input",{type:"radio",name:"profile-privacy",value:val,
                 checked:profilePrivacy===val,
