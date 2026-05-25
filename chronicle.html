@@ -13572,9 +13572,6 @@ function handleEdit(m) {
             iconBtn("🖨","Print & export",view==="print",()=>setView("print")),
             isHistoryMode&&iconBtn("🌳","GEDCOM",view==="gedcom",()=>setView("gedcom")),
             React.createElement(NavDropdown,{label:"Help",isActive:false,items:[
-              {label:"Manual",href:"https://remembory.net/manual.html",external:true},
-              {label:"Tips",href:"https://remembory.net/tips.html",external:true},
-              {divider:true},
               {label:"Contact",action:()=>setView("contact"),active:view==="contact"},
               {divider:true},
               {label:"Terms of Service",href:WORKER_URL+"/terms",external:true},
@@ -13660,9 +13657,6 @@ function handleEdit(m) {
         mobileIconBtn("🖨","Print & export",view==="print",()=>setView("print")),
         isHistoryMode&&mobileIconBtn("🌳","GEDCOM",view==="gedcom",()=>setView("gedcom")),
         React.createElement(NavDropdown,{label:"Help",icon:"?",isActive:false,variant:"mobile",direction:"up",items:[
-          {label:"Manual",href:"https://remembory.net/manual.html",external:true},
-          {label:"Tips",href:"https://remembory.net/tips.html",external:true},
-          {divider:true},
           {label:"Contact",action:()=>setView("contact"),active:view==="contact"},
           {divider:true},
           {label:"Terms of Service",href:WORKER_URL+"/terms",external:true},

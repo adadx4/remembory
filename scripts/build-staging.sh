@@ -17,8 +17,6 @@ mkdir -p "$DIST"
 cp "$ROOT/chronicle.html" "$DIST/"
 cp "$ROOT/chronicle.css" "$DIST/"
 cp "$ROOT/index.html" "$DIST/"
-cp "$ROOT/manual.html" "$DIST/"
-cp "$ROOT/tips.html" "$DIST/"
 cp "$ROOT/research.html" "$DIST/"
 cp "$ROOT/add-resource.html" "$DIST/"
 # Lineage uses the same code as Chronicle — URL detection inside picks the product flag.
