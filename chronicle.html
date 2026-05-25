@@ -6258,9 +6258,9 @@ function SettingsView({
       // ── Danger zone ──
       React.createElement("div",{style:{background:"rgba(255,245,245,0.7)",border:"1px solid #e0c8c8",borderRadius:"3px",padding:"20px"}},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#8a3030",margin:"0 0 8px"}},"Reset"),
-        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px"}},"Permanently deletes all memories and cannot be undone. Download a backup first if you want to keep a copy."),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px"}},"Permanently deletes all memories and cannot be undone."),
         React.createElement("button",{
-          onClick:()=>{ if(window.confirm("Delete all "+memories.length+" memories? This cannot be undone.\n\nDownload a backup first.")) { persistSubject({memories:[],knownPeople:[],knownOrgs:[],knownLocations:[],customTags:[],peopleEmails:{},peopleRelationships:{},peopleNotes:{},orgNotes:{},orgLocations:{},orgPeriods:{},entityPhotos:{},locationNotes:{},locationCoords:{},personOrgs:{},personLocations:{},personGroups:{},shareHistory:[],lastBackup:null,lastImport:null}); setView("life"); }},
+          onClick:()=>{ if(window.confirm("Delete all "+memories.length+" memories? This cannot be undone.")) { persistSubject({memories:[],knownPeople:[],knownOrgs:[],knownLocations:[],customTags:[],peopleEmails:{},peopleRelationships:{},peopleNotes:{},orgNotes:{},orgLocations:{},orgPeriods:{},entityPhotos:{},locationNotes:{},locationCoords:{},personOrgs:{},personLocations:{},personGroups:{},shareHistory:[],lastBackup:null,lastImport:null}); setView("life"); }},
           style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}
         },"\ud83d\uddd1 Clear all memories")
       ),
@@ -12854,50 +12854,10 @@ function handleEdit(m) {
       );
     })()),
 
-    (!backupNagDismissed && ownerName && memories.length > 0 && (()=>{
-      const newSinceBackup = Math.max(0, memories.length - (subject.memCountAtBackup||0));
-      const newSinceSync = Math.max(0, memories.length - (subject.memCountAtSync||0));
-      const unbackedAnywhere = Math.min(newSinceBackup, newSinceSync);
-      // Show if there are memories not backed up anywhere, or if it's been over 7 days
-      const daysSince = subject.lastBackup ? Math.floor((Date.now()-new Date(subject.lastBackup))/86400000) : 999;
-      if (unbackedAnywhere === 0 && daysSince < 7) return null;
-      const nagMsg = !subject.lastBackup
-        ? memories.length+" "+(memories.length===1?"memory":"memories")+" not yet backed up."
-        : unbackedAnywhere > 0
-          ? unbackedAnywhere+" "+(unbackedAnywhere===1?"memory":"memories")+" not backed up anywhere."
-          : "Your last backup was "+daysSince+" days ago.";
-      return React.createElement("div",{style:{background:"rgba(196,133,138,0.12)",borderBottom:"1px solid rgba(196,133,138,0.35)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
-        React.createElement("p",{style:{margin:0,fontSize:"0.85rem",color:"#8a3030",lineHeight:1.4}},
-          "⚠️ "+nagMsg+"Download a backup to keep your memories safe."
-        ),
-        React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0}},
-          React.createElement("button",{
-            onClick:async()=>{ setSaveBackupBusy(true); await exportBackup(); setSaveBackupBusy(false); setBackupNagDismissed(true); },
-            style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem",background:"#4a7a5a"}
-          }, saveBackupBusy ? "Saving…" : "💾 Download now"),
-          React.createElement("button",{
-            onClick:()=>setBackupNagDismissed(true),
-            style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1rem",padding:"4px 8px"}
-          },"×")
-        )
-      );
-    })()),
-
-    (!isSubscriber&&!subscribeNagDismissed&&!subscribeNagPermanent&&ownerName)&&React.createElement("div",{style:{background:"rgba(168,136,90,0.1)",borderBottom:"1px solid rgba(168,136,90,0.3)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
-      React.createElement("p",{style:{margin:0,fontSize:"0.85rem",color:"#5a4020",lineHeight:1.4}},
-        "\u2728 Enjoying Chronicle? A subscription unlocks sharing, social features, and Lineage mode — and helps keep the project going."
-      ),
-      React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0,alignItems:"center"}},
-        React.createElement(SubOptions,{mode:"buttons"}),
-        React.createElement("button",{onClick:()=>dismissSubscribeNag(false),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.8rem",padding:"4px 8px",fontFamily:"'Crimson Text',serif",whiteSpace:"nowrap"}},"Not now"),
-        React.createElement("button",{onClick:()=>dismissSubscribeNag(true),style:{background:"transparent",border:"none",color:"#b0a080",cursor:"pointer",fontSize:"0.78rem",padding:"4px 6px"}},"Don\u2019t show again")
-      )
-    ),
-
     !onboardingDismissed && !ownerName && React.createElement("div",{style:{background:"rgba(200,168,122,0.12)",borderBottom:"1px solid rgba(200,168,122,0.4)",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
       React.createElement("div",null,
         React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#4a3820",fontWeight:600}},"👋 Welcome to Chronicle"),
-        React.createElement("span",{style:{fontSize:"0.88rem",color:"#6a5c48",marginLeft:"10px"}},"Add your name in Settings, and remember to back up regularly \u2014 your memories live in this browser and could be lost if you clear your browser data.")
+        React.createElement("span",{style:{fontSize:"0.88rem",color:"#6a5c48",marginLeft:"10px"}},"Add your name in Settings to get started.")
       ),
       React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0}},
         React.createElement("button",{onClick:()=>{setView("settings");setOnboardingDismissed(true);},style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem"}},"Open Settings"),
