@@ -49,7 +49,7 @@ function useWindowSize() {
 
 // ── Constants ──────────────────────────────────────────────────
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const TAGS = ["childhood","family","travel","education","work","love","health","milestone","home","friendship","adventure","loss"];
+const TAGS = ["childhood","family","travel","education","work","love","health","milestone","home","friendship","adventure","loss","community"];
 const WORKER_URL = "https://social.remembory.net";
 const IS_STAGING = WORKER_URL.includes('staging');
 
@@ -73,73 +73,12 @@ function subjectInProduct(s) {
   if (PRODUCT === "lineage") return s.mode === "history";
   return s.mode !== "history"; // chronicle catches personal, legacy, and unset
 }
-// Legacy single-plan URLs (kept for backwards compat)
-const STRIPE_URL  = "https://buy.stripe.com/14A5kC9s67KS9Ll49n8IU02";
-const PAYPAL_URL  = "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-05R23708A75872801NHNR24Q&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net";
-// Tier-specific PayPal subscribe URLs
-const TIER_PAYPAL = {
-  basic_monthly:  "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-8A039115JW5963309NHWDKFY&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
-  basic_annual:   "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-8EM5053771319903FNHWDKRA&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
-  premium_monthly:"https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-5YW95489AS5523114NHWDIYA&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
-  premium_annual: "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-36836414R6412833CNHWDJYY&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
-  social_monthly: "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-5ME91618BL673874NNHWDLJY&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
-  social_annual:  "https://www.paypal.com/webapps/billing/plans/subscribe?plan_id=P-0VE52677U6814661SNHWDLVA&return_url=https://share.remembory.net/paypal/success&cancel_url=https://remembory.net",
-};
-const TIER_STRIPE = {
-  basic_monthly:  "https://buy.stripe.com/8x228q33I9T06z95dr8IU03",
-  basic_annual:   "https://buy.stripe.com/5kQ14m33IaX4g9J21f8IU04",
-  premium_monthly:"https://buy.stripe.com/6oU9AS0VAghoaPpbBP8IU05",
-  premium_annual: "https://buy.stripe.com/4gMbJ06fU8OW4r149n8IU06",
-  social_monthly: "https://buy.stripe.com/9B66oG7jY0iq5v5axL8IU07",
-  social_annual:  "https://buy.stripe.com/28E3cu47M1mu8HhcFT8IU08",
-};
-
-// ── Subscribe buttons helper ────────────────────────────────────
-// Renders Stripe + PayPal options. mode: "buttons"|"links"|"full"
-// Subscriptions temporarily paused
-const SUBS_PAUSED = false;
-
-function SubOptions({mode="buttons"}) {
-  if (SUBS_PAUSED) {
-    const style = mode==="links"
-      ? {color:"#8a7460",fontSize:"inherit",fontStyle:"italic"}
-      : {padding:mode==="full"?"12px":"6px 14px",fontSize:mode==="full"?"0.95rem":"0.84rem",color:"#8a7460",fontStyle:"italic"};
-    return React.createElement("span",{style},"Subscriptions available soon");
-  }
-  const subUrl = "https://remembory.net/#subscribe";
-  // Simple link for "links" and "buttons" modes
-  if (mode==="links") return React.createElement("a",{href:subUrl,target:"_blank",rel:"noopener",
-    style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)",fontSize:"inherit"}},"subscribe from $20/yr");
-  if (mode==="buttons") return React.createElement("a",{href:subUrl,target:"_blank",rel:"noopener",
-    style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem",textDecoration:"none",display:"inline-block"}},"View plans");
-  // Full mode: detailed tier cards with all payment options
-  const tiers = [
-    {id:"basic",label:"Share Basic",price:"$20/yr",monthly:"$5/mo"},
-    {id:"premium",label:"Share Premium",price:"$30/yr",monthly:"$8/mo"},
-  ];
-  return React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"8px",width:"100%"}},
-    tiers.map(t=>React.createElement("div",{key:t.id,style:{border:"1px solid #d4c4a8",borderRadius:"3px",padding:"10px 14px"}},
-      React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}},
-        React.createElement("div",null,
-          React.createElement("div",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#1a1208"}},t.label),
-          React.createElement("div",{style:{fontSize:"0.78rem",color:"#8a7460"}},t.price+" or "+t.monthly)
-        )
-      ),
-      React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap"}},
-        React.createElement("a",{href:TIER_STRIPE[t.id+"_annual"],target:"_blank",rel:"noopener",style:{...S.btn,padding:"5px 10px",fontSize:"0.82rem",textDecoration:"none"}},"Annual (Card)"),
-        React.createElement("a",{href:TIER_STRIPE[t.id+"_monthly"],target:"_blank",rel:"noopener",style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.82rem",textDecoration:"none"}},"Monthly (Card)"),
-        React.createElement("a",{href:TIER_PAYPAL[t.id+"_annual"],target:"_blank",rel:"noopener",style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.82rem",textDecoration:"none",color:"#003087",borderColor:"#1a9dd9"}},"Annual (PayPal)"),
-        React.createElement("a",{href:TIER_PAYPAL[t.id+"_monthly"],target:"_blank",rel:"noopener",style:{...S.btnOutline,padding:"5px 10px",fontSize:"0.82rem",textDecoration:"none",color:"#003087",borderColor:"#1a9dd9"}},"Monthly (PayPal)")
-      )
-    ))
-  );
-}
-
+// Lineage is free — no Stripe / PayPal / pricing components. SubOptions
+// is a no-op stub so existing call-sites in Settings keep working.
+function SubOptions() { return null; }
 // ── Subscribe pill (header) ───────────────────────────────────
-function SubscribePill() {
-  if (SUBS_PAUSED) return React.createElement("span",{style:{display:"inline-flex",alignItems:"center",padding:"4px 10px",border:"1px solid rgba(138,116,96,0.3)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",color:"#8a7460"}},"Subscriptions coming soon");
-  return React.createElement("a",{href:"https://remembory.net/#subscribe",target:"_blank",rel:"noopener",style:{display:"inline-flex",alignItems:"center",gap:"6px",padding:"4px 10px",border:"1px solid rgba(168,136,90,0.45)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",whiteSpace:"nowrap",flexShrink:0,cursor:"pointer",background:"transparent",color:"#a8885a",textDecoration:"none"}},"\u2728 Subscribe");
-}
+// Lineage is free \u2014 kept as a stub so existing render sites keep working.
+function SubscribePill() { return null; }
 
 // ── Dropdown nav menu ──────────────────────────────────────────
 // variant: "desktop" | "mobile"  direction: "down" | "up"  menuAlign: "left"|"center"|"right"
@@ -268,20 +207,440 @@ const SOURCE_CONFIDENCE = [
 // Genealogical event types — must match the values accepted by the Genealogy
 // research tool's eventType field at https://adadx4.github.io/genealogy/.
 const EVENT_TYPES = [
-  {id:"birth",      label:"Birth"},
-  {id:"baptism",    label:"Baptism"},
-  {id:"marriage",   label:"Marriage"},
-  {id:"death",      label:"Death"},
-  {id:"burial",     label:"Burial"},
-  {id:"residence",  label:"Residence (census, directories, electoral rolls)"},
-  {id:"employment", label:"Employment / occupational"},
-  {id:"education",  label:"Education / schools"},
-  {id:"travel",     label:"Travel / immigration / emigration"},
-  {id:"military",   label:"Military"},
-  {id:"legal",      label:"Legal (wills, probate, court, land)"},
-  {id:"other",      label:"Other"},
+  {id:"birth",      label:"Birth",                                            short:"Birth"},
+  {id:"baptism",    label:"Baptism",                                          short:"Baptism"},
+  {id:"marriage",   label:"Marriage",                                         short:"Marriage"},
+  {id:"death",      label:"Death",                                            short:"Death"},
+  {id:"burial",     label:"Burial",                                           short:"Burial"},
+  {id:"residence",  label:"Residence (census, directories, electoral rolls)", short:"Residence"},
+  {id:"employment", label:"Employment / occupational",                        short:"Employment"},
+  {id:"education",  label:"Education / schools",                              short:"Education"},
+  {id:"community",  label:"Community (church, club, society, membership)",    short:"Community"},
+  {id:"travel",     label:"Travel / immigration / emigration",                short:"Travel"},
+  {id:"military",   label:"Military",                                         short:"Military"},
+  {id:"legal",      label:"Legal (wills, probate, court, land)",              short:"Legal"},
+  {id:"other",      label:"Other",                                            short:""},
 ];
+// Point-in-time events: their end-date UI is hidden when the date is exact
+// (nothing to bracket) and reframed as a "range" when the date is vague
+// (so the user can record "between X and Y" without inventing a fake end).
+const POINT_EVENT_IDS = new Set(["birth","baptism","marriage","death","burial"]);
+const eventTypeShort = (id) => (EVENT_TYPES.find(t => t.id === id) || {}).short || "";
 const GENEALOGY_TOOL_URL = "/research.html";
+
+// ── Tree helpers (module-level so the relationship-update path in
+//    AddEditForm / ImportView can keep the tree in sync as new relatives
+//    are added to the chronicle, without depending on FamilyTreeView
+//    being mounted) ─────────────────────────────────────────────
+function newPersonRecord(draft) {
+  const id = "tp_manual_"+Date.now()+Math.random().toString(36).slice(2,7);
+  return {
+    id,
+    gedId: "@" + id.toUpperCase() + "@",
+    name: (draft.name||"").trim(),
+    sex: (draft.sex||"").trim(),
+    dob: (draft.dob||"").trim(),
+    dod: (draft.dod||"").trim(),
+    birthPlace: (draft.birthPlace||"").trim(),
+    deathPlace: (draft.deathPlace||"").trim(),
+    notes: (draft.notes||"").trim(),
+    subjectId: null,
+  };
+}
+function newFamilyRecord() {
+  const id = "tf_manual_"+Date.now()+Math.random().toString(36).slice(2,7);
+  return {
+    id, gedId: "@" + id.toUpperCase() + "@",
+    husbandId: null, wifeId: null, childIds: [],
+    marriageYear: null, marriagePlace: "",
+  };
+}
+
+// Map a free-text relationship label to a structured family role we can
+// wire into the tree. Returns null for ambiguous cases (in-laws, grand-
+// anything, uncles/aunts, cousins, godparents) — these need multi-hop
+// wiring that's risky to auto-guess, so they don't get auto-added.
+function classifyRelType(relText) {
+  const r = (relText||"").toLowerCase().trim();
+  if (!r) return null;
+  if (/in[\s-]?law/.test(r)) return null;
+  if (/\b(grand|great)/.test(r)) return null;
+  if (/\b(uncle|aunt|cousin|nephew|niece|godparent|godfather|godmother)\b/.test(r)) return null;
+  if (/\b(father|stepfather|dad(?:dy)?|papa)\b/.test(r))            return {role:"parent", sex:"M"};
+  if (/\b(mother|stepmother|mum(?:my)?|mom(?:my)?|mama)\b/.test(r)) return {role:"parent", sex:"F"};
+  if (/\b(parent|guardian)\b/.test(r))                              return {role:"parent", sex:""};
+  if (/\b(husband|fianc[eé])\b/.test(r))                            return {role:"spouse", sex:"M"};
+  if (/\b(wife|fianc[eé]e)\b/.test(r))                              return {role:"spouse", sex:"F"};
+  if (/\b(spouse|partner)\b/.test(r))                               return {role:"spouse", sex:""};
+  if (/\b(son|stepson)\b/.test(r))                                  return {role:"child",  sex:"M"};
+  if (/\b(daughter|stepdaughter)\b/.test(r))                        return {role:"child",  sex:"F"};
+  if (/\b(child|kid)\b/.test(r))                                    return {role:"child",  sex:""};
+  if (/\b(brother|stepbrother|half[\s-]?brother)\b/.test(r))        return {role:"sibling",sex:"M"};
+  if (/\b(sister|stepsister|half[\s-]?sister)\b/.test(r))           return {role:"sibling",sex:"F"};
+  if (/\b(sibling|twin)\b/.test(r))                                 return {role:"sibling",sex:""};
+  return null;
+}
+
+// Incrementally extend a subject's tree with one new relative. Returns
+// {treePersons, treeFamilies} when the tree was changed, or null when
+// nothing was done (empty/missing tree, no focal, ambiguous relationship,
+// relative already in tree). Pure — caller is responsible for persisting.
+//
+// The new tree person is connected to the focal via the right family
+// slot (parent → parents-of-focal family, spouse → spousal family,
+// child → spousal family children list, sibling → parents family
+// childIds). If the appropriate family doesn't exist yet, a new one is
+// created; if it exists but the relevant slot is filled with someone
+// else, a parallel family is spawned (e.g. a second spouse).
+function addRelativeToTree(subject, name, rel) {
+  if (!subject) return null;
+  const treePersons  = subject.treePersons  || [];
+  const treeFamilies = subject.treeFamilies || [];
+  if (treePersons.length === 0) return null; // nothing to attach to yet
+  const role = classifyRelType(rel);
+  if (!role) return null;
+  const nm = (name||"").trim();
+  if (!nm) return null;
+
+  // Focal: prefer gedFocalPersonId; fall back to the tp whose name
+  // matches the subject's own name (covers manually-built trees where
+  // gedFocalPersonId may not have been set yet).
+  let focal = subject.gedFocalPersonId
+    ? treePersons.find(p => p.id === subject.gedFocalPersonId)
+    : null;
+  if (!focal) {
+    const subjLow = (subject.name||"").trim().toLowerCase();
+    if (subjLow) focal = treePersons.find(p => (p.name||"").trim().toLowerCase() === subjLow);
+  }
+  if (!focal) return null;
+
+  // Already in tree (by case-insensitive name)? Leave alone — we don't
+  // try to reconcile an existing person into a different family slot
+  // automatically, since that's a destructive change the user should
+  // make explicitly via the tree view.
+  const nmLow = nm.toLowerCase();
+  if (treePersons.some(p => (p.name||"").trim().toLowerCase() === nmLow)) return null;
+
+  const np = newPersonRecord({name: nm, sex: role.sex || ""});
+  const persons = [...treePersons, np];
+  let families = [...treeFamilies];
+
+  if (role.role === "parent") {
+    let fam = families.find(f => (f.childIds||[]).includes(focal.id));
+    const isFemale = role.sex === "F";
+    if (!fam) {
+      const nf = newFamilyRecord();
+      nf.childIds = [focal.id];
+      if (isFemale) nf.wifeId = np.id; else nf.husbandId = np.id;
+      families.push(nf);
+    } else if (isFemale && !fam.wifeId) {
+      families = families.map(f => f.id===fam.id ? {...f, wifeId: np.id} : f);
+    } else if (!isFemale && !fam.husbandId) {
+      families = families.map(f => f.id===fam.id ? {...f, husbandId: np.id} : f);
+    } else if (!fam.wifeId) {
+      families = families.map(f => f.id===fam.id ? {...f, wifeId: np.id} : f);
+    } else if (!fam.husbandId) {
+      families = families.map(f => f.id===fam.id ? {...f, husbandId: np.id} : f);
+    } else {
+      // Both parent slots already filled → second parents family for focal.
+      const nf = newFamilyRecord();
+      nf.childIds = [focal.id];
+      if (isFemale) nf.wifeId = np.id; else nf.husbandId = np.id;
+      families.push(nf);
+    }
+  } else if (role.role === "spouse") {
+    // Reuse a one-sided family that already includes the focal, otherwise
+    // create a new spousal family with focal + new person.
+    let fam = families.find(f =>
+      (f.husbandId === focal.id && !f.wifeId) ||
+      (f.wifeId === focal.id && !f.husbandId)
+    );
+    if (fam) {
+      families = families.map(f => {
+        if (f.id !== fam.id) return f;
+        if (f.husbandId === focal.id) return {...f, wifeId: np.id};
+        return {...f, husbandId: np.id};
+      });
+    } else {
+      const nf = newFamilyRecord();
+      if (focal.sex === "F")            { nf.wifeId = focal.id; nf.husbandId = np.id; }
+      else if (focal.sex === "M")       { nf.husbandId = focal.id; nf.wifeId = np.id; }
+      else if (role.sex === "F")        { nf.wifeId = np.id;    nf.husbandId = focal.id; }
+      else if (role.sex === "M")        { nf.husbandId = np.id; nf.wifeId = focal.id; }
+      else                              { nf.husbandId = focal.id; nf.wifeId = np.id; }
+      families.push(nf);
+    }
+  } else if (role.role === "child") {
+    let fam = families.find(f => f.husbandId === focal.id || f.wifeId === focal.id);
+    if (fam) {
+      families = families.map(f => f.id===fam.id ? {...f, childIds:[...(f.childIds||[]), np.id]} : f);
+    } else {
+      const nf = newFamilyRecord();
+      if (focal.sex === "F") nf.wifeId = focal.id; else nf.husbandId = focal.id;
+      nf.childIds = [np.id];
+      families.push(nf);
+    }
+  } else if (role.role === "sibling") {
+    let fam = families.find(f => (f.childIds||[]).includes(focal.id));
+    if (fam) {
+      families = families.map(f => f.id===fam.id ? {...f, childIds:[...(f.childIds||[]), np.id]} : f);
+    } else {
+      const nf = newFamilyRecord();
+      nf.childIds = [focal.id, np.id];
+      families.push(nf);
+    }
+  }
+
+  return {treePersons: persons, treeFamilies: families};
+}
+
+// Walk every entry in subject.peopleRelationships and add any classifi-
+// able relative that isn't already in the tree. Reuses addRelativeToTree
+// (so the wiring rules are identical to the incremental path). Returns
+// {treePersons, treeFamilies, addedCount, missingNames} where addedCount
+// is the number of relatives newly attached and missingNames lists names
+// that classified but didn't fit (e.g. focal absent). Returns null when
+// nothing changed. Caller persists the result.
+function syncAllRelativesIntoTree(subject) {
+  if (!subject) return null;
+  const rels = subject.peopleRelationships || {};
+  let acc = subject;
+  let count = 0;
+  const added = [];
+  for (const [name, rel] of Object.entries(rels)) {
+    const update = addRelativeToTree(acc, name, rel);
+    if (update) {
+      acc = {...acc, treePersons: update.treePersons, treeFamilies: update.treeFamilies};
+      count++;
+      added.push(name);
+    }
+  }
+  if (count === 0) return null;
+  return {treePersons: acc.treePersons, treeFamilies: acc.treeFamilies, addedCount: count, addedNames: added};
+}
+
+// Count how many of the subject's relationships would be newly added to
+// the tree if we synced now. Cheap (no record allocation), used to drive
+// the "Pull N relatives from the chronicle" banner. Mirrors addRelative-
+// ToTree's skip-conditions so the count is honest.
+function countMissingRelativesForTree(subject) {
+  if (!subject) return 0;
+  const treePersons = subject.treePersons || [];
+  if (treePersons.length === 0) return 0;
+  const treeNames = new Set(treePersons.map(p => (p.name||"").trim().toLowerCase()));
+  // Need a focal — same rule as addRelativeToTree.
+  const subjLow = (subject.name||"").trim().toLowerCase();
+  const hasFocal = (subject.gedFocalPersonId && treePersons.some(p => p.id === subject.gedFocalPersonId))
+    || (subjLow && treePersons.some(p => (p.name||"").trim().toLowerCase() === subjLow));
+  if (!hasFocal) return 0;
+  let n = 0;
+  for (const [name, rel] of Object.entries(subject.peopleRelationships || {})) {
+    const nm = (name||"").trim();
+    if (!nm) continue;
+    if (treeNames.has(nm.toLowerCase())) continue;
+    if (!classifyRelType(rel)) continue;
+    n++;
+  }
+  return n;
+}
+
+// Wire a single birth / baptism / death / burial event into the
+// family tree. The event's "primary person" is the individual the
+// event is about — explicit via event.primaryPerson, or inferred when
+// the event tags exactly one person other than the chronicle owner.
+// When the primary isn't the chronicle owner:
+//   1. Ensure they're in the tree, adding them via addRelativeToTree
+//      using their entry in peopleRelationships (if classifiable).
+//   2. Fill in dob/birthPlace (for birth/baptism) or dod/deathPlace
+//      (for death/burial) on their tree person — only when those
+//      fields are currently empty, so a manual edit in the tree view
+//      is never overwritten by a later event save.
+// Returns {treePersons, treeFamilies} when something changed, null
+// otherwise. Caller persists.
+function applyEventToTree(subject, event) {
+  if (!subject || !event) return null;
+  const et = event.eventType;
+  if (!["birth","baptism","death","burial"].includes(et)) return null;
+
+  const subjLow = (subject.name||"").trim().toLowerCase();
+  // Resolve primary: explicit pick first, then auto-pick when exactly
+  // one tagged person isn't the chronicle owner.
+  let primary = (event.primaryPerson || "").trim();
+  if (!primary) {
+    const others = (event.people||[]).filter(p => {
+      const t = (p||"").trim();
+      return t && t.toLowerCase() !== subjLow;
+    });
+    if (others.length === 1) primary = others[0];
+  }
+  if (!primary || primary.toLowerCase() === subjLow) return null;
+
+  let treePersons = subject.treePersons || [];
+  let treeFamilies = subject.treeFamilies || [];
+  const primaryLow = primary.toLowerCase();
+
+  // Ensure the primary is in the tree. addRelativeToTree handles all
+  // the family-slot wiring; if it returns null (empty tree, missing
+  // focal, unclassifiable rel, etc.) we can't safely auto-add, and the
+  // caller would need a tree present + a relationship before the
+  // dob/dod patch makes sense.
+  let tpNode = treePersons.find(p => (p.name||"").trim().toLowerCase() === primaryLow);
+  if (!tpNode) {
+    const rel = (subject.peopleRelationships || {})[primary] || "";
+    if (!rel) return null;
+    const addUpdate = addRelativeToTree(
+      {...subject, treePersons, treeFamilies}, primary, rel);
+    if (!addUpdate) return null;
+    treePersons = addUpdate.treePersons;
+    treeFamilies = addUpdate.treeFamilies;
+    tpNode = treePersons.find(p => (p.name||"").trim().toLowerCase() === primaryLow);
+    if (!tpNode) return null;
+  }
+
+  // Patch dob / dod / places. Only fill empty fields — a tree edit
+  // that's already specified, say, an exact month is preserved.
+  const year = event.year ? String(event.year) : "";
+  const place = (event.locationLabel || event.location || "").trim();
+  const patch = {};
+  if (et === "birth" || et === "baptism") {
+    if (!tpNode.dob && year) patch.dob = year;
+    if (!tpNode.birthPlace && place) patch.birthPlace = place;
+  } else {
+    if (!tpNode.dod && year) patch.dod = year;
+    if (!tpNode.deathPlace && place) patch.deathPlace = place;
+  }
+
+  const treeMutated = treePersons !== (subject.treePersons || []);
+  const patchHasChanges = Object.keys(patch).length > 0;
+  if (!treeMutated && !patchHasChanges) return null;
+  if (patchHasChanges) {
+    treePersons = treePersons.map(p => p.id === tpNode.id ? {...p, ...patch} : p);
+  }
+  return {treePersons, treeFamilies};
+}
+
+// ── Cross-chronicle event sync ────────────────────────────────
+// When a subject is mentioned by name in events on OTHER subjects'
+// chronicles, those events represent the same real-world moments seen
+// from a different angle (e.g. a marriage on the spouse's chronicle
+// also belongs to this person). promoteToSubject does this once at
+// chronicle creation; the helpers below keep it current as new events
+// are added to OTHER chronicles after creation.
+
+// Infer eventType from a tree-stub title (Born → birth, Died → death,
+// Married → marriage). Returns null when the title doesn't classify;
+// caller falls back to keeping both entries side-by-side.
+function inferEventTypeFromTitle(title) {
+  const t = (title||"").toLowerCase().trim();
+  if (/^born\b|^birth\b/.test(t))            return "birth";
+  if (/^died\b/.test(t))                     return "death";
+  if (/^married\b|^marriage\b/.test(t))      return "marriage";
+  return null;
+}
+
+// Cross-chronicle dedupe key. Two events from different chronicles for
+// the same (eventType, year) collapse to one — we prefer the richer
+// remote version over a bare tree stub on this subject.
+function crossChronicleMemKey(m) {
+  if (!m || !m.year) return null;
+  const et = m.eventType || inferEventTypeFromTitle(m.title);
+  return et ? et + "@" + m.year : null;
+}
+
+// Recast an event from another chronicle (`srcSubject`'s memory `m`) as
+// a memory belonging to `subj`. The subject's own name is dropped from
+// the people list and the source subject's name is added in its place
+// so the cross-reference stays visible. A fresh id is generated and
+// perspectives are cleared so other chronicles' viewpoints don't bleed
+// in. The provenance is stamped on _seededFromSubjectId so future syncs
+// can dedupe against this entry.
+function recastEventForChronicle(srcSubject, m, subj) {
+  const subjLow = (subj.name||"").trim().toLowerCase();
+  const people = (m.people||[]).filter(p => (p||"").trim().toLowerCase() !== subjLow);
+  if (srcSubject?.name &&
+      !people.some(p => (p||"").trim().toLowerCase() === srcSubject.name.toLowerCase())) {
+    people.push(srcSubject.name);
+  }
+  return {
+    ...m,
+    id: "mem_synced_"+Date.now()+Math.random().toString(36).slice(2,7),
+    people,
+    perspectives: [],
+    _seededFromSubjectId: srcSubject.id,
+    _seededFromSubjectName: srcSubject.name,
+  };
+}
+
+// Walk every OTHER subject's memories for events that tag `subj` by
+// name (case-insensitive) and don't already have a representation on
+// `subj.memories`. Dedupe rules, in order:
+//   1. Already seeded from this exact source for this year+title
+//      (provenance signature — survives across syncs).
+//   2. Same (eventType, year) signature — the existing entry wins (we
+//      assume the user has already edited it; we don't clobber).
+// Returns the raw {source, mem} pairs so the caller can preview before
+// recasting / persisting.
+function missingTaggedEventsForSubject(allSubjects, subj) {
+  if (!subj) return [];
+  const subjLow = (subj.name||"").trim().toLowerCase();
+  if (!subjLow) return [];
+  const existingKeys = new Set((subj.memories||[]).map(crossChronicleMemKey).filter(Boolean));
+  const seededProvSigs = new Set((subj.memories||[])
+    .filter(m => m && m._seededFromSubjectId)
+    .map(m => m._seededFromSubjectId + "|" + (m.year||"") + "|" + (m.title||"")));
+  const out = [];
+  for (const src of (allSubjects||[])) {
+    if (!src || src.id === subj.id) continue;
+    for (const m of (src.memories||[])) {
+      const tags = Array.isArray(m.people) ? m.people : [];
+      if (!tags.some(p => (p||"").trim().toLowerCase() === subjLow)) continue;
+      const k = crossChronicleMemKey(m);
+      if (k && existingKeys.has(k)) continue;
+      const prov = src.id + "|" + (m.year||"") + "|" + (m.title||"");
+      if (seededProvSigs.has(prov)) continue;
+      out.push({source: src, mem: m});
+    }
+  }
+  return out;
+}
+
+function countMissingTaggedEventsForSubject(allSubjects, subj) {
+  return missingTaggedEventsForSubject(allSubjects, subj).length;
+}
+
+// Build a persistTop-shaped patch for `subj`: recast every missing
+// tagged event, plus copy across any knownSources referenced by those
+// events so the new memories' citations resolve in this chronicle. The
+// caller updates the subjects array and persists. Returns null if
+// nothing needed adding.
+function buildMissingTaggedEventsPatch(allSubjects, subj) {
+  const missing = missingTaggedEventsForSubject(allSubjects, subj);
+  if (missing.length === 0) return null;
+  const recast = missing.map(({source, mem}) => recastEventForChronicle(source, mem, subj));
+  // Collect referenced sourceIds, then copy any source records the
+  // current chronicle doesn't already have.
+  const needIds = new Set();
+  recast.forEach(m => {
+    const srcs = Array.isArray(m.sources) ? m.sources :
+      (Array.isArray(m.sourceIds) ? m.sourceIds.map(id => ({sourceId:id})) : []);
+    srcs.forEach(s => { if (s.sourceId) needIds.add(s.sourceId); });
+  });
+  const existingSrcIds = new Set((subj.knownSources||[]).map(s => s.id));
+  const extraSources = [];
+  for (const otherSub of (allSubjects||[])) {
+    for (const src of (otherSub.knownSources||[])) {
+      if (needIds.has(src.id) && !existingSrcIds.has(src.id)) {
+        extraSources.push(src);
+        existingSrcIds.add(src.id);
+      }
+    }
+  }
+  return {
+    memories: [...(subj.memories||[]), ...recast],
+    knownSources: extraSources.length > 0 ? [...(subj.knownSources||[]), ...extraSources] : (subj.knownSources||[]),
+    addedCount: recast.length,
+  };
+}
 
 // ── Styles ─────────────────────────────────────────────────────
 const S = {
@@ -760,7 +1119,7 @@ function knownLocationValues(knownLocations, field) {
 }
 
 function newForm() {
-  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], sources:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town", researchNote:"", candidateConfidence:"possible", candidatePersonId:"", eventType:"", recalledBy:"self" };
+  return { title:"", content:"", year:0, month:1, day:0, fuzzy:"day", season:"Early", dateUncertain:false, location:"", locations:[], tags:[], people:[], orgs:[], sources:[], mediaUrls:[], endFuzzy:null, endYear:null, endMonth:1, endDay:1, endSeason:"Early", endOngoing:false, inLegacy:false, visibility:"private", publicSummary:"", locationLabel:"", locationStreet:"", locationTown:"", locationState:"", locationCountry:"", locationPrivacy:"town", researchNote:"", candidateConfidence:"possible", candidatePersonId:"", eventType:"", primaryPerson:"", recalledBy:"self" };
 }
 
 // ── Storage ────────────────────────────────────────────────────
@@ -1066,7 +1425,7 @@ const MODES = {
   legacy: {
     id:"legacy", label:"Legacy", icon:"◈",
     tagline:"Record for someone else",
-    desc:"Preserve the story of a loved one — a parent, grandparent, or friend. Free for one contributor; subscribe to invite others.",
+    desc:"Preserve the story of a loved one — a parent, grandparent, or friend.",
     isSelf:false,
     color:"#89b08a", bg:"rgba(137,176,138,0.1)", border:"rgba(137,176,138,0.4)",
     addMemory: name => `Record a Memory for ${name||"them"}`,
@@ -1518,6 +1877,145 @@ function LocationFieldsBlock({form, updateForm, knownLocations}) {
   );
 }
 
+// AdditionalLocationsField - structured entry for extra places attached
+// to an event (road trips, multi-city visits, etc.). Starts as a single
+// Town field; once the user types anything, the Street / State / Country
+// fields fade in for full address entry, mirroring the primary
+// LocationFieldsBlock UX. Town picks from the user's known towns and
+// auto-fills State / Country from the matching saved place. On save:
+// the structured fields go into the subject's knownLocations index (so
+// the entry is reusable everywhere) and the rebuilt label gets pushed
+// into form.locations.
+function AdditionalLocationsField({form, updateForm, knownLocations, persistSubject}) {
+  const [draft, setDraft] = React.useState({street:"", town:"", state:"", country:""});
+  const labels = form.locations || [];
+  const kl = knownLocations || [];
+  const expanded = !!(draft.town || draft.street || draft.state || draft.country);
+  const uniq = arr => [...new Set(arr.filter(Boolean))].sort();
+  const knownTowns     = uniq(kl.map(l => l && typeof l === 'object' ? l.town    : null));
+  const knownStates    = uniq(kl.map(l => l && typeof l === 'object' ? l.state   : null));
+  const knownCountries = uniq(kl.map(l => l && typeof l === 'object' ? l.country : null));
+
+  function applyPatch(patch) {
+    const next = {...draft, ...patch};
+    // Town change → fill State / Country from a matching saved place
+    // (only fields the user hasn't typed something into themselves).
+    if (patch.town !== undefined && patch.town && patch.town !== draft.town) {
+      const m = kl.find(l => l && typeof l === 'object' && l.town === patch.town);
+      if (m) {
+        if (!next.state   && m.state)   next.state   = m.state;
+        if (!next.country && m.country) next.country = m.country;
+        if (!next.street  && m.street)  next.street  = m.street;
+      }
+    }
+    if (patch.state !== undefined && patch.state && patch.state !== draft.state) {
+      const m = kl.find(l => l && typeof l === 'object' && l.state === patch.state && l.country);
+      if (m && !next.country) next.country = m.country;
+    }
+    setDraft(next);
+  }
+
+  function reset() { setDraft({street:"", town:"", state:"", country:""}); }
+
+  function save() {
+    // Prefer to re-use an existing saved place if all four fields match,
+    // so we don't bloat knownLocations with near-duplicates of the same
+    // place under slightly different labels.
+    const matchExisting = kl.find(l =>
+      l && typeof l === 'object' &&
+      (l.street ||"") === (draft.street ||"") &&
+      (l.town   ||"") === (draft.town   ||"") &&
+      (l.state  ||"") === (draft.state  ||"") &&
+      (l.country||"") === (draft.country||"")
+    );
+    const label = matchExisting
+      ? (matchExisting.label || "")
+      : ([draft.town, draft.state, draft.country].filter(Boolean).join(", ") || draft.street);
+    if (!label) return;
+    if (labels.includes(label)) { reset(); return; }
+    if (!matchExisting && persistSubject) {
+      const newKL = {label, street:draft.street, town:draft.town, state:draft.state, country:draft.country};
+      persistSubject({
+        knownLocations: [...kl, newKL].sort((a,b) =>
+          ((typeof a==='string'?a:a.label)||"").localeCompare((typeof b==='string'?b:b.label)||"")
+        )
+      });
+    }
+    updateForm({locations: [...labels, label]});
+    reset();
+  }
+
+  function remove(label) {
+    updateForm({locations: labels.filter(l => l !== label)});
+  }
+
+  const labelCss = {fontSize:"0.74rem",color:"#8a7460",display:"block",marginBottom:"3px"};
+  const inpCss   = {...S.input,padding:"7px 10px",fontSize:"0.88rem"};
+  const fieldDef = (key, label, listId, listValues, placeholder, fullWidth) =>
+    React.createElement("div",{style:fullWidth?{gridColumn:"1 / -1"}:{}},
+      React.createElement("label",{style:labelCss}, label),
+      React.createElement("input",{
+        list:listId, value:draft[key]||"",
+        onChange:e=>applyPatch({[key]:e.target.value}),
+        onKeyDown:e=>{if(e.key==="Enter"&&(draft.town||draft.street)){e.preventDefault();save();}if(e.key==="Escape")reset();},
+        placeholder, style:inpCss, autoComplete:"off"
+      }),
+      React.createElement("datalist",{id:listId}, listValues.map(v=>React.createElement("option",{key:v,value:v})))
+    );
+
+  return React.createElement("div",null,
+    // Chips for already-attached additional locations
+    labels.length > 0 && React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"5px",marginBottom:"8px"}},
+      labels.map(label =>
+        React.createElement("span",{key:label,style:{display:"inline-flex",alignItems:"center",gap:"4px",padding:"3px 8px",borderRadius:"20px",fontSize:"0.8rem",background:"rgba(100,110,140,0.1)",color:"#4a5470",border:"1px solid rgba(100,110,140,0.25)"}},
+          "📍 ", label,
+          React.createElement("button",{onClick:()=>remove(label),title:"Remove",style:{background:"none",border:"none",cursor:"pointer",color:"#8a8aaa",fontSize:"0.78rem",padding:0,lineHeight:1}},"×")
+        )
+      )
+    ),
+    // Progressive disclosure: a single Town input when collapsed; the
+    // full Street / Town / State / Country grid + Save / Clear once
+    // the user starts typing.
+    React.createElement("div",{style:{
+      background: expanded ? "rgba(240,235,224,0.5)" : "transparent",
+      border: expanded ? "1px solid #d4c4a8" : "1px dashed #c8b89a",
+      borderRadius:"3px",
+      padding: expanded ? "10px 12px" : "0",
+      transition:"background 0.2s,border-color 0.2s,padding 0.2s"
+    }},
+      expanded
+        ? React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}},
+            React.createElement("div",{style:{gridColumn:"1 / -1"}},
+              React.createElement("label",{style:labelCss},"Street ",React.createElement("span",{style:{color:"#9a8a78",fontStyle:"italic"}},"(optional)")),
+              React.createElement("input",{value:draft.street,onChange:e=>applyPatch({street:e.target.value}),onKeyDown:e=>{if(e.key==="Enter"&&(draft.town||draft.street)){e.preventDefault();save();}if(e.key==="Escape")reset();},placeholder:"Number and road",style:inpCss,autoComplete:"off"})
+            ),
+            fieldDef("town",    "Town / Suburb / City", "al-town-sugs",    knownTowns,    "e.g. Brunswick",  false),
+            fieldDef("state",   "State / Region",       "al-state-sugs",   knownStates,   "e.g. Victoria",   false),
+            fieldDef("country", "Country",              "al-country-sugs", knownCountries,"e.g. Australia", true)
+          )
+        : React.createElement("input",{
+            list:"al-town-sugs",
+            autoFocus:false,
+            value:draft.town,
+            onChange:e=>applyPatch({town:e.target.value}),
+            onKeyDown:e=>{if(e.key==="Enter"&&draft.town){e.preventDefault();save();}if(e.key==="Escape")reset();},
+            placeholder:"+ Add another location — town or place",
+            style:{...inpCss,width:"100%"},
+            autoComplete:"off"
+          }),
+      // Datalist always emitted so the collapsed Town input still
+      // autocompletes; the structured branch re-emits its own data-
+      // lists with the same ids, which is fine (last one wins, and
+      // the values are identical).
+      !expanded && React.createElement("datalist",{id:"al-town-sugs"}, knownTowns.map(t=>React.createElement("option",{key:t,value:t}))),
+      expanded && React.createElement("div",{style:{display:"flex",gap:"6px",marginTop:"10px"}},
+        React.createElement("button",{onClick:save,disabled:!(draft.town||draft.street),style:{...S.btn,padding:"6px 14px",fontSize:"0.85rem",opacity:(draft.town||draft.street)?1:0.5}},"+ Add location"),
+        React.createElement("button",{onClick:reset,style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"6px 12px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",color:"#8a7460"}},"Clear")
+      )
+    )
+  );
+}
+
 // PlacePicker - single-field location entry that searches saved places
 // instantly and Nominatim live (debounced). Still used inside the Map
 // view's "fix this place's coordinates" workflow.
@@ -1696,15 +2194,27 @@ const RELATIONSHIP_SUGGESTIONS = [
 function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPerson, onNewPersonRelationship, allRelationships=[], groups={}}) {
   const [input, setInput] = React.useState("");
   const [showSugs, setShowSugs] = React.useState(false);
-  const [step, setStep] = React.useState(null); // null | "email" | "relationship"
+  const [step, setStep] = React.useState(null); // null | "email" | "relationship" | "qualifier"
   const [pendingName, setPendingName] = React.useState(null);
   const [relInput, setRelInput] = React.useState("");
   const [showRelSugs, setShowRelSugs] = React.useState(false);
+  // Qualifier step: when two people share a name we ask the user for a
+  // free-text discriminator (Sr/Jr/III, "b. 1920", "Mary's brother", …)
+  // that gets appended in parentheses so the full string becomes the
+  // unique identifier ("John Smith (Sr)").
+  const [qualifierInput, setQualifierInput] = React.useState("");
   const groupNames = Object.keys(groups);
   const peopleSugs = allValues.filter(v=>v.toLowerCase().includes(input.toLowerCase())&&!values.includes(v)&&input.length>0);
   const groupSugs = input.length>0 ? groupNames.filter(g=>g.toLowerCase().includes(input.toLowerCase())) : [];
   const suggestions = [...peopleSugs, ...groupSugs.filter(g=>!peopleSugs.includes(g))];
   const allRelSugs=[...new Set([...RELATIONSHIP_SUGGESTIONS,...allRelationships])]; const relSugs=allRelSugs.filter(r=>r.toLowerCase().includes(relInput.toLowerCase())&&relInput.length>0);
+  // Detect an exact (case-insensitive) match against an existing person —
+  // drives the "+ Add as different person" affordance in the dropdown.
+  const trimInput = input.trim();
+  const exactMatchName = trimInput
+    ? allValues.find(v => v.toLowerCase() === trimInput.toLowerCase())
+    : null;
+  const canDisambiguate = exactMatchName && !!onNewPerson;
 
   function commit(name, email, rel) {
     const v = name.trim();
@@ -1712,7 +2222,7 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
     if (onNewPerson) onNewPerson(v, "");
     if (onNewPersonRelationship && rel.trim()) onNewPersonRelationship(v, rel.trim());
     setInput(""); setShowSugs(false); setPendingName(null);
-    setRelInput(""); setStep(null);
+    setRelInput(""); setQualifierInput(""); setStep(null);
   }
 
   function add(val) {
@@ -1728,6 +2238,37 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
       setPendingName(v); setInput(""); setShowSugs(false); setStep("relationship");
     } else {
       commit(v, "", "");
+    }
+  }
+
+  // Start the disambiguation flow for an existing name. Captures the base
+  // name, blanks the qualifier input, and routes into the qualifier step.
+  function startDisambiguate(baseName) {
+    setPendingName(baseName);
+    setQualifierInput("");
+    setInput("");
+    setShowSugs(false);
+    setStep("qualifier");
+  }
+
+  // Apply the qualifier and decide what comes next. Empty qualifier
+  // collapses back to the bare existing name (effectively cancel); a
+  // qualifier we've already seen short-circuits to a plain commit; a
+  // new qualified name flows into the relationship step the same way
+  // any other new person does, so the user only ever sees the extra
+  // qualifier prompt when they actually need it.
+  function commitWithQualifier(qualifier) {
+    const q = (qualifier||"").trim();
+    if (!q) { setStep(null); setPendingName(null); setQualifierInput(""); return; }
+    const fullName = pendingName + " (" + q + ")";
+    if (values.includes(fullName)) {
+      setStep(null); setPendingName(null); setQualifierInput("");
+      return;
+    }
+    if (onNewPerson && !allValues.includes(fullName)) {
+      setPendingName(fullName); setQualifierInput(""); setStep("relationship");
+    } else {
+      commit(fullName, "", "");
     }
   }
 
@@ -1762,11 +2303,33 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
               onMouseLeave:e=>e.currentTarget.style.background="transparent"},r))
           )
         )
-      : React.createElement("div",{style:{display:"flex",gap:"6px"}},
-          React.createElement("input",{value:input,onChange:e=>{setInput(e.target.value);setShowSugs(true);},onKeyDown:e=>{if(e.key==="Enter"){e.preventDefault();add(input);}if(e.key==="Escape")setShowSugs(false);},onBlur:()=>setTimeout(()=>setShowSugs(false),150),onFocus:()=>input&&setShowSugs(true),placeholder,style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",flex:1}}),
-          React.createElement("button",{onClick:()=>add(input),style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"6px 11px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.85rem",color:"#8a7460"}},"+ Add")
-        ),
-    showSugs&&suggestions.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,right:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",maxHeight:"160px",overflowY:"auto"}},
+      : step==="qualifier"
+        ? React.createElement("div",{style:{background:"rgba(240,235,224,0.8)",border:"1px solid #c8b89a",borderRadius:"3px",padding:"10px 12px",marginBottom:"4px"}},
+            React.createElement("p",{style:{margin:"0 0 7px",fontSize:"0.84rem",color:"#2c2416"}},
+              "Another ",React.createElement("strong",null,pendingName),". ",
+              React.createElement("span",{style:{color:"#7a6a58",fontStyle:"italic"}},"What sets them apart?")
+            ),
+            React.createElement("div",{style:{display:"flex",gap:"6px"}},
+              React.createElement("input",{autoFocus:true,value:qualifierInput,
+                onChange:e=>setQualifierInput(e.target.value),
+                onKeyDown:e=>{
+                  if(e.key==="Enter"){e.preventDefault();commitWithQualifier(qualifierInput);}
+                  if(e.key==="Escape"){setStep(null);setPendingName(null);setQualifierInput("");}
+                },
+                placeholder:"e.g. Sr, b. 1920, Mary's brother…",
+                style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",flex:1}}),
+              React.createElement("button",{onClick:()=>commitWithQualifier(qualifierInput),disabled:!qualifierInput.trim(),style:{...S.btn,padding:"6px 13px",fontSize:"0.84rem",opacity:qualifierInput.trim()?1:0.5}},"Save"),
+              React.createElement("button",{onClick:()=>{setStep(null);setPendingName(null);setQualifierInput("");},style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"6px 11px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",color:"#8a7460"}},"Cancel")
+            ),
+            React.createElement("p",{style:{margin:"6px 0 0",fontSize:"0.74rem",color:"#7a6a58",fontStyle:"italic"}},
+              "Saves as “",pendingName,(qualifierInput.trim()?" (" + qualifierInput.trim() + ")":""), "” — a separate person from the existing ",pendingName,"."
+            )
+          )
+        : React.createElement("div",{style:{display:"flex",gap:"6px"}},
+            React.createElement("input",{value:input,onChange:e=>{setInput(e.target.value);setShowSugs(true);},onKeyDown:e=>{if(e.key==="Enter"){e.preventDefault();add(input);}if(e.key==="Escape")setShowSugs(false);},onBlur:()=>setTimeout(()=>setShowSugs(false),150),onFocus:()=>input&&setShowSugs(true),placeholder,style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",flex:1}}),
+            React.createElement("button",{onClick:()=>add(input),style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"6px 11px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.85rem",color:"#8a7460"}},"+ Add")
+          ),
+    showSugs&&(suggestions.length>0||canDisambiguate)&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,right:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",maxHeight:"200px",overflowY:"auto"}},
       suggestions.map(s=>{
         const isGroup = !!groups[s];
         const memberCount = isGroup ? (groups[s].members||[]).length : 0;
@@ -1781,7 +2344,18 @@ function PeopleOrgField({icon, values, allValues, onChange, placeholder, onNewPe
               )
             : React.createElement("span",null,icon," ",s)
         );
-      })
+      }),
+      // "+ Add as a different person" footer — only when input exactly
+      // matches an existing name. The default Enter / click still picks
+      // the existing person (no extra clicks for the common case); this
+      // footer is the escape hatch when the user means a different person
+      // who happens to share the name (Sr/Jr, distant cousin, etc.).
+      canDisambiguate && React.createElement("div",{
+        onMouseDown:()=>startDisambiguate(exactMatchName),
+        style:{padding:"8px 12px",cursor:"pointer",fontSize:"0.85rem",color:"#5a4820",borderTop:"1px dashed #d4c4a8",background:"rgba(196,169,98,0.06)",fontStyle:"italic"},
+        onMouseEnter:e=>e.currentTarget.style.background="rgba(196,169,98,0.16)",
+        onMouseLeave:e=>e.currentTarget.style.background="rgba(196,169,98,0.06)"
+      }, "+ Different ", exactMatchName, " — add as a new person")
     )
   );
 }
@@ -2039,23 +2613,33 @@ function LifeTimeline({memories, setView, setSelected, setIndexFilter, onMissing
   }
   const eduPeriods  = buildPeriods("education");
   const workPeriods = buildPeriods("work");
+  const commPeriods = buildPeriods("community");
 
-  if (!residences.length&&!eduPeriods.length&&!workPeriods.length) return null;
+  if (!residences.length&&!eduPeriods.length&&!workPeriods.length&&!commPeriods.length) return null;
 
   // Colour palettes
   const RES_PAL  = ["#a87e6b","#c4a962","#c4858a","#b5936b","#d4986b"];
   const EDU_PAL  = ["#8b9dc3","#7a8ec0","#9b8ea8","#6d80b0","#a090c0"];
   const WORK_PAL = ["#7a9e9f","#89b08a","#5a8e8e","#6a9e7a","#7a8e6a"];
+  // Community palette — burgundy / wine / muted rose, chosen to read as
+  // social/affiliation distinct from the brown-residence, blue-education
+  // and green-work lanes. Subjects often belong to several communities at
+  // once, so this lane can get visually crowded; the existing per-period
+  // absolute positioning still works but you'll see overlaps inside the
+  // lane when memberships run concurrently.
+  const COMM_PAL = ["#a8746a","#946a6a","#b88a7a","#8a5a5a","#a4707a"];
   function makeColFn(pal){const c={};return l=>{if(!c[l])c[l]=pal[Object.keys(c).length%pal.length];return c[l];};}
-  const resCol=makeColFn(RES_PAL),eduCol=makeColFn(EDU_PAL),workCol=makeColFn(WORK_PAL);
+  const resCol=makeColFn(RES_PAL),eduCol=makeColFn(EDU_PAL),workCol=makeColFn(WORK_PAL),commCol=makeColFn(COMM_PAL);
   residences.forEach(r=>resCol(r.label));
   eduPeriods.forEach(r=>eduCol(r.label));
   workPeriods.forEach(r=>workCol(r.label));
+  commPeriods.forEach(r=>commCol(r.label));
 
   const tabs = [
     residences.length>0  && {id:"residence", label:"Residence", periods:residences,  colFn:resCol,  tag:"home"},
     eduPeriods.length>0  && {id:"education", label:"Education", periods:eduPeriods,  colFn:eduCol,  tag:"education"},
     workPeriods.length>0 && {id:"work",      label:"Employment",periods:workPeriods, colFn:workCol, tag:"work"},
+    commPeriods.length>0 && {id:"community", label:"Community", periods:commPeriods, colFn:commCol, tag:"community"},
   ].filter(Boolean);
 
   const [activeTab, setActiveTab] = React.useState(null);
@@ -2069,7 +2653,7 @@ function LifeTimeline({memories, setView, setSelected, setIndexFilter, onMissing
   function periodLabel(year, month, hasMo) { return hasMo && month > 0 ? MONTHS[month-1]+" "+year : String(year); }
 
   // Graphical multi-lane timeline
-  const allPeriods = [...residences,...eduPeriods,...workPeriods];
+  const allPeriods = [...residences,...eduPeriods,...workPeriods,...commPeriods];
   const minFrac = Math.min(...allPeriods.map(p=>p.startFrac));
   const maxFrac = Math.max(...allPeriods.map(p=>p.endFrac));
   const graphStartYear = Math.floor(minFrac);
@@ -2079,7 +2663,8 @@ function LifeTimeline({memories, setView, setSelected, setIndexFilter, onMissing
   const lanes = [
     {id:"residence", label:"Residence", periods:residences, colFn:resCol},
     {id:"education", label:"Education", periods:eduPeriods, colFn:eduCol},
-    {id:"work", label:"Employment", periods:workPeriods, colFn:workCol},
+    {id:"work",      label:"Employment",periods:workPeriods, colFn:workCol},
+    {id:"community", label:"Community", periods:commPeriods, colFn:commCol},
   ].filter(l=>l.periods.length>0);
   const labelW = 40;
   const chartH = span * rowH;
@@ -6213,63 +6798,19 @@ function SettingsView({
         )
       ),
 
-      // ── Subscription ──
-      React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
-        React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}},
-          React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:0}},"\u2728 Subscription"),
-          isSubscriber&&React.createElement("span",{style:{fontSize:"0.78rem",background:"#4a7a5a",color:"#fff",padding:"2px 9px",borderRadius:"20px",letterSpacing:"0.04em"}},"ACTIVE")
-        ),
-        isSubscriber
-          ? React.createElement("div",null,
-              React.createElement("p",{style:{fontSize:"0.82rem",color:"#4a7a5a",marginBottom:"6px"}},"\u2713 Subscriber"),
-              React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginBottom:"12px"}},"Sharing and Lineage Mode are enabled."),
-              !activePassword&&React.createElement("div",{style:{background:"rgba(168,136,90,0.08)",border:"1px solid rgba(168,136,90,0.3)",borderRadius:"3px",padding:"9px 12px",marginBottom:"12px",fontSize:"0.8rem",color:"#5a4020",lineHeight:1.5}},
-                "\uD83D\uDD13 Your licence key is saved in plain text on this device \u2014 anyone who opens Chronicle here could use it. Set a password below to encrypt it along with all your memories."
-              ),
-              React.createElement("button",{onClick:()=>saveLicenceKey(""),style:{...S.btnOutline,fontSize:"0.82rem",padding:"5px 12px",color:"#c4858a",borderColor:"#e0c8c8"}},"Remove key")
-            )
-          : React.createElement("div",null,
-              React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",lineHeight:1.6,marginBottom:"12px"}},
-                "A subscription unlocks sharing memories with others, Lineage Mode, and public timelines. The core app is always free \u2014 no account ever required."),
-              licenceStatus&&!licenceStatus.valid&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#c4858a",marginBottom:"8px",fontStyle:"italic"}},
-                licenceStatus.reason==="expired"?"Your licence key has expired \u2014 renew at remembory.net.":
-                licenceStatus.reason==="invalid"?"That key doesn\u2019t look right \u2014 check for typos.":"Couldn\u2019t validate that key."),
-              React.createElement("div",{style:{display:"flex",gap:"8px",marginBottom:"10px"}},
-                React.createElement("input",{value:licenceKey,
-                  onChange:e=>saveLicenceKey(e.target.value),
-                  onKeyDown:e=>{if(e.key==="Enter")saveLicenceKey(e.target.value);},
-                  id:"licence-key-input",
-                  placeholder:"Paste your licence key (REM-XXXX-…)\u2026",
-                  style:{...S.input,flex:1,fontSize:"0.88rem",fontFamily:"monospace",letterSpacing:"0.05em"}}),
-                React.createElement("button",{
-                  onClick:()=>{ const el=document.getElementById("licence-key-input"); saveLicenceKey(el?el.value:licenceKey); },
-                  style:{...S.btn,padding:"7px 14px",fontSize:"0.86rem"}
-                },"Apply")
-              ),
-              React.createElement("div",{style:{marginTop:"4px"}},React.createElement(SubOptions,{mode:"buttons"})),
-              React.createElement("p",{style:{fontSize:"0.78rem",color:"#a8a090",marginTop:"6px"}},
-                "Lost your key? Contact us at ",React.createElement("a",{href:"mailto:admin@remembory.net",style:{color:"#a8885a"}},"admin@remembory.net"))
-            )
-      ),
-
       // ── Password / lock ──
       React.createElement(PasswordCard,{activePassword,data,setActivePassword,setLocked,setData}),
 
       // ── Danger zone ──
       React.createElement("div",{style:{background:"rgba(255,245,245,0.7)",border:"1px solid #e0c8c8",borderRadius:"3px",padding:"20px"}},
         React.createElement("h3",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#8a3030",margin:"0 0 8px"}},"Reset"),
-        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px"}},"Permanently deletes all memories and cannot be undone. Download a backup first if you want to keep a copy."),
+        React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",margin:"0 0 14px"}},"Permanently deletes all memories and cannot be undone."),
         React.createElement("button",{
-          onClick:()=>{ if(window.confirm("Delete all "+memories.length+" memories? This cannot be undone.\n\nDownload a backup first.")) { persistSubject({memories:[],knownPeople:[],knownOrgs:[],knownLocations:[],customTags:[],peopleEmails:{},peopleRelationships:{},peopleNotes:{},orgNotes:{},orgLocations:{},orgPeriods:{},entityPhotos:{},locationNotes:{},locationCoords:{},personOrgs:{},personLocations:{},personGroups:{},shareHistory:[],lastBackup:null,lastImport:null}); setView("life"); }},
+          onClick:()=>{ if(window.confirm("Delete all "+memories.length+" memories? This cannot be undone.")) { persistSubject({memories:[],knownPeople:[],knownOrgs:[],knownLocations:[],customTags:[],peopleEmails:{},peopleRelationships:{},peopleNotes:{},orgNotes:{},orgLocations:{},orgPeriods:{},entityPhotos:{},locationNotes:{},locationCoords:{},personOrgs:{},personLocations:{},personGroups:{},shareHistory:[],lastBackup:null,lastImport:null}); setView("life"); }},
           style:{...S.btnOutline,padding:"8px 16px",fontSize:"0.86rem",color:"#c4858a",borderColor:"#e0c8c8"}
         },"\ud83d\uddd1 Clear all memories")
       ),
 
-      !isSubscriber&&React.createElement("p",{style:{marginTop:"32px",textAlign:"center",fontSize:"0.84rem",color:"#7a6a58",fontStyle:"italic",fontFamily:"'Crimson Text',Georgia,serif"}},
-        "Unlock sharing & Lineage mode \u2014 ",
-        React.createElement(SubOptions,{mode:"links"}),
-        "."
-      ),
       React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",textAlign:"center",marginTop:"16px",fontStyle:"italic",letterSpacing:"0.03em"}},
         "Chronicle \u2022 build 2026-04-03 UTC"
       )
@@ -6911,6 +7452,8 @@ function ImportView({
   isHistoryMode,
   // Shared data
   knownPeople, knownOrgs, knownLocations, peopleEmails, peopleRelationships, persistSubject,
+  // For incremental tree sync on new relationships
+  subject,
 }) {
   return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
     React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:"0 0 6px",color:"#1a1208"}},"Import"),
@@ -6951,7 +7494,13 @@ function ImportView({
             React.createElement("div",null,React.createElement("label",{style:S.label},"Tags"),React.createElement(TagPicker,{tags:item.tags,onToggle:tag=>updatePhoto(item.id,{tags:item.tags.includes(tag)?item.tags.filter(t=>t!==tag):[...item.tags,tag]})})),
             React.createElement("div",null,
               React.createElement("label",{style:S.label},"People"),
-              React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:item.people||[],allValues:knownPeople,onChange:v=>updatePhoto(item.id,{people:v}),placeholder:"Add a person\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
+              React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:item.people||[],allValues:knownPeople,onChange:v=>updatePhoto(item.id,{people:v}),placeholder:"Add a person\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{
+                if (!rel) return;
+                const treeUpdate = addRelativeToTree(subject, name, rel);
+                const patch = {peopleRelationships:{...peopleRelationships, [name]:rel}};
+                if (treeUpdate) { patch.treePersons = treeUpdate.treePersons; patch.treeFamilies = treeUpdate.treeFamilies; }
+                persistSubject(patch);
+              },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
             ),
             React.createElement("div",null,
               React.createElement("label",{style:S.label},"Organisations"),
@@ -7173,7 +7722,13 @@ function ImportView({
           React.createElement("div",null,
             React.createElement("label",{style:S.label},"People"),
             React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 6px"}},"Sender added automatically. Add anyone else mentioned in the email."),
-            React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:emailForm.people||[],allValues:knownPeople,onChange:v=>setEmailForm(f=>({...f,people:v})),placeholder:"Add a person\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships, [name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
+            React.createElement(PeopleOrgField,{icon:"\ud83d\udc64",values:emailForm.people||[],allValues:knownPeople,onChange:v=>setEmailForm(f=>({...f,people:v})),placeholder:"Add a person\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails, [name]:email}}); },onNewPersonRelationship:(name,rel)=>{
+              if (!rel) return;
+              const treeUpdate = addRelativeToTree(subject, name, rel);
+              const patch = {peopleRelationships:{...peopleRelationships, [name]:rel}};
+              if (treeUpdate) { patch.treePersons = treeUpdate.treePersons; patch.treeFamilies = treeUpdate.treeFamilies; }
+              persistSubject(patch);
+            },allRelationships:Object.values(peopleRelationships).filter(Boolean)})
           ),
           React.createElement("button",{onClick:saveEmail,style:{...S.btn,justifySelf:"start"}},"Save to Chronicle")
         )
@@ -7694,31 +8249,8 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
     }
 
     // ── Manual relation builder ────────────────────────────────
-    // Helpers that produce {persons, families} updates without persisting,
-    // so saveAddRelation can batch into a single persistTop call.
-    function newPersonRecord(draft) {
-      const id = "tp_manual_"+Date.now()+Math.random().toString(36).slice(2,5);
-      return {
-        id,
-        gedId: "@" + id.toUpperCase() + "@",
-        name: (draft.name||"").trim(),
-        sex: (draft.sex||"").trim(),
-        dob: (draft.dob||"").trim(),
-        dod: (draft.dod||"").trim(),
-        birthPlace: (draft.birthPlace||"").trim(),
-        deathPlace: (draft.deathPlace||"").trim(),
-        notes: (draft.notes||"").trim(),
-        subjectId: null,
-      };
-    }
-    function newFamilyRecord() {
-      const id = "tf_manual_"+Date.now()+Math.random().toString(36).slice(2,5);
-      return {
-        id, gedId: "@" + id.toUpperCase() + "@",
-        husbandId: null, wifeId: null, childIds: [],
-        marriageYear: null, marriagePlace: "",
-      };
-    }
+    // newPersonRecord / newFamilyRecord live at FamilyTreeView level so the
+    // first-person + seed-from-subject path can share them.
     // Each relation helper returns either {addFamily} (a new family object to
     // append) or {updateFamily} (an existing family object to replace by id).
     // Caller layers these on top of the new person itself.
@@ -7802,6 +8334,11 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
     function saveAddRelation() {
       if (!(newDraft.name||"").trim()) return;
       const person = newPersonRecord(newDraft);
+      // Link to an existing subject if the typed name matches one, so the
+      // new card immediately picks up the Chronicle palette + can be
+      // navigated to without a manual link step.
+      const matchedSub = findSubjectByName(person.name);
+      if (matchedSub) person.subjectId = matchedSub.id;
       let ops = null;
       if (addingKind === "spouse")  ops = relationOpsSpouse(addingAnchor, person);
       else if (addingKind === "parent")  ops = relationOpsParent(addingAnchor, person);
@@ -7816,18 +8353,112 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       if (persistSubject) persistSubject({gedFocalPersonId: person.id});
     }
 
+    // Walk every other tree member's chronicle (matched via tp.subjectId or
+    // gedFocalPersonId) and pull events that tag `tp` by name. These are
+    // shared events (a marriage tagged on the spouse's chronicle, a child's
+    // birth tagged on the parent's, etc.) — the same event-record gets
+    // re-cast from this person's perspective, so the new chronicle starts
+    // populated with everything the user has already entered elsewhere
+    // about them.
+    function eventsFromOtherTreeSubjects(tp) {
+      const tpNameLow = (tp.name||"").trim().toLowerCase();
+      if (!tpNameLow) return [];
+      const otherSubjectIds = new Set();
+      (treePersons||[]).forEach(p => {
+        if (p.id === tp.id) return;
+        if (p.subjectId) otherSubjectIds.add(p.subjectId);
+      });
+      (subjects||[]).forEach(s => {
+        if (s.gedFocalPersonId && s.gedFocalPersonId !== tp.id) otherSubjectIds.add(s.id);
+      });
+      const found = [];
+      (subjects||[]).forEach(s => {
+        if (!otherSubjectIds.has(s.id)) return;
+        (s.memories||[]).forEach(m => {
+          const tags = Array.isArray(m.people) ? m.people : [];
+          if (tags.some(p => (p||"").trim().toLowerCase() === tpNameLow)) {
+            found.push({source: s, mem: m});
+          }
+        });
+      });
+      return found;
+    }
+    // Re-cast a tagged event as a memory belonging to `tp`: drop `tp` from
+    // the people list (they're now the implicit subject of the event), add
+    // the source subject's name in (so we keep the connection visible),
+    // give it a fresh id, and clear perspectives so they don't bleed
+    // across chronicles.
+    function memFromTaggedEvent(srcSubject, m, tp) {
+      const tpNameLow = (tp.name||"").trim().toLowerCase();
+      const people = (m.people||[]).filter(p => (p||"").trim().toLowerCase() !== tpNameLow);
+      if (srcSubject?.name &&
+          !people.some(p => (p||"").trim().toLowerCase() === srcSubject.name.toLowerCase())) {
+        people.push(srcSubject.name);
+      }
+      return {
+        ...m,
+        id: "mem_seed_"+Date.now()+Math.random().toString(36).slice(2,7),
+        people,
+        perspectives: [],
+        _seededFromSubjectId: srcSubject.id,
+        _seededFromSubjectName: srcSubject.name,
+      };
+    }
+    // Dedupe key for the tree-stub vs tagged-event merge. Tree stubs don't
+    // carry eventType, so we infer it from the title (Born → birth, Died
+    // → death, Married → marriage). Null = not eligible for dedupe — keep
+    // both entries side by side.
+    function inferTreeEventType(title) {
+      const t = (title||"").toLowerCase().trim();
+      if (/^born\b|^birth\b/.test(t))            return "birth";
+      if (/^died\b/.test(t))                     return "death";
+      if (/^married\b|^marriage\b/.test(t))      return "marriage";
+      return null;
+    }
+    function memDedupeKey(m) {
+      if (!m || !m.year) return null;
+      const et = m.eventType || inferTreeEventType(m.title);
+      return et ? et + "@" + m.year : null;
+    }
+
     function promoteToSubject(tp) {
       const newId = "subj_tp_"+Date.now();
       const tpById2 = Object.fromEntries(treePersons.map(p=>[p.id,p]));
       const { allMems, rels } = buildMemsFromTree(tp, tpById2, treeFamilies);
-      const allKnownPeople = [...new Set(allMems.flatMap(m=>m.people||[]))].sort();
-      const allKnownLocs   = [...new Set(allMems.map(m=>m.location).filter(Boolean))].sort();
+      // Bring in events from other tree members' chronicles that tag this
+      // person. Tree-stub events get dropped when a richer tagged event
+      // exists for the same (eventType, year) — so a Marriage entered by
+      // hand on the spouse's chronicle replaces the bare "Married X" stub.
+      const taggedMems = eventsFromOtherTreeSubjects(tp)
+        .map(({source, mem}) => memFromTaggedEvent(source, mem, tp));
+      const taggedKeys = new Set(taggedMems.map(memDedupeKey).filter(Boolean));
+      const treeKept = allMems.filter(m => {
+        const k = memDedupeKey(m);
+        return !(k && taggedKeys.has(k));
+      });
+      const mergedMems = [...treeKept, ...taggedMems];
+      const allKnownPeople = [...new Set(mergedMems.flatMap(m=>m.people||[]))].sort();
+      const allKnownLocs   = [...new Set(mergedMems.map(m=>m.location).filter(Boolean))].sort();
+      // Pull in source records cited on any of the merged events so the new
+      // chronicle's Sources index isn't empty when those events arrive
+      // pre-cited. Look up each referenced sourceId in the source chronicle's
+      // knownSources and copy the entry over.
+      const sourceIdsNeeded = new Set();
+      mergedMems.forEach(m => eventSources(m).forEach(s => { if (s.sourceId) sourceIdsNeeded.add(s.sourceId); }));
+      const seedKnownSources = [];
+      const seenSrcIds = new Set();
+      (subjects||[]).forEach(s => (s.knownSources||[]).forEach(src => {
+        if (sourceIdsNeeded.has(src.id) && !seenSrcIds.has(src.id)) {
+          seedKnownSources.push(src);
+          seenSrcIds.add(src.id);
+        }
+      }));
       const newSubj = {
         id:newId, name:tp.name, isSelf:false, mode:"history",
         dob:tp.dob||"", notes:tp.notes||"",
-        memories:allMems, candidates:[], candidatePersons:[],
+        memories:mergedMems, candidates:[], candidatePersons:[],
         knownPeople:allKnownPeople, knownOrgs:[], knownLocations:allKnownLocs,
-        knownSources:[], peopleEmails:{}, peopleRelationships:rels,
+        knownSources:seedKnownSources, peopleEmails:{}, peopleRelationships:rels,
         peopleNotes:{}, orgNotes:{}, orgLocations:{}, orgPeriods:{}, entityPhotos:{},
         locationNotes:{}, locationCoords:{}, personOrgs:{}, personLocations:{},
         personGroups:{}, customTags:[], shareHistory:[], lastBackup:null, lastImport:null,
@@ -7978,6 +8609,22 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
       );
     })();
 
+    // Active subject hosts the tree and the relationships index \u2014 both
+    // are needed for the "pull missing relatives" affordance.
+    const activeSubjectForMissing = (subjects||[]).find(s => s.id === activeSubjectId);
+    const missingRelCount = countMissingRelativesForTree(activeSubjectForMissing);
+
+    function pullMissingRelatives() {
+      const update = syncAllRelativesIntoTree(activeSubjectForMissing);
+      if (!update) return;
+      const newSubjects = subjects.map(s =>
+        s.id === activeSubjectId
+          ? {...s, treePersons: update.treePersons, treeFamilies: update.treeFamilies}
+          : s
+      );
+      persistTop({subjects: newSubjects});
+    }
+
     return React.createElement("div",{style:{animation:"fadeIn 0.3s ease"}},
       React.createElement("div",{style:{display:"flex",alignItems:"center",gap:"10px",marginBottom:"16px",flexWrap:"wrap"}},
         React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.8rem",fontStyle:"italic",margin:0,color:"#1a1208"}},"Family Tree"),
@@ -7985,6 +8632,22 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
         React.createElement("div",{style:{marginLeft:"auto"}},
           React.createElement("input",{value:tpSearch,onChange:e=>setTpSearch(e.target.value),placeholder:"Find another person\u2026",style:{...S.input,padding:"5px 10px",fontSize:"0.86rem",width:"200px"}})
         )
+      ),
+
+      // Missing-relatives banner: shown when the chronicle's
+      // peopleRelationships index has classifiable entries that aren't
+      // yet represented in the tree. Catches pre-existing relationships
+      // entered before the tree-sync wiring landed, plus the trickle
+      // from any future code path that bypasses the per-callback sync.
+      missingRelCount > 0 && React.createElement("div",{style:{background:"rgba(196,169,98,0.12)",border:"1px solid rgba(196,169,98,0.45)",borderRadius:"4px",padding:"10px 14px",marginBottom:"16px",display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
+        React.createElement("span",{style:{fontSize:"1rem",flexShrink:0}}, "\ud83c\udf3f"),
+        React.createElement("span",{style:{flex:1,fontSize:"0.88rem",color:"#5a4820",lineHeight:1.5}},
+          React.createElement("strong",null, missingRelCount, " ", missingRelCount===1?"relative":"relatives"),
+          " in this chronicle's people index ",
+          missingRelCount===1?"isn't":"aren't",
+          " in the tree yet."
+        ),
+        React.createElement("button",{onClick:pullMissingRelatives,style:{...S.btn,padding:"6px 14px",fontSize:"0.86rem",flexShrink:0}}, "Add to tree")
       ),
 
       filtered && React.createElement("div",{style:{marginBottom:"16px",border:"1px solid #d4c4a8",borderRadius:"4px",maxHeight:"260px",overflowY:"auto",background:"rgba(255,252,245,0.85)"}},
@@ -8237,28 +8900,155 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
     );
   }
 
+  // newPersonRecord / newFamilyRecord / classifyRelType are defined at
+  // module level so the relationship-update path in AddEditForm can keep
+  // the tree in sync without needing FamilyTreeView to be mounted.
+
+  // Find a subject whose name matches `name` case-insensitively. Used so a
+  // manually-added tree person can pick up the subjectId of an existing
+  // chronicle without the user having to re-link by hand later.
+  function findSubjectByName(name) {
+    const nm = (name||"").trim().toLowerCase();
+    if (!nm) return null;
+    return (subjects||[]).find(s => (s.name||"").trim().toLowerCase() === nm) || null;
+  }
+
+  // Seed an empty tree from a subject's peopleRelationships. The focal
+  // tree person is `focalPerson`; relatives are pulled out of
+  // matchedSubject.peopleRelationships, classified by classifyRelType,
+  // and wired into family groups:
+  //   • one "parents" family — both parents + focal + any siblings;
+  //   • one family per spouse — focal + spouse;
+  //   • children attach to the first spouse's family, or a single-parent
+  //     family if no spouse is known.
+  // If a relative's name also matches another subject, the new tree
+  // person is linked to that subject as well.
+  function seedTreeFromSubject(focalPerson, matchedSubject) {
+    const rels = matchedSubject.peopleRelationships || {};
+    const persons = [focalPerson];
+    const families = [];
+    const personByName = {[focalPerson.name.toLowerCase()]: focalPerson};
+    function ensurePerson(name, sex) {
+      const key = name.toLowerCase();
+      if (personByName[key]) return personByName[key];
+      const matched = findSubjectByName(name);
+      const p = {
+        ...newPersonRecord({name, sex: sex || matched?.sex || ""}),
+        dob: matched?.dob || "",
+        dod: matched?.dod || "",
+        birthPlace: matched ? placeFromEvent(matched.memories, "birth") : "",
+        deathPlace: matched ? placeFromEvent(matched.memories, "death") : "",
+        subjectId: matched ? matched.id : null,
+      };
+      persons.push(p);
+      personByName[key] = p;
+      return p;
+    }
+    const classified = [];
+    for (const [name, rel] of Object.entries(rels)) {
+      const c = classifyRelType(rel);
+      if (!c || !(name||"").trim()) continue;
+      classified.push({name: name.trim(), ...c});
+    }
+    const parents  = classified.filter(c => c.role === "parent");
+    const siblings = classified.filter(c => c.role === "sibling");
+    const spouses  = classified.filter(c => c.role === "spouse");
+    const children = classified.filter(c => c.role === "child");
+
+    // Parents family — focal + siblings share it
+    if (parents.length || siblings.length) {
+      const fam = newFamilyRecord();
+      const father = parents.find(p => p.sex === "M") || parents.find(p => !p.sex);
+      const mother = parents.find(p => p.sex === "F" && p !== father)
+                  || parents.find(p => !p.sex && p !== father);
+      if (father) fam.husbandId = ensurePerson(father.name, "M").id;
+      if (mother) fam.wifeId   = ensurePerson(mother.name, "F").id;
+      fam.childIds = [focalPerson.id, ...siblings.map(s => ensurePerson(s.name, s.sex).id)];
+      families.push(fam);
+    }
+
+    // Spouse / child families. Multiple spouses get separate families; all
+    // children attach to the first spouse's family (we have no signal for
+    // which kid belongs to which marriage). With no spouse known, children
+    // join a single-parent family rooted on the focal.
+    function assignSpouseSlots(fam, spouseTpId, spouseSex) {
+      if (focalPerson.sex === "F")            { fam.wifeId = focalPerson.id; fam.husbandId = spouseTpId; }
+      else if (focalPerson.sex === "M")       { fam.husbandId = focalPerson.id; fam.wifeId = spouseTpId; }
+      else if (spouseSex === "F")             { fam.wifeId = spouseTpId; fam.husbandId = focalPerson.id; }
+      else if (spouseSex === "M")             { fam.husbandId = spouseTpId; fam.wifeId = focalPerson.id; }
+      else                                    { fam.husbandId = focalPerson.id; fam.wifeId = spouseTpId; }
+    }
+    if (spouses.length > 0) {
+      spouses.forEach((sp, idx) => {
+        const spouseTp = ensurePerson(sp.name, sp.sex);
+        const fam = newFamilyRecord();
+        assignSpouseSlots(fam, spouseTp.id, sp.sex || spouseTp.sex);
+        if (idx === 0) fam.childIds = children.map(c => ensurePerson(c.name, c.sex).id);
+        families.push(fam);
+      });
+    } else if (children.length > 0) {
+      const fam = newFamilyRecord();
+      if (focalPerson.sex === "F") fam.wifeId = focalPerson.id;
+      else                          fam.husbandId = focalPerson.id;
+      fam.childIds = children.map(c => ensurePerson(c.name, c.sex).id);
+      families.push(fam);
+    }
+
+    return {persons, families};
+  }
+
   // ── NO TREE DATA — prompt import OR start manually ─────────────
   // While addingKind === "first" we render the inline person form here so
   // the user can build a tree from scratch. Save creates a single tp_*
   // record on the active subject; from there the in-tree "+ Spouse / +
   // Parent / + Sibling / + Child" buttons let them grow it organically.
-  function startFirstPerson() { setAddingKind("first"); setNewDraft({name:"",sex:"",dob:"",dod:"",birthPlace:"",deathPlace:"",notes:""}); }
+  // If a subject with the same name already exists, the new tree person
+  // is linked to it AND the subject's peopleRelationships are walked to
+  // pre-populate the initial tree with parents / spouses / siblings /
+  // children — so you don't have to retype people you've already named.
+  // Suggest the active subject as the first tree person — most of the time
+  // you're building a tree centred on yourself or the person you're
+  // chronicling, so prefilling their name / sex / dates saves a step and
+  // also primes the subject-match logic in saveFirstPerson (which links
+  // the tp to the subject and seeds the tree from peopleRelationships).
+  // If there's no active subject (or it has no name), fall back to a
+  // blank draft.
+  function activeSubjectForSeed() {
+    return (subjects||[]).find(s => s.id === activeSubjectId) || null;
+  }
+  // Pull a place string out of a subject's first event of a given type
+  // (birth / death / baptism / burial / …). Prefers the user's display
+  // label, falls back to the canonical place name, blank if neither.
+  function placeFromEvent(memories, eventTypeId) {
+    if (!Array.isArray(memories)) return "";
+    const m = memories.find(x => x && x.eventType === eventTypeId);
+    if (!m) return "";
+    return (m.locationLabel||"").trim() || (m.location||"").trim() || "";
+  }
+  function startFirstPerson() {
+    const sub = activeSubjectForSeed();
+    setAddingKind("first");
+    setNewDraft(sub && (sub.name||"").trim()
+      ? { name:sub.name||"", sex:sub.sex||"", dob:sub.dob||"", dod:sub.dod||"",
+          birthPlace: placeFromEvent(sub.memories, "birth"),
+          deathPlace: placeFromEvent(sub.memories, "death"),
+          notes:"" }
+      : { name:"", sex:"", dob:"", dod:"", birthPlace:"", deathPlace:"", notes:"" });
+  }
   function cancelFirstPerson() { setAddingKind(null); setNewDraft({}); }
   function saveFirstPerson() {
     if (!(newDraft.name||"").trim()) return;
-    const id = "tp_manual_"+Date.now()+Math.random().toString(36).slice(2,5);
-    const person = {
-      id, gedId: "@" + id.toUpperCase() + "@",
-      name: (newDraft.name||"").trim(),
-      sex: (newDraft.sex||"").trim(),
-      dob: (newDraft.dob||"").trim(), dod: (newDraft.dod||"").trim(),
-      birthPlace: (newDraft.birthPlace||"").trim(), deathPlace: (newDraft.deathPlace||"").trim(),
-      notes: (newDraft.notes||"").trim(),
-      subjectId: null,
-    };
+    const person = newPersonRecord(newDraft);
+    const matched = findSubjectByName(person.name);
+    if (matched) person.subjectId = matched.id;
+    const seed = matched
+      ? seedTreeFromSubject(person, matched)
+      : {persons:[person], families:[]};
     const targetId = activeSubjectId;
     const newSubjects = subjects.map(s =>
-      s.id === targetId ? {...s, treePersons: [person], treeFamilies: [], gedFocalPersonId: person.id} : s
+      s.id === targetId
+        ? {...s, treePersons: seed.persons, treeFamilies: seed.families, gedFocalPersonId: person.id}
+        : s
     );
     persistTop({subjects: newSubjects});
     setFocalId(person.id);
@@ -8281,9 +9071,26 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
     );
   }
   if (addingKind === "first") {
+    // Heading + helper text shift when the typed name still matches an
+    // existing subject, to surface the auto-link / auto-seed that will
+    // happen on save. The user can edit the prefilled name and the
+    // banner updates live.
+    const draftName = (newDraft.name||"").trim();
+    const matchedFirstSub = draftName ? findSubjectByName(draftName) : null;
+    const relCount = matchedFirstSub
+      ? Object.values(matchedFirstSub.peopleRelationships||{}).filter(r=>classifyRelType(r)).length
+      : 0;
     return React.createElement("div",{style:{animation:"fadeIn 0.3s ease",maxWidth:"560px",margin:"40px auto",padding:"0 20px"}},
-      React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.4rem",fontStyle:"italic",margin:"0 0 10px",color:"#1a1208",textAlign:"center"}}, "Add the first person to your tree"),
-      React.createElement("p",{style:{fontSize:"0.86rem",color:"#8a7460",textAlign:"center",marginBottom:"20px",lineHeight:1.5}}, "Once they\u2019re in, click \u201c+ Spouse / Parent / Sibling / Child\u201d on their detail card to grow the tree from them."),
+      React.createElement("h2",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.4rem",fontStyle:"italic",margin:"0 0 10px",color:"#1a1208",textAlign:"center"}},
+        matchedFirstSub ? "Start your tree with " + matchedFirstSub.name : "Add the first person to your tree"
+      ),
+      React.createElement("p",{style:{fontSize:"0.86rem",color:"#8a7460",textAlign:"center",marginBottom:"20px",lineHeight:1.5}},
+        matchedFirstSub
+          ? (relCount > 0
+              ? `Linked to your existing chronicle. We\u2019ll add ${relCount} relative${relCount===1?"":"s"} from their known relationships to seed the tree.`
+              : "Linked to your existing chronicle. Once they\u2019re in, use \u201c+ Spouse / Parent / Sibling / Child\u201d to grow the tree.")
+          : "Once they\u2019re in, click \u201c+ Spouse / Parent / Sibling / Child\u201d on their detail card to grow the tree from them."
+      ),
       React.createElement("div",{style:{background:"rgba(196,169,98,0.07)",border:"1px solid rgba(196,169,98,0.4)",borderRadius:"4px",padding:"16px 18px"}},
         React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}},
           renderFirstField("name","Name", false, false),
@@ -8312,7 +9119,10 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
         "Import GEDCOM \u2192"
       ),
       React.createElement("button",{onClick:startFirstPerson,style:{...S.btnOutline,padding:"9px 22px",fontSize:"0.95rem"}},
-        "+ Build manually"
+        (() => {
+          const sub = activeSubjectForSeed();
+          return sub && (sub.name||"").trim() ? "Start with " + sub.name : "+ Build manually";
+        })()
       )
     )
   );
@@ -8321,6 +9131,7 @@ function FamilyTreeView({subjects, activeSubjectId, subjectLinks, persistTop, on
 const CANDIDATE_CONFIDENCE = [
   {id:"possible",  label:"Possible",  color:"#8a7460"},
   {id:"probable",  label:"Probable",  color:"#5a7a6a"},
+  {id:"certain",   label:"Certain",   color:"#3a6a4a"},
 ];
 
 function CandidatesPanel({candidates, memories, knownSources, isMobile, onEdit, onAccept, onReject, onAddNew}) {
@@ -9250,6 +10061,57 @@ function AddEditForm({
   const [enddateOpen, setEnddateOpen] = React.useState(() =>
     !!(form._expandEndDate || form.endFuzzy || form.endOngoing));
 
+  // End-date framing depends on event type + date precision:
+  //   • Point event (birth/baptism/marriage/death/burial) + exact date
+  //       → hide the section entirely (nothing to bracket).
+  //   • Point event + vague/uncertain date
+  //       → keep the section but reframe it as a "range" — the second
+  //         date is the latest possible date, not an end of a period.
+  //   • Any other event type
+  //       → "end date" as before (for jobs, residences, journeys…).
+  const isPointEvent = POINT_EVENT_IDS.has(form.eventType);
+  const isExactDate  = form.fuzzy === "day" && !form.dateUncertain;
+  const showEndDateSection = !(isPointEvent && isExactDate);
+  const endDateMode = isPointEvent ? "range" : "period";
+
+  // Clear stale end-date data when the form transitions into the
+  // "point event + exact date" combination — otherwise a range left over
+  // from a previous edit would silently persist in the saved record while
+  // being invisible in the UI. Also clear `endOngoing` on point events,
+  // where "still ongoing" has no meaning.
+  React.useEffect(() => {
+    if (isPointEvent && isExactDate &&
+        (form.endFuzzy || form.endOngoing || form.endYear)) {
+      updateForm({endFuzzy:null, endOngoing:false, endYear:0,
+                  endMonth:null, endDay:null, endSeason:null});
+      setEnddateOpen(false);
+    } else if (isPointEvent && form.endOngoing) {
+      updateForm({endOngoing:false});
+    }
+  // updateForm is a stable closure from the parent; tracking it would
+  // re-fire the effect on every keystroke.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.eventType, form.fuzzy, form.dateUncertain]);
+
+  // Auto-default primaryPerson for events that target a specific
+  // individual when there's exactly one tagged person (and that person
+  // isn't the chronicle owner). Keeps the common "Birth of John —
+  // tag John — save" flow zero-click on the primary picker. The user
+  // can still override; we only set when primaryPerson is empty, so a
+  // deliberate pick is never clobbered by adding/removing other people.
+  React.useEffect(() => {
+    if (!isHistoryMode) return;
+    if (!["birth","baptism","death","burial"].includes(form.eventType)) return;
+    if (form.primaryPerson) return;
+    const subjLow = (subject?.name||"").trim().toLowerCase();
+    const taggedOthers = (form.people||[]).filter(p => {
+      const t = (p||"").trim();
+      return t && t.toLowerCase() !== subjLow;
+    });
+    if (taggedOthers.length === 1) updateForm({primaryPerson: taggedOthers[0]});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.eventType, form.people]);
+
   // In Lineage mode, eventType must be picked (even if just "Other").
   // Collect every missing required field at once so the footer can list
   // them all together and each input can flag itself inline, instead of
@@ -9318,7 +10180,18 @@ function AddEditForm({
         React.createElement("label",{style:{...S.label,marginBottom:"6px"}},"\ud83d\udcdc Event Type *"),
         React.createElement("select",{
           value:form.eventType||"",
-          onChange:e=>updateForm({eventType:e.target.value}),
+          onChange:e=>{
+            const newType = e.target.value;
+            const oldShort = eventTypeShort(form.eventType);
+            const newShort = eventTypeShort(newType);
+            const titleTrim = (form.title || "").trim();
+            // Autofill the title from the picked event type as a starting
+            // point. Only overwrite when the title is empty or still equals
+            // the previously auto-filled value, so a deliberate edit like
+            // "Birth of John Smith" is never clobbered by a type switch.
+            const shouldAutofill = newShort && (!titleTrim || titleTrim === oldShort);
+            updateForm(shouldAutofill ? {eventType:newType, title:newShort} : {eventType:newType});
+          },
           style:{...S.select,width:"100%",borderColor:!form.eventType?"#c4858a":undefined},
           autoFocus:view==="add"
         },
@@ -9327,15 +10200,38 @@ function AddEditForm({
         ),
         React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"6px 0 0",lineHeight:1.4}},
           "Pick the closest match \u2014 use \u201cOther\u201d if none apply."
-        )
+        ),
+        // Primary person picker \u2014 surfaced only for events that target a
+        // specific individual (birth / baptism / death / burial), and only
+        // once there's someone tagged on the event. Used at save time to
+        // wire the event's year + place into the tree person's dob/dod /
+        // birthPlace / deathPlace. Empty value = the chronicle owner is
+        // the implicit primary; otherwise the picked tagged person is.
+        ["birth","baptism","death","burial"].includes(form.eventType) && (form.people||[]).length > 0 &&
+          React.createElement("div",{style:{marginTop:"10px",paddingTop:"10px",borderTop:"1px dashed rgba(196,169,98,0.5)"}},
+            React.createElement("label",{style:{...S.label,marginBottom:"6px"}}, "\ud83d\udc64 Primary person"),
+            React.createElement("select",{
+              value: form.primaryPerson || "",
+              onChange: e => updateForm({primaryPerson: e.target.value}),
+              style: {...S.select, width:"100%"}
+            },
+              React.createElement("option",{value:""}, (subject?.name || "(this chronicle's subject)") + " \u2014 implicit"),
+              (form.people||[]).map(p => React.createElement("option",{key:p, value:p}, p))
+            ),
+            React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"4px 0 0",lineHeight:1.4}},
+              "Who this event is about. Picking a tagged person other than the chronicle owner lets us write their birth / death date and place into the family tree."
+            )
+          )
       ),
       React.createElement("div",null,
         React.createElement("label",{style:S.label},"Title *"),
         React.createElement("input",{value:form.title,onChange:e=>updateForm({title:e.target.value}),placeholder:isHistoryMode?"e.g. Birth of John Smith":"What do you want to call this memory?",style:{...S.input,borderColor:isMissing("title")?"#c4858a":S.input.borderColor},autoFocus:view==="add"&&!isHistoryMode})
       ),
       React.createElement(DateFields,{form,setForm:updateForm}),
-      // End date — visible button
-      !enddateOpen&&React.createElement("button",{onClick:()=>setEnddateOpen(true),style:{
+      // End-date / range button — hidden when point-in-time event has an
+      // exact date (nothing to bracket); reframed as a date range when
+      // a point event has a vague or uncertain date.
+      showEndDateSection&&!enddateOpen&&React.createElement("button",{onClick:()=>setEnddateOpen(true),style:{
         display:"flex",alignItems:"center",gap:"7px",width:"100%",
         background:"rgba(200,184,154,0.1)",border:"1px dashed #c8b89a",borderRadius:"4px",
         padding:"9px 14px",cursor:"pointer",textAlign:"left",
@@ -9346,16 +10242,19 @@ function AddEditForm({
       },
         React.createElement("span",{style:{fontSize:"1rem",lineHeight:1,flexShrink:0}},"\u23f8"),
         React.createElement("span",null,
-          React.createElement("span",{style:{fontWeight:600,color:"#4a3820"}},"Add end date"),
-          React.createElement("span",{style:{color:"#8a7460",marginLeft:"6px",fontSize:"0.82rem",fontStyle:"italic"}},"\u2014 for jobs, addresses, relationships, journeys\u2026")
+          React.createElement("span",{style:{fontWeight:600,color:"#4a3820"}},endDateMode==="range"?"Add a date range":"Add end date"),
+          React.createElement("span",{style:{color:"#8a7460",marginLeft:"6px",fontSize:"0.82rem",fontStyle:"italic"}},
+            endDateMode==="range"
+              ? "\u2014 latest possible date, when the date is not certain"
+              : "\u2014 for jobs, addresses, relationships, journeys\u2026")
         )
       ),
-      enddateOpen&&React.createElement("div",{style:{background:"rgba(200,184,154,0.1)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px"}},
+      showEndDateSection&&enddateOpen&&React.createElement("div",{style:{background:"rgba(200,184,154,0.1)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px"}},
         React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:form.endFuzzy||form.endOngoing?"12px":0}},
-          React.createElement("span",{style:{...S.label,margin:0}},"End date"),
+          React.createElement("span",{style:{...S.label,margin:0}},endDateMode==="range"?"Latest possible date":"End date"),
           React.createElement("button",{onClick:()=>{setEnddateOpen(false);updateForm({endFuzzy:null,endOngoing:false});},style:{background:"none",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.9rem",padding:0}},"\u00d7")
         ),
-        React.createElement("label",{style:{...S.label,cursor:"pointer",display:"flex",alignItems:"center",gap:"8px",marginBottom:form.endOngoing?0:"10px",userSelect:"none"}},
+        endDateMode!=="range"&&React.createElement("label",{style:{...S.label,cursor:"pointer",display:"flex",alignItems:"center",gap:"8px",marginBottom:form.endOngoing?0:"10px",userSelect:"none"}},
           React.createElement("input",{type:"checkbox",checked:!!form.endOngoing,onChange:e=>updateForm({endOngoing:e.target.checked,endFuzzy:e.target.checked?null:(form.endFuzzy||form.fuzzy)}),style:{accentColor:"#2c2416",cursor:"pointer"}}),
           "Still ongoing (present)"
         ),
@@ -9374,8 +10273,8 @@ function AddEditForm({
         )
       ),
       React.createElement("div",null,
-        React.createElement("label",{style:S.label},"Memory ",React.createElement("span",{style:{fontWeight:"normal",textTransform:"none",fontSize:"0.78rem",color:"#8a7460",letterSpacing:0}},"(optional)")),
-        React.createElement("textarea",{value:form.content,onChange:e=>updateForm({content:e.target.value}),placeholder:"Write as much or as little as you remember\u2026",rows:5,style:{...S.input,resize:"vertical",lineHeight:"1.7"}})
+        React.createElement("label",{style:S.label},isHistoryMode?"Transcript / Notes ":"Memory ",React.createElement("span",{style:{fontWeight:"normal",textTransform:"none",fontSize:"0.78rem",color:"#8a7460",letterSpacing:0}},"(optional)")),
+        React.createElement("textarea",{value:form.content,onChange:e=>updateForm({content:e.target.value}),placeholder:isHistoryMode?"Paste a transcript, or jot down what the record shows\u2026":"Write as much or as little as you remember\u2026",rows:5,style:{...S.input,resize:"vertical",lineHeight:"1.7"}})
       )
     ),
 
@@ -9424,7 +10323,7 @@ function AddEditForm({
         React.createElement("div",null,
           React.createElement("label",{style:{...S.label,fontSize:"0.78rem",color:"#8a7460"}},"Additional locations"),
           React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 5px"}},"Road trips, multi-city visits, or memories spanning several places"),
-          React.createElement(PeopleOrgField,{icon:"\ud83d\udccd",values:form.locations||[],allValues:knownLocationLabels(knownLocations),onChange:v=>updateForm({locations:v}),placeholder:"Add another location\u2026"})
+          React.createElement(AdditionalLocationsField,{form,updateForm,knownLocations,persistSubject})
         )
       );
     })()),
@@ -9455,7 +10354,13 @@ function AddEditForm({
           // Preserve any pet entries already on the memory that we hid above.
           const pets = (form.people||[]).filter(n => petNames && petNames.has(n));
           updateForm({people: [...new Set([...v, ...pets])]});
-        },placeholder:"Add a person or group\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails,[name]:email}}); },onNewPersonRelationship:(name,rel)=>{ if(rel) persistSubject({peopleRelationships:{...peopleRelationships,[name]:rel}}); },allRelationships:Object.values(peopleRelationships).filter(Boolean),groups:personGroups||{}})
+        },placeholder:"Add a person or group\u2026",onNewPerson:(name,email)=>{ if(email) persistSubject({peopleEmails:{...peopleEmails,[name]:email}}); },onNewPersonRelationship:(name,rel)=>{
+          if (!rel) return;
+          const treeUpdate = addRelativeToTree(subject, name, rel);
+          const patch = {peopleRelationships:{...peopleRelationships,[name]:rel}};
+          if (treeUpdate) { patch.treePersons = treeUpdate.treePersons; patch.treeFamilies = treeUpdate.treeFamilies; }
+          persistSubject(patch);
+        },allRelationships:Object.values(peopleRelationships).filter(Boolean),groups:personGroups||{}})
       );
     })()),
 
@@ -9591,6 +10496,40 @@ function AddEditForm({
         if (endYear) return "to "+endYear;
         return "";
       }
+      // Catalogue records already cited on this subject's other events —
+      // surfaced above each empty citation so a single record (one URL /
+      // page reference) that's evidence for multiple events (birth,
+      // marriage, death, residence…) can be re-used with one click.
+      // Keyed on sourceId + citation text so each distinct record gets
+      // its own row, not just each collection. Click on a row copies
+      // every field forward (citation text, notes, confidence, media)
+      // so it's a true "use this record again" action, not just "use
+      // this collection".
+      const usedRecordsMap = new Map();
+      for (const ev of (subject?.memories || [])) {
+        if (ev.id === editingId) continue;
+        for (const s of eventSources(ev)) {
+          if (!s.sourceId) continue;
+          const urlTxt = (s.url || "").trim();
+          const citTxt = (s.citation || "").trim();
+          // Record identity = sourceId + url + citation. The URL is the
+          // primary record reference (the actual page on Ancestry /
+          // Findmypast / etc.); citation text disambiguates when several
+          // distinct records on the same source share no URL.
+          const key = s.sourceId + "␟" + urlTxt + "␟" + citTxt;
+          const existing = usedRecordsMap.get(key);
+          if (existing) { existing.count++; continue; }
+          usedRecordsMap.set(key, {
+            sourceId: s.sourceId,
+            url: s.url || "",
+            citation: s.citation || "",
+            recordNotes: s.recordNotes || "",
+            confidence: s.confidence || "unknown",
+            mediaUrls: s.mediaUrls || [],
+            count: 1,
+          });
+        }
+      }
       return React.createElement("div",null,
         React.createElement("label",{style:S.label},"Source Citations"),
         React.createElement("p",{style:{fontSize:"0.78rem",color:"#7a6a58",fontStyle:"italic",margin:"0 0 10px",lineHeight:1.5}},
@@ -9621,10 +10560,98 @@ function AddEditForm({
                 // has already linked (so the dropdown doesn't show duplicates).
                 const linkedCollIds = new Set(userCollectionsInRepo.map(s => s.researchCollectionId).filter(Boolean));
                 const cataloguedColls = (catalogueRepoEntry?.collections||[]).filter(c => c.id && !linkedCollIds.has(c.id));
+                // Per-citation record list. Starts from the subject-wide
+                // map (records on saved events) and merges in the in-
+                // progress sibling citations from this same form so a
+                // record the user just picked on citation 1 immediately
+                // becomes available to pick on citation 2 (the common
+                // "one record, evidence for two events" workflow on a
+                // single new entry). Nothing is filtered out \u2014 letting
+                // the user re-pick the same record on two slots is
+                // harmless and dropping it can leave the list empty.
+                const localMap = new Map(usedRecordsMap);
+                sources.forEach((s, j) => {
+                  if (j === idx || !s.sourceId) return;
+                  const urlTxt = (s.url||"").trim();
+                  const citTxt = (s.citation||"").trim();
+                  const key = s.sourceId + "\u241f" + urlTxt + "\u241f" + citTxt;
+                  const existing = localMap.get(key);
+                  if (existing) { existing.count++; return; }
+                  localMap.set(key, {
+                    sourceId: s.sourceId,
+                    url: s.url || "",
+                    citation: s.citation || "",
+                    recordNotes: s.recordNotes || "",
+                    confidence: s.confidence || "unknown",
+                    mediaUrls: s.mediaUrls || [],
+                    count: 1,
+                  });
+                });
+                const usedRecords = [...localMap.values()]
+                  .sort((a, b) => b.count - a.count);
+                const showUsedRecords = !cit.sourceId && !repoPicked && usedRecords.length > 0;
                 return React.createElement("div",{key:idx,style:{background:"rgba(255,252,245,0.65)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"12px 14px",marginBottom:"10px"}},
                   React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px",marginBottom:"10px"}},
                     React.createElement("strong",{style:{fontSize:"0.82rem",letterSpacing:"0.06em",textTransform:"uppercase",color:"#8a7460"}}, "Citation " + (idx+1)),
                     React.createElement("button",{onClick:()=>removeCitation(idx),title:"Remove citation",style:{background:"none",border:"none",cursor:"pointer",color:"#c4858a",fontSize:"1.1rem",padding:"2px 6px",lineHeight:1}},"\u00d7")
+                  ),
+
+                  showUsedRecords && React.createElement("div",{style:{marginBottom:"10px",padding:"8px 10px",background:"rgba(196,169,98,0.08)",border:"1px solid rgba(196,169,98,0.3)",borderRadius:"3px"}},
+                    React.createElement("div",{style:{fontSize:"0.72rem",color:"#7a6a58",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:"6px"}}, "Records used on this person \u2014 click to reuse"),
+                    React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"4px"}},
+                      usedRecords.slice(0,10).map((rec, ri) => {
+                        const recSrc = (knownSources||[]).find(s => s.id === rec.sourceId);
+                        const title = recSrc?.title || "(untitled source)";
+                        const repo = recSrc?.repository || "";
+                        const urlTxt = (rec.url||"").trim();
+                        const citTxt = (rec.citation||"").trim();
+                        // URL is the primary identifier; fall back to
+                        // citation text; final fallback indicates no
+                        // record-level reference at all.
+                        const detail = urlTxt || citTxt;
+                        const detailShort = detail.length > 90 ? detail.slice(0,87)+"\u2026" : detail;
+                        const mediaCount = (rec.mediaUrls||[]).length;
+                        const summary = [
+                          "used " + rec.count + " time" + (rec.count===1?"":"s") + " elsewhere on this person",
+                          repo ? "in " + repo : "",
+                          mediaCount ? mediaCount + " media attachment" + (mediaCount===1?"":"s") : "",
+                          "click to copy this record into this citation"
+                        ].filter(Boolean).join(" \u00b7 ");
+                        return React.createElement("button",{
+                          key:ri,
+                          onClick:()=>updateCitation(idx,{
+                            sourceId: rec.sourceId,
+                            url: rec.url,
+                            citation: rec.citation,
+                            recordNotes: rec.recordNotes,
+                            confidence: rec.confidence,
+                            mediaUrls: rec.mediaUrls,
+                            _repoFilter: undefined,
+                            _collText: undefined,
+                          }),
+                          title: summary,
+                          style:{textAlign:"left",padding:"6px 9px",borderRadius:"3px",border:"1px solid #d4c4a8",background:"rgba(255,252,245,0.9)",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.84rem",color:"#2c2416"}
+                        },
+                          React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:"8px"}},
+                            React.createElement("span",{style:{flex:"1 1 auto",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},
+                              React.createElement("strong",{style:{fontWeight:600}}, title),
+                              repo ? React.createElement("span",{style:{color:"#8a7460",fontWeight:400,fontSize:"0.78rem",marginLeft:"6px"}}, "\u2014 " + repo) : null
+                            ),
+                            React.createElement("span",{style:{color:"#8a7460",fontSize:"0.74rem",flexShrink:0}},
+                              mediaCount ? "\ud83d\udcce " + mediaCount + " \u00b7 " : "",
+                              "\u00d7" + rec.count
+                            )
+                          ),
+                          detailShort
+                            ? React.createElement("div",{style:{fontSize:"0.76rem",color:urlTxt?"#5a4820":"#7a6a58",fontStyle:urlTxt?"normal":"italic",marginTop:"2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},
+                                urlTxt ? "\ud83d\udd17 " : "",
+                                detailShort,
+                                urlTxt && citTxt ? React.createElement("span",{style:{color:"#8a7460",fontStyle:"italic",marginLeft:"6px"}}, "\u00b7 " + (citTxt.length > 50 ? citTxt.slice(0,47)+"\u2026" : citTxt)) : null
+                              )
+                            : React.createElement("div",{style:{fontSize:"0.74rem",color:"#9a8a78",fontStyle:"italic",marginTop:"2px"}}, "(no specific record reference)")
+                        );
+                      })
+                    )
                   ),
 
                   // Step 1 — Repository (free-text + autocomplete suggestions).
@@ -10023,10 +11050,14 @@ function App() {
     }catch(e){return "";}
   },[licenceKey]);
   const [licenceStatus, setLicenceStatus] = useState(null);
-  const userTier = licenceStatus?.valid ? (licenceStatus.tier || "premium") : "free";
+  // Lineage is free — every feature is unlocked for every user, so the
+  // legacy tier / subscriber gates always pass. Kept as constants here
+  // so call-sites (`hasTier("premium")`, `if (isSubscriber)`, etc.)
+  // continue to work without churn through the rest of the codebase.
+  const userTier = "premium";
   const TIERS = {free:0, basic:1, premium:2, social:3};
-  const hasTier = (required) => (TIERS[userTier]||0) >= (TIERS[required]||0);
-  const isSubscriber = userTier !== "free";
+  const hasTier = () => true;
+  const isSubscriber = true;
   // Daily usage counters (reset each day)
   function getDailyCount(key) {
     try { const d=JSON.parse(localStorage.getItem("chronicle-daily-"+key)||"{}"); return d.date===new Date().toISOString().slice(0,10)?d.count:0; } catch(e){return 0;}
@@ -10414,7 +11445,12 @@ function App() {
   function setOrgPeriods(orgName, periods) { persistSubject({orgPeriods:{...orgPeriods, [orgName]: periods}}); }
   function registerPeople(names) { const merged=[...new Set([...knownPeople,...names])].sort(); persistSubject({knownPeople:merged}); }
   function setPersonEmail(name, email) { persistSubject({peopleEmails:{...peopleEmails, [name]: email}}); }
-  function setPersonRelationship(name, rel) { persistSubject({peopleRelationships:{...peopleRelationships, [name]: rel}}); }
+  function setPersonRelationship(name, rel) {
+    const patch = {peopleRelationships:{...peopleRelationships, [name]: rel}};
+    const treeUpdate = addRelativeToTree(subject, name, rel);
+    if (treeUpdate) { patch.treePersons = treeUpdate.treePersons; patch.treeFamilies = treeUpdate.treeFamilies; }
+    persistSubject(patch);
+  }
   function setLocationNotes(name, notes) { persistSubject({locationNotes:{...locationNotes, [name]: notes}}); }
   function setLocationCoords(name, coords) {
     const updated = knownLocations.map(l => l.label===name ? {...l, coords: coords||null} : l);
@@ -10657,6 +11693,23 @@ function App() {
         .map(label => ({label, street:"", town:"", state:"", country:""}))
     ].sort((a,b) => (typeof a==='string'?a:a.label).localeCompare(typeof b==='string'?b:b.label));
 
+    // For birth / baptism / death / burial events that target another
+    // person, wire the event's date and place into the family tree —
+    // adding the primary to the tree if classifiable, otherwise just
+    // filling in dob/dod/birthPlace/deathPlace on the matching node.
+    // Run BEFORE the persistSubject call so the tree update lands in
+    // the same patch and replays correctly on undo.
+    const treeUpdate = isHistoryMode ? applyEventToTree({
+      ...subject,
+      // Use the freshly-built people/locations indexes so a tree-person
+      // that was added as part of THIS save (e.g. the primary newly
+      // tagged inline) can be matched via peopleRelationships.
+      knownPeople: newPeople,
+    }, primary) : null;
+    const treePatch = treeUpdate
+      ? {treePersons: treeUpdate.treePersons, treeFamilies: treeUpdate.treeFamilies}
+      : {};
+
     if (editingId) {
       // Preserve addedBy, allow contributor name correction via edit form
       const {addedByName, ...primaryClean} = primary;
@@ -10665,7 +11718,7 @@ function App() {
         ? {...primaryClean, addedBy:{...orig.addedBy, ...(addedByName!==undefined&&{name:addedByName})}}
         : primaryClean;
       const updated = memories.map(m=>m.id===editingId?editedPrimary:m).sort((a,b)=>sortKey(a)-sortKey(b));
-      persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs});
+      persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs, ...treePatch});
       setEditingId(null); setSelected(editingId); setForm(newForm()); clearDraft(); setView("detail");
     } else {
       // Stamp addedBy / recalledBy on new memories in carer mode
@@ -10680,7 +11733,7 @@ function App() {
       }
       const toAdd = secondary ? [primary, secondary] : [primary];
       const updated = [...memories,...toAdd].sort((a,b)=>sortKey(a)-sortKey(b));
-      persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs});
+      persistSubject({memories:updated, knownPeople:newPeople, knownOrgs:newOrgs, knownLocations:newLocs, ...treePatch});
       setForm(newForm()); clearDraft();
       setView("life");
     }
@@ -12854,50 +13907,10 @@ function handleEdit(m) {
       );
     })()),
 
-    (!backupNagDismissed && ownerName && memories.length > 0 && (()=>{
-      const newSinceBackup = Math.max(0, memories.length - (subject.memCountAtBackup||0));
-      const newSinceSync = Math.max(0, memories.length - (subject.memCountAtSync||0));
-      const unbackedAnywhere = Math.min(newSinceBackup, newSinceSync);
-      // Show if there are memories not backed up anywhere, or if it's been over 7 days
-      const daysSince = subject.lastBackup ? Math.floor((Date.now()-new Date(subject.lastBackup))/86400000) : 999;
-      if (unbackedAnywhere === 0 && daysSince < 7) return null;
-      const nagMsg = !subject.lastBackup
-        ? memories.length+" "+(memories.length===1?"memory":"memories")+" not yet backed up."
-        : unbackedAnywhere > 0
-          ? unbackedAnywhere+" "+(unbackedAnywhere===1?"memory":"memories")+" not backed up anywhere."
-          : "Your last backup was "+daysSince+" days ago.";
-      return React.createElement("div",{style:{background:"rgba(196,133,138,0.12)",borderBottom:"1px solid rgba(196,133,138,0.35)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
-        React.createElement("p",{style:{margin:0,fontSize:"0.85rem",color:"#8a3030",lineHeight:1.4}},
-          "⚠️ "+nagMsg+"Download a backup to keep your memories safe."
-        ),
-        React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0}},
-          React.createElement("button",{
-            onClick:async()=>{ setSaveBackupBusy(true); await exportBackup(); setSaveBackupBusy(false); setBackupNagDismissed(true); },
-            style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem",background:"#4a7a5a"}
-          }, saveBackupBusy ? "Saving…" : "💾 Download now"),
-          React.createElement("button",{
-            onClick:()=>setBackupNagDismissed(true),
-            style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1rem",padding:"4px 8px"}
-          },"×")
-        )
-      );
-    })()),
-
-    (!isSubscriber&&!subscribeNagDismissed&&!subscribeNagPermanent&&ownerName)&&React.createElement("div",{style:{background:"rgba(168,136,90,0.1)",borderBottom:"1px solid rgba(168,136,90,0.3)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
-      React.createElement("p",{style:{margin:0,fontSize:"0.85rem",color:"#5a4020",lineHeight:1.4}},
-        "\u2728 Enjoying Chronicle? A subscription unlocks sharing, social features, and Lineage mode — and helps keep the project going."
-      ),
-      React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0,alignItems:"center"}},
-        React.createElement(SubOptions,{mode:"buttons"}),
-        React.createElement("button",{onClick:()=>dismissSubscribeNag(false),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.8rem",padding:"4px 8px",fontFamily:"'Crimson Text',serif",whiteSpace:"nowrap"}},"Not now"),
-        React.createElement("button",{onClick:()=>dismissSubscribeNag(true),style:{background:"transparent",border:"none",color:"#b0a080",cursor:"pointer",fontSize:"0.78rem",padding:"4px 6px"}},"Don\u2019t show again")
-      )
-    ),
-
     !onboardingDismissed && !ownerName && React.createElement("div",{style:{background:"rgba(200,168,122,0.12)",borderBottom:"1px solid rgba(200,168,122,0.4)",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",flexWrap:"wrap"}},
       React.createElement("div",null,
         React.createElement("span",{style:{fontFamily:"'Playfair Display',serif",fontSize:"0.95rem",color:"#4a3820",fontWeight:600}},"👋 Welcome to Chronicle"),
-        React.createElement("span",{style:{fontSize:"0.88rem",color:"#6a5c48",marginLeft:"10px"}},"Add your name in Settings, and remember to back up regularly \u2014 your memories live in this browser and could be lost if you clear your browser data.")
+        React.createElement("span",{style:{fontSize:"0.88rem",color:"#6a5c48",marginLeft:"10px"}},"Add your name in Settings to get started.")
       ),
       React.createElement("div",{style:{display:"flex",gap:"8px",flexShrink:0}},
         React.createElement("button",{onClick:()=>{setView("settings");setOnboardingDismissed(true);},style:{...S.btn,padding:"6px 14px",fontSize:"0.84rem"}},"Open Settings"),
@@ -13547,6 +14560,12 @@ function handleEdit(m) {
             ].filter(Boolean)}),
             React.createElement(NavDropdown,{label:"Add",isActive:addActive,items:(isHistoryMode?[
               {label:"+ Event",action:()=>{setForm(newForm());setEditingId(null);setEditingCandidateId(null);setView("add");}},
+              {divider:true},
+              {label:"🏠 Residence",action:()=>{setForm({...newForm(),eventType:"residence",tags:["home"],_expandEndDate:true,_initialTab:"location"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+              {label:"🎓 Education",action:()=>{setForm({...newForm(),eventType:"education",tags:["education"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+              {label:"💼 Occupation",action:()=>{setForm({...newForm(),eventType:"employment",tags:["work"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+              {label:"🤝 Community",action:()=>{setForm({...newForm(),eventType:"community",tags:["community"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+              {divider:true},
               {label:"📚 Source",action:()=>{setIndexFilter({type:"sources"});setView("index");},active:view==="index"&&indexFilter?.type==="sources"},
               {label:"🔍 Candidate",action:()=>{setIndexFilter({type:"candidatePersons"});setView("index");},active:view==="index"&&indexFilter?.type==="candidatePersons"},
               {label:"👤 Person",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
@@ -13633,6 +14652,12 @@ function handleEdit(m) {
         ].filter(Boolean)}),
         React.createElement(NavDropdown,{label:"Add",icon:"＋",isActive:addActive,variant:"mobile",direction:"up",menuAlign:"center",items:(isHistoryMode?[
           {label:"+ Event",action:()=>{setForm(newForm());setEditingId(null);setEditingCandidateId(null);setView("add");}},
+          {divider:true},
+          {label:"🏠 Residence",action:()=>{setForm({...newForm(),eventType:"residence",tags:["home"],_expandEndDate:true,_initialTab:"location"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+          {label:"🎓 Education",action:()=>{setForm({...newForm(),eventType:"education",tags:["education"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+          {label:"💼 Occupation",action:()=>{setForm({...newForm(),eventType:"employment",tags:["work"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+          {label:"🤝 Community",action:()=>{setForm({...newForm(),eventType:"community",tags:["community"],_expandEndDate:true,_initialTab:"orgs"});setEditingId(null);setEditingCandidateId(null);setView("add");}},
+          {divider:true},
           {label:"📚 Source",action:()=>{setIndexFilter({type:"sources"});setView("index");},active:view==="index"&&indexFilter?.type==="sources"},
           {label:"🔍 Candidate",action:()=>{setIndexFilter({type:"candidatePersons"});setView("index");},active:view==="index"&&indexFilter?.type==="candidatePersons"},
           {label:"👤 Person",action:()=>{setIndexFilter({type:"people"});setView("index");},active:view==="index"&&indexFilter?.type==="people"},
@@ -14079,7 +15104,7 @@ function handleEdit(m) {
                 },"Dismiss all")
               ),
               React.createElement("p",{style:{fontSize:"0.82rem",color:"#6a5840",fontStyle:"italic",marginBottom:"10px",lineHeight:1.5}},
-                "These subscribers published memories at the same time and place as you. You may have crossed paths."
+                "These people published memories at the same time and place as you. You may have crossed paths."
               ),
               placeMatchNotifs.map((n,i)=>React.createElement("div",{key:i,
                 style:{padding:"8px 0",borderBottom:i<placeMatchNotifs.length-1?"1px solid rgba(122,158,138,0.15)":"none"}},
@@ -14195,7 +15220,7 @@ function handleEdit(m) {
         // Profile privacy
         React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"20px",marginBottom:"20px"}},
           React.createElement("label",{style:{...S.label,display:"block",marginBottom:"8px"}},"Profile visibility"),
-          [["open","Open","Anyone with your profile link can view it"],["subscribers","Subscribers only","Visitors must have a valid Remembory subscription"],["connected","Connected only","Only people linked to your profile"],["disabled","Disabled","Profile is offline — memories stay private"]].map(([val,label,desc])=>
+          [["open","Open","Anyone with your profile link can view it"],["connected","Connected only","Only people linked to your profile"],["disabled","Disabled","Profile is offline — memories stay private"]].map(([val,label,desc])=>
             React.createElement("label",{key:val,style:{display:"flex",alignItems:"flex-start",gap:"10px",marginBottom:"10px",cursor:"pointer"}},
               React.createElement("input",{type:"radio",name:"profile-privacy",value:val,
                 checked:profilePrivacy===val,
@@ -14426,10 +15451,38 @@ React.createElement("div",{style:{background:"rgba(255,252,245,0.7)",border:"1px
         handleGedFile, handleGedPick, commitGedImport, commitGedTreeImport,
         isHistoryMode,
         knownPeople, knownOrgs, knownLocations, peopleEmails, peopleRelationships, persistSubject,
+        subject,
       }),
                         
       // ── LIFE VIEW ──
       view==="life"&&React.createElement("div",{style:{animation:"fadeIn 0.35s ease"}},
+        // Cross-chronicle event sync banner: surfaces events from other
+        // subjects' chronicles that tag this person but haven't yet been
+        // re-cast into their own chronicle. Click → recasts all and
+        // also copies across any referenced source records.
+        (()=>{
+          const missingTaggedCount = isHistoryMode ? countMissingTaggedEventsForSubject(subjects, subject) : 0;
+          if (missingTaggedCount === 0) return null;
+          return React.createElement("div",{style:{background:"rgba(74,122,90,0.10)",border:"1px solid rgba(74,122,90,0.4)",borderRadius:"4px",padding:"10px 14px",marginBottom:"16px",display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}},
+            React.createElement("span",{style:{fontSize:"1rem",flexShrink:0}}, "🔗"),
+            React.createElement("span",{style:{flex:1,fontSize:"0.88rem",color:"#3a5a3a",lineHeight:1.5}},
+              React.createElement("strong",null, missingTaggedCount, " ", missingTaggedCount===1?"event":"events"),
+              " on other chronicles tag ",
+              React.createElement("strong",null, subject.name),
+              " but ", missingTaggedCount===1?"isn't":"aren't",
+              " on this chronicle yet."
+            ),
+            React.createElement("button",{onClick:()=>{
+              const patch = buildMissingTaggedEventsPatch(subjects, subject);
+              if (!patch) return;
+              const newSubjects = subjects.map(s =>
+                s.id === subject.id
+                  ? {...s, memories: patch.memories, knownSources: patch.knownSources}
+                  : s);
+              persistTop({subjects: newSubjects});
+            },style:{...S.btn,padding:"6px 14px",fontSize:"0.86rem",flexShrink:0}}, "Add to chronicle")
+          );
+        })(),
         React.createElement("p",{style:{fontStyle:"italic",color:"#8a7460",marginBottom:"22px",fontSize:"0.95rem"}},modeFor(subject).subtitle(subject.name, ownMems.length, allDecades.length)),
         ownMems.length===0&&(()=>{const sm=modeFor(subject);return React.createElement("div",{style:{textAlign:"center",padding:"60px 20px",color:"#8a7460"}},
           React.createElement("div",{style:{fontSize:"3rem",marginBottom:"12px",opacity:0.4}},sm.icon),
