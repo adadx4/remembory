@@ -5473,356 +5473,320 @@ function ShareViaLink({memories, senderName, senderEmail, personalMsg, deliverTo
 
 // ── ShareButton component ──────────────────────────────────────
 function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, shareHistory, localConnections, onRecordShare, onSaveEmails, onSetSenderEmail, userTier, onShareUsed}) {
+  // Wizard: one decision per screen.
+  //   who    → pick a recipient (single by default; "Send to several" toggles multi)
+  //   note   → optional personal note
+  //   review → memory + recipient + note summary, big Send button
+  //   sent / error → outcome screens
+  // The old single-panel form is gone; tier gates + the link-fallback branch
+  // are dropped to keep the path linear.
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState("compose");
-  const [senderName, setSenderName] = useState(ownerName||"");
-  const [selectedPeople, setSelectedPeople] = useState([]);
-  const [selectedMemIds, setSelectedMemIds] = useState(new Set([memory.id]));
+  const [step, setStep] = useState("who");
+  const [senderName, setSenderName] = useState(ownerName || "");
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientEmails, setRecipientEmails] = useState({});
+  const [multiPick, setMultiPick] = useState(false);
+  const [selectedMulti, setSelectedMulti] = useState([]);
+  const [customName, setCustomName] = useState("");
+  const [customEmail, setCustomEmail] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
   const [personalMsg, setPersonalMsg] = useState("");
-  const [msgError, setMsgError] = useState("");
-  const [emailInputs, setEmailInputs] = useState({}); // {personName: emailString} for ad-hoc emails
-  const [selectedPhotos, setSelectedPhotos] = useState({}); // {memId: Set of mediaId indices to include}
-  const [sendStatus, setSendStatus] = useState("idle"); // idle | sending | sent | error
+  const [sendStatus, setSendStatus] = useState("idle");
   const [sendError, setSendError] = useState("");
 
-  useEffect(()=>{ if(ownerName && !senderName) setSenderName(ownerName); }, [ownerName]);
+  useEffect(() => { if (ownerName && !senderName) setSenderName(ownerName); }, [ownerName]);
 
-  const effectiveEmail = ownerEmail || "";
-  const allMems = memories || [];
+  const tagged = [...new Set(memory.people || [])].sort();
+  const emailFor = (p) => (peopleEmails||{})[p]
+    || ((localConnections||[]).find(c => c.name===p)?.email)
+    || recipientEmails[p]
+    || "";
 
-  // Resolve email for a person from either the per-subject email map or localConnections
-  function emailFor(p) {
-    return (peopleEmails||{})[p] || (localConnections||[]).find(c=>c.name===p)?.email || "";
-  }
-  // Classify a recipient: connected Chronicle user, or just a name
-  function recipientType(p) {
-    const isConn = (localConnections||[]).some(c=>c.name===p);
-    const hasEmail = !!emailFor(p);
-    if (isConn && hasEmail) return "connected_email";
-    if (isConn) return "connected_no_email";
-    if (hasEmail) return "has_email";
-    return "name_only";
-  }
+  const recipients = multiPick ? selectedMulti : (recipientName ? [recipientName] : []);
+  const recipientsWithEmail = recipients.filter(p => emailFor(p));
+  const missingEmails = recipients.filter(p => !emailFor(p));
 
-  // Only people tagged in the current memory are offered as recipients
-  const allPeople = [...new Set(memory.people||[])].sort();
-
-  // Memories shown in checklist: only those that include ALL selected recipients
-  // When nobody selected yet, show only the current memory
-  const eligibleMems = selectedPeople.length === 0
-    ? allMems.filter(m => m.id === memory.id)
-    : allMems.filter(m => selectedPeople.every(p=>(m.people||[]).includes(p)));
-
-  function togglePerson(person) {
-    setSelectedPeople(prev => {
-      const next = prev.includes(person) ? prev.filter(p=>p!==person) : [...prev, person];
-      // Re-seed selected memories to those eligible for the new recipient set
-      // Always keep current memory selected if it qualifies
-      const eligible = next.length === 0
-        ? allMems.filter(m => m.id === memory.id)
-        : allMems.filter(m => next.every(p=>(m.people||[]).includes(p)));
-      const eligibleIds = new Set(eligible.map(m=>m.id));
-      setSelectedMemIds(eligibleIds.has(memory.id) ? new Set([memory.id]) : new Set(eligible.map(m=>m.id)));
-      return next;
-    });
+  function pickRecipient(name) {
+    if (multiPick) {
+      setSelectedMulti(prev => prev.includes(name) ? prev.filter(p=>p!==name) : [...prev, name]);
+    } else {
+      setRecipientName(prev => prev === name ? "" : name);
+    }
   }
 
-  function toggleMem(id) {
-    setSelectedMemIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  function resetWizard() {
+    setStep("who"); setRecipientName(""); setSelectedMulti([]); setMultiPick(false);
+    setRecipientEmails({}); setShowCustom(false); setCustomName(""); setCustomEmail("");
+    setPersonalMsg(""); setSendStatus("idle"); setSendError("");
   }
 
-  function effectiveEmailFor(p) {
-    return emailFor(p) || (emailInputs[p]||"").trim();
-  }
-
-  function handleGetLink() {
-    if (!senderName.trim()) { alert("Please enter your name first."); return; }
-    setMsgError("");
-    if (onRecordShare && selectedPeople.length) onRecordShare(selectedPeople, selectedMemIds);
-    setStep("link");
-  }
+  function handleClose() { setOpen(false); resetWizard(); }
 
   async function handleSend() {
-    if (!senderName.trim()) { alert("Please enter your name first."); return; }
-    // Free tier cannot share
-    if (!userTier || userTier === "free") { setSendError("Sharing requires a subscription."); setSendStatus("error"); return; }
-    // Basic tier: 3 shares per day
-    if (userTier === "basic") {
-      try { const d=JSON.parse(localStorage.getItem("chronicle-daily-shares")||"{}"); const today=new Date().toISOString().slice(0,10); const count=d.date===today?d.count:0; if(count>=3){setSendError("Basic plan allows 3 shares per day. Upgrade to Premium for unlimited sharing.");setSendStatus("error");return;} } catch(e){}
-    }
+    if (!senderName.trim()) { setSendError("Please add your name first."); setStep("review"); return; }
+    if (recipients.length === 0) { setSendError("Pick at least one person to send to."); setStep("who"); return; }
+    if (missingEmails.length > 0) { setSendError("Missing email for " + missingEmails.join(", ") + "."); setStep("who"); return; }
     setSendStatus("sending");
     setSendError("");
     try {
-      const toShare = allMems.filter(m => selectedMemIds.has(m.id));
-      // Collect photos to upload separately via R2
-      // Sanitise: resize first photo to data URL, strip sender from people
-      const sanitised = await Promise.all(toShare.map(async (m) => {
-        const photos = m.mediaUrls||[];
-        const picked = selectedPhotos[m.id];
-        const rawMedia = picked ? photos.filter((_,i)=>picked.has(i)).slice(0,3) : photos.slice(0,3);
-        const mediaUrls = await Promise.all(rawMedia.map(async (med) => {
-          if (med.mediaId) {
-            try {
-              const blob = await idbGet(med.mediaId);
-              if (blob) {
-                const dataUrl = await resizeImageBlob(blob, 1200);
-                return {url:dataUrl, name:med.name};
-              }
-            } catch(e) {}
-          }
-          // Fallback: if med has a data URL already, use it
-          if (med.url && med.url.startsWith("data:")) return {url:med.url, name:med.name};
-          return med;
-        }));
-        return {...m, people:(m.people||[]).filter(p=>p!==senderName.trim()), mediaUrls};
+      const photos = (memory.mediaUrls || []).slice(0, 3);
+      const mediaUrls = await Promise.all(photos.map(async (med) => {
+        if (med.mediaId) {
+          try {
+            const blob = await idbGet(med.mediaId);
+            if (blob) {
+              const dataUrl = await resizeImageBlob(blob, 1200);
+              return {url: dataUrl, name: med.name};
+            }
+          } catch(e) {}
+        }
+        if (med.url && med.url.startsWith("data:")) return {url: med.url, name: med.name};
+        return med;
       }));
-      await Promise.all(selectedPeople.filter(p=>effectiveEmailFor(p)).map(async p => {
+      const sanitised = {...memory, people: (memory.people||[]).filter(p => p !== senderName.trim()), mediaUrls};
+      await Promise.all(recipients.map(async p => {
         const r = await fetch(WORKER_URL + "/share/send", {
-          method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({toEmail:effectiveEmailFor(p), fromName:senderName.trim(), fromEmail:effectiveEmail, message:personalMsg, memories:sanitised})
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            toEmail: emailFor(p), fromName: senderName.trim(),
+            fromEmail: ownerEmail || "", message: personalMsg,
+            memories: [sanitised]
+          })
         });
-        if(!r.ok){ const d=await r.json().catch(()=>({})); throw new Error(d.error||"Server error "+r.status); }
+        if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || "Server error " + r.status); }
       }));
-      if (onRecordShare && selectedPeople.length) onRecordShare(selectedPeople, selectedMemIds);
-      // Increment daily share counter for basic tier
-      if (userTier === "basic") {
-        try { const today=new Date().toISOString().slice(0,10); const d=JSON.parse(localStorage.getItem("chronicle-daily-shares")||"{}"); const count=(d.date===today?d.count:0)+1; localStorage.setItem("chronicle-daily-shares",JSON.stringify({date:today,count})); } catch(e){}
-      }
-      // Persist any ad-hoc emails entered during this share
+      // Persist ad-hoc emails so next time the person's email is on file.
       const newEmails = {};
-      Object.entries(emailInputs).forEach(([name, email]) => {
-        const trimmed = email.trim();
+      Object.entries(recipientEmails).forEach(([name, email]) => {
+        const trimmed = (email||"").trim();
         if (trimmed && trimmed.includes("@") && !(peopleEmails||{})[name]) newEmails[name] = trimmed.toLowerCase();
       });
       if (Object.keys(newEmails).length && onSaveEmails) onSaveEmails(newEmails);
+      if (onRecordShare && recipients.length) onRecordShare(recipients, new Set([memory.id]));
       setSendStatus("sent");
+      setStep("sent");
     } catch(e) {
       setSendError(e.message || String(e));
       setSendStatus("error");
+      setStep("error");
     }
   }
 
-  function handleClose() {
-    setOpen(false);
-    setStep("compose");
-    setPersonalMsg("");
-    setSelectedPeople([]);
-    setSelectedMemIds(new Set([memory.id]));
-    setEmailInputs({});
-    setSendStatus("idle");
-    setSendError("");
+  if (!open) return React.createElement("button", {
+    onClick: () => setOpen(true),
+    style: {...S.btnOutline, color: "#7a9e8a", borderColor: "#7a9e8a"}
+  }, "✉ Share");
+
+  const headerRow = (title) => React.createElement("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"18px"}},
+    React.createElement("h3", {style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:0,fontStyle:"italic"}}, title),
+    React.createElement("button", {onClick: handleClose, "aria-label":"Close", style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1.4rem",padding:"6px 10px",lineHeight:1,minWidth:"40px",minHeight:"40px",display:"flex",alignItems:"center",justifyContent:"center"}}, "×")
+  );
+
+  const navRow = (backFn, nextFn, nextLabel, nextDisabled) =>
+    React.createElement("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:"22px",gap:"10px"}},
+      backFn
+        ? React.createElement("button", {onClick:backFn,style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.95rem",padding:"12px 14px",minHeight:"44px",fontFamily:"'Crimson Text',serif"}}, "← Back")
+        : React.createElement("span"),
+      React.createElement("button", {onClick:nextFn,disabled:nextDisabled,style:{...S.btn,padding:"12px 24px",fontSize:"1rem",opacity:nextDisabled?0.45:1,cursor:nextDisabled?"not-allowed":"pointer",minHeight:"48px"}}, nextLabel)
+    );
+
+  // === Step: who ===
+  function whoStep() {
+    return React.createElement("div", null,
+      headerRow("Who should see this?"),
+      tagged.length === 0
+        ? React.createElement("p", {style:{fontSize:"0.95rem",color:"#7a6a58",fontStyle:"italic",marginBottom:"10px"}},
+            "No people are tagged in this memory yet. You can add someone below.")
+        : React.createElement("div", {style:{display:"flex",flexDirection:"column",gap:"7px",marginBottom:"4px"}},
+            tagged.map(p => {
+              const sel = multiPick ? selectedMulti.includes(p) : recipientName === p;
+              const email = emailFor(p);
+              return React.createElement("div", {key:p,
+                onClick: () => pickRecipient(p),
+                role: "button",
+                tabIndex: 0,
+                onKeyDown: e => { if (e.key==="Enter"||e.key===" ") { e.preventDefault(); pickRecipient(p); } },
+                style:{
+                  padding:"14px 16px",
+                  borderRadius:"4px",
+                  border: "1.5px solid " + (sel ? "#4a7a5a" : "#d4c4a8"),
+                  background: sel ? "rgba(122,158,138,0.12)" : "rgba(255,252,245,0.85)",
+                  cursor:"pointer",
+                  minHeight: "56px",
+                  display:"flex",alignItems:"center",gap:"14px",
+                  transition:"background 0.15s, border-color 0.15s"
+                }
+              },
+                React.createElement("div", {style:{
+                  width:"24px",height:"24px",
+                  borderRadius:multiPick?"4px":"50%",
+                  border: "2px solid " + (sel?"#4a7a5a":"#c8b89a"),
+                  display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+                  background: sel?"#4a7a5a":"transparent"
+                }}, sel && React.createElement("span", {style:{color:"#fff",fontSize:"0.95rem",lineHeight:1,fontWeight:600}}, "✓")),
+                React.createElement("div", {style:{flex:1, minWidth:0}},
+                  React.createElement("div", {style:{fontSize:"1.05rem",color:"#1a1208",fontFamily:"'Crimson Text',serif",fontWeight:600}}, p),
+                  email
+                    ? React.createElement("div", {style:{fontSize:"0.85rem",color:"#7a6a58",marginTop:"2px"}}, "→ " + email)
+                    : sel
+                      ? React.createElement("input", {
+                          type:"email",
+                          value: recipientEmails[p] || "",
+                          onChange: e => setRecipientEmails(prev => ({...prev, [p]: e.target.value})),
+                          onClick: e => e.stopPropagation(),
+                          placeholder: "Type their email here",
+                          autoFocus: true,
+                          style: {...S.input, padding:"8px 11px", fontSize:"0.95rem", marginTop:"8px", width:"100%"}
+                        })
+                      : React.createElement("div", {style:{fontSize:"0.85rem",color:"#a89a78",marginTop:"2px",fontStyle:"italic"}}, "We'll need their email")
+                )
+              );
+            })
+          ),
+      // Add someone not listed
+      !showCustom && React.createElement("button", {
+        onClick: () => setShowCustom(true),
+        style:{background:"transparent",border:"1px dashed #c8b89a",borderRadius:"4px",padding:"12px 16px",width:"100%",marginTop:"10px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",color:"#7a6a58",minHeight:"48px"}
+      }, "+ Add someone not in this list"),
+      showCustom && React.createElement("div", {style:{marginTop:"12px",padding:"14px",border:"1px solid #d4c4a8",borderRadius:"4px",background:"rgba(255,252,245,0.7)"}},
+        React.createElement("label", {style:{...S.label,marginBottom:"6px"}}, "Send to someone else"),
+        React.createElement("input", {value:customName,onChange:e=>setCustomName(e.target.value),placeholder:"Their name",style:{...S.input,marginBottom:"8px",fontSize:"0.95rem"},autoFocus:true}),
+        React.createElement("input", {type:"email",value:customEmail,onChange:e=>setCustomEmail(e.target.value),placeholder:"Their email",style:{...S.input,fontSize:"0.95rem"}}),
+        React.createElement("div", {style:{display:"flex",gap:"8px",marginTop:"10px"}},
+          React.createElement("button", {
+            onClick: () => {
+              const nm = customName.trim(), em = customEmail.trim();
+              if (!nm) return;
+              if (multiPick) {
+                setSelectedMulti(prev => prev.includes(nm) ? prev : [...prev, nm]);
+              } else {
+                setRecipientName(nm);
+              }
+              if (em) setRecipientEmails(prev => ({...prev, [nm]: em}));
+              setCustomName(""); setCustomEmail(""); setShowCustom(false);
+            },
+            disabled: !customName.trim(),
+            style:{...S.btn,padding:"8px 16px",fontSize:"0.92rem",opacity:customName.trim()?1:0.45}
+          }, "Use this person"),
+          React.createElement("button", {
+            onClick: () => { setShowCustom(false); setCustomName(""); setCustomEmail(""); },
+            style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"8px 14px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.92rem",color:"#8a7460"}
+          }, "Cancel")
+        )
+      ),
+      // Multi-toggle link — quiet
+      tagged.length > 1 && React.createElement("button", {
+        onClick: () => {
+          if (multiPick) {
+            setMultiPick(false);
+            setRecipientName(selectedMulti[0] || "");
+          } else {
+            setMultiPick(true);
+            setSelectedMulti(recipientName ? [recipientName] : []);
+          }
+        },
+        style:{background:"transparent",border:"none",color:"#7a6a58",cursor:"pointer",fontSize:"0.86rem",padding:"10px 0",marginTop:"6px",textDecoration:"underline",fontFamily:"'Crimson Text',serif",display:"block"}
+      }, multiPick ? "Send to just one person" : "Send to several people at once"),
+      navRow(null, () => setStep("note"), "Next →", recipients.length === 0 || missingEmails.length > 0)
+    );
   }
 
-  if (!open) return React.createElement("button",{
-    onClick:()=>setOpen(true),
-    style:{...S.btnOutline,color:"#7a9e8a",borderColor:"#7a9e8a"}
-  },"Share");
-
-  const toShare = allMems.filter(m=>selectedMemIds.has(m.id));
-  const canShare = senderName.trim() && selectedMemIds.size > 0;
-
-  return React.createElement("div",{style:{width:"100%",marginTop:"4px",border:"1px solid #7a9e8a",borderRadius:"4px",background:"rgba(122,158,138,0.05)",padding:"16px",animation:"fadeIn 0.2s ease"}},
-    React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}},
-      React.createElement("span",{style:{fontSize:"0.88rem",fontWeight:600,color:"#4a7a5a",letterSpacing:"0.05em",textTransform:"uppercase"}},
-        step==="link" ? "✓ Ready to send" : "Share memories"
+  // === Step: note ===
+  function noteStep() {
+    const audience = recipients.length === 1 ? recipients[0] : (recipients.length + " people");
+    return React.createElement("div", null,
+      headerRow("Add a note for " + audience + "?"),
+      React.createElement("p", {style:{fontSize:"0.95rem",color:"#6a5840",marginBottom:"12px",lineHeight:1.5}},
+        "Optional. Tell them what this memory means to you, or why you're sharing it."
       ),
-      React.createElement("button",{onClick:handleClose,"aria-label":"Close",style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"1.3rem",padding:"6px 10px",lineHeight:1,minWidth:"36px",minHeight:"36px",display:"flex",alignItems:"center",justifyContent:"center"}},"×")
-    ),
+      React.createElement("textarea", {
+        value: personalMsg, onChange: e => setPersonalMsg(e.target.value),
+        rows: 6,
+        placeholder: "Type your note here…",
+        style: {...S.input, resize:"vertical", fontSize:"1rem", lineHeight:1.6, fontFamily:"'Crimson Text', Georgia, serif"},
+        autoFocus: true
+      }),
+      navRow(() => setStep("who"), () => setStep("review"), personalMsg.trim() ? "Next →" : "Skip →")
+    );
+  }
 
-    step==="compose" && React.createElement("div",null,
-
-      // Sender name — always editable, pre-filled from settings
-      React.createElement("div",{style:{marginBottom:"14px"}},
-        React.createElement("label",{style:{...S.label,marginBottom:"4px",display:"block"}},"Your name"),
-        React.createElement("input",{
-          value:senderName,
-          onChange:e=>setSenderName(e.target.value),
-          placeholder:"Your name (will be added to the memory)",
-          style:{...S.input,fontSize:"0.9rem"}
-        }),
-        React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",marginTop:"4px",fontStyle:"italic"}},
-          "This name will be tagged in the memory on the recipient’s side."
+  // === Step: review ===
+  function reviewStep() {
+    const needSender = !senderName.trim();
+    const sendLabel = sendStatus === "sending"
+      ? "Sending…"
+      : recipients.length === 1
+        ? "Send to " + recipients[0]
+        : "Send to " + recipients.length + " people";
+    return React.createElement("div", null,
+      headerRow("Ready to send?"),
+      React.createElement("div", {style:{background:"rgba(255,252,245,0.85)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"14px",marginBottom:"12px"}},
+        React.createElement("div", {style:{fontSize:"0.78rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"6px"}}, "Memory"),
+        React.createElement("div", {style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208"}}, memory.title),
+        memory.year && React.createElement("div", {style:{fontSize:"0.88rem",color:"#7a6a58",marginTop:"3px"}}, memory.year),
+        (memory.mediaUrls||[]).length > 0 && React.createElement("div", {style:{fontSize:"0.82rem",color:"#8a7460",marginTop:"6px",fontStyle:"italic"}},
+          (memory.mediaUrls.length > 3 ? "First 3 of " + memory.mediaUrls.length : memory.mediaUrls.length) + " photo" + (memory.mediaUrls.length===1?"":"s") + " included"
         )
       ),
-
-      // Recipient picker
-      React.createElement("div",{style:{marginBottom:"14px"}},
-        React.createElement("label",{style:{...S.label,marginBottom:"6px",display:"block"}},"Who are you sharing with?"),
-        allPeople.length === 0
-          ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic"}},"No people tagged in any memories yet.")
-          : React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:"6px"}},
-              allPeople.map(person => {
-                const sel = selectedPeople.includes(person);
-                const rt = recipientType(person);
-                const borderColor = sel?"#7a9e8a":rt==="connected_email"||rt==="connected_no_email"?"#a8885a":"#d4c4a8";
-                const bg = sel?"rgba(122,158,138,0.15)":rt==="connected_email"||rt==="connected_no_email"?"rgba(168,136,90,0.08)":"rgba(255,252,245,0.8)";
-                const color = sel?"#4a7a5a":rt==="connected_email"||rt==="connected_no_email"?"#7a5a20":"#6a5c48";
-                const hint = rt==="connected_email"?"→ inbox":rt==="connected_no_email"?"Chronicle":rt==="has_email"?"→ inbox":"";
-                // Tooltip explaining what each delivery indicator means.
-                const tip = rt==="connected_email"
-                  ? "Already connected — your share will arrive directly in their Chronicle inbox."
-                  : rt==="connected_no_email"
-                    ? "Connected, but no email on file. They'll receive the share next time they open Chronicle."
-                    : rt==="has_email"
-                      ? "Email on file — share will be delivered to their Chronicle inbox once they verify the address."
-                      : "No email on file — you'll get a copyable link to send manually.";
-                return React.createElement("button",{
-                  key:person,
-                  onClick:()=>togglePerson(person),
-                  title:tip,
-                  style:{padding:"5px 12px",borderRadius:"20px",border:"1px solid "+borderColor,background:bg,color,cursor:"pointer",fontSize:"0.88rem",fontWeight:sel?600:400,display:"flex",alignItems:"center",gap:"5px"}
-                },
-                  person,
-                  hint&&React.createElement("span",{style:{fontSize:"0.78rem",opacity:0.7,fontStyle:"italic"}},hint)
-                );
-              })
-            ),
-        selectedPeople.length > 0 && React.createElement("div",null,
-          React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",marginTop:"6px",fontStyle:"italic"}},
-            "Showing memories featuring " + (selectedPeople.length===1
-              ? selectedPeople[0]
-              : selectedPeople.slice(0,-1).join(", ") + " and " + selectedPeople[selectedPeople.length-1])
-          ),
-          // Inline email inputs for selected people without a known email
-          selectedPeople.filter(p=>!emailFor(p)).length > 0 && React.createElement("div",{style:{marginTop:"8px",display:"flex",flexDirection:"column",gap:"6px"}},
-            selectedPeople.filter(p=>!emailFor(p)).map(p=>
-              React.createElement("div",{key:p,style:{display:"flex",alignItems:"center",gap:"8px"}},
-                React.createElement("span",{style:{fontSize:"0.82rem",color:"#6a5840",minWidth:"80px",flexShrink:0}},p),
-                React.createElement("input",{
-                  type:"email",
-                  value:emailInputs[p]||"",
-                  onChange:e=>setEmailInputs(prev=>({...prev,[p]:e.target.value})),
-                  placeholder:"their email (optional)",
-                  style:{...S.input,fontSize:"0.82rem",padding:"4px 8px",flex:1}
-                })
-              )
-            )
-          )
+      React.createElement("div", {style:{background:"rgba(255,252,245,0.85)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"14px",marginBottom:"12px"}},
+        React.createElement("div", {style:{fontSize:"0.78rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"6px"}}, "Sending to"),
+        React.createElement("div", {style:{fontFamily:"'Crimson Text',serif",fontSize:"1rem",color:"#1a1208"}}, recipients.join(", ")),
+        React.createElement("div", {style:{fontSize:"0.85rem",color:"#7a6a58",marginTop:"4px"}},
+          recipients.map(p => emailFor(p)).join(" · ")
         )
       ),
-
-      // Memory picker
-      React.createElement("div",{style:{marginBottom:"14px"}},
-        React.createElement("label",{style:{...S.label,marginBottom:"6px",display:"block"}},"Memories to include"),
-        eligibleMems.length === 0
-          ? React.createElement("p",{style:{fontSize:"0.84rem",color:"#8a7460",fontStyle:"italic"}},"No memories feature all the selected people.")
-          : React.createElement("div",null,
-              React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:"4px",maxHeight:"180px",overflowY:"auto",border:"1px solid #d4c4a8",borderRadius:"3px",padding:"8px"}},
-                eligibleMems.map(m=>{
-                  const alreadySent = selectedPeople.length > 0 && (shareHistory||[]).some(h=>
-                    h.memIds.includes(m.id) && selectedPeople.every(p=>h.people.includes(p))
-                  );
-                  const photos = m.mediaUrls||[];
-                  const needsPicker = photos.length > 3 && selectedMemIds.has(m.id);
-                  const pickedForMem = selectedPhotos[m.id] || new Set(photos.slice(0,3).map((_,i)=>i));
-                  return React.createElement("div",{key:m.id},
-                    React.createElement("label",{style:{display:"flex",alignItems:"baseline",gap:"10px",padding:"5px 6px",cursor:"pointer",background:selectedMemIds.has(m.id)?"rgba(122,158,138,0.07)":"transparent",borderRadius:"2px"}},
-                      React.createElement("input",{type:"checkbox",checked:selectedMemIds.has(m.id),onChange:()=>toggleMem(m.id),style:{marginTop:"2px",flexShrink:0}}),
-                      React.createElement("span",{style:{fontSize:"0.88rem",color:"#2c2416",fontFamily:"'Playfair Display',serif"}},m.title),
-                      React.createElement("span",{style:{fontSize:"0.8rem",color:"#8a7460",marginLeft:"4px"}},m.year||""),
-                      photos.length>0&&React.createElement("span",{style:{fontSize:"0.78rem",color:"#8a7460",marginLeft:"4px"}},photos.length+" photo"+(photos.length===1?"":"s")),
-                      alreadySent && React.createElement("span",{style:{fontSize:"0.78rem",color:"#7a9e8a",marginLeft:"auto",whiteSpace:"nowrap",fontStyle:"italic"}},"✓ sent")
-                    ),
-                    needsPicker&&React.createElement("div",{style:{paddingLeft:"28px",paddingBottom:"6px"}},
-                      React.createElement("p",{style:{fontSize:"0.78rem",color:"#b0804a",fontStyle:"italic",margin:"2px 0 4px"}},"Up to 3 photos can be shared. Choose which to include:"),
-                      React.createElement("div",{style:{display:"flex",gap:"6px",flexWrap:"wrap"}},
-                        photos.map((med,pi)=>React.createElement("div",{key:pi,
-                          onClick:()=>{
-                            setSelectedPhotos(prev=>{
-                              const s=new Set(prev[m.id]||new Set(photos.slice(0,3).map((_,i)=>i)));
-                              if(s.has(pi)) s.delete(pi); else if(s.size<3) s.add(pi);
-                              return {...prev,[m.id]:s};
-                            });
-                          },
-                          style:{position:"relative",cursor:"pointer",opacity:pickedForMem.has(pi)?1:0.4,border:pickedForMem.has(pi)?"2px solid #4a7a5a":"2px solid transparent",borderRadius:"4px"}},
-                          React.createElement(MediaImg,{med,alt:"",style:{width:"48px",height:"48px",objectFit:"cover",borderRadius:"2px",display:"block"}}),
-                          pickedForMem.has(pi)&&React.createElement("div",{style:{position:"absolute",top:"-4px",right:"-4px",width:"14px",height:"14px",background:"#4a7a5a",color:"#fff",borderRadius:"50%",fontSize:"0.6rem",display:"flex",alignItems:"center",justifyContent:"center"}},"\u2713")
-                        ))
-                      )
-                    )
-                  );
-                })
-              ),
-              eligibleMems.length > 1 && React.createElement("div",{style:{display:"flex",gap:"10px",marginTop:"5px"}},
-                React.createElement("button",{onClick:()=>setSelectedMemIds(new Set(eligibleMems.map(m=>m.id))),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem",padding:0}},"Select all"),
-                React.createElement("button",{onClick:()=>setSelectedMemIds(new Set([memory.id])),style:{background:"transparent",border:"none",color:"#8a7460",cursor:"pointer",fontSize:"0.78rem",padding:0}},"Just this one")
-              )
-            )
+      personalMsg.trim() && React.createElement("div", {style:{background:"rgba(255,252,245,0.85)",border:"1px solid #d4c4a8",borderRadius:"4px",padding:"14px",marginBottom:"12px"}},
+        React.createElement("div", {style:{fontSize:"0.78rem",color:"#8a7460",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"6px"}}, "Your note"),
+        React.createElement("div", {style:{fontSize:"1rem",color:"#2c2416",fontFamily:"'Crimson Text',serif",lineHeight:1.5,whiteSpace:"pre-wrap"}}, personalMsg)
       ),
-
-      // Personal note
-      React.createElement("div",{style:{marginBottom:"14px"}},
-        React.createElement("label",{style:{...S.label,marginBottom:"6px",display:"block"}},"Personal note"),
-        React.createElement("textarea",{
-          value:personalMsg,
-          onChange:e=>setPersonalMsg(e.target.value),
-          placeholder:"Add a personal note (optional) — why you\u2019re sharing, what it means to you\u2026",
-          rows:3,
-          style:{...S.input,resize:"vertical",marginTop:"4px",fontFamily:"'Crimson Text',Georgia,serif",fontSize:"0.95rem",lineHeight:1.6}
-        }),
-        React.createElement("p",{style:{fontSize:"0.78rem",color:"#8a7460",marginTop:"4px",fontStyle:"italic"}},"Optional")
+      needSender && React.createElement("div", {style:{marginBottom:"14px"}},
+        React.createElement("label", {style:{...S.label,marginBottom:"6px"}}, "Your name"),
+        React.createElement("input", {value:senderName,onChange:e=>setSenderName(e.target.value),placeholder:"This will be shown to them",style:{...S.input,fontSize:"0.95rem"}}),
+        React.createElement("p", {style:{fontSize:"0.82rem",color:"#7a6a58",margin:"6px 0 0",fontStyle:"italic"}},
+          "We'll show this name to the people you send to."
+        )
       ),
+      navRow(() => setStep("note"), handleSend, sendLabel, sendStatus === "sending" || needSender)
+    );
+  }
 
-      (()=>{
-        const recipsWithEmail = selectedPeople.filter(p=>effectiveEmailFor(p));
-        const recipsNoEmail = selectedPeople.filter(p=>!effectiveEmailFor(p));
-        const canSend = canShare && recipsWithEmail.length > 0 && sendStatus !== "sending";
-        const memLabel = selectedMemIds.size===1 ? "this memory" : selectedMemIds.size+" memories";
-        // Check for previously shared memories
-        const alreadySharedCount = [...selectedMemIds].filter(id =>
-          selectedPeople.some(p => (shareHistory||[]).some(h => h.memIds.includes(id) && h.people.includes(p)))
-        ).length;
-        if (sendStatus==="error") return React.createElement("div",null,
-          React.createElement("p",{style:{color:"#c4858a",fontSize:"0.84rem",marginBottom:"8px"}},"\u26a0 "+sendError),
-          React.createElement("button",{onClick:()=>setSendStatus("idle"),style:{...S.btnOutline,fontSize:"0.84rem",padding:"6px 14px"}},"Try again")
-        );
-        const needsSenderEmail = !effectiveEmail;
-        return React.createElement("div",null,
-          needsSenderEmail&&React.createElement("div",{style:{background:"rgba(196,133,90,0.1)",border:"1px solid rgba(196,133,90,0.3)",borderRadius:"3px",padding:"10px 14px",marginBottom:"10px"}},
-            React.createElement("p",{style:{fontSize:"0.84rem",color:"#7a4a18",margin:"0 0 6px"}},"Enter your email to enable sharing:"),
-            React.createElement("input",{type:"email",placeholder:"your@email.com",
-              onChange:e=>{const v=e.target.value.trim();if(v.includes("@")&&onSetSenderEmail)onSetSenderEmail(v.toLowerCase());},
-              style:{...S.input,padding:"6px 10px",fontSize:"0.88rem",width:"100%"}})
-          ),
-          alreadySharedCount>0&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#b0804a",fontStyle:"italic",marginBottom:"8px"}},
-            alreadySharedCount===1?"This memory was previously shared with "+(selectedPeople.length===1?"this person":"one or more of these people")+". Send again if the first share didn\u2019t work."
-            :alreadySharedCount+" of these memories were previously shared. Send again if needed."),
-          recipsWithEmail.length > 0 && React.createElement("button",{
-            onClick:handleSend,
-            disabled:!canSend||needsSenderEmail,
-            style:{...S.btn,width:"100%",opacity:canSend&&!needsSenderEmail?1:0.45,cursor:canSend&&!needsSenderEmail?"pointer":"not-allowed",marginBottom:"8px"}
-          }, sendStatus==="sending" ? "Sending\u2026" : alreadySharedCount>0?"Resend "+memLabel:"Send "+memLabel),
-          !recipsWithEmail.length&&React.createElement("p",{style:{fontSize:"0.82rem",color:"#8a7460",fontStyle:"italic",marginTop:"6px"}},"Add an email address to at least one recipient to send.")
-        );
-      })()
-    ),
-
-    step==="compose" && sendStatus==="sent" && React.createElement("div",{style:{textAlign:"center",padding:"24px 0"}},
-      React.createElement("div",{style:{fontSize:"1.5rem",marginBottom:"8px"}},"\u2713"),
-      React.createElement("p",{style:{fontFamily:"'Playfair Display',serif",fontSize:"1.1rem",color:"#1a1208",margin:"0 0 6px"}},
-        selectedMemIds.size===1 ? "Memory sent" : selectedMemIds.size+" memories sent"
+  // === Step: sent ===
+  function sentStep() {
+    return React.createElement("div", {style:{textAlign:"center",padding:"28px 12px"}},
+      React.createElement("div", {style:{fontSize:"2.6rem",color:"#4a7a5a",marginBottom:"12px"}}, "✓"),
+      React.createElement("h3", {style:{fontFamily:"'Playfair Display',serif",fontSize:"1.3rem",color:"#1a1208",margin:"0 0 10px",fontStyle:"italic"}},
+        recipients.length === 1 ? "Sent to " + recipients[0] : "Sent to " + recipients.length + " people"
       ),
-      React.createElement("p",{style:{fontSize:"0.84rem",color:"#8a7460",margin:"0 0 16px"}},
-        selectedPeople.filter(p=>effectiveEmailFor(p)).join(" and ")+" will see it in their Chronicle inbox."
+      React.createElement("p", {style:{fontSize:"0.95rem",color:"#7a6a58",margin:"0 0 24px",lineHeight:1.5}},
+        recipients.length === 1
+          ? recipients[0] + " will see it in their Chronicle inbox shortly."
+          : "They will see it in their Chronicle inboxes shortly."
       ),
-      React.createElement("button",{onClick:handleClose,style:{...S.btn,padding:"10px 32px",fontSize:"0.95rem"}},"Done"),
-      React.createElement("button",{onClick:()=>setSendStatus("idle"),style:{background:"none",border:"none",color:"#b0a090",cursor:"pointer",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",padding:"4px",marginTop:"14px"}},"Didn\u2019t work? Resend")
-    ),
+      React.createElement("button", {onClick:handleClose,style:{...S.btn,padding:"14px 40px",fontSize:"1.05rem",minHeight:"48px"}}, "Done")
+    );
+  }
 
-    step==="link" && (()=>{
-      const withEmail = selectedPeople.filter(p=>!!emailFor(p));
-      const withoutEmail = selectedPeople.filter(p=>!emailFor(p));
-      return React.createElement(ShareViaLink,{
-        memories:toShare,
-        senderName:senderName,
-        senderEmail:effectiveEmail,
-        personalMsg:personalMsg,
-        deliverToEmails:withEmail.map(p=>emailFor(p)),
-        deliveredToNames:withEmail,
-        allDelivered:withEmail.length>0 && withoutEmail.length===0,
-        onDone:handleClose
-      });
-    })()
+  // === Step: error ===
+  function errorStep() {
+    return React.createElement("div", {style:{textAlign:"center",padding:"28px 12px"}},
+      React.createElement("div", {style:{fontSize:"2.2rem",color:"#c4858a",marginBottom:"12px"}}, "✕"),
+      React.createElement("h3", {style:{fontFamily:"'Playfair Display',serif",fontSize:"1.2rem",color:"#1a1208",margin:"0 0 10px",fontStyle:"italic"}}, "Something went wrong"),
+      React.createElement("p", {style:{fontSize:"0.95rem",color:"#7a6a58",margin:"0 0 6px",lineHeight:1.5}}, sendError || "We couldn't send it just now."),
+      React.createElement("p", {style:{fontSize:"0.85rem",color:"#8a7460",margin:"0 0 22px",fontStyle:"italic"}}, "Your memories are safe — nothing was changed."),
+      React.createElement("div", {style:{display:"flex",justifyContent:"center",gap:"10px"}},
+        React.createElement("button", {onClick:()=>{setSendStatus("idle");setStep("review");},style:{background:"transparent",border:"1px solid #c8b89a",borderRadius:"2px",padding:"12px 20px",cursor:"pointer",fontFamily:"'Crimson Text',serif",fontSize:"0.95rem",color:"#7a6a58",minHeight:"48px"}}, "← Back"),
+        React.createElement("button", {onClick:handleSend,style:{...S.btn,padding:"12px 24px",fontSize:"1rem",minHeight:"48px"}}, "Try again")
+      )
+    );
+  }
+
+  return React.createElement("div", {style:{width:"100%",marginTop:"4px",border:"1.5px solid #7a9e8a",borderRadius:"6px",background:"rgba(122,158,138,0.05)",padding:"20px",animation:"fadeIn 0.2s ease"}},
+    step === "who"    && whoStep(),
+    step === "note"   && noteStep(),
+    step === "review" && reviewStep(),
+    step === "sent"   && sentStep(),
+    step === "error"  && errorStep()
   );
 }
 
