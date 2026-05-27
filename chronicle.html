@@ -4912,10 +4912,16 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
   useEffect(() => { if (ownerName && !senderName) setSenderName(ownerName); }, [ownerName]);
 
   const tagged = [...new Set(memory.people || [])].sort();
-  const emailFor = (p) => (peopleEmails||{})[p]
+  // emailOnFile is what we knew about this person BEFORE the wizard
+  // opened (peopleEmails dict + localConnections). emailFor adds in any
+  // ad-hoc email the user types into the inline field. The row's
+  // "do we still need to ask?" check has to use emailOnFile only —
+  // otherwise the first character typed flips the conditional and
+  // unmounts the input mid-keystroke.
+  const emailOnFile = (p) => (peopleEmails||{})[p]
     || ((localConnections||[]).find(c => c.name===p)?.email)
-    || recipientEmails[p]
     || "";
+  const emailFor = (p) => emailOnFile(p) || recipientEmails[p] || "";
 
   const recipients = multiPick ? selectedMulti : (recipientName ? [recipientName] : []);
   const recipientsWithEmail = recipients.filter(p => emailFor(p));
@@ -5016,7 +5022,7 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
         : React.createElement("div", {style:{display:"flex",flexDirection:"column",gap:"7px",marginBottom:"4px"}},
             tagged.map(p => {
               const sel = multiPick ? selectedMulti.includes(p) : recipientName === p;
-              const email = emailFor(p);
+              const onFile = emailOnFile(p);
               return React.createElement("div", {key:p,
                 onClick: () => pickRecipient(p),
                 role: "button",
@@ -5042,8 +5048,8 @@ function ShareButton({memory, peopleEmails, memories, ownerName, ownerEmail, sha
                 }}, sel && React.createElement("span", {style:{color:"#fff",fontSize:"0.95rem",lineHeight:1,fontWeight:600}}, "✓")),
                 React.createElement("div", {style:{flex:1, minWidth:0}},
                   React.createElement("div", {style:{fontSize:"1.05rem",color:"#1a1208",fontFamily:"'Crimson Text',serif",fontWeight:600}}, p),
-                  email
-                    ? React.createElement("div", {style:{fontSize:"0.85rem",color:"#7a6a58",marginTop:"2px"}}, "→ " + email)
+                  onFile
+                    ? React.createElement("div", {style:{fontSize:"0.85rem",color:"#7a6a58",marginTop:"2px"}}, "→ " + onFile)
                     : sel
                       ? React.createElement("input", {
                           type:"email",
