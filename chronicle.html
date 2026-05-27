@@ -12727,17 +12727,45 @@ function handleEdit(m) {
   }, [lastShareSentAt, ownerEmail, licenceKey]);
 
   // ── Navigation ───────────────────────────────────────────────
+  // Returns true when we navigated in-app, false when we were already at
+  // root with nothing to undo. The browser back-button bridge uses the
+  // return value to decide whether to re-push the sentinel or let the
+  // next back press fall through to leaving the app.
   function goBack() {
-    if (view==="index" && indexFilter) { setIndexFilter(null); return; }
+    if (view==="index" && indexFilter) { setIndexFilter(null); return true; }
     const hist = viewHistoryRef.current;
     if (hist.length > 0) {
       const prev = hist[hist.length - 1];
       viewHistoryRef.current = hist.slice(0, -1);
       _setView(prev);
-    } else {
-      _setView("life");
+      return true;
     }
+    if (view !== "life") { _setView("life"); return true; }
+    return false;
   }
+
+  // Browser / phone back-button bridge. Without this, hitting back from
+  // a sub-view (Detail, Settings, Index, …) leaves the app entirely —
+  // older users in particular hit Back instinctively to "go home" and
+  // get bounced out. We push one sentinel history entry on mount and
+  // re-push after each successful in-app back, so popstate fires for
+  // every browser back press and we translate it into a goBack() call.
+  // At root with no in-app history left, goBack returns false and we
+  // skip the re-push so the *next* back press leaves cleanly.
+  const goBackRef = React.useRef(goBack);
+  goBackRef.current = goBack;
+  React.useEffect(() => {
+    try { history.pushState({_inApp:true}, ""); } catch(e) {}
+    function onPopState() {
+      const navigated = goBackRef.current && goBackRef.current();
+      if (navigated) {
+        try { history.pushState({_inApp:true}, ""); } catch(e) {}
+      }
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function bc() {
     if (view==="decade") return `${zoomDecade}s`;
