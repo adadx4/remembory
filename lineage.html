@@ -1779,14 +1779,20 @@ function DateFields({form, setForm}) {
 // for users who'd find the full Add Event editor overwhelming. Saves as
 // a normal memory tagged "home" with eventType:"residence" (the latter
 // is what Lineage's timeline + filters key on; harmless in Chronicle).
+// Date pickers reuse the existing DateFields component so the user can
+// be as precise as they like — exact day, month, season-of-year, or
+// just a year.
 function AddResidenceView({knownLocations, commitMemory, onCancel}) {
   const [label, setLabel] = useState("");
   const [place, setPlace] = useState("");
-  const [fromYear, setFromYear] = useState("");
-  const [toYear, setToYear] = useState("");
+  const [start, setStart] = useState({fuzzy:"year", year:0, month:1, day:0, season:"Early", dateUncertain:false});
+  const [end, setEnd]     = useState({fuzzy:"year", year:0, month:1, day:0, season:"Early", dateUncertain:false});
   const [stillHere, setStillHere] = useState(false);
-  const yearOk = (y) => /^\d{4}$/.test((y||"").trim());
-  const canSave = (place||"").trim() && yearOk(fromYear) && (stillHere || !toYear.trim() || yearOk(toYear));
+
+  function patchStart(p) { setStart(s => ({...s, ...p})); }
+  function patchEnd(p)   { setEnd(e   => ({...e, ...p})); }
+
+  const canSave = (place||"").trim() && start.year > 0;
 
   function handleSave() {
     if (!canSave) return;
@@ -1795,14 +1801,17 @@ function AddResidenceView({knownLocations, commitMemory, onCancel}) {
     const title = trimmedLabel || ("Lived at " + trimmedPlace);
     const knownEntry = (knownLocations||[]).find(l => (typeof l === "string" ? l : l.label) === trimmedPlace);
     const struct = knownEntry && typeof knownEntry === "object" ? knownEntry : {};
-    const fy = parseInt(fromYear, 10);
-    const ty = stillHere ? null : (yearOk(toYear) ? parseInt(toYear, 10) : null);
+    const hasEnd = stillHere || end.year > 0;
     const memory = {
       id: Date.now().toString() + Math.random().toString(36).slice(2),
       title,
       content: "",
-      year: fy, month: 1, day: 0,
-      fuzzy: "year", season: "Early", dateUncertain: false,
+      year:  start.year,
+      month: start.month || 1,
+      day:   start.day   || 0,
+      fuzzy: start.fuzzy || "year",
+      season: start.season || "Early",
+      dateUncertain: !!start.dateUncertain,
       location: trimmedPlace,
       locationLabel: trimmedLabel && trimmedLabel !== trimmedPlace ? trimmedLabel : "",
       locationStreet:  struct.street  || "",
@@ -1812,8 +1821,11 @@ function AddResidenceView({knownLocations, commitMemory, onCancel}) {
       locationPrivacy: "town",
       locations: [], tags: ["home"], people: [], orgs: [],
       sources: [], mediaUrls: [],
-      endFuzzy: (stillHere || ty) ? "year" : null,
-      endYear:  ty, endMonth: 1, endDay: 1, endSeason: "Early",
+      endFuzzy: hasEnd ? (stillHere ? "year" : (end.fuzzy || "year")) : null,
+      endYear:  stillHere ? null : (end.year || null),
+      endMonth: end.month || 1,
+      endDay:   end.day   || 1,
+      endSeason: end.season || "Early",
       endOngoing: !!stillHere,
       eventType: "residence",
       visibility: "private", inLegacy: false,
@@ -1826,7 +1838,7 @@ function AddResidenceView({knownLocations, commitMemory, onCancel}) {
 
   const fieldLabelStyle = {display:"block", marginBottom:"6px", fontSize:"0.86rem", letterSpacing:"0.06em", textTransform:"uppercase", color:"#6a5840"};
   const helpStyle      = {fontSize:"0.84rem", color:"#7a6a58", fontStyle:"italic", margin:"5px 0 0", lineHeight:1.4};
-  const yearInputStyle = {...S.input, width:"110px", fontSize:"1.05rem", padding:"10px 12px", textAlign:"center"};
+  const sectionTitle   = {display:"block", marginBottom:"8px", fontSize:"0.86rem", letterSpacing:"0.06em", textTransform:"uppercase", color:"#6a5840"};
 
   return React.createElement("div", {style:{animation:"fadeIn 0.3s ease", maxWidth:"540px", margin:"30px auto", padding:"0 16px"}},
     React.createElement("h2", {style:{fontFamily:"'Playfair Display',serif", fontSize:"1.6rem", fontStyle:"italic", margin:"0 0 6px", color:"#1a1208", textAlign:"center"}}, "Add a residence"),
@@ -1866,40 +1878,26 @@ function AddResidenceView({knownLocations, commitMemory, onCancel}) {
         React.createElement("p", {style:helpStyle}, "Leave blank to just use the place name.")
       ),
 
-      // Date range
+      // Move-in date
+      React.createElement("div", {style:{marginBottom:"16px"}},
+        React.createElement("span", {style:sectionTitle}, "When did you move in? *"),
+        React.createElement(DateFields, {form:start, setForm:patchStart})
+      ),
+
+      // Move-out date — toggle between "still here" and a second DateFields
       React.createElement("div", null,
-        React.createElement("label", {style:fieldLabelStyle}, "When did you live there? *"),
-        React.createElement("div", {style:{display:"flex", flexWrap:"wrap", alignItems:"center", gap:"10px"}},
-          React.createElement("span", {style:{fontFamily:"'Crimson Text',serif", color:"#6a5840", fontSize:"0.95rem"}}, "From"),
-          React.createElement("input", {
-            type:"text", inputMode:"numeric", pattern:"[0-9]*",
-            value: fromYear,
-            onChange: e => setFromYear(e.target.value.replace(/[^0-9]/g, "").slice(0,4)),
-            placeholder: "1985",
-            maxLength: 4,
-            style: yearInputStyle
-          }),
-          React.createElement("span", {style:{fontFamily:"'Crimson Text',serif", color:"#6a5840", fontSize:"0.95rem"}}, "to"),
-          stillHere
-            ? React.createElement("span", {style:{fontFamily:"'Crimson Text',serif", color:"#4a7a5a", fontSize:"0.95rem", fontStyle:"italic"}}, "present")
-            : React.createElement("input", {
-                type:"text", inputMode:"numeric", pattern:"[0-9]*",
-                value: toYear,
-                onChange: e => setToYear(e.target.value.replace(/[^0-9]/g, "").slice(0,4)),
-                placeholder: "1990",
-                maxLength: 4,
-                style: yearInputStyle
-              })
-        ),
-        React.createElement("label", {style:{display:"flex", alignItems:"center", gap:"8px", marginTop:"12px", cursor:"pointer", fontSize:"0.95rem", color:"#6a5840", fontFamily:"'Crimson Text',serif"}},
+        React.createElement("span", {style:sectionTitle}, "When did you leave?"),
+        React.createElement("label", {style:{display:"flex", alignItems:"center", gap:"8px", marginBottom:"10px", cursor:"pointer", fontSize:"0.95rem", color:"#6a5840", fontFamily:"'Crimson Text',serif"}},
           React.createElement("input", {
             type:"checkbox",
             checked: stillHere,
-            onChange: e => { setStillHere(e.target.checked); if (e.target.checked) setToYear(""); },
+            onChange: e => setStillHere(e.target.checked),
             style:{width:"20px", height:"20px", accentColor:"#4a7a5a", cursor:"pointer"}
           }),
           "Still living here"
-        )
+        ),
+        !stillHere && React.createElement(DateFields, {form:end, setForm:patchEnd}),
+        !stillHere && React.createElement("p", {style:helpStyle}, "Leave the year blank if you're not sure when you left.")
       )
     ),
 
@@ -1914,36 +1912,6 @@ function AddResidenceView({knownLocations, commitMemory, onCancel}) {
         disabled: !canSave,
         style:{...S.btn, padding:"12px 28px", fontSize:"1.05rem", opacity:canSave?1:0.45, cursor:canSave?"pointer":"not-allowed", minHeight:"48px"}
       }, "Save residence")
-    )
-  );
-}
-
-function LocationAutocomplete({value, onChange, knownLocations, placeholder, onSelect, style:customStyle}) {
-  const [showSugs, setShowSugs] = React.useState(false);
-  // Support both old string arrays and new object arrays
-  const labels = (knownLocations||[]).map(l => typeof l === 'string' ? l : l.label).filter(Boolean);
-  const suggestions = labels.filter(v=>v.toLowerCase().includes(value.toLowerCase())&&v!==value&&value.length>0);
-  function handlePick(label) {
-    onChange(label);
-    setShowSugs(false);
-    if (onSelect) {
-      const loc = (knownLocations||[]).find(l => (typeof l === 'string' ? l : l.label) === label);
-      if (loc && typeof loc === 'object') onSelect(loc);
-    }
-  }
-  return React.createElement("div",{style:{position:"relative"}},
-    React.createElement("input",{
-      value, onChange:e=>{onChange(e.target.value);setShowSugs(true);},
-      onKeyDown:e=>{if(e.key==="Escape")setShowSugs(false);},
-      onBlur:()=>setTimeout(()=>setShowSugs(false),150),
-      onFocus:()=>value&&setShowSugs(true),
-      placeholder, style:customStyle||S.input
-    }),
-    showSugs&&suggestions.length>0&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,right:0,background:"#fffcf5",border:"1px solid #c8b89a",borderRadius:"2px",zIndex:50,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",maxHeight:"180px",overflowY:"auto"}},
-      suggestions.map(s=>React.createElement("div",{key:s,onMouseDown:()=>handlePick(s),style:{padding:"8px 12px",cursor:"pointer",fontSize:"0.9rem",color:"#2c2416"},
-        onMouseEnter:e=>e.currentTarget.style.background="#f5ede0",
-        onMouseLeave:e=>e.currentTarget.style.background="transparent"
-      },"\ud83d\udccd ",s))
     )
   );
 }
