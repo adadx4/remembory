@@ -12,7 +12,12 @@
       "Bash(git -C /c/Remembory/remembory diff --stat)",
       "Bash(node -e \"eval\\('\\(' + require\\('fs'\\).readFileSync\\('c:/Remembory/remembory/chronicle.html','utf8'\\).match\\(/<script[^>]*>\\([\\\\s\\\\S]*?\\)<\\\\/script>/\\)[1].slice\\(0,500\\) + '\\)'\\)\")",
       "Bash(curl -s https://staging.remembory.net/chronicle.html)",
-      "Bash(curl -s https://staging.remembory.net/)"
+      "Bash(curl -s https://staging.remembory.net/)",
+      "Bash(git checkout *)",
+      "Bash(rm .git/hooks/pre-commit && ls .git/hooks/ | grep -v sample)"
+    ],
+    "additionalDirectories": [
+      "C:\\Remembory\\remembory\\.git\\hooks"
     ]
   }
 }
