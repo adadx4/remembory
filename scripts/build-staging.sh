@@ -17,6 +17,7 @@ mkdir -p "$DIST"
 cp "$ROOT/chronicle.html" "$DIST/"
 cp "$ROOT/chronicle.css" "$DIST/"
 cp "$ROOT/index.html" "$DIST/"
+cp "$ROOT/tools.html" "$DIST/"
 cp "$ROOT/research.html" "$DIST/"
 cp "$ROOT/add-resource.html" "$DIST/"
 # Lineage uses the same code as Chronicle — URL detection inside picks the product flag.
@@ -44,11 +45,11 @@ sed -i \
   -e "s|$SHARE_PROD|$STAGING_WORKER|g" \
   "$DIST/chronicle.html" "$DIST/lineage.html"
 
-# Rewrite prod URLs in index.html so landing page links stay within staging
+# Rewrite prod URLs in index.html/tools.html so landing page links stay within staging
 sed -i \
   -e "s|$PROD_WORKER|$STAGING_WORKER|g" \
   -e "s|$SHARE_PROD|$STAGING_WORKER|g" \
-  "$DIST/index.html"
+  "$DIST/index.html" "$DIST/tools.html"
 
 echo "Staging build written to dist/"
 echo "  Worker URL → $STAGING_WORKER"

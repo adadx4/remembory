@@ -106,7 +106,7 @@ function SubOptions({mode="buttons"}) {
       : {padding:mode==="full"?"12px":"6px 14px",fontSize:mode==="full"?"0.95rem":"0.84rem",color:"#8a7460",fontStyle:"italic"};
     return React.createElement("span",{style},"Subscriptions available soon");
   }
-  const subUrl = "https://remembory.net/#subscribe";
+  const subUrl = "https://remembory.net/tools.html#subscribe";
   // Simple link for "links" and "buttons" modes
   if (mode==="links") return React.createElement("a",{href:subUrl,target:"_blank",rel:"noopener",
     style:{color:"#a8885a",textDecoration:"none",borderBottom:"1px solid rgba(168,136,90,0.4)",fontSize:"inherit"}},"subscribe from $20/yr");
@@ -138,7 +138,7 @@ function SubOptions({mode="buttons"}) {
 // ── Subscribe pill (header) ───────────────────────────────────
 function SubscribePill() {
   if (SUBS_PAUSED) return React.createElement("span",{style:{display:"inline-flex",alignItems:"center",padding:"4px 10px",border:"1px solid rgba(138,116,96,0.3)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",color:"#8a7460"}},"Subscriptions coming soon");
-  return React.createElement("a",{href:"https://remembory.net/#subscribe",target:"_blank",rel:"noopener",style:{display:"inline-flex",alignItems:"center",gap:"6px",padding:"4px 10px",border:"1px solid rgba(168,136,90,0.45)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",whiteSpace:"nowrap",flexShrink:0,cursor:"pointer",background:"transparent",color:"#a8885a",textDecoration:"none"}},"\u2728 Subscribe");
+  return React.createElement("a",{href:"https://remembory.net/tools.html#subscribe",target:"_blank",rel:"noopener",style:{display:"inline-flex",alignItems:"center",gap:"6px",padding:"4px 10px",border:"1px solid rgba(168,136,90,0.45)",borderRadius:"20px",fontSize:"0.78rem",fontFamily:"'Crimson Text',serif",fontStyle:"italic",whiteSpace:"nowrap",flexShrink:0,cursor:"pointer",background:"transparent",color:"#a8885a",textDecoration:"none"}},"\u2728 Subscribe");
 }
 
 // ── Dropdown nav menu ──────────────────────────────────────────
