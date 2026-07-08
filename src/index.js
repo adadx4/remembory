@@ -2033,24 +2033,40 @@ export default {
     }
 
     // ── Contact form ──────────────────────────────────────────────────────
+    // source: "support" (default, from the Chronicle app) or "consultation" (from the
+    // Remembory life-chronicle enquiry form) — just changes the email framing/routing.
     if (request.method === "POST" && path === "/contact") {
       if (!await checkRateLimit(env, clientIp, "contact", 3, 3600)) return json({ error: "Too many requests. Please try again later." }, 429);
       try {
         const body = await request.json();
         const name = (body.name || "").trim().slice(0, 200);
         const email = (body.email || "").trim().toLowerCase().slice(0, 200);
+        const phone = (body.phone || "").trim().slice(0, 50);
         const message = (body.message || "").trim().slice(0, 5000);
+        const source = body.source === "consultation" ? "consultation" : "support";
         if (!message) return json({ error: "Please enter a message." }, 400);
+        if (source === "consultation" && !email) return json({ error: "Please enter your email." }, 400);
         if (!env.RESEND_API_KEY) return json({ error: "Email not configured." }, 500);
+        const isConsultation = source === "consultation";
+        const fromLabel = isConsultation ? "Remembory Enquiries <noreply@remembory.net>" : "Chronicle Support <noreply@remembory.net>";
+        const subject = isConsultation
+          ? "Free consultation request from " + (name || "a website visitor")
+          : "Support request from " + (name || "a Chronicle user");
+        const lines = [
+          "From: " + (name || "Anonymous"),
+          "Email: " + (email || "not provided"),
+        ];
+        if (isConsultation) lines.push("Phone: " + (phone || "not provided"));
+        lines.push("", message);
         await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": "Bearer " + env.RESEND_API_KEY },
           body: JSON.stringify({
-            from: "Chronicle Support <noreply@remembory.net>",
+            from: fromLabel,
             to: ["admin@remembory.net"],
             reply_to: email || undefined,
-            subject: "Support request from " + (name || "a Chronicle user"),
-            text: "From: " + (name || "Anonymous") + "\nEmail: " + (email || "not provided") + "\n\n" + message,
+            subject,
+            text: lines.join("\n"),
           }),
         }).catch(() => {});
         return json({ ok: true });

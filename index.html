@@ -204,6 +204,12 @@
     transform: translateY(-1px);
   }
 
+  .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: default;
+    transform: none;
+  }
+
   .btn-secondary {
     background: transparent;
     color: var(--ink-light);
@@ -547,6 +553,7 @@
     border: 1px solid var(--parchment-dark);
     border-radius: 4px;
     padding: 44px;
+    text-align: left;
   }
 
   .consultation-card p.small {
@@ -554,6 +561,72 @@
     color: var(--ink-faint);
     font-style: italic;
     margin-top: 20px;
+    margin-bottom: 0;
+    text-align: center;
+  }
+
+  .consult-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .consult-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+
+  .consult-field label {
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .consult-field input,
+  .consult-field textarea {
+    padding: 12px 14px;
+    background: rgba(255,252,245,0.9);
+    border: 1px solid var(--parchment-dark);
+    border-radius: 2px;
+    font-family: 'Crimson Text', serif;
+    font-size: 1rem;
+    color: var(--ink-mid);
+    outline: none;
+    width: 100%;
+  }
+
+  .consult-field textarea { resize: vertical; min-height: 120px; }
+
+  .consult-field input:focus,
+  .consult-field textarea:focus { border-color: var(--gold); }
+
+  .consult-field input::placeholder,
+  .consult-field textarea::placeholder { color: var(--ink-faint); font-style: italic; }
+
+  .consult-error {
+    display: none;
+    color: var(--rust);
+    font-size: 0.9rem;
+    font-style: italic;
+    margin-top: -6px;
+    margin-bottom: 16px;
+  }
+
+  .consult-success {
+    display: none;
+    text-align: center;
+  }
+
+  .consult-success h3 {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 1.4rem;
+    color: var(--ink);
+    margin-bottom: 10px;
+  }
+
+  .consult-success p {
+    font-size: 1rem;
+    color: var(--ink-light);
     margin-bottom: 0;
   }
 
@@ -623,6 +696,7 @@
 
   @media (max-width: 600px) {
     .process-steps { grid-template-columns: 1fr; }
+    .consult-form-row { grid-template-columns: 1fr; gap: 0; }
   }
 </style>
 </head>
@@ -779,10 +853,35 @@
   <h2>Start with a conversation</h2>
   <p>Tell us a little about your family's story. There's no cost and no obligation — we'll simply talk about what you'd like to preserve and how we can help.</p>
   <div class="consultation-card reveal">
-    <a href="mailto:admin@remembory.net?subject=Free%20consultation%20request&body=Hi%20Remembory%2C%0A%0AI'd%20like%20to%20book%20a%20free%20consultation%20about%20a%20life%20chronicle.%0A%0AA%20little%20about%20my%20family's%20story%3A%0A" class="btn-primary" style="width:100%; justify-content:center; font-size:1.1rem; padding:16px;">
-      Email us to book your free consultation
-    </a>
-    <p class="small">Prefer to write in your own words? admin@remembory.net — we'll reply personally.</p>
+    <form id="consult-form" onsubmit="handleConsultSubmit(event)">
+      <div class="consult-form-row">
+        <div class="consult-field">
+          <label for="consult-name">Your name</label>
+          <input type="text" id="consult-name" name="name" placeholder="Jane Smith" maxlength="200" required>
+        </div>
+        <div class="consult-field">
+          <label for="consult-email">Email</label>
+          <input type="email" id="consult-email" name="email" placeholder="jane@example.com" maxlength="200" required>
+        </div>
+      </div>
+      <div class="consult-field">
+        <label for="consult-phone">Phone <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+        <input type="tel" id="consult-phone" name="phone" placeholder="04xx xxx xxx" maxlength="50">
+      </div>
+      <div class="consult-field">
+        <label for="consult-message">Tell us about your family's story</label>
+        <textarea id="consult-message" name="message" placeholder="Who is this chronicle for, and what would you like to preserve?" maxlength="5000" required></textarea>
+      </div>
+      <p class="consult-error" id="consult-error"></p>
+      <button type="submit" class="btn-primary" id="consult-submit" style="width:100%; justify-content:center; font-size:1.1rem; padding:16px;">
+        Send your enquiry
+      </button>
+      <p class="small">We'll reply personally, usually within a day or two.</p>
+    </form>
+    <div class="consult-success" id="consult-success">
+      <h3>Thank you — message sent.</h3>
+      <p>We'll be in touch soon to arrange your free consultation. In the meantime, feel free to email us directly at <a href="mailto:admin@remembory.net" style="color:var(--gold-dark);">admin@remembory.net</a>.</p>
+    </div>
   </div>
 </section>
 
@@ -816,6 +915,39 @@
       ? '0 2px 20px rgba(26,18,8,0.08)'
       : 'none';
   });
+
+  function handleConsultSubmit(e) {
+    e.preventDefault();
+    const errorEl = document.getElementById('consult-error');
+    const submitBtn = document.getElementById('consult-submit');
+    errorEl.style.display = 'none';
+
+    const name = document.getElementById('consult-name').value.trim();
+    const email = document.getElementById('consult-email').value.trim();
+    const phone = document.getElementById('consult-phone').value.trim();
+    const message = document.getElementById('consult-message').value.trim();
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending…';
+
+    fetch('https://social.remembory.net/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, phone, message, source: 'consultation' })
+    })
+    .then(async res => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+      document.getElementById('consult-form').style.display = 'none';
+      document.getElementById('consult-success').style.display = 'block';
+    })
+    .catch(err => {
+      errorEl.textContent = err.message;
+      errorEl.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send your enquiry';
+    });
+  }
 </script>
 </body>
 </html>
